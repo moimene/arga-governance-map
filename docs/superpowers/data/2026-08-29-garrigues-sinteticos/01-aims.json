@@ -16,7 +16,8 @@
       "La capa de gobernanza que faltaba sobre esos 6 va en `ampliacion_gobernanza_catalogo_c2`, que es un OVERLAY de lectura/actualizacion, no filas nuevas. Se separo en otra clave precisamente para que un seeder distraido no la pueda insertar como alta.",
       "El catalogo C2 deja `risk_level` a null a proposito porque nadie ha hecho la clasificacion del Reglamento (UE) 2024/1689. Este fichero NO la hace: solo propone, y lo marca como propuesta no validada. No sobreescribir `risk_level` con estas propuestas.",
       "No se ha inventado ni un solo nombre de persona. Los responsables se expresan por cargo u organo real ya modelado en el tenant. Un nombre de ficcion en un incidente de IA no aportaba nada y si podia confundirse con un profesional real.",
-      "`status` de `ai_systems` no tiene CHECK en Cloud: el dominio lo sostiene este fichero, no el servidor."
+      "`status` de `ai_systems` no tiene CHECK en Cloud: el dominio lo sostiene este fichero, no el servidor.",
+      "Todo elemento de `sistemas`, `evaluaciones`, `incidentes` y `controles_ia` es una fila insertable. La prosa metodologica vive en `_notas` y las referencias a filas que YA existen en el tenant viven en `controles_ia_referenciados_no_insertar`: ambas fuera de los arrays iterables, para que un seeder no las pueda insertar aunque no lea ni una etiqueta."
     ],
     "anclas_reales_usadas": [
       "PI-30 «Politica de uso de sistemas de inteligencia artificial generativa» (Edicion 02, julio de 2025): §3.1.1 herramientas corporativas, §3.1.2 herramientas no corporativas, §3.2 normas de uso, §6 Comite de IA. Catalogada en scripts/garrigues/normativo/catalogo-normativo.ts.",
@@ -33,6 +34,13 @@
       "Ningun importe economico salvo los 25.000 EUR de la auditoria externa, que si constan en el Plan.",
       "Ninguna hora del dia en ninguna cronologia. Las fechas que hay son de dia y estan marcadas SIMULADO en su propio registro."
     ]
+  },
+
+  "_notas": {
+    "_por_que_aqui": "Estas tres notas son PROSA METODOLOGICA, no registros. Vivian como primer elemento de `evaluaciones`, `incidentes` y `controles_ia`, donde un seeder que recorriera el array las habria tratado como filas. Estan fuera de todo array iterable a proposito: la condicion de no-registro es estructural y no depende de que nadie lea un campo.",
+    "evaluaciones": "Las diez evaluaciones aplican los factores P1 y P2 de la metodologia REAL del PPD (P1: habitual 5 / ocasional 2,5 / remoto 1 / fuera de alcance sin valor; P2: solo Socio-Counsel-Director 1 / Asoc. Principal-Gerente y superior 1,25 / Asoc. Senior-mando intermedio y superior 1,5 / Staff y superior 2; bruto maximo 10; relativa = bruto/10; bandas Muy alta ≥0,8, Alta ≥0,6, Media ≥0,4, Baja ≥0,2, Muy baja ≥0). El factor P4 se declara por componentes y NO se compone en un numero, porque el ancla da los pesos pero no la formula. El `nivel_riesgo_propuesto` NO sale de la matriz oficial: el ancla no contiene las celdas del cruce. Se propone y se marca DEMO_PILOTO.",
+    "incidentes": "Los seis incidentes son SIMULADOS en su integridad: no ha ocurrido ninguno. Todas las fechas son inventadas y se expresan solo a nivel de dia, sin hora, para que no puedan leerse como registro de un sistema de deteccion. Los intervinientes se identifican por cargo u organo, nunca por nombre.",
+    "controles_ia": "Prefijo CTR-IA-* deliberado. Los controles ya existentes del tenant usan CTR-GARR-01..35 (scripts/garrigues/normativo/obligaciones-pbcft.ts y obligaciones-ciber.ts); continuar esa numeracion desde otro carril garantizaria una colision cuando el carril de GRC genere los suyos. El vocabulario de `status` es el del proyecto (Efectivo / Parcial / Inefectivo) porque es el que admite el CHECK de `controls.status`."
   },
 
   "sistemas": [
@@ -581,9 +589,6 @@
 
   "evaluaciones": [
     {
-      "_nota_metodologica_comun": "Las diez evaluaciones aplican los factores P1 y P2 de la metodologia REAL del PPD (P1: habitual 5 / ocasional 2,5 / remoto 1 / fuera de alcance sin valor; P2: solo Socio-Counsel-Director 1 / Asoc. Principal-Gerente y superior 1,25 / Asoc. Senior-mando intermedio y superior 1,5 / Staff y superior 2; bruto maximo 10; relativa = bruto/10; bandas Muy alta ≥0,8, Alta ≥0,6, Media ≥0,4, Baja ≥0,2, Muy baja ≥0). El factor P4 se declara por componentes y NO se compone en un numero, porque el ancla da los pesos pero no la formula. El `nivel_riesgo_propuesto` NO sale de la matriz oficial: el ancla no contiene las celdas del cruce. Se propone y se marca DEMO_PILOTO."
-    },
-    {
       "id": "EV-IA-01",
       "sistema": "GARR-IA-001",
       "sistema_nombre": "Copilot",
@@ -958,9 +963,6 @@
 
   "incidentes": [
     {
-      "_nota_comun": "Los seis incidentes son SIMULADOS en su integridad: no ha ocurrido ninguno. Todas las fechas son inventadas y se expresan solo a nivel de dia, sin hora, para que no puedan leerse como registro de un sistema de deteccion. Los intervinientes se identifican por cargo u organo, nunca por nombre."
-    },
-    {
       "id": "INC-IA-001",
       "titulo": "Cita jurisprudencial inexistente en un borrador de informe",
       "sistema": "GARR-IA-003",
@@ -1117,9 +1119,6 @@
 
   "controles_ia": [
     {
-      "_nota_comun": "Prefijo CTR-IA-* deliberado. Los controles ya existentes del tenant usan CTR-GARR-01..35 (scripts/garrigues/normativo/obligaciones-pbcft.ts y obligaciones-ciber.ts); continuar esa numeracion desde otro carril garantizaria una colision cuando el carril de GRC genere los suyos. El vocabulario de `status` es el del proyecto (Efectivo / Parcial / Inefectivo) porque es el que admite el CHECK de `controls.status`."
-    },
-    {
       "code": "CTR-IA-01",
       "name": "Neutralización de inyecciones de prompt en la capa de orquestación",
       "descripcion": "Control en tiempo real sobre la entrada, en la capa de orquestacion, para detectar y bloquear instrucciones dirigidas al sistema embebidas en el material tratado.",
@@ -1250,7 +1249,10 @@
       "firmeza": "SINTETICO",
       "ancla": "NINGUNA como control formal. Deriva de los incidentes simulados INC-IA-004 y de la evaluacion EV-IA-08.",
       "procedencia": "DEMO_PILOTO"
-    },
+    }
+  ],
+
+  "controles_ia_referenciados_no_insertar": [
     {
       "code": "CTR-GARR-33",
       "name": "Prohibición taxativa de volcado de información confidencial y datos de clientes en herramientas de IA Generativa de terceros",

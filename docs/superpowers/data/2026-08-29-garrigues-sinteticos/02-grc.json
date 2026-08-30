@@ -21,7 +21,9 @@
         "sin_valor": "Trabajo fuera de alcance",
         "firmeza": "SINTETICO",
         "ancla": "Plantilla de evaluación de riesgos del despacho (factor P1, literal)",
-        "procedencia": "DECLARADO_USUARIO"
+        "procedencia": "DECLARADO_USUARIO",
+        "hecho_descrito": "ACREDITADO",
+        "hecho_descrito_ancla": "Los valores de la escala son literales de la plantilla oficial de evaluación de riesgos del PPD del despacho: dato acreditado. `firmeza: SINTETICO` marca el envoltorio —su transcripción a este fichero de datos sintéticos y su uso en las evaluaciones de aquí—, no el contenido de la escala."
       },
       "P2_sujetos_activos": {
         "escala": {
@@ -32,7 +34,9 @@
         },
         "firmeza": "SINTETICO",
         "ancla": "Plantilla de evaluación de riesgos del despacho (factor P2, literal)",
-        "procedencia": "DECLARADO_USUARIO"
+        "procedencia": "DECLARADO_USUARIO",
+        "hecho_descrito": "ACREDITADO",
+        "hecho_descrito_ancla": "Los valores de la escala son literales de la plantilla oficial de evaluación de riesgos del PPD del despacho: dato acreditado. `firmeza: SINTETICO` marca el envoltorio —su transcripción a este fichero de datos sintéticos y su uso en las evaluaciones de aquí—, no el contenido de la escala."
       },
       "P3_colaboracion_con_cliente": {
         "valores": [
@@ -42,7 +46,9 @@
         "efecto_en_el_calculo": "NO DOCUMENTADO EN LA FUENTE",
         "firmeza": "SINTETICO",
         "ancla": "Plantilla de evaluación de riesgos del despacho (factor P3)",
-        "procedencia": "DECLARADO_USUARIO"
+        "procedencia": "DECLARADO_USUARIO",
+        "hecho_descrito": "ACREDITADO",
+        "hecho_descrito_ancla": "Los valores de la escala son literales de la plantilla oficial de evaluación de riesgos del PPD del despacho: dato acreditado. `firmeza: SINTETICO` marca el envoltorio —su transcripción a este fichero de datos sintéticos y su uso en las evaluaciones de aquí—, no el contenido de la escala. El factor P3 y sus valores (Sí/No) constan en la plantilla; lo que NO consta, y por eso no se aplica, es su efecto en el cálculo."
       },
       "P4_entorno_de_control": {
         "valoracion": [
@@ -62,7 +68,9 @@
         },
         "firmeza": "SINTETICO",
         "ancla": "Plantilla de evaluación de riesgos del despacho (factor P4, literal)",
-        "procedencia": "DECLARADO_USUARIO"
+        "procedencia": "DECLARADO_USUARIO",
+        "hecho_descrito": "ACREDITADO",
+        "hecho_descrito_ancla": "Los valores de la escala son literales de la plantilla oficial de evaluación de riesgos del PPD del despacho: dato acreditado. `firmeza: SINTETICO` marca el envoltorio —su transcripción a este fichero de datos sintéticos y su uso en las evaluaciones de aquí—, no el contenido de la escala."
       }
     },
     "algoritmo_probabilidad": {
@@ -76,7 +84,9 @@
       },
       "firmeza": "SINTETICO",
       "ancla": "Plantilla de evaluación de riesgos del despacho: máximo de probabilidad bruta 10 y cortes 0,8/0,6/0,4/0,2",
-      "procedencia": "DECLARADO_USUARIO"
+      "procedencia": "DECLARADO_USUARIO",
+      "hecho_descrito": "ACREDITADO",
+      "hecho_descrito_ancla": "El máximo de probabilidad bruta (10) y los cortes de banda (0,8 / 0,6 / 0,4 / 0,2) son literales de la plantilla oficial del despacho: dato acreditado. `firmeza: SINTETICO` marca el envoltorio, no la escala."
     },
     "matriz_riesgo_prioridad": {
       "ejes": {
@@ -202,10 +212,12 @@
         }
       ],
       "organo_responsable": {
-        "slug": "caci",
+        "slug": "garrigues-caci",
         "nombre": "Comité de Análisis y Control Interno (CACI)",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant (scripts/garrigues/gobierno/comites-2026.json)"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-caci', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'caci') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano responsable» significa aquí seguimiento, informe y elevación del riesgo: NUNCA adopción de un acuerdo societario ni de un acto inscribible. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027, «Sistemas de operaciones y gobierno»: SAP S/4HANA (RISE) — ERP, OTC, MM, PTP, consolidación, con segregación de funciones (SoD); y Roadmap 2027 «Go-Live definitivo de SAP S/4HANA RISE».",
@@ -268,10 +280,12 @@
       },
       "controles_existentes": [
         {
-          "descripcion": "Certificación ISO 27001 declarada para Portal Litigar y DD Portal",
+          "descripcion": "Alineamiento declarado con el estándar ISO/IEC 27001 como foco del CISO (objetivo, no certificado acreditado)",
           "firmeza": "SINTETICO",
-          "ancla": "Plan de Sistemas 2025-2027 (postura o control declarado)",
-          "procedencia": "DECLARADO_USUARIO"
+          "ancla": "Plan de Sistemas 2025-2027, ficha «Portal Litigar & DD Portal», columna «foco CISO»: «certificación ISO 27001, cifrado SSL, control estricto de roles externos». Contrastado con PI-26 del sistema normativo del tenant (scripts/garrigues/normativo/catalogo-normativo.ts).",
+          "procedencia": "DEMO_PILOTO",
+          "estado": "OBJETIVO_DECLARADO_NO_ACREDITADO",
+          "cautela": "El Plan de Sistemas 2025-2027 lista «certificación ISO 27001» en la columna de FOCO DEL CISO de la ficha «Portal Litigar & DD Portal», junto a «cifrado SSL» y «control estricto de roles externos»: es una línea de objetivo, no evidencia de certificado emitido. NO consta el certificado, ni su alcance, ni su entidad certificadora, ni su vigencia. La norma interna del SGSI (PI-26, «Política sobre seguridad de la información», edición 04 de junio de 2025) no contiene ni una vez la raíz «certific»: se declara «conforme el estándar ISO/IEC 27001 y Esquema Nacional de Seguridad (ENS)» y sitúa la política «en el proceso de implantación» del SGSI. Este registro NO afirma que exista certificación: describe un objetivo declarado y no debe computar como control acreditado a efectos de riesgo residual."
         },
         {
           "descripcion": "Cifrado SSL",
@@ -317,10 +331,12 @@
         }
       ],
       "organo_responsable": {
-        "slug": "comite-seguridad-privacidad",
+        "slug": "garrigues-comite-seguridad-privacidad",
         "nombre": "Comité de Seguridad y Privacidad",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant (scripts/garrigues/gobierno/comites-2026.json)"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-comite-seguridad-privacidad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'comite-seguridad-privacidad') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano responsable» significa aquí seguimiento, informe y elevación del riesgo: NUNCA adopción de un acuerdo societario ni de un acto inscribible. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027: taxonomía L1-L4 (L4 = máximo riesgo CISO), ficha «Portal Litigar & DD Portal» y proyecto «WAF Azure & FW Fortinet» Q1-Q4 2026, 77.300 €.",
@@ -422,10 +438,12 @@
         }
       ],
       "organo_responsable": {
-        "slug": "oficina-tecnica-seguridad",
+        "slug": "garrigues-oficina-tecnica-seguridad",
         "nombre": "Oficina Técnica de Seguridad (OTS)",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant (scripts/garrigues/gobierno/comites-2026.json)"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-oficina-tecnica-seguridad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'oficina-tecnica-seguridad') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano responsable» significa aquí seguimiento, informe y elevación del riesgo: NUNCA adopción de un acuerdo societario ni de un acto inscribible. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027, «Consolidación Microsoft E5»: sustitución de Tenable.AD por Microsoft Defender for Identity, con 100 k€ de ahorro anual recurrente.",
@@ -519,10 +537,12 @@
         }
       ],
       "organo_responsable": {
-        "slug": "oficina-tecnica-seguridad",
+        "slug": "garrigues-oficina-tecnica-seguridad",
         "nombre": "Oficina Técnica de Seguridad (OTS)",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant (scripts/garrigues/gobierno/comites-2026.json)"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-oficina-tecnica-seguridad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'oficina-tecnica-seguridad') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano responsable» significa aquí seguimiento, informe y elevación del riesgo: NUNCA adopción de un acuerdo societario ni de un acto inscribible. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027: «Seguridad y detección — microsegmentación de red» y proyecto «Microsegmentación de Red» Q1-Q2 2026, 100.000 €, objetivo «aislamiento de zonas críticas y contención de movimientos laterales».",
@@ -617,10 +637,12 @@
         }
       ],
       "organo_responsable": {
-        "slug": "oficina-tecnica-seguridad",
+        "slug": "garrigues-oficina-tecnica-seguridad",
         "nombre": "Oficina Técnica de Seguridad (OTS)",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant (scripts/garrigues/gobierno/comites-2026.json)"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-oficina-tecnica-seguridad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'oficina-tecnica-seguridad') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano responsable» significa aquí seguimiento, informe y elevación del riesgo: NUNCA adopción de un acuerdo societario ni de un acto inscribible. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027: ficha «g-digital / EAD Trust» (custodia de claves privadas, firma avanzada, sellado de tiempo cualificado) y proyecto «Sustitución PKI/CA & PoC Purview» Q1-Q4 2026, 40.000 €.",
@@ -732,10 +754,12 @@
         }
       ],
       "organo_responsable": {
-        "slug": "comite-gobernanza-ia",
+        "slug": "garrigues-comite-gobernanza-ia",
         "nombre": "Comité de Gobernanza de la Inteligencia Artificial",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant (scripts/garrigues/gobierno/comites-2026.json)"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-comite-gobernanza-ia', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'comite-gobernanza-ia') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano responsable» significa aquí seguimiento, informe y elevación del riesgo: NUNCA adopción de un acuerdo societario ni de un acto inscribible. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027, «Seguridad en IA»: RAG masivo escalable de 100k a 10M páginas con control de fuga de datos; y ficha «Garrigues GA_IA (3 & Local)».",
@@ -824,10 +848,12 @@
         }
       ],
       "organo_responsable": {
-        "slug": "comite-seguridad-privacidad",
+        "slug": "garrigues-comite-seguridad-privacidad",
         "nombre": "Comité de Seguridad y Privacidad",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant (scripts/garrigues/gobierno/comites-2026.json)"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-comite-seguridad-privacidad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'comite-seguridad-privacidad') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano responsable» significa aquí seguimiento, informe y elevación del riesgo: NUNCA adopción de un acuerdo societario ni de un acto inscribible. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027, ficha «g-digital / EAD Trust»: confianza y firma digital, certificados (280+), firmas, eArchiving.",
@@ -922,10 +948,12 @@
         }
       ],
       "organo_responsable": {
-        "slug": "oficina-tecnica-seguridad",
+        "slug": "garrigues-oficina-tecnica-seguridad",
         "nombre": "Oficina Técnica de Seguridad (OTS)",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant (scripts/garrigues/gobierno/comites-2026.json)"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-oficina-tecnica-seguridad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'oficina-tecnica-seguridad') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano responsable» significa aquí seguimiento, informe y elevación del riesgo: NUNCA adopción de un acuerdo societario ni de un acto inscribible. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027: «Seguridad y detección» y proyecto «Sustitución SOC/SIEM (PoC XSIAM)» Q2-Q3 2026, 57.234 €.",
@@ -1020,10 +1048,12 @@
         }
       ],
       "organo_responsable": {
-        "slug": "comite-seguridad-privacidad",
+        "slug": "garrigues-comite-seguridad-privacidad",
         "nombre": "Comité de Seguridad y Privacidad",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant (scripts/garrigues/gobierno/comites-2026.json)"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-comite-seguridad-privacidad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'comite-seguridad-privacidad') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano responsable» significa aquí seguimiento, informe y elevación del riesgo: NUNCA adopción de un acuerdo societario ni de un acto inscribible. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027, ficha «iManage DMS & Teams VDR»: migración de Collaborate a Teams seguro y DLP; y taxonomía L2.",
@@ -1130,10 +1160,12 @@
         }
       ],
       "organo_responsable": {
-        "slug": "comite-gobernanza-ia",
+        "slug": "garrigues-comite-gobernanza-ia",
         "nombre": "Comité de Gobernanza de la Inteligencia Artificial",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant (scripts/garrigues/gobierno/comites-2026.json)"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-comite-gobernanza-ia', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'comite-gobernanza-ia') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano responsable» significa aquí seguimiento, informe y elevación del riesgo: NUNCA adopción de un acuerdo societario ni de un acto inscribible. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027, «Seguridad en IA»: guardrails anti-jailbreak en la capa de orquestación para neutralizar inyecciones de prompt.",
@@ -1245,10 +1277,12 @@
         }
       ],
       "organo_responsable": {
-        "slug": "comite-gobernanza-ia",
+        "slug": "garrigues-comite-gobernanza-ia",
         "nombre": "Comité de Gobernanza de la Inteligencia Artificial",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant (scripts/garrigues/gobierno/comites-2026.json)"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-comite-gobernanza-ia', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'comite-gobernanza-ia') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano responsable» significa aquí seguimiento, informe y elevación del riesgo: NUNCA adopción de un acuerdo societario ni de un acto inscribible. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027: taxonomía L3 y «Seguridad en IA» (evitar alucinaciones jurídicas).",
@@ -1333,10 +1367,12 @@
         }
       ],
       "organo_responsable": {
-        "slug": "oficina-tecnica-seguridad",
+        "slug": "garrigues-oficina-tecnica-seguridad",
         "nombre": "Oficina Técnica de Seguridad (OTS)",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant (scripts/garrigues/gobierno/comites-2026.json)"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-oficina-tecnica-seguridad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'oficina-tecnica-seguridad') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano responsable» significa aquí seguimiento, informe y elevación del riesgo: NUNCA adopción de un acuerdo societario ni de un acto inscribible. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027, Roadmap Q3-Q4 2026 «Gobernar y Migrar»: migración del 40 % de servidores a Windows Server 2022.",
@@ -1425,10 +1461,12 @@
         }
       ],
       "organo_responsable": {
-        "slug": "oficina-dpo",
+        "slug": "garrigues-oficina-dpo",
         "nombre": "Delegado de Protección de Datos (DPO)",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant (scripts/garrigues/gobierno/comites-2026.json)"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-oficina-dpo', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'oficina-dpo') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano responsable» significa aquí seguimiento, informe y elevación del riesgo: NUNCA adopción de un acuerdo societario ni de un acto inscribible. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027, ficha «Generador Laboral (Carrefour)»: motor documental (Bryter), bajas, suspensiones, datos de empleados; foco CISO «flujo determinista supervisado y aislamiento de datos de terceros».",
@@ -1496,10 +1534,12 @@
           "procedencia": "DECLARADO_USUARIO"
         },
         {
-          "descripcion": "Certificación ISO 27001 declarada",
+          "descripcion": "Alineamiento declarado con el estándar ISO/IEC 27001 como foco del CISO (objetivo, no certificado acreditado)",
           "firmeza": "SINTETICO",
-          "ancla": "Plan de Sistemas 2025-2027 (postura o control declarado)",
-          "procedencia": "DECLARADO_USUARIO"
+          "ancla": "Plan de Sistemas 2025-2027, ficha «Portal Litigar & DD Portal», columna «foco CISO»: «certificación ISO 27001, cifrado SSL, control estricto de roles externos». Contrastado con PI-26 del sistema normativo del tenant (scripts/garrigues/normativo/catalogo-normativo.ts).",
+          "procedencia": "DEMO_PILOTO",
+          "estado": "OBJETIVO_DECLARADO_NO_ACREDITADO",
+          "cautela": "El Plan de Sistemas 2025-2027 lista «certificación ISO 27001» en la columna de FOCO DEL CISO de la ficha «Portal Litigar & DD Portal», junto a «cifrado SSL» y «control estricto de roles externos»: es una línea de objetivo, no evidencia de certificado emitido. NO consta el certificado, ni su alcance, ni su entidad certificadora, ni su vigencia. La norma interna del SGSI (PI-26, «Política sobre seguridad de la información», edición 04 de junio de 2025) no contiene ni una vez la raíz «certific»: se declara «conforme el estándar ISO/IEC 27001 y Esquema Nacional de Seguridad (ENS)» y sitúa la política «en el proceso de implantación» del SGSI. Este registro NO afirma que exista certificación: describe un objetivo declarado y no debe computar como control acreditado a efectos de riesgo residual."
         },
         {
           "descripcion": "Cifrado SSL",
@@ -1545,10 +1585,12 @@
         }
       ],
       "organo_responsable": {
-        "slug": "comite-seguridad-privacidad",
+        "slug": "garrigues-comite-seguridad-privacidad",
         "nombre": "Comité de Seguridad y Privacidad",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant (scripts/garrigues/gobierno/comites-2026.json)"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-comite-seguridad-privacidad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'comite-seguridad-privacidad') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano responsable» significa aquí seguimiento, informe y elevación del riesgo: NUNCA adopción de un acuerdo societario ni de un acto inscribible. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027, ficha «Portal Litigar & DD Portal»: control estricto de roles externos; y taxonomía L2.",
@@ -1653,10 +1695,12 @@
         }
       ],
       "organo_responsable": {
-        "slug": "caci",
+        "slug": "garrigues-caci",
         "nombre": "Comité de Análisis y Control Interno (CACI)",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant (scripts/garrigues/gobierno/comites-2026.json)"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-caci', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'caci') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano responsable» significa aquí seguimiento, informe y elevación del riesgo: NUNCA adopción de un acuerdo societario ni de un acto inscribible. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027, proyecto «Proofpoint AEDLP & Email Fraud» Q1 2026, 48.000 €, objetivo «prevención de fraude por email (BEC) y fuga de datos (DLP)».",
@@ -1744,10 +1788,12 @@
         }
       ],
       "organo_responsable": {
-        "slug": "comite-gobernanza-ia",
+        "slug": "garrigues-comite-gobernanza-ia",
         "nombre": "Comité de Gobernanza de la Inteligencia Artificial",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant (scripts/garrigues/gobierno/comites-2026.json)"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-comite-gobernanza-ia', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'comite-gobernanza-ia') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano responsable» significa aquí seguimiento, informe y elevación del riesgo: NUNCA adopción de un acuerdo societario ni de un acto inscribible. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027, «Seguridad en IA»: partida específica de 25.000 € para auditoría externa de cumplimiento normativo (AI Act), seguridad técnica y análisis de sesgo algorítmico.",
@@ -1837,10 +1883,12 @@
         }
       ],
       "organo_responsable": {
-        "slug": "comite-seguridad-privacidad",
+        "slug": "garrigues-comite-seguridad-privacidad",
         "nombre": "Comité de Seguridad y Privacidad",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant (scripts/garrigues/gobierno/comites-2026.json)"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-comite-seguridad-privacidad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'comite-seguridad-privacidad') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano responsable» significa aquí seguimiento, informe y elevación del riesgo: NUNCA adopción de un acuerdo societario ni de un acto inscribible. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027, «Consolidación Microsoft E5 (100 k€ de ahorro anual recurrente)»: migración de Check Point Harmony a Defender for Mobile, sustitución de Tenable.AD por Defender for Identity, reducción de solapamientos y simplificación de telemetría en el SOC.",
@@ -1945,10 +1993,12 @@
         }
       ],
       "organo_responsable": {
-        "slug": "comite-seguridad-privacidad",
+        "slug": "garrigues-comite-seguridad-privacidad",
         "nombre": "Comité de Seguridad y Privacidad",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant (scripts/garrigues/gobierno/comites-2026.json)"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-comite-seguridad-privacidad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'comite-seguridad-privacidad') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano responsable» significa aquí seguimiento, informe y elevación del riesgo: NUNCA adopción de un acuerdo societario ni de un acto inscribible. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027, proyecto «Sustitución PKI/CA & PoC Purview» Q1-Q4 2026, 40.000 €, objetivo «cifrado corporativo, custodia de certificados y gobierno del dato».",
@@ -2020,7 +2070,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-017",
@@ -2066,7 +2118,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-023",
@@ -2112,7 +2166,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-018",
@@ -2158,7 +2214,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-031",
@@ -2204,7 +2262,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         }
       ],
       "total_delitos": 5,
@@ -2277,7 +2337,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-039",
@@ -2317,7 +2379,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-038",
@@ -2357,7 +2421,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-033",
@@ -2403,7 +2469,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-069",
@@ -2449,7 +2517,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-061",
@@ -2489,7 +2559,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         }
       ],
       "total_delitos": 6,
@@ -2556,7 +2628,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-079",
@@ -2602,7 +2676,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-037",
@@ -2642,7 +2718,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-081",
@@ -2682,7 +2760,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-080",
@@ -2722,7 +2802,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-077",
@@ -2762,7 +2844,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         }
       ],
       "total_delitos": 6,
@@ -2829,7 +2913,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-014",
@@ -2875,7 +2961,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-016",
@@ -2915,7 +3003,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-073",
@@ -2955,7 +3045,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-029",
@@ -3001,7 +3093,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         },
         {
           "codigo_riesgo_tenant": "RSK-GARR-PEN-064",
@@ -3041,7 +3135,9 @@
           ],
           "firmeza": "SINTETICO",
           "ancla": "Código, artículo, denominación y color de celda leídos del mapa de riesgos penales evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts). No transcritos a mano.",
-          "procedencia": "DECLARADO_USUARIO"
+          "procedencia": "DECLARADO_USUARIO",
+          "hecho_descrito": "ACREDITADO",
+          "hecho_descrito_ancla": "El artículo del CP, la denominación del delito, la banda del mapa y el color de la celda proceden del mapa penal evaluado 2025 YA CARGADO en el tenant (scripts/garrigues/penal/mapa-penal.ts): son dato acreditado, no simulado. `firmeza: SINTETICO` cubre el envoltorio de catálogo departamental y las `situaciones`, que son SIMULADO y llevan cada una su propia etiqueta."
         }
       ],
       "total_delitos": 6,
@@ -3083,7 +3179,7 @@
         },
         {
           "fecha": "2025-12-04",
-          "actuacion": "El CACI acuerda elevar la verificación por doble canal a requisito no dispensable en operaciones de cierre y respaldar la dotación de la partida de prevención de fraude por email."
+          "actuacion": "El CACI, como órgano consultivo, informa favorablemente la elevación de la verificación por doble canal a requisito no dispensable en operaciones de cierre y recomienda respaldar la dotación de la partida de prevención de fraude por email. No adopta acuerdo societario: su naturaleza en el tenant es consultiva."
         }
       ],
       "nota_fechas": "Todas las fechas y horas de la cronología son SIMULADAS. No proceden de ningún registro real del despacho y no deben leerse como medidas.",
@@ -3102,12 +3198,16 @@
         "RSK-GARR-TEC-15"
       ],
       "consecuencia_societaria": {
-        "organo_slug": "caci",
+        "organo_slug": "garrigues-caci",
         "organo": "Comité de Análisis y Control Interno (CACI)",
         "fecha": "2025-12-04",
-        "tipo": "Acuerdo de comité",
-        "contenido": "Elevar a requisito no dispensable la verificación por doble canal de instrucciones de pago en operaciones de cierre y respaldar la dotación de la partida de prevención de fraude por email.",
-        "pendiente_de_correlato": "Este acuerdo debe tener correlato en Secretaría. Si no lo tiene, es una incoherencia a reportar, no a tapar."
+        "tipo": "Informe de comité",
+        "contenido": "Informar favorablemente la elevación a requisito no dispensable de la verificación por doble canal de instrucciones de pago en operaciones de cierre, y recomendar el respaldo de la dotación de la partida de prevención de fraude por email.",
+        "pendiente_de_correlato": "Debe existir rastro documental en Secretaría fechado el 2025-12-04 y asociado a garrigues-caci, de tipo informe o acta de órgano consultivo. Lo que se pide NO es un acuerdo adoptado: si no hay rastro, es una incoherencia a reportar, no a tapar; y si lo que aparece es un acuerdo adoptado por este comité, es un defecto de siembra a reportar igualmente.",
+        "donde_vive": "scripts/garrigues/gobierno/comites-2026.json (slug 'caci'); en el tenant, con prefijo 'garrigues-' aplicado por scripts/seed-garrigues-bodies.ts",
+        "naturaleza_organo": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). Por tanto este registro NO debe materializarse como acuerdo societario ni como acto inscribible: su rastro correcto en Secretaría es un informe o un acta de órgano consultivo, NUNCA un acuerdo adoptado. Si la consola encuentra un acuerdo adoptado por Comité de Análisis y Control Interno (CACI), es un defecto de siembra, no un dato.",
+        "verificable_como": "Existe rastro documental en Secretaría fechado el 2025-12-04 asociado a garrigues-caci, y su tipo NO es acuerdo adoptado."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027, proyecto «Proofpoint AEDLP & Email Fraud» Q1 2026, 48.000 €. La cronología es inventada; el proyecto, su trimestre y su presupuesto son literales del Plan.",
@@ -3190,7 +3290,7 @@
         },
         {
           "fecha": "2026-03-05",
-          "actuacion": "Elevación al Comité de Práctica Profesional, que decide reforzar el protocolo de salida de profesionales."
+          "actuacion": "Elevación al Comité de Práctica Profesional, que emite recomendación de reforzar el protocolo de salida de profesionales. Es un órgano consultivo: recomienda, no adopta acuerdo societario."
         },
         {
           "fecha": "2026-03-20",
@@ -3213,12 +3313,16 @@
         "RSK-GARR-TEC-18"
       ],
       "consecuencia_societaria": {
-        "organo_slug": "comite-practica-profesional",
+        "organo_slug": "garrigues-comite-practica-profesional",
         "organo": "Comité de Práctica Profesional",
         "fecha": "2026-03-05",
-        "tipo": "Decisión de comité",
-        "contenido": "Reforzar el protocolo de salida de profesionales con ajuste del perfil documental desde el inicio del preaviso y revisión nominal por el responsable del área.",
-        "pendiente_de_correlato": "Debe tener correlato documentado. Si Secretaría no registra actuación de este comité en esa fecha, es una incoherencia a reportar."
+        "tipo": "Acta de órgano consultivo",
+        "contenido": "Recomendar el refuerzo del protocolo de salida de profesionales, con ajuste del perfil documental desde el inicio del preaviso y revisión nominal por el responsable del área.",
+        "pendiente_de_correlato": "Debe existir rastro documental en Secretaría fechado el 2026-03-05 y asociado a garrigues-comite-practica-profesional, de tipo informe o acta de órgano consultivo. Lo que se pide NO es un acuerdo adoptado: si Secretaría no registra actuación de este comité en esa fecha, es una incoherencia a reportar; si la registra como acuerdo adoptado, es un defecto de siembra a reportar igualmente.",
+        "donde_vive": "scripts/garrigues/gobierno/comites-2026.json (slug 'comite-practica-profesional'); en el tenant, con prefijo 'garrigues-' aplicado por scripts/seed-garrigues-bodies.ts",
+        "naturaleza_organo": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). Por tanto este registro NO debe materializarse como acuerdo societario ni como acto inscribible: su rastro correcto en Secretaría es un informe o un acta de órgano consultivo, NUNCA un acuerdo adoptado. Si la consola encuentra un acuerdo adoptado por Comité de Práctica Profesional, es un defecto de siembra, no un dato.",
+        "verificable_como": "Existe rastro documental en Secretaría fechado el 2026-03-05 asociado a garrigues-comite-practica-profesional, y su tipo NO es acuerdo adoptado."
       },
       "firmeza": "SINTETICO",
       "ancla": "Plan de Sistemas 2025-2027, ficha «iManage DMS & Teams VDR»: expedientes, contratos, litigios, actas, con cifrado y control de acceso. La conducta y las fechas son inventadas.",
@@ -3538,10 +3642,12 @@
       "fecha_hallazgo": "2026-03-10",
       "nota_fechas": "Todas las fechas y horas de la cronología son SIMULADAS. No proceden de ningún registro real del despacho y no deben leerse como medidas.",
       "organo_al_que_se_reporta": {
-        "slug": "comite-seguridad-privacidad",
+        "slug": "garrigues-comite-seguridad-privacidad",
         "nombre": "Comité de Seguridad y Privacidad",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-comite-seguridad-privacidad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'comite-seguridad-privacidad') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano al que se reporta» significa destinatario del informe del hallazgo. Su rastro en Secretaría, si lo hubiera, es un informe o un acta de órgano consultivo, NUNCA un acuerdo adoptado ni un acto inscribible."
       },
       "descripcion": "El ejercicio de Red Team localiza una interfaz de administración de un portal de autoservicio alcanzable desde el exterior, sin restricción por origen y con la autenticación como única barrera.",
       "riesgos_relacionados": [
@@ -3561,10 +3667,12 @@
       "fecha_hallazgo": "2026-04-21",
       "nota_fechas": "Todas las fechas y horas de la cronología son SIMULADAS. No proceden de ningún registro real del despacho y no deben leerse como medidas.",
       "organo_al_que_se_reporta": {
-        "slug": "oficina-tecnica-seguridad",
+        "slug": "garrigues-oficina-tecnica-seguridad",
         "nombre": "Oficina Técnica de Seguridad (OTS)",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-oficina-tecnica-seguridad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'oficina-tecnica-seguridad') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano al que se reporta» significa destinatario del informe del hallazgo. Su rastro en Secretaría, si lo hubiera, es un informe o un acta de órgano consultivo, NUNCA un acuerdo adoptado ni un acto inscribible."
       },
       "descripcion": "La revisión interna constata que el censo de cuentas con privilegio en el directorio no cuenta con una revisión periódica documentada, lo que impide acreditar la vigencia de la necesidad de cada privilegio.",
       "riesgos_relacionados": [
@@ -3584,10 +3692,12 @@
       "fecha_hallazgo": "2026-02-26",
       "nota_fechas": "Todas las fechas y horas de la cronología son SIMULADAS. No proceden de ningún registro real del despacho y no deben leerse como medidas.",
       "organo_al_que_se_reporta": {
-        "slug": "caci",
+        "slug": "garrigues-caci",
         "nombre": "Comité de Análisis y Control Interno (CACI)",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-caci', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'caci') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano al que se reporta» significa destinatario del informe del hallazgo. Su rastro en Secretaría, si lo hubiera, es un informe o un acta de órgano consultivo, NUNCA un acuerdo adoptado ni un acto inscribible."
       },
       "descripcion": "En una submuestra de expedientes de aceptación, la documentación que sostiene la identificación del titular real consta en el expediente pero sin traza de la fecha ni del profesional que la incorporó, lo que impide reconstruir el momento de la diligencia.",
       "riesgos_relacionados": [],
@@ -3604,19 +3714,23 @@
       "severidad": "Media",
       "estado": "EN CURSO",
       "fecha_hallazgo": "2026-06-15",
-      "nota_fechas": "La fecha del hallazgo es SIMULADA; el hecho descrito es real en el tenant.",
+      "nota_fechas": "La fecha del hallazgo, su severidad y su estado son SIMULADOS; el hecho descrito es real en el tenant.",
       "organo_al_que_se_reporta": {
-        "slug": "comite-prevencion-delitos",
+        "slug": "garrigues-comite-prevencion-delitos",
         "nombre": "Comité de Prevención de Delitos",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-comite-prevencion-delitos', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'comite-prevencion-delitos') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano al que se reporta» significa destinatario del informe del hallazgo. Su rastro en Secretaría, si lo hubiera, es un informe o un acta de órgano consultivo, NUNCA un acuerdo adoptado ni un acto inscribible."
       },
       "descripcion": "De las 39 normas internas cargadas en el sistema, solo 3 tienen órgano propietario acreditado por su propia fuente. En el resto, la fuente no atribuye la responsabilidad a un órgano de gobierno o la atribuye a un cargo, que no es un órgano. La consecuencia práctica es que la mayoría del cuerpo normativo no tiene hoy destinatario orgánico para su revisión.",
       "riesgos_relacionados": [],
       "plan_de_accion": "PA-GARR-SINT-04",
       "firmeza": "SINTETICO",
       "ancla": "Estado real del tenant Garrigues: 39 documentos normativos internos, de los que solo 3 tienen órgano responsable acreditado (PBC-FT-10 ↔ CACI, PI-30 ↔ Comité de Gobernanza de la IA, PI-14 ↔ Comité Editorial Global, este último marcado como selección forzada). Es un hecho verificable del tenant, no una simulación.",
-      "procedencia": "DECLARADO_USUARIO"
+      "procedencia": "DECLARADO_USUARIO",
+      "hecho_descrito": "ACREDITADO",
+      "hecho_descrito_ancla": "`firmeza: SINTETICO` cubre SOLO el envoltorio: la fecha, la severidad, el estado y el formato de hallazgo GRC. El hecho descrito es un recuento del dato ya cargado en el tenant: de los 39 documentos normativos internos, solo 3 tienen órgano responsable acreditado por su propia fuente (PBC-FT-10 ↔ CACI por §8.1.3 literal; PI-30 ↔ Comité de Gobernanza de la IA por coincidencia literal de misión; PI-14 ↔ Comité Editorial Global, marcado como selección forzada). Los otros 36 tienen `owner_body_id` NULL a propósito, porque su fuente no atribuye la responsabilidad a un órgano de gobierno o la atribuye a un cargo. Verificable en scripts/garrigues/normativo/catalogo-normativo.ts y en el seed de `policies`. La cifra 36/39 no es una simulación."
     },
     {
       "id": "FIND-GARR-SINT-05",
@@ -3627,10 +3741,12 @@
       "fecha_hallazgo": "2026-05-19",
       "nota_fechas": "Todas las fechas y horas de la cronología son SIMULADAS. No proceden de ningún registro real del despacho y no deben leerse como medidas.",
       "organo_al_que_se_reporta": {
-        "slug": "caci",
+        "slug": "garrigues-caci",
         "nombre": "Comité de Análisis y Control Interno (CACI)",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-caci', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'caci') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano al que se reporta» significa destinatario del informe del hallazgo. Su rastro en Secretaría, si lo hubiera, es un informe o un acta de órgano consultivo, NUNCA un acuerdo adoptado ni un acto inscribible."
       },
       "descripcion": "Existe matriz de segregación de funciones para cada entorno ERP por separado, pero no una matriz consolidada que evalúe la combinación de funciones que una misma persona acumula sumando ambos. Las incompatibilidades que solo aparecen en la suma no se detectan.",
       "riesgos_relacionados": [
@@ -3650,10 +3766,12 @@
       "fecha_hallazgo": "2026-03-10",
       "nota_fechas": "Todas las fechas y horas de la cronología son SIMULADAS. No proceden de ningún registro real del despacho y no deben leerse como medidas.",
       "organo_al_que_se_reporta": {
-        "slug": "oficina-tecnica-seguridad",
+        "slug": "garrigues-oficina-tecnica-seguridad",
         "nombre": "Oficina Técnica de Seguridad (OTS)",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-oficina-tecnica-seguridad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'oficina-tecnica-seguridad') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano al que se reporta» significa destinatario del informe del hallazgo. Su rastro en Secretaría, si lo hubiera, es un informe o un acta de órgano consultivo, NUNCA un acuerdo adoptado ni un acto inscribible."
       },
       "descripcion": "El ejercicio localiza credenciales de servicio compartidas entre el entorno de preproducción de un portal externo y su entorno productivo, de modo que un compromiso del primero, menos protegido, alcanza al segundo.",
       "riesgos_relacionados": [
@@ -3671,19 +3789,23 @@
       "severidad": "Baja",
       "estado": "CERRADO",
       "fecha_hallazgo": "2026-07-02",
-      "nota_fechas": "La fecha del hallazgo es SIMULADA; el hecho descrito es real en el tenant.",
+      "nota_fechas": "La fecha del hallazgo, su severidad y su estado son SIMULADOS; el hecho descrito es real en el documento fuente.",
       "organo_al_que_se_reporta": {
-        "slug": "comite-prevencion-delitos",
+        "slug": "garrigues-comite-prevencion-delitos",
         "nombre": "Comité de Prevención de Delitos",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-comite-prevencion-delitos', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'comite-prevencion-delitos') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano al que se reporta» significa destinatario del informe del hallazgo. Su rastro en Secretaría, si lo hubiera, es un informe o un acta de órgano consultivo, NUNCA un acuerdo adoptado ni un acto inscribible."
       },
       "descripcion": "El catálogo de situaciones de riesgo penal de un departamento contiene en su introducción una atribución de autoría a los responsables del Programa de Prevención de Delitos de un departamento distinto del que el propio documento cataloga. Es un defecto de copia, sin efecto sobre el contenido del catálogo, pero afecta a la trazabilidad de quién identificó cada situación.",
       "riesgos_relacionados": [],
       "plan_de_accion": "PA-GARR-SINT-07",
       "firmeza": "SINTETICO",
       "ancla": "Defecto real observado en el documento fuente que sirvió de modelo para estos catálogos (COR del departamento G-Digital). No es una simulación: es una incidencia de la fuente.",
-      "procedencia": "DECLARADO_USUARIO"
+      "procedencia": "DECLARADO_USUARIO",
+      "hecho_descrito": "ACREDITADO",
+      "hecho_descrito_ancla": "`firmeza: SINTETICO` cubre SOLO el envoltorio: la fecha, la severidad, el estado y el formato de hallazgo GRC. El hecho descrito es un defecto de copia REAL observado en el documento fuente que sirvió de modelo (COR del departamento G-Digital): su introducción atribuye la identificación de las situaciones a «los responsables del PPD del Departamento de Litigación y Arbitraje», pese a tratarse de un catálogo de G-Digital. Es una incidencia de la fuente, no una simulación. Concuerda con `catalogos_penales_departamento[0].incidencia_detectada_en_la_fuente` de este mismo fichero."
     },
     {
       "id": "FIND-GARR-SINT-08",
@@ -3694,10 +3816,12 @@
       "fecha_hallazgo": "2026-07-14",
       "nota_fechas": "Todas las fechas y horas de la cronología son SIMULADAS. No proceden de ningún registro real del despacho y no deben leerse como medidas.",
       "organo_al_que_se_reporta": {
-        "slug": "comite-gobernanza-ia",
+        "slug": "garrigues-comite-gobernanza-ia",
         "nombre": "Comité de Gobernanza de la Inteligencia Artificial",
         "procedencia": "DECLARADO_USUARIO",
-        "ancla": "Órgano REAL modelado en el tenant"
+        "ancla": "Órgano REAL modelado en el tenant. El identificador que se cita es el de `governing_bodies.slug` = 'garrigues-comite-gobernanza-ia', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json (slug 'comite-gobernanza-ia') por scripts/seed-garrigues-bodies.ts. NO es el slug del catálogo JSON.",
+        "naturaleza": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). «Órgano al que se reporta» significa destinatario del informe del hallazgo. Su rastro en Secretaría, si lo hubiera, es un informe o un acta de órgano consultivo, NUNCA un acuerdo adoptado ni un acto inscribible."
       },
       "descripcion": "Determinados casos de uso apoyados en sistemas de IA se pusieron en servicio sin una evaluación documentada previa de su impacto, de modo que la postura de riesgo de cada uno se sostiene hoy en la valoración del equipo que lo desplegó y no en un análisis conservado.",
       "riesgos_relacionados": [
@@ -3956,6 +4080,10 @@
     "ÓRGANO COMPETENTE PARA ELEVAR UN INCIDENTE — Ni los estatutos ni las anclas dicen a qué órgano se eleva un incidente de ciberseguridad con consecuencia de gobierno. He usado el CACI y el Comité de Práctica Profesional por coherencia con su misión declarada, pero la competencia no está acreditada: es una atribución de esta demo.",
     "EAD TRUST — El riesgo de concentración (RSK-GARR-TEC-07) NO afirma porcentaje de participación del grupo: esa cifra sigue marcada A_CONFIRMAR en el propio tenant. La condición de prestador cualificado sí consta acreditada en la Trusted List española y no se pone en cuestión.",
     "REGISTROS NO GENERADOS POR FALTA DE PROCEDENCIA — (a) Riesgo de incumplimiento de NIS2 por el despacho: la propia fuente del tenant sostiene que los servicios jurídicos quedan fuera de los anexos I y II, de modo que afirmar un deber sería inventar un hecho jurídico. (b) Cuantificación económica de pérdidas o de impacto de los incidentes: no hay ancla y una cifra en euros en pantalla se lee como medida. (c) Catálogos penales de departamentos distintos de los cuatro pedidos: el mapa tiene 18 columnas, pero sin perfil de actividad declarado las situaciones serían relleno. (d) Riesgo sobre Salesforce (KYC/AML) y el cumplimiento SEPBLAC/UTTAI: el Plan lo nombra como sistema, pero evaluar ahí un riesgo exigiría afirmar obligaciones de comunicación que no constan en las anclas.",
-    "FECHAS — Todas las fechas de cronologías, hallazgos e hitos son simuladas y cada registro lo dice. Los únicos datos temporales reales del fichero son los trimestres de los proyectos del Plan (Q1-Q2 2026, etc.), y van marcados PLAN_NO_DESPLEGADO."
+    "FECHAS — Todas las fechas de cronologías, hallazgos e hitos son simuladas y cada registro lo dice. Los únicos datos temporales reales del fichero son los trimestres de los proyectos del Plan (Q1-Q2 2026, etc.), y van marcados PLAN_NO_DESPLEGADO.",
+    "NATURALEZA CONSULTIVA DE LOS 7 ÓRGANOS CITADOS — Los siete comités que aparecen en este fichero (CACI, Seguridad y Privacidad, Oficina Técnica de Seguridad, Gobernanza de la IA, Prevención de Delitos, Oficina DPO y Práctica Profesional) están modelados en el tenant como estructuras CONSULTIVAS y quedan fuera de los selectores de adopción. Por eso ningún registro de este fichero habla ya de «acuerdo» ni de «decisión» de comité: se corrigieron a informe y acta de órgano consultivo. Queda abierto DÓNDE vive ese rastro en Secretaría, que hoy tiene 0 reuniones y 0 acuerdos y cuyos steppers de adopción excluyen a los consultivos. Si el modelo no admite todavía un acta de órgano consultivo, la incoherencia debe reportarse, no resolverse convirtiéndola en acuerdo.",
+    "ISO 27001 — El Plan lista «certificación ISO 27001» en el foco del CISO de los portales, y PI-26 no contiene la raíz «certific» y habla de «proceso de implantación». No consta si existe certificado emitido, con qué alcance, por qué entidad y con qué vigencia. Los dos registros que lo recogían como control existente (RSK-GARR-TEC-02 y RSK-GARR-TEC-14) se han bajado a objetivo declarado con procedencia DEMO_PILOTO. Si se aporta el certificado, suben a control acreditado.",
+    "EL RESTO DEL FOCO DEL CISO — «Cifrado SSL» y «control estricto de roles externos» proceden de la MISMA columna de foco del CISO que la certificación ISO 27001. Se han conservado como controles existentes porque una medida técnica declarada por el propio CISO es distinta de una acreditación emitida por un tercero, que existe o no existe. Si el criterio del proyecto es tratar toda esa columna como objetivo, hay que bajar también esos dos.",
+    "PRESTADOR CUALIFICADO — La duda nº 9 de este fichero afirma que la condición de prestador cualificado de EAD Trust «consta acreditada en la Trusted List española». Este fichero no la usa para fundar ningún registro, pero la afirmación es del mismo tipo que la de la ISO 27001 y merece la misma verificación documental antes de sostenerse en pantalla."
   ]
 }
