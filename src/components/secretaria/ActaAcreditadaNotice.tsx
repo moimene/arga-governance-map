@@ -21,8 +21,8 @@ import { FileText, ExternalLink } from "lucide-react";
  * Gateado por el dato: un expediente sin esta clave no pinta nada.
  */
 export type ActaAcreditada = {
-  asiento?: string;
-  borme?: string;
+  /** Huella del ACTA: los anuncios de la Junta. El acta es una, los asientos varios. */
+  anuncios?: string;
   fecha_acta?: string;
   motivo_no_emision?: string;
   alcance?: string;
@@ -31,12 +31,23 @@ export type ActaAcreditada = {
 export function ActaAcreditadaNotice({
   acreditacion,
   contexto,
+  asientoDelAcuerdo = null,
+  bormeDelAcuerdo = null,
 }: {
   acreditacion: unknown;
   contexto: "ficha" | "cierre";
+  /**
+   * Asiento del expediente registral DE ESTE acuerdo, leido del filing y no de
+   * una copia. La primera version copiaba un unico asiento al JSON de los diez
+   * acuerdos: a los cuatro sin inscribir y a los tres no inscribibles les
+   * atribuia un asiento que no era suyo, y a la admision de socio —inscrita
+   * bajo el 961— le pintaba el 960. Un acuerdo sin inscripcion NO cita asiento.
+   */
+  asientoDelAcuerdo?: string | null;
+  bormeDelAcuerdo?: string | null;
 }) {
   const a = acreditacion as ActaAcreditada | null | undefined;
-  if (!a?.asiento) return null;
+  if (!a?.anuncios) return null;
 
   return (
     <div
@@ -56,17 +67,26 @@ export function ActaAcreditadaNotice({
           <dd className="text-[var(--g-text-primary)]">{a.fecha_acta ?? "—"}</dd>
         </div>
         <div className="flex gap-2">
-          <dt className="w-32 shrink-0 font-medium text-[var(--g-text-secondary)]">Asiento registral</dt>
+          <dt className="w-32 shrink-0 font-medium text-[var(--g-text-secondary)]">
+            Huella del acta
+          </dt>
           <dd className="flex items-center gap-1.5 text-[var(--g-text-primary)]">
-            {a.asiento}
-            {a.borme ? (
-              <span className="text-[var(--g-text-secondary)]">
-                <ExternalLink className="mr-1 inline h-3 w-3" aria-hidden />
-                BORME {a.borme}
-              </span>
-            ) : null}
+            <ExternalLink className="inline h-3 w-3 shrink-0" aria-hidden />
+            {a.anuncios}
           </dd>
         </div>
+        {contexto === "ficha" ? (
+          <div className="flex gap-2">
+            <dt className="w-32 shrink-0 font-medium text-[var(--g-text-secondary)]">
+              Este acuerdo
+            </dt>
+            <dd className="text-[var(--g-text-primary)]">
+              {asientoDelAcuerdo
+                ? `inscrito bajo el asiento ${asientoDelAcuerdo}${bormeDelAcuerdo ? ` (BORME ${bormeDelAcuerdo})` : ""}`
+                : "sin inscripción practicada: no le corresponde ninguno de esos asientos"}
+            </dd>
+          </div>
+        ) : null}
       </dl>
 
       {a.motivo_no_emision ? (

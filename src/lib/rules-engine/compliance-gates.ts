@@ -5,20 +5,39 @@ import type {
   ComplianceGateStatus,
   CompliancePanelResult,
   EffectiveRuleResolution,
+  EtapaEvaluacion,
   EvaluacionResult,
   ExplainNode,
   Fuente,
 } from './types';
 import { evaluarPuntoOrdenDia } from './agenda-item-engine';
 
-const STAGE_TO_GATE: Record<string, ComplianceGateKind> = {
-  convocatoria: 'convocation',
+/**
+ * Etapa del motor → gate del panel.
+ *
+ * Las claves eran `Record<string, …>` y estaban en MINUSCULA (`convocatoria`,
+ * `constitucion`, `votacion`) contra motores que emiten `'CONVOCATORIA'`,
+ * `'CONSTITUCION'` y `'VOTACION'`. Las auxiliares —`*_skip`, `documentacion`—
+ * si acertaban, asi que el mapa fallaba EXACTAMENTE en las tres que importan y
+ * el `?? 'formalization'` de mas abajo lo tapaba: ante una votacion bloqueada,
+ * el panel proponia «Completar formalizacion, instrumento o tramitacion
+ * registral exigida», que es el paso siguiente de OTRA etapa.
+ *
+ * Y habia una clave `postAcuerdo` que NINGUN motor emite.
+ *
+ * `Record<string, …>` es la misma enfermedad que `etapa: string`: se tipo el
+ * emisor y el consumidor seguia aceptando cualquier clave. Al tiparlo como
+ * `Record<EtapaEvaluacion, …>` el mapa es TOTAL: el compilador exige que esten
+ * todas las etapas reales y rechaza las que no existen.
+ */
+const STAGE_TO_GATE: Record<EtapaEvaluacion, ComplianceGateKind> = {
+  CONVOCATORIA: 'convocation',
   convocatoria_skip: 'convocation',
-  constitucion: 'constitution',
+  CONSTITUCION: 'constitution',
   constitucion_skip: 'constitution',
-  votacion: 'majority',
+  VOTACION: 'majority',
   documentacion: 'documentation',
-  postAcuerdo: 'formalization',
+  agenda_item: 'routing',
 };
 
 const GATE_LABELS: Record<ComplianceGateKind, string> = {

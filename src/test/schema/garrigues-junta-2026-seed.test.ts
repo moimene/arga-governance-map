@@ -1122,25 +1122,48 @@ describe("C1 — los 10 acuerdos de la Junta en Cloud", () => {
     expect((enArga ?? []).length).toBeGreaterThan(0);
   });
 
-  it("el acta se acredita por su huella registral, y el asiento sale del filing, no de una constante", async () => {
-    const { data: filing } = await garr.from("registry_filings")
-      .select("inscription_number, borme_ref")
-      .eq("tenant_id", GARRIGUES_TENANT).eq("status", "INSCRITA")
-      .not("inscription_number", "is", null)
-      .order("borme_ref").order("inscription_number").limit(1).maybeSingle();
-    expect(filing?.inscription_number).toBeTruthy();
+  it("la nota NO atribuye un asiento a ningún acuerdo, y cita TODOS los anuncios", async () => {
+    // El P0 que se le escapó a todos los gates: la primera versión copiaba UN
+    // asiento —elegido con un `order by … limit 1` arbitrario— al JSON de los
+    // DIEZ acuerdos. Hay DOS anuncios (960/338618 y 961/338619), solo TRES
+    // acuerdos están inscritos, y a la admisión de socio, inscrita bajo el 961,
+    // la ficha le pintaba el 960. Siete de diez citaban un asiento que no era
+    // suyo. Ningún test miraba `agreements.compliance_explain`: por eso pasó.
+    const { data: filings } = await garr.from("registry_filings")
+      .select("agreement_id, status, inscription_number, borme_ref")
+      .eq("tenant_id", GARRIGUES_TENANT);
+    const inscritos = (filings ?? []).filter((f) => f.status === "INSCRITA" && f.inscription_number);
+    // Precondición: si esto fuera 1, el test no distinguiría nada.
+    expect(new Set(inscritos.map((f) => f.inscription_number)).size).toBeGreaterThan(1);
 
+    const { data, error } = await garr.from("agreements")
+      .select("id, compliance_explain").in("id", acuerdos.map((a) => a.id));
+    expect(error).toBeNull();
+    expect(data).toHaveLength(acuerdos.length);
+
+    for (const fila of data!) {
+      const nota = (fila.compliance_explain as Record<string, Record<string, Record<string, string>>>)
+        ?.c1_junta_socios_2026?.acta_certificacion;
+      expect(nota).toBeTruthy();
+      // 1. No se atribuye asiento en el dato. El de CADA acuerdo lo lee la ficha
+      //    de SU expediente registral (`ExpedienteAcuerdo` → registryFiling).
+      expect(Object.keys(nota)).not.toContain("asiento");
+      // 2. La huella del ACTA son TODOS los anuncios, porque el acta es una y
+      //    los asientos varios. Si mañana aparece un tercero, esto cae.
+      for (const f of inscritos) {
+        expect(nota.anuncios).toContain(String(f.inscription_number));
+        expect(nota.anuncios).toContain(String(f.borme_ref));
+      }
+      expect(nota.alcance).toContain("ACREDITACIÓN, no emisión");
+      expect(nota.alcance).toContain("como expediente, no como capacidad");
+      expect(nota.motivo_no_emision).toContain("no emite acta autoritativa");
+    }
+
+    // Y la reunión dice lo mismo: el acta es la misma para los diez.
     const { data: m } = await garr.from("meetings")
       .select("quorum_data").eq("id", meetingId).maybeSingle();
-    const nota = (m!.quorum_data as Record<string, Record<string, string>>).acta_certificacion;
-    // El asiento que pinta la pantalla es EL DEL FILING, no uno tecleado aparte.
-    expect(nota.asiento).toBe(String(filing!.inscription_number));
-    expect(nota.borme).toBe(filing!.borme_ref);
-    // Y el texto dice que es acreditación y no emisión: sin esta frase la
-    // pantalla se leería como que la plataforma emitió el acta.
-    expect(nota.alcance).toContain("ACREDITACION, no emision");
-    expect(nota.alcance).toContain("como expediente, no como capacidad");
-    expect(nota.motivo_no_emision).toContain("no emite acta autoritativa");
+    const notaReunion = (m!.quorum_data as Record<string, Record<string, string>>).acta_certificacion;
+    for (const f of inscritos) expect(notaReunion.anuncios).toContain(String(f.inscription_number));
 
     const { data: enArga } = await arga.from("meetings")
       .select("id").not("quorum_data->acta_certificacion", "is", null).limit(5);
