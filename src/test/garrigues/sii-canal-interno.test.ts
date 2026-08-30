@@ -51,6 +51,8 @@ describe("SII Garrigues — las citas de PI-31 dicen lo que dice PI-31", () => {
   it("los dos roles tienen prevista su sustitución por conflicto", () => {
     // La política lo prevé para los dos, y omitirlo dejaría el procedimiento
     // sin salida en el único caso en que de verdad hace falta.
+    // `[].every()` es `true`: sin la longitud, esto pasaria con la lista vacia.
+    expect(SII_ROLES).toHaveLength(2);
     expect(SII_ROLES.every((r) => r.sustitucion.includes("conflicto"))).toBe(true);
   });
 

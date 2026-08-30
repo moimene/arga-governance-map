@@ -36,6 +36,10 @@ describe("C3 Tarea 6 — conflictos declarados y etiquetados", () => {
   it("NINGUNA lleva persona: `person_id` es NULL en todas", async () => {
     const { data } = await garr.from("conflicts_of_interest")
       .select("code, person_id").eq("tenant_id", GARRIGUES_TENANT);
+    // Sin esto la aserción es VACUA: con el seed borrado, filtrar un conjunto
+    // vacío da vacío y el test pasa sin haber mirado ninguna fila. Probado
+    // apuntando a un tenant inexistente: 9 pass / 0 fail.
+    expect(data.length).toBe(CONFLICTOS_DEMO.length);
     expect(data.filter((c) => c.person_id !== null)).toEqual([]);
   });
 
@@ -47,6 +51,7 @@ describe("C3 Tarea 6 — conflictos declarados y etiquetados", () => {
     // que G5 aplicó a `findings.severity`.
     const { data } = await garr.from("conflicts_of_interest")
       .select("code, conflict_type").eq("tenant_id", GARRIGUES_TENANT);
+    expect(data.length).toBe(CONFLICTOS_DEMO.length);
     expect(data.filter((c) => c.conflict_type !== null)).toEqual([]);
   });
 
@@ -54,6 +59,7 @@ describe("C3 Tarea 6 — conflictos declarados y etiquetados", () => {
     const ADMITIDOS = new Set(["Declarado", "Pendiente", "Resuelto"]);
     const { data } = await garr.from("conflicts_of_interest")
       .select("code, status").eq("tenant_id", GARRIGUES_TENANT);
+    expect(data.length).toBe(CONFLICTOS_DEMO.length);
     expect(data.filter((c) => !ADMITIDOS.has(c.status))).toEqual([]);
     // Y el término de la fuente —«en chequeo»— se conserva aparte, sin
     // pretender que la BD lo entiende.

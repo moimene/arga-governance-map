@@ -44,10 +44,23 @@ export default function ConflictosList() {
   const hayProcedenciaDeclarada = tenantId === CONFLICTOS_TENANT;
 
   const conflictKpis = useMemo(() => {
+    // `0` afirma «no hay ninguno». Cuando HAY filas pero ninguna lleva
+    // `conflict_type`, lo cierto es «sin clasificar por este eje», que no es lo
+    // mismo: la columna admite 'Permanente' | 'Situacional' —clasifica por
+    // duración— y hay tenants cuya política clasifica por naturaleza, así que
+    // se deja NULL en vez de inventar una correspondencia.
+    //
+    // Mismo criterio que la columna Persona de esta misma tabla, que muestra
+    // «—» y no un vacío: omitir no es afirmar cero.
+    //
+    // La condición exige que HAYA filas: un tenant sin conflictos sí tiene un
+    // cero de verdad y lo sigue viendo.
+    const sinClasificar =
+      conflicts.length > 0 && conflicts.every((c) => !c.conflict_type);
     const permanentes = conflicts.filter((c) => c.conflict_type === "Permanente").length;
     const situacionales = conflicts.filter((c) => c.conflict_type === "Situacional").length;
     const noDeclarados = conflicts.filter((c) => c.status === "Pendiente" || c.status === "No declarado" || !!c.related_finding_id).length;
-    return { permanentes, situacionales, noDeclarados };
+    return { permanentes, situacionales, noDeclarados, sinClasificar };
   }, [conflicts]);
 
   const completed = attestations.filter((a) => a.status === "Completada").length;
@@ -89,8 +102,8 @@ export default function ConflictosList() {
           )}
 
           <div className="grid grid-cols-3 gap-4">
-            <KpiCard label="Conflictos permanentes declarados" value={conflictKpis.permanentes} icon={CheckCircle} tone="success" />
-            <KpiCard label="Conflictos situacionales" value={conflictKpis.situacionales} icon={CheckCircle} tone="success" />
+            <KpiCard label="Conflictos permanentes declarados" value={conflictKpis.sinClasificar ? "—" : conflictKpis.permanentes} icon={CheckCircle} tone="success" />
+            <KpiCard label="Conflictos situacionales" value={conflictKpis.sinClasificar ? "—" : conflictKpis.situacionales} icon={CheckCircle} tone="success" />
             <KpiCard label="Pendientes / No declarados" value={conflictKpis.noDeclarados} icon={ShieldAlert} tone="critical" />
           </div>
 

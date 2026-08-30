@@ -68,7 +68,7 @@ describe("C3 Tarea 5 — hallazgos enlazados y planes etiquetados", () => {
   });
 
   it("NO hay planes de acción sembrados, y eso es el requisito", async () => {
-    // PPD-01 §246 describe el MECANISMO del Plan de acción y no publica la
+    // PPD-01 §4.2 describe el MECANISMO del Plan de acción y no publica la
     // lista. Sembrar ocho planes verosímiles los haría indistinguibles de los
     // reales, que es justo lo que este carril tiene prohibido. La aserción va
     // en positivo: si alguien los siembra, esto cae.
@@ -81,7 +81,7 @@ describe("C3 Tarea 5 — hallazgos enlazados y planes etiquetados", () => {
   it("y la ausencia se explica con su motivo y su fuente, no en blanco", () => {
     expect(PLAN_ACCION_AUSENCIA.motivo).toContain("no publica");
     expect(PLAN_ACCION_AUSENCIA.fuente).toContain("PPD-01");
-    expect(PLAN_ACCION_AUSENCIA.fuente).toContain("246");
+    expect(PLAN_ACCION_AUSENCIA.fuente).toContain("§4.2");
     // Lo que sí consta del mecanismo está sembrado como controles de
     // supervisión —actividades recurrentes con órgano responsable—, así que la
     // ausencia remite a ellos en vez de dejar el hueco mudo.
@@ -96,6 +96,15 @@ describe("C3 Tarea 5 — hallazgos enlazados y planes etiquetados", () => {
   });
 
   it("ARGA no cambia: sigue sin hallazgos ni planes del prefijo de Garrigues", async () => {
+    // Control POSITIVO antes de la ausencia. Una lista vacía puede significar
+    // «no los tiene» o «el cliente no ve nada» —RLS mal, sesión caída, tabla
+    // equivocada—, y las dos se ven idénticas. Si ARGA no viera ni lo suyo,
+    // la ausencia de abajo pasaría por el motivo equivocado.
+    const { data: propios, error } = await arga.from("findings")
+      .select("code").eq("tenant_id", DEMO_TENANT);
+    expect(error).toBeNull();
+    expect(propios.length).toBeGreaterThan(0);
+
     const { data: f } = await arga.from("findings")
       .select("code").eq("tenant_id", DEMO_TENANT).like("code", "FND-GARR-%");
     expect(f).toEqual([]);

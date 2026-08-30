@@ -95,6 +95,11 @@ describe("C3 Tarea 5 — desde el riesgo se llega al hallazgo, en el DOM", () =>
     // —incluso con `findings` a null— pasaría el test anterior sin probar nada.
     riesgoActual = { ...RIESGO, finding_id: null, findings: null };
     await montar();
+    // Control POSITIVO de la ausencia: si el componente no hubiera renderizado
+    // nada —crash, estado de carga, ruta que no resuelve—, `queryByRole`
+    // devolvería null igual y esto pasaría **estando ciego**. Se comprueba
+    // primero que la ficha SÍ está en pantalla.
+    expect(screen.getByText(RIESGO.code)).toBeTruthy();
     expect(screen.queryByRole("link", { name: /FND-GARR-PEN/ })).toBeNull();
   });
 });

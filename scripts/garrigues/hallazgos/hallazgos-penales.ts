@@ -8,7 +8,7 @@
 //    catálogo del mapa penal reasignaba los ocho hallazgos en silencio, sin
 //    tocar una línea de código y sin que ningún gate lo notara.
 //
-// 2) NO hay planes de acción sembrados, y no es un olvido. PPD-01 §246
+// 2) NO hay planes de acción sembrados, y no es un olvido. PPD-01 §4.2
 //    describe el mecanismo del Plan de acción y **no publica la lista**. La
 //    regla del carril es que lo que la fuente no dice no se afirma, así que
 //    la pantalla muestra la ausencia con su motivo y su fuente en vez de
@@ -65,7 +65,10 @@ export const PLAN_ACCION_AUSENCIA = {
   consecuencia:
     "No se muestran planes porque no consta ninguno en la fuente. Rellenar este espacio con " +
     "planes verosímiles los haría indistinguibles de los reales.",
-  fuente: "PPD-01, Manual del Sistema de Gestión de Riesgos Penales, §246 y §350-356",
+  // §4.2 «Plan de acción» y §8 «Supervisión y seguimiento del programa», que
+  // son los apartados REALES del índice del documento. Antes citaba «§246 y
+  // §350-356», que son posiciones de párrafo del volcado, no apartados.
+  fuente: "PPD-01, Manual del Sistema de Gestión de Riesgos Penales, §4.2 y §8",
   // Lo que sí consta del mecanismo está sembrado como controles de
   // supervisión, no como planes: son actividades recurrentes con órgano
   // responsable identificado. Ver `penal/seguimiento-ppd.ts`.

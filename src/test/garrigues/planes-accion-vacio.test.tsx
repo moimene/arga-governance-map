@@ -44,7 +44,7 @@ describe("C3 Tarea 5 — el vacío de planes se explica, y solo a quien le toca"
     await montar(PLAN_ACCION_AUSENCIA.tenantId);
     expect(screen.getByText(PLAN_ACCION_AUSENCIA.titulo)).toBeTruthy();
     expect(screen.getByText(new RegExp("no publica los planes concretos"))).toBeTruthy();
-    expect(screen.getByText(/PPD-01.*246/)).toBeTruthy();
+    expect(screen.getByText(/PPD-01.*§4\.2/)).toBeTruthy();
     // Y remite a lo que sí consta, con enlace, no como texto suelto.
     expect(screen.getByRole("link", { name: /CTR-GARR-25/ })).toBeTruthy();
   });

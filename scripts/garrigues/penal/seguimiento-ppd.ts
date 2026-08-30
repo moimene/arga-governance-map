@@ -1,10 +1,16 @@
 // scripts/garrigues/penal/seguimiento-ppd.ts
 // Las cuatro actividades del Plan de seguimiento del PPD, LITERALES de
-// PPD-01 "Supervisión y seguimiento del programa" (§350-356).
+// PPD-01 "Supervisión y seguimiento del programa" (§8, con sus 8.1-8.4).
 //
 // Son controles y no planes de acción: son actividades de supervisión
-// recurrentes con órgano responsable identificado. El Plan de acción del §246
+// recurrentes con órgano responsable identificado. El Plan de acción del §4.2
 // no se siembra porque la fuente describe el mecanismo y no publica la lista.
+//
+// CORRECCIÓN 2026-08-30: esto citaba «§246» y «§350-356». Esos números NO son
+// apartados: son posiciones de párrafo del volcado de texto del PDF, escritas
+// con el signo de apartado. El índice canónico de PPD-01 va de «1» a «10», y
+// el Plan de acción es el 4.2 y la supervisión el 8. Un «§246» promete que
+// alguien puede ir a mirarlo, y no puede.
 export const CONTROLES_SEGUIMIENTO = [
   { code: "CTR-GARR-25", name: "PPD — Seguimiento del desarrollo del Plan de acción" },
   { code: "CTR-GARR-26", name: "PPD — Seguimiento del desarrollo del Plan de formación" },

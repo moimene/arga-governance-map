@@ -441,3 +441,57 @@ Delta contra `11fcf51` (3730 / 152 / 0 · 21.185 · 3882): **+57 pass, +194
 aserciones, +57 tests, 0 fail, skip sin mover.**
 
 **Queda solo la Tarea 8**, que espera al merge de C2 por el paso 1.
+
+---
+
+## Tarea 8 — pasos 2 y 3 CERRADOS (2026-08-30)
+
+Commit `35762a7`, tras el merge de C2 (`75a9457`).
+
+**La vacuidad rompe.** El `console.warn` de `tenant-isolation.test.ts` pasa a
+aserción: una dirección vacua **falla** salvo que esté declarada con motivo y
+fuente. Un warn es la forma más educada de un gate que no lo es — nadie lee los
+warns de una suite verde.
+
+**Había una vacua real y no era mía:** `document_templates`, con 0 filas para
+Garrigues. Medido antes de clasificarla — sus 6 plantillas viven en
+`plantillas_protegidas`—, así que se declara con `alternativa`, que convierte la
+inferencia en invariante comprobable contra Cloud.
+
+**Ampliación aditiva** de `conflicts_of_interest` y `action_plans` en describe
+propio, sin tocar una aserción de G0/G4.
+
+### La prueba de los dos lados
+
+| | control positivo del cliente de ARGA | resultado |
+|---|---|---|
+| A | **puesto** | 27 pass · **2 fail** |
+| B | quitado | **29 pass · 0 fail** |
+
+Con el cliente de ARGA ciego, sin control positivo la aserción de aislamiento
+**pasa**. Ésa es la forma nº7 medida, no argumentada.
+
+### Correcciones a mis propias herramientas
+
+1. **El arnés de mutación me borró trabajo sin commitear.** Restaura con
+   `git checkout --`, mi entrada de `document_templates` no estaba commiteada,
+   y el gate falló por su ausencia en vez de por el defecto que buscaba. La
+   regla «se muta desde estado commiteado» estaba **en un comentario del propio
+   arnés**. Ahora la comprueba y aborta.
+2. **Una mutación mía no probaba nada:** quitar el control positivo y ver si
+   falla. Quitar una aserción no hace fallar un test, lo hace más flojo. La
+   forma correcta es **crear la condición que el control vigila**.
+3. El guard de «fuente comprobable» se amplía por principio: una `alternativa`
+   verificada contra Cloud es mejor fuente que una cita en prosa. Lo que sigue
+   sin admitirse es un motivo sin nada detrás, y está probado.
+
+### Estado
+
+```
+3834 pass · 152 skip · 0 fail · 21.815 expects · 3986 tests
+typecheck 0 · lint limpio
+```
+
+**Pendiente de la Tarea 8:** medición de cierre en los dos modos sobre HEAD
+inmutable (pasos 4 y 5), verificación viva ya hecha, y la lente adversarial
+antes del merge (paso 7).

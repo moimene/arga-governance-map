@@ -22,7 +22,7 @@ const restaurarMocks = await mockearModulos([
   ["@/context/TenantContext", () => ({ useTenantContext: () => ({ tenantId: tenantActual }) })],
   ["@/context/TenantBrandContext", () => ({ useTenantBranding: () => null })],
   ["@/hooks/useConflicts", () => ({
-    useConflictsList: () => ({ data: [FILA_SIN_TIPO], isLoading: false }),
+    useConflictsList: () => ({ data: filasActuales, isLoading: false }),
     useAttestationsList: () => ({ data: [], isLoading: false }),
   })],
 ]);
@@ -51,11 +51,13 @@ const FILA_SIN_TIPO = {
 };
 
 let tenantActual: string | null = CONFLICTOS_TENANT;
+let filasActuales: Array<Record<string, unknown>> = [FILA_SIN_TIPO];
 
 afterEach(() => cleanup());
 
-async function montar(tenant: string | null) {
+async function montar(tenant: string | null, filas = [FILA_SIN_TIPO] as Array<Record<string, unknown>>) {
   tenantActual = tenant;
+  filasActuales = filas;
   const { default: Conflictos } = await import("@/pages/Conflictos");
   render(
     <MemoryRouter>
@@ -84,5 +86,58 @@ describe("C3 Tarea 6 — la pantalla de conflictos", () => {
     await montar(ARGA);
     expect(screen.queryByText(CONFLICTOS_AVISO.titulo)).toBeNull();
     expect(screen.queryByText(/PI-02/)).toBeNull();
+  });
+
+  it("los KPI muestran «—» y no 0 cuando ninguna fila lleva clasificación", async () => {
+    // `0` afirma «no hay ninguno». Con cinco filas delante y ningún
+    // `conflict_type`, lo cierto es «sin clasificar por este eje». Mismo
+    // criterio que la columna Persona de la misma tabla.
+    await montar(CONFLICTOS_TENANT, [FILA_SIN_TIPO, { ...FILA_SIN_TIPO, id: "c2", code: "COI-GARR-02" }]);
+    // Se comprueba el VALOR, no que la cadena contenga un carácter: el
+    // `textContent` del KPI es «<valor><etiqueta>» pegado, así que un
+    // `/\b0\b/` no casaba nunca y la aserción habría pasado igual con un 0.
+    // Lo destapó el tercer caso al fallar. Se pina el principio de la cadena.
+    const permanentes = screen.getByText("Conflictos permanentes declarados").parentElement!;
+    const situacionales = screen.getByText("Conflictos situacionales").parentElement!;
+    expect(permanentes.textContent!.startsWith("—")).toBe(true);
+    expect(situacionales.textContent!.startsWith("—")).toBe(true);
+  });
+
+  it("pero un tenant CON clasificación sigue viendo su cifra: ARGA no cambia", async () => {
+    await montar(ARGA, [
+      { ...FILA_SIN_TIPO, id: "a1", code: "CON-SIT-002", conflict_type: "Situacional" },
+    ]);
+    const kpi = screen.getByText("Conflictos situacionales").parentElement!;
+    expect(kpi.textContent!.startsWith("1")).toBe(true);
+  });
+
+  it("y un tenant SIN conflictos ve un cero de verdad, no «—»", async () => {
+    // El caso que mantiene honesto el arreglo. Si «—» apareciera también aquí,
+    // se estaría ocultando una ausencia real detrás de una de procedencia.
+    await montar(CONFLICTOS_TENANT, []);
+    const kpi = screen.getByText("Conflictos permanentes declarados").parentElement!;
+    expect(kpi.textContent!.startsWith("0")).toBe(true);
+    expect(kpi.textContent).not.toContain("—");
+  });
+
+  it("con clasificación MIXTA muestra la cifra, y eso es literalmente cierto", async () => {
+    // El caso que faltaba, señalado por la lente adversarial.
+    //
+    // La etiqueta dice «Conflictos permanentes DECLARADOS». Con una fila
+    // declarada permanente y otra sin clasificar, «1» es cierto: la segunda no
+    // ha sido declarada permanente. Lo que no era cierto es el caso anterior
+    // —«0 declarados» con TODAS sin clasificar—, porque ahí lo ausente no es
+    // el valor sino la dimensión entera, y dos ceros leen «no hay conflictos».
+    //
+    // Se pina para que quede claro que es una decisión y no un descuido: si
+    // alguien quiere que el mixto avise de las no clasificadas, es cambio de
+    // producto, y este test se lo pondrá delante.
+    await montar(CONFLICTOS_TENANT, [
+      { ...FILA_SIN_TIPO, id: "m1", code: "COI-GARR-01", conflict_type: "Permanente" },
+      { ...FILA_SIN_TIPO, id: "m2", code: "COI-GARR-02" },
+    ]);
+    const permanentes = screen.getByText("Conflictos permanentes declarados").parentElement!;
+    expect(permanentes.textContent!.startsWith("1")).toBe(true);
+    expect(permanentes.textContent).not.toContain("—");
   });
 });

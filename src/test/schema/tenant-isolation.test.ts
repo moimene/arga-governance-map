@@ -12,6 +12,7 @@ import {
   GARRIGUES_DEMO_EMAIL,
   sesionDe,
 } from "../helpers/supabase-test-client";
+import { AISLAMIENTO_DECLARADO } from "../garrigues/aislamiento-declarado";
 
 const SUPABASE_URL =
   process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
@@ -90,12 +91,25 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
       const foreign = (data ?? []).filter((r) => r.tenant_id === GARRIGUES_TENANT);
       expect(foreign).toEqual([]);
 
+      // La aserción de arriba es VACUA si Garrigues no tiene filas en la tabla:
+      // filtrar un conjunto vacío da vacío y pasa sin probar aislamiento. Esto
+      // se venía señalando con un `console.warn`, que es la forma más educada
+      // de un gate que no lo es — nadie lee los warns de una suite verde.
+      //
+      // Ahora ROMPE, salvo que la ausencia esté DECLARADA con su motivo y su
+      // fuente en `aislamiento-declarado.ts`. No se silencia la vacuidad: se le
+      // pone dueño. Y si una tabla declarada como vacía deja de estarlo, el
+      // test de esa declaración también rompe.
       const own = await garr.from(table).select("tenant_id").limit(1);
-      if (!own.error && (own.data ?? []).length === 0) {
-        console.warn(
-          `[tenant-isolation] dirección VACUA: Garrigues no tiene filas en ${table}, ` +
-            "así que esta aserción no prueba aislamiento (la inversa sí).",
-        );
+      expect(own.error, `${table}: la sonda de vacuidad no pudo consultar`).toBeNull();
+      if ((own.data ?? []).length === 0) {
+        const declarada = AISLAMIENTO_DECLARADO.find((t) => t.tabla === table);
+        expect(
+          declarada?.garrigues,
+          `${table}: dirección VACUA sin declarar. Garrigues no tiene filas, así que esta ` +
+            "aserción no prueba aislamiento. Decláralo en aislamiento-declarado.ts con su " +
+            "motivo y su fuente, o averigua por qué falta el dato.",
+        ).toBe("NINGUNA");
       }
     });
   }
@@ -159,5 +173,94 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
     const ids = (data ?? []).map((r) => r.id);
     expect(ids).toContain(DEMO_TENANT);
     expect(ids).toContain(GARRIGUES_TENANT);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// C3 Tarea 8 — ampliación ADITIVA: `conflicts_of_interest` y `action_plans`.
+//
+// Va en describe propio para no tocar una sola aserción de G0/G4, y usa la
+// declaración de `aislamiento-declarado.ts` en vez de repetir literales.
+//
+// Cada afirmación de ausencia lleva el control positivo DEL CLIENTE QUE LA
+// HACE. Un control positivo en el otro cliente no vale: si la sesión de ARGA
+// estuviera caída, «ARGA no ve lo de Garrigues» pasaría por ceguera y no por
+// aislamiento, y un gate de aislamiento no puede permitirse esa confusión.
+describe("C3 — aislamiento en conflicts_of_interest y action_plans", () => {
+  let arga: SupabaseClient;
+  let garr: SupabaseClient;
+
+  beforeAll(async () => {
+    // Sin graceful-skip: `sesionDe` lanza y el gate se pone rojo. Una sonda
+    // que se autodesactiva cuando no puede autenticar es un verde que no
+    // asierta nada.
+    [arga, garr] = await Promise.all([sesionDe("ARGA"), sesionDe("GARRIGUES")]);
+  }, 30_000);
+
+  const NUEVAS = AISLAMIENTO_DECLARADO.filter(
+    (t) => t.tabla === "conflicts_of_interest" || t.tabla === "action_plans",
+  );
+
+  it("las dos tablas nuevas están declaradas", () => {
+    // Si alguien renombra una tabla en la declaración, el bucle de abajo se
+    // quedaría vacío y sus tests desaparecerían sin que nadie lo note.
+    expect(NUEVAS.map((t) => t.tabla).sort()).toEqual(["action_plans", "conflicts_of_interest"]);
+  });
+
+  for (const decl of NUEVAS) {
+    it(`Garrigues no ve filas ARGA en ${decl.tabla}`, async () => {
+      const { data, error } = await garr.from(decl.tabla).select("tenant_id").limit(500);
+      expect(error).toBeNull();
+
+      // Control positivo del cliente de GARRIGUES, que es el que afirma.
+      // Cuando la tabla está declarada vacía para él, el control se hace
+      // contra la tabla donde SÍ está su dato.
+      if (decl.garrigues === "ALGUNA") {
+        expect(data.length, `${decl.tabla}: Garrigues no ve ni lo suyo`).toBeGreaterThan(0);
+      } else {
+        const alt = decl.alternativa;
+        const sonda = alt
+          ? await garr.from(alt.tabla).select("id").eq("tenant_id", GARRIGUES_TENANT).limit(1)
+          : await garr.from("entities").select("id").eq("tenant_id", GARRIGUES_TENANT).limit(1);
+        expect(sonda.data.length, `${decl.tabla}: la sesión de Garrigues no ve nada`)
+          .toBeGreaterThan(0);
+      }
+
+      expect(data.filter((r) => r.tenant_id !== GARRIGUES_TENANT)).toEqual([]);
+    });
+
+    it(`ARGA no ve filas Garrigues en ${decl.tabla}`, async () => {
+      const { data, error } = await arga.from(decl.tabla).select("tenant_id").limit(500);
+      expect(error).toBeNull();
+
+      // Control positivo del cliente de ARGA, que es el que afirma aquí.
+      expect(data.length, `${decl.tabla}: ARGA no ve ni lo suyo`).toBeGreaterThan(0);
+      expect(data.every((r) => r.tenant_id === DEMO_TENANT)).toBe(true);
+
+      expect(data.filter((r) => r.tenant_id === GARRIGUES_TENANT)).toEqual([]);
+    });
+  }
+
+  it("y los marcadores de Garrigues no cruzan, por código concreto", async () => {
+    // La invariante escrita A MANO. No se comparan dos conjuntos traídos con la
+    // misma consulta —eso probaría que la consulta es determinista—: se pinan
+    // códigos que solo pueden existir en un tenant.
+    const conflictos = NUEVAS.find((t) => t.tabla === "conflicts_of_interest")!;
+    const codigos = conflictos.marcadores.garrigues ?? [];
+    expect(codigos.length).toBeGreaterThan(0);
+
+    const { data: propios } = await garr.from("conflicts_of_interest")
+      .select("code").eq("tenant_id", GARRIGUES_TENANT).in("code", [...codigos]);
+    expect(propios).toHaveLength(codigos.length);
+
+    // Control positivo del cliente de ARGA antes de afirmar que no los ve.
+    const { data: suyos } = await arga.from("conflicts_of_interest")
+      .select("code").eq("tenant_id", DEMO_TENANT).limit(1);
+    expect(suyos.length, "ARGA no ve ni sus propios conflictos").toBeGreaterThan(0);
+
+    const { data: ajenos, error } = await arga.from("conflicts_of_interest")
+      .select("code").in("code", [...codigos]);
+    expect(error).toBeNull();
+    expect(ajenos).toEqual([]);
   });
 });
