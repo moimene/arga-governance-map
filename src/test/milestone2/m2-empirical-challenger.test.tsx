@@ -92,7 +92,6 @@ vi.mock("@/hooks/useNotifications", () => ({
 function createMockScope(mode: "grupo" | "sociedad" = "sociedad"): SecretariaScopeController {
   return {
     mode,
-    selectedEntityId: "ent-nexus-1",
     selectedEntity: {
       id: "ent-nexus-1",
       name: "Nexus Seguros S.A.",

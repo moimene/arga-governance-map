@@ -77,7 +77,6 @@ function createChallengerMockScope(
 ): SecretariaScopeController {
   return {
     mode,
-    selectedEntityId: "ent-alpha-01",
     selectedEntity: {
       id: "ent-alpha-01",
       name: entityName,
@@ -276,7 +275,6 @@ describe("Milestone 2 — Empirical Challenger Verification Suite", () => {
     it("filters modules based on tenant whitelist", () => {
       const brandingWithOnlySecretaria = {
         nombre: "Secretaría Only Client",
-        // @ts-expect-error test typing
         modules: ["secretaria"],
       };
 
