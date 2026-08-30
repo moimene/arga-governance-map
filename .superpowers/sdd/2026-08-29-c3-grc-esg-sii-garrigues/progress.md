@@ -377,7 +377,7 @@ atribuye a una persona.
 - **Crash real:** `c.conflict_type.toUpperCase()` sin guarda sobre columna
   nullable reventaba la pantalla entera.
 
-## Tarea 7 — EN CURSO
+## Tarea 7 — CERRADA (2026-08-30)
 
 Commits `c20824d` (clasificador), `43a501c` (catálogo PI-31), `+` (portal).
 
@@ -393,12 +393,28 @@ Commits `c20824d` (clasificador), `43a501c` (catálogo PI-31), `+` (portal).
   el matiz del art. 25 —el interno es preferente pero no obligatorio ni previo—
   y los dos roles con su sustitución por conflicto.
 
-**Pendiente:**
-- Paso 4 (resto): `whistleblowing-engine.ts:541` sigue diciendo «Presidencia de
-  la Comisión de Auditoría y Control» y `:354`/`:454` «Comité de Cumplimiento».
-  Son literales del motor COMPARTIDO: hay que parametrizarlos por tenant sin
-  alterar el camino de ARGA.
-- Paso 5: tres casos demo de despacho, etiquetados como simulados.
+**Paso 4 (resto), cerrado.** Los tres literales de órgano del motor
+COMPARTIDO pasan a `OrganosSii`, con el valor por defecto **byte a byte** el de
+antes. La aserción que hace segura la refactorización no es «Garrigues ve lo
+suyo», sino que el defecto no se desvíe: si se desviara, ARGA cambiaría sin que
+nadie lo hubiera pedido. Probado mutando una tilde del defecto.
+
+`actionRequired: "ESCALADO_COMITE_AUDITORIA"` NO se toca: es contrato de la
+interfaz. Cambia lo que lee una persona, no el código que enruta.
+
+**Paso 5, cerrado.** Tres casos de las tres vías reales (PBC/FT, conflicto con
+cliente, acoso), **simulados y dicho en pantalla con el motivo**: ni PI-31 ni
+el Manual de PBC/FT publican un registro de comunicaciones, porque la Ley
+2/2023 impone confidencialidad reforzada. El instructor es el CARGO, no una
+persona. Y los relojes del fixture cumplen la ley que la pantalla invoca —7
+días de acuse (9.2.c), 3 meses de resolución (9.2.d)—, porque un fixture fuera
+de plazo enseñaría un incumplimiento que nadie ha querido enseñar.
+
+**Defecto propio, repetido:** mi guard contra el error del art. 25 vetaba la
+palabra «agotar» y tropezaba con el texto correcto («no requiere agotar»). Una
+lista negra de palabras no distingue afirmar de negar — **el mismo
+`includes("ia")` que acababa de corregir, quince minutos después**. Ahora
+prohíbe la construcción afirmativa.
 
 ## Estado de la rama
 
@@ -410,3 +426,18 @@ typecheck ...... 1  ← de C1 (`compliance-gates.test.ts`), intacto y reportado
 
 Delta contra `11fcf51` (3730 / 152 / 0 · 21.185 · 3882): **+47 pass, +153
 aserciones, +47 tests, 0 fail, skip sin mover.**
+
+---
+
+## Estado tras la Tarea 7 (2026-08-30)
+
+```
+bun test ....... 3787 pass · 152 skip · 0 fail · 21.379 expects · 3939 tests
+lint ........... limpio
+typecheck ...... 1  ← de C1 (`compliance-gates.test.ts`), intacto y reportado
+```
+
+Delta contra `11fcf51` (3730 / 152 / 0 · 21.185 · 3882): **+57 pass, +194
+aserciones, +57 tests, 0 fail, skip sin mover.**
+
+**Queda solo la Tarea 8**, que espera al merge de C2 por el paso 1.
