@@ -8,26 +8,63 @@
 Cada punto describe algo que **parece un defecto y no lo es**. Todos han estado a punto de
 ser «corregidos» al menos una vez, y corregirlos destruiría dato correcto.
 
+> **El §1 está SUPERADO** desde el 2026-08-29 por una fuente que apareció después. Se deja
+> escrito con su refutación en vez de borrarlo. Un invariante desmentido que se queda escrito
+> como invariante es peor que no tenerlo: se lee como comprobado y el siguiente lector ya no
+> vuelve a mirar.
+
 ---
 
-## 1. Los dos verdes del mapa penal no tienen orden publicado
+## 1. ~~Los dos verdes del mapa penal no tienen orden publicado~~ — SUPERADO
+
+> **⚠️ Invariante superado por fuente sobrevenida el 2026-08-29.** No se borra: se deja con
+> su razonamiento original y su refutación, porque el orden en que se supo importa.
+
+### Lo que decía, y por qué era cierto entonces
 
 `assessed_band` colapsa verde intenso y verde claro en un único `VERDE`, mientras que
-`assessment_breakdown` conserva el color exacto de cada celda. **No es una pérdida de
-información por descuido.**
+`assessment_breakdown` conserva el color exacto de cada celda.
 
-La fuente —el mapa evaluado 2025— expresa el nivel **solo por color** y **no publica leyenda
-en ninguna de sus páginas**; PPD-01 tampoco documenta la escala. Se comprobó si el orden era
-derivable y **no lo es**: solo 5 de las 82 filas usan los dos verdes a la vez, y la frecuencia
-se invierte entre los dos mapas (en áreas de negocio el claro es 17 veces más frecuente que el
-intenso; en departamentos internos la proporción se da la vuelta).
+Con la evidencia disponible en G5 —los dos PDF del mapa evaluado 2025— **el nivel se expresa
+solo por color y no hay leyenda en ninguna de sus páginas**; PPD-01 tampoco documenta la
+escala. Se comprobó si el orden era derivable del propio dato y **no lo era**: solo 5 de las
+82 filas usan los dos verdes a la vez, y la frecuencia se invierte entre los dos mapas (en
+áreas de negocio el claro es 17 veces más frecuente que el intenso; en departamentos internos
+la proporción se da la vuelta). Determinado: amarillo < naranja < rojo, y los dos verdes por
+debajo del amarillo. Indeterminado: cuál de los dos verdes iba antes.
 
-Determinado: amarillo < naranja < rojo, y los dos verdes por debajo del amarillo.
-Indeterminado: cuál de los dos verdes va antes.
+Colapsarlos **era la decisión correcta con esa evidencia**: separarlos habría sido inventar
+una escala que las fuentes entonces conocidas no tenían.
 
-**Separarlos en dos bandas ordenadas sería inventar una escala que la fuente no tiene.** Si el
-despacho facilita algún día la leyenda real, las bandas pasan de anónimas a nombradas y la
-`firmeza` sube de `DEMO_PILOTO` a `FIRME`. Hasta entonces, no.
+### Lo que la superó
+
+`Plantilla evaluación de riesgos_G-Digital.xlsx`, hoja **`Config.`**. Es la plantilla oficial
+del despacho para evaluar riesgos penales. Su matriz probabilidad × impacto lleva el nivel
+escrito en el texto de cada celda y **la banda en el color de relleno**. Los rellenos
+extraídos de `xl/styles.xml` coinciden **exactamente** con los RGB medidos píxel a píxel en el
+mapa evaluado — la misma paleta por dos caminos independientes:
+
+| Nivel | Color | RGB |
+|---|---|---|
+| Muy bajo | verde intenso | `#00B050` = (0,176,80) |
+| Bajo | verde claro | `#92D050` = (146,208,80) |
+| Medio | amarillo | `#FFFF00` |
+| Alto | naranja | `#FFC000` |
+| Muy alto | rojo | `#FF0000` |
+| — | gris `#D9D9D9` | sin valor / no evaluado |
+
+**La escala tiene nombres y los dos verdes tienen orden: verde intenso = Muy bajo, verde
+claro = Bajo.** El spec de G5 §6 condicionaba el pase de `DEMO_PILOTO` a `FIRME` a que el
+despacho facilitara la leyenda real. La ha facilitado.
+
+### Qué queda en pie y qué no
+
+- **Cae:** «escala ordinal sin nombres» y «el orden de los dos verdes no es derivable».
+- **Sigue en pie:** que el colapso a `VERDE` fue correcto mientras la leyenda no constaba, y
+  que `assessment_breakdown` conserve el color exacto de cada celda — ahora es lo que permite
+  reetiquetar sin volver a extraer.
+- **Pendiente de ejecución**, en cola detrás del cierre de C3: reetiquetar las bandas con sus
+  nombres y subir la `firmeza`. Hasta que se ejecute, el dato en Cloud sigue como está.
 
 ## 2. `probability`, `impact` y `residual_score` están en NULL a propósito
 
@@ -36,6 +73,18 @@ impide rellenarlos cuando existe `assessed_band`.
 
 La fuente da **un nivel compuesto por celda** y no lo descompone en probabilidad × impacto.
 **Rellenarlos es fabricar dato, no completarlo.** El CHECK es la red; la razón es esta.
+
+**Matiz añadido el 2026-08-29, y es el que impide que el hallazgo del §1 se convierta en
+barra libre.** La plantilla revela que la metodología del despacho **sí descompone**: P1
+frecuencia de exposición (habitual 5 / ocasional 2,5 / remoto 1) × P2 sujetos activos (solo
+Socio 1 → Staff y superior 2), máximo bruto 10, normalizado a 0-1 con cortes en 0,8 / 0,6 /
+0,4 / 0,2, cruzado contra impacto en la matriz de `Config.`.
+
+Eso **no cambia este invariante**. La plantilla acredita la **leyenda**, no los **ejes de cada
+riesgo concreto**: el PDF evaluado sigue publicando únicamente el color final, y de ahí no se
+pueden derivar la P y la I de cada celda. Dejarlos en NULL sigue siendo lo correcto. Solo si
+llegan las **plantillas rellenas** habrá P e I reales, y **entonces** —no antes— se revisa el
+CHECK `risks_banda_sin_ejes_check`.
 
 De aquí salieron cuatro superficies que afirmaban algo falso al leer NULL, y las cuatro se
 corrigieron en código: la ficha de Risk 360 imprimía «Prob. 1 · Impacto 1», la rejilla apilaba
