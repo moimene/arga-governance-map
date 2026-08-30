@@ -54,6 +54,7 @@ function rulePack(overrides: Partial<RulePack> & Record<string, unknown> = {}): 
         SL: ["NOTIFICACION_INDIVIDUAL"],
         SAU: ["BORME", "WEB"],
         SLU: ["NOTIFICACION_INDIVIDUAL"],
+        SLP: ["NOTIFICACION_INDIVIDUAL"],
       },
       contenidoMinimo: ["orden_dia"],
       documentosObligatorios: [{ id: "cuentas_formuladas", nombre: "Cuentas formuladas" }],

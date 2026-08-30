@@ -14,8 +14,9 @@ const pack: RulePack = {
       SL: { valor: 15, fuente: 'LEY', referencia: 'art. 176 LSC' },
       SAU: { valor: 30, fuente: 'LEY', referencia: 'art. 176 LSC' },
       SLU: { valor: 15, fuente: 'LEY', referencia: 'art. 176 LSC' },
+      SLP: { valor: 15, fuente: 'LEY', referencia: 'art. 176 LSC' },
     },
-    canales: { SA: [], SL: [], SAU: [], SLU: [] },
+    canales: { SA: [], SL: [], SAU: [], SLU: [], SLP: [] },
     contenidoMinimo: [],
   },
   constitucion: {
@@ -23,6 +24,7 @@ const pack: RulePack = {
       SA_1a: { valor: 0.5, fuente: 'LEY', referencia: 'art. 194 LSC' },
       SA_2a: { valor: 0.25, fuente: 'LEY' },
       SL: { valor: 0, fuente: 'LEY' },
+      SLP: { valor: 0, fuente: 'LEY' },
       CONSEJO: { valor: 'mayoria_miembros', fuente: 'LEY' },
     },
   },

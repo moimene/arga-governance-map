@@ -38,7 +38,7 @@
  * Dry-run por defecto (solo imprime lo que haría). --commit ejecuta contra
  * Cloud. Requiere una service-role key en el entorno.
  */
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { GARRIGUES_TENANT } from "./garrigues/entities-catalog";
 
 const SUPABASE_URL =
@@ -710,7 +710,7 @@ export const PACKS: Array<{
   },
 ];
 
-async function ensureRulePack(admin: ReturnType<typeof createClient>, pack: (typeof PACKS)[number]) {
+async function ensureRulePack(admin: SupabaseClient, pack: (typeof PACKS)[number]) {
   const { data: existingPack, error: eSelPack } = await admin
     .from("rule_packs")
     .select("id")
@@ -781,7 +781,7 @@ async function ensureRulePack(admin: ReturnType<typeof createClient>, pack: (typ
 // v1.0.0 solo si sigue activa. Ambos pasos son no-op en una segunda pasada.
 const JUNTA_SOCIOS_V110_VERSION = "1.1.0";
 
-async function ensureJuntaSociosV110Upgrade(admin: ReturnType<typeof createClient>) {
+async function ensureJuntaSociosV110Upgrade(admin: SupabaseClient) {
   const packId = "GARR_JUNTA_SOCIOS";
 
   const { data: existingV110, error: eSelV110 } = await admin

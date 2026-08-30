@@ -19,3 +19,14 @@ interface ImportMeta {
   /** true cuando el módulo es el punto de entrada del proceso (Bun). */
   readonly main: boolean;
 }
+
+// 3) El global `Bun`. Igual que `import.meta.main`: lo usan los scripts (p. ej.
+//    `Bun.file`) y es la otra superficie de Bun que este proyecto toca. Se
+//    declara al mínimo en vez de arrastrar los tipos completos del runtime.
+declare const Bun: {
+  write(path: string, data: string | Uint8Array): Promise<number>;
+  spawnSync(
+    cmd: string[],
+    opts?: { stdout?: "pipe" | "inherit"; stderr?: "pipe" | "inherit" },
+  ): { stdout: Uint8Array; stderr: Uint8Array; exitCode: number; success: boolean };
+};

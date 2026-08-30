@@ -167,7 +167,10 @@ async function mutate(
   supabase: SupabaseClient,
   repairs: string[],
   label: string,
-  fn: () => Promise<{ error: { message: string } | null }>,
+  // `PromiseLike`, no `Promise`: los llamantes pasan un PostgrestFilterBuilder,
+  // que es THENABLE —`await fn()` funciona— pero no es estructuralmente un
+  // Promise. NO falta un await: el tipo era demasiado estrecho.
+  fn: () => PromiseLike<{ error: { message: string } | null }>,
 ) {
   if (!apply) {
     repairs.push(`[PLAN] ${label}`);

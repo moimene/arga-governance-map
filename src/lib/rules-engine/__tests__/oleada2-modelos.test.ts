@@ -24,8 +24,9 @@ function makePackOrdinario(materia: string, inscribible = false): RulePack {
         SL: { valor: 15, fuente: 'LEY' },
         SLU: { valor: 0, fuente: 'LEY' },
         SAU: { valor: 0, fuente: 'LEY' },
+        SLP: { valor: 15, fuente: 'LEY' },
       },
-      canales: { SA: ['BORME'], SL: ['NOTIFICACION'], SLU: [], SAU: [] },
+      canales: { SA: ['BORME'], SL: ['NOTIFICACION'], SLU: [], SAU: [], SLP: ['NOTIFICACION'] },
       contenidoMinimo: [],
     },
     constitucion: {
@@ -33,6 +34,7 @@ function makePackOrdinario(materia: string, inscribible = false): RulePack {
         SA_1a: { valor: 0.25, fuente: 'LEY', referencia: 'art. 189 LSC' },
         SA_2a: { valor: 0, fuente: 'LEY', referencia: 'art. 189 LSC' },
         SL: { valor: 0, fuente: 'LEY', referencia: 'art. 201 LSC' },
+        SLP: { valor: 0, fuente: 'LEY', referencia: 'art. 201 LSC' },
         CONSEJO: { valor: 'mayoria_miembros', fuente: 'LEY' },
       },
     },
