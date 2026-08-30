@@ -30,6 +30,7 @@ describe("SII — los casos demo son de despacho, y son simulados", () => {
   });
 
   it("TODOS etiquetados como simulados, y el aviso dice por qué no puede haber reales", () => {
+    expect(CASOS_DEMO_GARRIGUES).toHaveLength(3);
     expect(CASOS_DEMO_GARRIGUES.every((c) => c.firmeza === CASOS_DEMO_FIRMEZA)).toBe(true);
     // Aserción inversa: si alguien añade uno afirmándolo real, cae.
     expect(CASOS_DEMO_GARRIGUES.filter((c) => c.firmeza !== CASOS_DEMO_FIRMEZA)).toEqual([]);

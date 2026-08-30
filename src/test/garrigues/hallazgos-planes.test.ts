@@ -96,6 +96,15 @@ describe("C3 Tarea 5 — hallazgos enlazados y planes etiquetados", () => {
   });
 
   it("ARGA no cambia: sigue sin hallazgos ni planes del prefijo de Garrigues", async () => {
+    // Control POSITIVO antes de la ausencia. Una lista vacía puede significar
+    // «no los tiene» o «el cliente no ve nada» —RLS mal, sesión caída, tabla
+    // equivocada—, y las dos se ven idénticas. Si ARGA no viera ni lo suyo,
+    // la ausencia de abajo pasaría por el motivo equivocado.
+    const { data: propios, error } = await arga.from("findings")
+      .select("code").eq("tenant_id", DEMO_TENANT);
+    expect(error).toBeNull();
+    expect(propios.length).toBeGreaterThan(0);
+
     const { data: f } = await arga.from("findings")
       .select("code").eq("tenant_id", DEMO_TENANT).like("code", "FND-GARR-%");
     expect(f).toEqual([]);
