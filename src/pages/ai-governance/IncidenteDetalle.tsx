@@ -39,9 +39,13 @@ export default function AiIncidenteDetalle() {
   const [status, setStatus] = useState<string>("");
   const [severity, setSeverity] = useState<string>("");
   const [riaSeverity, setRiaSeverity] = useState<RiaIncidentSeverity>("ORDINARY_SERIOUS");
-  const [affectsPii, setAffectsPii] = useState<boolean>(true);
+  // Arrancaban en `true`, sin ningún control en la UI para cambiarlos: TODO
+  // incidente de TODO tenant activaba el reloj del RGPD y el de DORA. Que un
+  // incidente afecte a datos personales, y que la entidad esté sujeta a DORA,
+  // son afirmaciones — y una afirmación no se presume: se declara.
+  const [affectsPii, setAffectsPii] = useState<boolean>(false);
   const [highRiskPii, setHighRiskPii] = useState<boolean>(false);
-  const [isIctCritical, setIsIctCritical] = useState<boolean>(true);
+  const [isIctCritical, setIsIctCritical] = useState<boolean>(false);
   const [rootCause, setRootCause] = useState<string>("");
   const [correctiveAction, setCorrectiveAction] = useState<string>("");
   const [isEditing, setIsEditing] = useState(false);
@@ -370,7 +374,8 @@ export default function AiIncidenteDetalle() {
               )}
             </div>
             <p className="text-xs text-[var(--g-text-secondary)] leading-relaxed">
-              {clocks.gdpr?.ruleDescription}
+              {clocks.gdpr?.ruleDescription ??
+                "No consta declarado que el incidente afecte a datos personales, así que no se cuenta plazo del art. 33 RGPD."}
             </p>
             {clocks.gdpr?.dataSubjectNoticeArticleRef && (
               <p className="text-[11px] text-[var(--g-text-secondary)] leading-relaxed">
@@ -405,7 +410,8 @@ export default function AiIncidenteDetalle() {
               )}
             </div>
             <p className="text-xs text-[var(--g-text-secondary)] leading-relaxed">
-              {clocks.dora?.ruleDescription}
+              {clocks.dora?.ruleDescription ??
+                "No consta que la entidad esté sujeta a DORA ni que el incidente afecte a funciones críticas TIC: no se cuenta plazo."}
             </p>
             {clocks.dora?.assumesPriorReportsAtDeadline && (
               <p className="text-[11px] text-[var(--g-text-secondary)] leading-relaxed">

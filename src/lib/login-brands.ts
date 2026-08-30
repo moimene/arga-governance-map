@@ -80,7 +80,7 @@ export const LOGIN_BRANDS: Record<string, LoginBrand> = {
       {
         icon: "compass",
         title: "GRC Compass & AI Governance (AIMS 360)",
-        description: "Gestión de riesgos DORA, penal y supervisión IA",
+        description: "Riesgo penal, ciberseguridad y supervisión de la IA",
       },
     ],
   },
