@@ -271,6 +271,12 @@ function evaluateFormula(
 
   // 2/3 of present/concurrent capital
   if (formulaActual === 'favor >= 2/3_capital_presente') {
+    // Sin base no hay mayoria reforzada que proclamar: con la base a 0 el umbral
+    // es 0 y `favor >= 0` daria por alcanzados los dos tercios con cero votos.
+    // Misma guarda que ya aplica `lsc_201_2_reforzada` mas abajo.
+    if (capital_presente <= 0) {
+      return { alcanzada: false, valorRequerido: 1, valorObtenido: favor };
+    }
     const requerido = (2 * capital_presente) / 3;
     return {
       alcanzada: favor >= requerido,
@@ -281,6 +287,12 @@ function evaluateFormula(
 
   // 2/3 of total capital
   if (formulaActual === 'favor >= 2/3_capital') {
+    // Sin base no hay mayoria reforzada que proclamar: con la base a 0 el umbral
+    // es 0 y `favor >= 0` daria por alcanzados los dos tercios con cero votos.
+    // Misma guarda que ya aplica `lsc_201_2_reforzada` mas abajo.
+    if (capital_total <= 0) {
+      return { alcanzada: false, valorRequerido: 1, valorObtenido: favor };
+    }
     const requerido = (2 * capital_total) / 3;
     return {
       alcanzada: favor >= requerido,
@@ -294,10 +306,8 @@ function evaluateFormula(
   if (formulaActual === 'favor >= 4/5_capital') {
     // Sin base no hay mayoria reforzada que proclamar: con `capital_total = 0`
     // el umbral es 0 y `favor >= 0` daria por alcanzado un 80% con cero votos.
-    // Las ramas hermanas de 2/3 y 1/2 comparten el agujero; no se tocan aqui
-    // porque ARGA las usa en 27 packs vivos y moverlas cambia su calculo.
     if (capital_total <= 0) {
-      return { alcanzada: false, valorRequerido: 0, valorObtenido: favor };
+      return { alcanzada: false, valorRequerido: 1, valorObtenido: favor };
     }
     const requerido = (4 * capital_total) / 5;
     return {

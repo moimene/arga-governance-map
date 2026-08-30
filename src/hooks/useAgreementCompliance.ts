@@ -25,6 +25,7 @@ import {
   type SolidarioConfig,
   type NoSessionInput,
   type ComplianceGateResult,
+  type EtapaEvaluacion,
 } from "@/lib/rules-engine";
 
 type RulePackJoinRow = {
@@ -576,13 +577,8 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
     }
   );
 
-  // Mapear EngineComplianceResult → ComplianceResult V1
-  const convEtapa = result.etapas.find((e) => e.etapa === "convocatoria");
-  const quorumEtapa = result.etapas.find((e) => e.etapa === "constitucion");
-  const votEtapa = result.etapas.find((e) => e.etapa === "votacion");
-  const postEtapa = result.etapas.find((e) => e.etapa === "postAcuerdo");
-
-  const inscribable = resolveAgreementInscribable(a.inscribable, postEtapa?.explain);
+  const etapasOk = mapEtapasACumplimiento(result.etapas);
+  const inscribable = resolveAgreementInscribable(a.inscribable, undefined);
   const gates = [
     ...(agendaBoundary ? [gateFromEvaluation(agendaBoundary, { kind: "routing", label: "Punto del orden del día" })] : []),
     ...result.etapas.map((etapa) => gateFromEvaluation(etapa)),
@@ -599,10 +595,13 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
     matter_class: a.matter_class,
     adoption_mode: a.adoption_mode,
     inscribable,
-    convocation_compliant: convEtapa?.ok ?? true,
-    quorum_compliant: quorumEtapa?.ok ?? true,
+    // Si la etapa no corrio, el sistema NO ha comprobado nada: `false`. El
+    // `?? true` anterior afirmaba cumplimiento por ausencia de evaluacion, que
+    // es justo lo contrario de lo que significa que una etapa no este.
+    convocation_compliant: etapasOk.convocatoria,
+    quorum_compliant: etapasOk.constitucion,
     conflict_handled: true,
-    majority_compliant: votEtapa?.ok ?? true,
+    majority_compliant: etapasOk.votacion,
     instrument_required: inscribable ? "ESCRITURA" : "NINGUNO",
     registry_required: inscribable,
     publication_required: false,
@@ -624,6 +623,37 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
  *
  * No aplica cambios en BD — es una vista derivada para el expediente del acuerdo.
  */
+/**
+ * Traduce las etapas que devuelve el orquestador a los tres booleanos que la
+ * ficha del acuerdo corona con un ✓ o una ✗.
+ *
+ * Vivia en linea dentro del hook y comparaba en MINUSCULA (`"convocatoria"`)
+ * contra motores que emiten la etapa en MAYUSCULA. Los tres `find` no encajaban
+ * NUNCA y caian a un `?? true`: la ficha afirmaba en verde que la convocatoria,
+ * el quorum y la mayoria cumplian, en acuerdos donde ninguna de las tres se
+ * habia comprobado. Sobrevivio meses porque `etapa` era `string` pelado y
+ * porque NINGUN test miraba estos tres campos. Ahora `etapa` es una union
+ * tipada y esto es una funcion pura con su prueba.
+ *
+ * Reglas:
+ * - etapa presente  → su `ok`.
+ * - etapa `*_skip`  → cuenta: el orquestador la emite con `ok:true` cuando el
+ *                     tramite no se requiere (unipersonal, junta universal).
+ * - etapa ausente   → `false`. Que una etapa no haya corrido significa que el
+ *                     sistema no ha comprobado nada, no que cumpla.
+ */
+export function mapEtapasACumplimiento(
+  etapas: ReadonlyArray<{ etapa: EtapaEvaluacion; ok: boolean }>,
+): { convocatoria: boolean; constitucion: boolean; votacion: boolean } {
+  const buscar = (...nombres: EtapaEvaluacion[]) =>
+    etapas.find((e) => nombres.includes(e.etapa));
+  return {
+    convocatoria: buscar("CONVOCATORIA", "convocatoria_skip")?.ok ?? false,
+    constitucion: buscar("CONSTITUCION", "constitucion_skip")?.ok ?? false,
+    votacion: buscar("VOTACION")?.ok ?? false,
+  };
+}
+
 export function useAgreementCompliance(agreementId?: string) {
   const { tenantId } = useTenantContext();
   return useQuery({
