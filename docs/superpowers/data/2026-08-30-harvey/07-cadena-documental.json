@@ -1,0 +1,3295 @@
+{
+ "meta": {
+  "tenant": "00000000-0000-0000-0000-000000000002",
+  "fecha_generacion": "2026-08-30",
+  "firmeza": "SINTETICO",
+  "procedencia": "SIMULADO",
+  "advertencia_firma": "Los artefactos modelan firma, custodia e integridad documental, pero no atribuyen a ninguna persona una firma electrónica cualificada.",
+  "reglas_aplicadas": [
+   "Las cuentas anuales se depositan y nunca se elevan a público.",
+   "La formulación de cuentas termina en ADOPTED y en el libro de actas.",
+   "Las certificaciones expedidas por administrador único no llevan visto bueno.",
+   "Las escrituras de poderes reproducen las facultades, límites y exclusiones del acuerdo de origen.",
+   "Los protocolos, nombres de notario y datos registrales generados llevan marca SIMULADO.",
+   "Los plazos fijados por meses se computan de fecha a fecha conforme al artículo 5.1 del Código Civil."
+  ]
+ },
+ "certificaciones": [
+  {
+   "agreement_id": "GARR-SEC-006",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_SOCIO_UNICO",
+   "fecha": "2024-05-15",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P., representada por D. Fernando Vives Ruiz",
+    "cargo": "Socio único de Compañía Digital NewLaw, S.L.U.",
+    "fundamento_facultad": "Artículos 15 LSC y 109.1 RRM"
+   },
+   "texto": "CERTIFICACIÓN DE DECISIONES DEL SOCIO ÚNICO. J&A Garrigues, S.L.P., representada por D. Fernando Vives Ruiz, en su condición de socio único de Compañía Digital NewLaw, S.L.U., con NIF B72893035, CERTIFICA: I. Que el día 14 de mayo de 2024, en Madrid, el socio único ejerció las competencias de la junta general, sin convocatoria ni quórum por razón de la unipersonalidad. II. Que las decisiones fueron consignadas en acta bajo la firma de su representante y el acta fue aprobada el mismo 14 de mayo de 2024. III. Que el tenor literal de las decisiones fue el siguiente: «PRIMERO.- Aprobar las cuentas anuales del ejercicio cerrado a 31 de diciembre de 2023, formuladas el 8 de marzo de 2024. SEGUNDO.- Aprobar la aplicación del resultado de 320.000,00 euros, destinando 32.000,00 euros a reserva legal y 288.000,00 euros a reservas voluntarias. TERCERO.- Aprobar la gestión del órgano de administración. CUARTO.- Facultar al órgano de administración para expedir certificación y presentar las cuentas a depósito». Y para que conste, se expide esta certificación en Madrid, a 15 de mayo de 2024. No se incorpora visto bueno por certificar el socio único mediante su representante. La firma incorporada al prototipo es ordinaria de demostración y no se califica como firma electrónica cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2024-05-14",
+     "marca": "SIMULADO"
+    },
+    "huella_custodia": {
+     "valor": "SHA256-DEMO-GARR-SEC-006-CERT",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2024-06-14",
+    "fecha_presentacion_prevista": "2024-06-07",
+    "dias_margen": 7
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-006 y su aplicación del resultado."
+  },
+  {
+   "agreement_id": "GARR-SEC-008",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_JUNTA",
+   "fecha": "2024-06-12",
+   "otorgante_o_certificante": {
+    "nombre": "Samuel Fontán Aguirre",
+    "cargo": "Secretario no consejero del Consejo de Administración",
+    "fundamento_facultad": "Artículo 109.1 RRM, con visto bueno del presidente"
+   },
+   "texto": "CERTIFICACIÓN DE ACUERDOS DE LA JUNTA GENERAL ORDINARIA. D. Samuel Fontán Aguirre, Secretario no consejero del Consejo de Administración de EAD Trust European Agency of Digital Trust, S.L., con NIF B85626240, CERTIFICA, con el visto bueno de la Presidenta: I. Que la junta general ordinaria se celebró en Madrid el 11 de junio de 2024, en el domicilio social, previa convocatoria en forma, concurriendo socios titulares del 100 % del capital social. II. Que los acuerdos fueron adoptados con el voto favorable del 100 % del capital concurrente. III. Que el acta fue aprobada al final de la sesión, el 11 de junio de 2024. IV. Que los acuerdos dicen literalmente: «PRIMERO.- Aprobar las cuentas anuales del ejercicio cerrado a 31 de diciembre de 2023, formuladas el 21 de marzo de 2024. SEGUNDO.- Aprobar la aplicación del resultado de 275.000,00 euros, destinando 27.500,00 euros a reserva legal y 247.500,00 euros a reservas voluntarias. TERCERO.- Aprobar la gestión del órgano de administración. CUARTO.- Facultar al órgano de administración para certificar y presentar las cuentas a depósito». Y para que conste, se expide en Madrid, a 12 de junio de 2024. Visto bueno: Irene Montalbán Crespo, Presidenta. Las firmas modeladas son ordinarias de demostración y no se califican como firmas electrónicas cualificadas.",
+   "datos_instrumentales": {
+    "secretario": {
+     "valor": "Samuel Fontán Aguirre",
+     "marca": "SIMULADO"
+    },
+    "presidenta_visto_bueno": {
+     "valor": "Irene Montalbán Crespo",
+     "marca": "SIMULADO"
+    },
+    "fecha_aprobacion_acta": {
+     "valor": "2024-06-11",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2024-07-11",
+    "fecha_presentacion_prevista": "2024-07-03",
+    "dias_margen": 8
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-008 y GARR-SEC-007."
+  },
+  {
+   "agreement_id": "GARR-SEC-010",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_SOCIO_UNICO",
+   "fecha": "2025-05-21",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P., representada por D. Fernando Vives Ruiz",
+    "cargo": "Socio único",
+    "fundamento_facultad": "Artículos 15 LSC y 109.1 RRM"
+   },
+   "texto": "CERTIFICACIÓN DE DECISIONES DEL SOCIO ÚNICO. El socio único de Compañía Digital NewLaw, S.L.U., CERTIFICA: Que el 20 de mayo de 2025, en Madrid, ejerció las competencias de la junta general, sin convocatoria, quórum ni votación, y aprobó el acta en esa misma fecha. Las decisiones fueron: «PRIMERO.- Aprobar las cuentas anuales del ejercicio cerrado a 31 de diciembre de 2024, formuladas el 14 de marzo de 2025. SEGUNDO.- Aprobar la aplicación del resultado de 465.000,00 euros, sin dotación a reserva legal, repartiendo un dividendo de 150.000,00 euros y destinando 315.000,00 euros a reservas voluntarias. TERCERO.- Aprobar la gestión del órgano de administración. CUARTO.- Facultar al órgano de administración para certificar y presentar las cuentas a depósito». Se expide en Madrid, a 21 de mayo de 2025, sin visto bueno. La firma de demostración no se califica como firma electrónica cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2025-05-20",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2025-06-20",
+    "fecha_presentacion_prevista": "2025-06-11",
+    "dias_margen": 9
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-010."
+  },
+  {
+   "agreement_id": "GARR-SEC-012",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_JUNTA",
+   "fecha": "2025-06-11",
+   "otorgante_o_certificante": {
+    "nombre": "Samuel Fontán Aguirre",
+    "cargo": "Secretario no consejero del Consejo",
+    "fundamento_facultad": "Artículo 109.1 RRM, con visto bueno"
+   },
+   "texto": "CERTIFICA: Que la junta general ordinaria de EAD Trust European Agency of Digital Trust, S.L. se celebró en Madrid el 10 de junio de 2025, previa convocatoria en forma, con asistencia del 100 % del capital; que los acuerdos fueron aprobados por el 100 % del capital concurrente y el acta fue aprobada al finalizar la sesión. Acuerdos: «PRIMERO.- Aprobar las cuentas de 2024 formuladas el 20 de marzo de 2025. SEGUNDO.- Aplicar el resultado de 410.000,00 euros, destinando 120.000,00 euros a dividendo y 290.000,00 euros a reservas voluntarias, sin dotación adicional a reserva legal. TERCERO.- Aprobar la gestión social. CUARTO.- Facultar para certificar y depositar». Se expide en Madrid, a 11 de junio de 2025. Visto bueno: Irene Montalbán Crespo. Las firmas son ordinarias de demostración, no cualificadas.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2025-06-10",
+     "marca": "SIMULADO"
+    },
+    "secretario_y_presidenta": {
+     "valor": "Samuel Fontán Aguirre / Irene Montalbán Crespo",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2025-07-10",
+    "fecha_presentacion_prevista": "2025-07-02",
+    "dias_margen": 8
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-012."
+  },
+  {
+   "agreement_id": "GARR-SEC-014",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_JUNTA",
+   "fecha": "2025-06-18",
+   "otorgante_o_certificante": {
+    "nombre": "Lucía Barrenechea Soto",
+    "cargo": "Secretaria del órgano de administración",
+    "fundamento_facultad": "Artículo 109.1 RRM, con visto bueno"
+   },
+   "texto": "CERTIFICA: Que la junta general ordinaria de G-Advisory, Consultoría Técnica, Económica y Estratégica, S.L.P. se celebró en Madrid el 17 de junio de 2025, previa convocatoria en forma, concurriendo el 100 % del capital; que los acuerdos fueron adoptados por unanimidad del capital concurrente y el acta se aprobó al final de la sesión. Acuerdos: «PRIMERO.- Aprobar las cuentas de 2024 formuladas el 7 de marzo de 2025. SEGUNDO.- Aplicar el resultado de 1.240.000,00 euros, repartiendo 400.000,00 euros de dividendo y destinando 840.000,00 euros a reservas voluntarias. TERCERO.- Aprobar la gestión social. CUARTO.- Facultar para certificar y depositar». Se expide el 18 de junio de 2025. Visto bueno: Álvaro Monreal Cifuentes. Las firmas de custodia no son firmas electrónicas cualificadas.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2025-06-17",
+     "marca": "SIMULADO"
+    },
+    "certificante_y_visto_bueno": {
+     "valor": "Lucía Barrenechea Soto / Álvaro Monreal Cifuentes",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2025-07-17",
+    "fecha_presentacion_prevista": "2025-07-09",
+    "dias_margen": 8
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-014."
+  },
+  {
+   "agreement_id": "GARR-SEC-016",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_SOCIO_UNICO",
+   "fecha": "2025-05-28",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P.",
+    "cargo": "Socio único de Garrigues IP, S.L.P.",
+    "fundamento_facultad": "Artículos 15 LSC y 109.1 RRM"
+   },
+   "texto": "CERTIFICA: Que el socio único de Garrigues IP, S.L.P. adoptó en Madrid, el 27 de mayo de 2025, sin convocatoria, quórum ni votación, y con acta aprobada en la misma fecha, las decisiones siguientes: «PRIMERO.- Aprobar las cuentas de 2024 formuladas el 26 de febrero de 2025. SEGUNDO.- Aplicar el resultado de 186.000,00 euros, repartiendo 60.000,00 euros de dividendo y destinando 126.000,00 euros a reservas voluntarias. TERCERO.- Aprobar la gestión social. CUARTO.- Facultar para certificar y depositar». Se expide el 28 de mayo de 2025, sin visto bueno. La firma modelada no tiene la consideración de firma electrónica cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2025-05-27",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2025-06-27",
+    "fecha_presentacion_prevista": "2025-06-18",
+    "dias_margen": 9
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-016."
+  },
+  {
+   "agreement_id": "GARR-SEC-018",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_SOCIO_UNICO",
+   "fecha": "2025-05-14",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P.",
+    "cargo": "Socio único de Garrigues Letrados de Soporte, S.L.P.",
+    "fundamento_facultad": "Artículos 15 LSC y 109.1 RRM"
+   },
+   "texto": "CERTIFICA: Que el 13 de mayo de 2025 el socio único adoptó y consignó en acta, aprobada en esa fecha, estas decisiones: «PRIMERO.- Aprobar las cuentas de 2024 formuladas el 11 de marzo de 2025. SEGUNDO.- Aplicar el resultado de 92.000,00 euros, destinando 9.200,00 euros a reserva legal y 82.800,00 euros a reservas voluntarias. TERCERO.- Aprobar la gestión social. CUARTO.- Facultar para certificar y depositar». Se expide en Madrid el 14 de mayo de 2025, sin visto bueno. No se atribuye firma electrónica cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2025-05-13",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2025-06-13",
+    "fecha_presentacion_prevista": "2025-06-04",
+    "dias_margen": 9
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-018."
+  },
+  {
+   "agreement_id": "GARR-SEC-020",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_SOCIO_UNICO",
+   "fecha": "2025-06-04",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P.",
+    "cargo": "Socio único de Garrigues Human Capital Services, S.L.P.",
+    "fundamento_facultad": "Artículos 15 LSC y 109.1 RRM"
+   },
+   "texto": "CERTIFICA: Que el 3 de junio de 2025 el socio único adoptó y consignó en acta, aprobada ese día, las decisiones siguientes: «PRIMERO.- Aprobar las cuentas de 2024 formuladas el 18 de marzo de 2025. SEGUNDO.- Aplicar el resultado de 143.000,00 euros, destinando 14.300,00 euros a reserva legal y 128.700,00 euros a reservas voluntarias. TERCERO.- Aprobar la gestión. CUARTO.- Facultar para certificar y depositar». Se expide el 4 de junio de 2025, sin visto bueno y sin atribución de firma electrónica cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2025-06-03",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2025-07-03",
+    "fecha_presentacion_prevista": "2025-06-25",
+    "dias_margen": 8
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-020."
+  },
+  {
+   "agreement_id": "GARR-SEC-022",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_SOCIO_UNICO",
+   "fecha": "2025-06-25",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P.",
+    "cargo": "Socio único de Garrigues Consultoría de Empresa Familiar, S.L.P.",
+    "fundamento_facultad": "Artículos 15 LSC y 109.1 RRM"
+   },
+   "texto": "CERTIFICA: Que el 24 de junio de 2025 el socio único aprobó el acta y adoptó: «PRIMERO.- Aprobar las cuentas de 2024 formuladas el 25 de marzo de 2025. SEGUNDO.- Aplicar el resultado de 61.000,00 euros, destinando 6.100,00 euros a reserva legal y 54.900,00 euros a reservas voluntarias. TERCERO.- Aprobar la gestión. CUARTO.- Facultar para certificar y depositar». Se expide el 25 de junio de 2025, sin visto bueno. La firma es de demostración y no cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2025-06-24",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2025-07-24",
+    "fecha_presentacion_prevista": "2025-07-16",
+    "dias_margen": 8
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-022."
+  },
+  {
+   "agreement_id": "GARR-SEC-024",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_SOCIO_UNICO",
+   "fecha": "2026-05-20",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P., representada por D. Fernando Vives Ruiz",
+    "cargo": "Socio único",
+    "fundamento_facultad": "Artículos 15 LSC y 109.1 RRM"
+   },
+   "texto": "CERTIFICA: Que el socio único de Compañía Digital NewLaw, S.L.U. adoptó el 19 de mayo de 2026 y aprobó en esa fecha el acta que contiene: «PRIMERO.- Aprobar las cuentas de 2025 formuladas el 10 de marzo de 2026. SEGUNDO.- Aplicar el resultado de 610.000,00 euros, repartiendo 250.000,00 euros de dividendo y destinando 360.000,00 euros a reservas voluntarias. TERCERO.- Aprobar la gestión. CUARTO.- Facultar para certificar y depositar». Se expide el 20 de mayo de 2026, sin visto bueno. No se atribuye firma electrónica cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2026-05-19",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-06-19",
+    "fecha_presentacion_prevista": "2026-06-10",
+    "dias_margen": 9
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-024."
+  },
+  {
+   "agreement_id": "GARR-SEC-026",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_JUNTA",
+   "fecha": "2026-06-10",
+   "otorgante_o_certificante": {
+    "nombre": "Samuel Fontán Aguirre",
+    "cargo": "Secretario no consejero del Consejo",
+    "fundamento_facultad": "Artículo 109.1 RRM, con visto bueno"
+   },
+   "texto": "CERTIFICA: Que la junta general ordinaria de EAD Trust European Agency of Digital Trust, S.L. se celebró el 9 de junio de 2026, previa convocatoria en forma, con asistencia del 100 % del capital; que los acuerdos fueron unánimes y el acta se aprobó al final. Acuerdos: «PRIMERO.- Aprobar las cuentas de 2025 formuladas el 17 de marzo de 2026. SEGUNDO.- Aplicar el resultado de 528.000,00 euros, repartiendo 180.000,00 euros de dividendo y destinando 348.000,00 euros a reservas voluntarias. TERCERO.- Aprobar la gestión. CUARTO.- Facultar para certificar y depositar». Se expide el 10 de junio de 2026. Visto bueno: Irene Montalbán Crespo. Firmas de demostración no cualificadas.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2026-06-09",
+     "marca": "SIMULADO"
+    },
+    "secretario_y_visto_bueno": {
+     "valor": "Samuel Fontán Aguirre / Irene Montalbán Crespo",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-07-09",
+    "fecha_presentacion_prevista": "2026-07-01",
+    "dias_margen": 8
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-026."
+  },
+  {
+   "agreement_id": "GARR-SEC-028",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_JUNTA",
+   "fecha": "2026-06-17",
+   "otorgante_o_certificante": {
+    "nombre": "Lucía Barrenechea Soto",
+    "cargo": "Secretaria del órgano de administración",
+    "fundamento_facultad": "Artículo 109.1 RRM, con visto bueno"
+   },
+   "texto": "CERTIFICA: Que la junta general ordinaria de G-Advisory, Consultoría Técnica, Económica y Estratégica, S.L.P. se celebró el 16 de junio de 2026, previa convocatoria en forma, con asistencia del 100 % del capital; que los acuerdos fueron unánimes y el acta se aprobó al final. Acuerdos: «PRIMERO.- Aprobar las cuentas de 2025 formuladas el 3 de marzo de 2026. SEGUNDO.- Aplicar el resultado de 1.415.000,00 euros, repartiendo 500.000,00 euros de dividendo y destinando 915.000,00 euros a reservas voluntarias. TERCERO.- Aprobar la gestión. CUARTO.- Facultar para certificar y depositar». Se expide el 17 de junio de 2026. Visto bueno: Álvaro Monreal Cifuentes. Las firmas modeladas no son cualificadas.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2026-06-16",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-07-16",
+    "fecha_presentacion_prevista": "2026-07-08",
+    "dias_margen": 8
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-028."
+  },
+  {
+   "agreement_id": "GARR-SEC-030",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_SOCIO_UNICO",
+   "fecha": "2026-05-27",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P.",
+    "cargo": "Socio único de Garrigues IP, S.L.P.",
+    "fundamento_facultad": "Artículos 15 LSC y 109.1 RRM"
+   },
+   "texto": "CERTIFICA: Que el 26 de mayo de 2026 el socio único adoptó y consignó en acta, aprobada en esa fecha: «PRIMERO.- Aprobar las cuentas de 2025 formuladas el 24 de febrero de 2026. SEGUNDO.- Aplicar el resultado de 204.000,00 euros, repartiendo 80.000,00 euros de dividendo y destinando 124.000,00 euros a reservas voluntarias. TERCERO.- Aprobar la gestión. CUARTO.- Facultar para certificar y depositar». Se expide el 27 de mayo de 2026, sin visto bueno y sin firma electrónica cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2026-05-26",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-06-26",
+    "fecha_presentacion_prevista": "2026-06-17",
+    "dias_margen": 9
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-030."
+  },
+  {
+   "agreement_id": "GARR-SEC-032",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_SOCIO_UNICO",
+   "fecha": "2026-05-13",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P.",
+    "cargo": "Socio único de Garrigues Letrados de Soporte, S.L.P.",
+    "fundamento_facultad": "Artículos 15 LSC y 109.1 RRM"
+   },
+   "texto": "CERTIFICA: Que el 12 de mayo de 2026 el socio único aprobó el acta que contiene: «PRIMERO.- Aprobar las cuentas de 2025 formuladas el 9 de marzo de 2026. SEGUNDO.- Aplicar el resultado de 108.000,00 euros, destinando 10.800,00 euros a reserva legal y 97.200,00 euros a reservas voluntarias. TERCERO.- Aprobar la gestión. CUARTO.- Facultar para certificar y depositar». Se expide el 13 de mayo de 2026, sin visto bueno. No se atribuye firma cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2026-05-12",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-06-12",
+    "fecha_presentacion_prevista": "2026-06-03",
+    "dias_margen": 9
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-032."
+  },
+  {
+   "agreement_id": "GARR-SEC-034",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_SOCIO_UNICO",
+   "fecha": "2026-06-03",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P.",
+    "cargo": "Socio único de Garrigues Human Capital Services, S.L.P.",
+    "fundamento_facultad": "Artículos 15 LSC y 109.1 RRM"
+   },
+   "texto": "CERTIFICA: Que el 2 de junio de 2026 el socio único adoptó y consignó en acta, aprobada ese día: «PRIMERO.- Aprobar las cuentas de 2025 formuladas el 16 de marzo de 2026. SEGUNDO.- Aplicar el resultado de 157.000,00 euros, repartiendo 50.000,00 euros de dividendo y destinando 107.000,00 euros a reservas voluntarias. TERCERO.- Aprobar la gestión. CUARTO.- Facultar para certificar y depositar». Se expide el 3 de junio de 2026, sin visto bueno y sin firma cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2026-06-02",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-07-02",
+    "fecha_presentacion_prevista": "2026-06-24",
+    "dias_margen": 8
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-034."
+  },
+  {
+   "agreement_id": "GARR-SEC-036",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_SOCIO_UNICO",
+   "fecha": "2026-06-24",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P.",
+    "cargo": "Socio único de Garrigues Consultoría de Empresa Familiar, S.L.P.",
+    "fundamento_facultad": "Artículos 15 LSC y 109.1 RRM"
+   },
+   "texto": "CERTIFICA: Que el 23 de junio de 2026 el socio único aprobó el acta que contiene: «PRIMERO.- Aprobar las cuentas de 2025 formuladas el 23 de marzo de 2026. SEGUNDO.- Compensar la pérdida del ejercicio, de 18.500,00 euros, con cargo a resultados negativos de ejercicios anteriores. TERCERO.- Aprobar la gestión. CUARTO.- Facultar para certificar y depositar». Se expide el 24 de junio de 2026, sin visto bueno. La firma de custodia es de demostración y no cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2026-06-23",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-07-23",
+    "fecha_presentacion_prevista": "2026-07-15",
+    "dias_margen": 8
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-036."
+  },
+  {
+   "agreement_id": "GARR-SEC-038",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_JUNTA",
+   "fecha": "2026-04-29",
+   "otorgante_o_certificante": {
+    "nombre": "Marina Saavedra Echevarría",
+    "cargo": "Secretaria de la Junta",
+    "fundamento_facultad": "Artículo 109 RRM, con visto bueno"
+   },
+   "texto": "CERTIFICA: Que la junta general ordinaria de Violet Inversiones 2010, S.L. se celebró el 28 de abril de 2026, previa convocatoria en forma, con asistencia del 100 % del capital; que los acuerdos fueron unánimes y el acta se aprobó al final. Acuerdos: «PRIMERO.- Aprobar las cuentas de 2025 formuladas el 2 de marzo de 2026. SEGUNDO.- Aplicar el resultado de 24.000,00 euros, destinando 2.400,00 euros a reserva legal y 21.600,00 euros a reservas voluntarias. TERCERO.- Aprobar la gestión. CUARTO.- Facultar para certificar y depositar». Se expide el 29 de abril de 2026. Visto bueno: Diego Valmaseda Rius. Firmas de demostración no cualificadas.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2026-04-28",
+     "marca": "SIMULADO"
+    },
+    "certificante_y_visto_bueno": {
+     "valor": "Marina Saavedra Echevarría / Diego Valmaseda Rius",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-05-28",
+    "fecha_presentacion_prevista": "2026-05-20",
+    "dias_margen": 8
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-038."
+  },
+  {
+   "agreement_id": "GARR-SEC-040",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_JUNTA",
+   "fecha": "2026-05-04",
+   "otorgante_o_certificante": {
+    "nombre": "Miguel Herranz Oliva",
+    "cargo": "Secretario de la Junta",
+    "fundamento_facultad": "Artículo 109 RRM, con visto bueno"
+   },
+   "texto": "CERTIFICA: Que la junta general ordinaria de EWOH Inversiones 2010, S.L. se celebró el 30 de abril de 2026, previa convocatoria en forma, con asistencia del 100 % del capital; que los acuerdos fueron unánimes y el acta se aprobó al final de la sesión. Acuerdos: «PRIMERO.- Aprobar las cuentas de 2025 formuladas el 3 de marzo de 2026. SEGUNDO.- Compensar la pérdida del ejercicio, de 7.200,00 euros, con cargo a resultados negativos de ejercicios anteriores. TERCERO.- Aprobar la gestión. CUARTO.- Facultar para certificar y depositar». Se expide el 4 de mayo de 2026. Visto bueno: Sofía Cabanillas Ros. No se atribuyen firmas cualificadas.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2026-04-30",
+     "marca": "SIMULADO"
+    },
+    "certificante_y_visto_bueno": {
+     "valor": "Miguel Herranz Oliva / Sofía Cabanillas Ros",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-05-30",
+    "fecha_presentacion_prevista": "2026-05-22",
+    "dias_margen": 8
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-040."
+  },
+  {
+   "agreement_id": "GARR-SEC-042",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_JUNTA",
+   "fecha": "2026-05-06",
+   "otorgante_o_certificante": {
+    "nombre": "Nuria Pardo Castejón",
+    "cargo": "Secretaria de la Junta",
+    "fundamento_facultad": "Artículo 109 RRM, con visto bueno"
+   },
+   "texto": "CERTIFICA: Que la junta general ordinaria de Garmen Inversiones 2013, S.L. se celebró el 5 de mayo de 2026, previa convocatoria en forma, concurriendo socios titulares del 92 % del capital; que los acuerdos fueron adoptados con el voto favorable del 100 % del capital concurrente y el acta se aprobó al final. Acuerdos: «PRIMERO.- Aprobar las cuentas de 2025 formuladas el 5 de marzo de 2026. SEGUNDO.- Aplicar el resultado de 41.000,00 euros, destinando 4.100,00 euros a reserva legal y 36.900,00 euros a reservas voluntarias. TERCERO.- Aprobar la gestión. CUARTO.- Facultar para certificar y depositar». Se expide el 6 de mayo de 2026. Visto bueno: Arturo Mencía Villalba. Firmas no cualificadas.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2026-05-05",
+     "marca": "SIMULADO"
+    },
+    "certificante_y_visto_bueno": {
+     "valor": "Nuria Pardo Castejón / Arturo Mencía Villalba",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-06-05",
+    "fecha_presentacion_prevista": "2026-05-27",
+    "dias_margen": 9
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-042."
+  },
+  {
+   "agreement_id": "GARR-SEC-044",
+   "tipo": "CERTIFICACION_APROBACION_CUENTAS_JUNTA",
+   "fecha": "2026-06-19",
+   "otorgante_o_certificante": {
+    "nombre": "Helena Duarte Salgado",
+    "cargo": "Secretaria de la Junta",
+    "fundamento_facultad": "Artículo 109 RRM, con visto bueno"
+   },
+   "texto": "CERTIFICA: Que la junta general ordinaria de Garrigues Portugal, S.L.P. se celebró en Madrid el 18 de junio de 2026, previa convocatoria en forma, con asistencia del 100 % del capital; que los acuerdos fueron unánimes y el acta se aprobó al final. Acuerdos: «PRIMERO.- Aprobar las cuentas de 2025 formuladas el 19 de marzo de 2026. SEGUNDO.- Aplicar el resultado de 690.000,00 euros, repartiendo 220.000,00 euros de dividendo y destinando 470.000,00 euros a reservas voluntarias. TERCERO.- Aprobar la gestión. CUARTO.- Facultar para certificar y depositar». Se expide el 19 de junio de 2026. Visto bueno: Rodrigo Valcárcel Mouriño. Las firmas modeladas no son cualificadas.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2026-06-18",
+     "marca": "SIMULADO"
+    },
+    "certificante_y_visto_bueno": {
+     "valor": "Helena Duarte Salgado / Rodrigo Valcárcel Mouriño",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-07-18",
+    "fecha_presentacion_prevista": "2026-07-10",
+    "dias_margen": 8
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-044."
+  },
+  {
+   "agreement_id": "GARR-SEC-045",
+   "tipo": "CERTIFICACION_OTORGAMIENTO_PODER",
+   "fecha": "2024-09-20",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P., representada por D. Fernando Vives Ruiz",
+    "cargo": "Administrador único de Compañía Digital NewLaw, S.L.U.",
+    "fundamento_facultad": "Artículos 109.1 y 109.2 RRM"
+   },
+   "texto": "CERTIFICA: Que el administrador único de Compañía Digital NewLaw, S.L.U., en Madrid, el 19 de septiembre de 2024, adoptó la decisión que se transcribe: «Conferir poder a D.ª Elvira Sanz Aróstegui para contratar, renovar y resolver servicios y licencias tecnológicas; suscribir contratos de encargo de tratamiento y acuerdos de nivel de servicio; solicitar, mantener, renovar y defender derechos de propiedad industrial e intelectual; representar a la sociedad ante prestadores de servicios de confianza y organismos de normalización, evaluación y certificación; y abrir y cancelar cuentas y disponer de fondos. Las facultades bancarias y de contratación serán solidarias hasta 250.000,00 euros; de 250.000,01 a 1.000.000,00 euros, mancomunadas con otro apoderado; y por encima de 1.000.000,00 euros exigirán acuerdo previo del órgano de administración. Se excluyen los actos gratuitos sobre propiedad industrial o intelectual, los compromisos sujetos a supervisión y el subapoderamiento». El acta fue aprobada el 19 de septiembre de 2024. Se expide sin visto bueno, por tratarse de administrador único. No se atribuye firma cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2024-09-19",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Presentación sin plazo especial; vigencia del asiento conforme al artículo 43 RRM",
+    "fecha_limite": "2024-11-25",
+    "dias_margen": 55
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-045."
+  },
+  {
+   "agreement_id": "GARR-SEC-046",
+   "tipo": "CERTIFICACION_REVOCACION_PODER",
+   "fecha": "2026-03-25",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P., representada por D. Fernando Vives Ruiz",
+    "cargo": "Administrador único",
+    "fundamento_facultad": "Artículo 109 RRM"
+   },
+   "texto": "CERTIFICA: Que el administrador único de Compañía Digital NewLaw, S.L.U. acordó el 24 de marzo de 2026 revocar, con efectos de esa fecha, el poder conferido a D.ª Elvira Sanz Aróstegui el 19 de septiembre de 2024; elevar la revocación a público; solicitar la cancelación registral; y notificarla a la interesada, entidades financieras y contrapartes. El acta fue aprobada el 24 de marzo de 2026. Se expide el 25 de marzo de 2026, sin visto bueno y sin firma electrónica cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2026-03-24",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite": "2026-05-30",
+    "dias_margen": 55
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-046 y GARR-SEC-045."
+  },
+  {
+   "agreement_id": "GARR-SEC-047",
+   "tipo": "CERTIFICACION_OTORGAMIENTO_PODER",
+   "fecha": "2024-10-23",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P.",
+    "cargo": "Administrador único de Garrigues IP, S.L.P.",
+    "fundamento_facultad": "Artículo 109 RRM"
+   },
+   "texto": "CERTIFICA: Que el 22 de octubre de 2024 el administrador único acordó conferir poder a D.ª Elvira Sanz Aróstegui para gestión administrativa ordinaria; cuentas bancarias; contratación de proveedores no profesionales; representación tributaria y ante la Seguridad Social; contratación de personal no profesional; y otorgamiento de recibos. Facultades bancarias y de contratación: solidarias hasta 250.000,00 euros; mancomunadas entre 250.000,01 y 1.000.000,00 euros; y sujetas a acuerdo previo por encima de 1.000.000,00 euros. Se excluyen el ejercicio de la actividad profesional, la firma de dictámenes, actuaciones judiciales y el subapoderamiento. El acta fue aprobada el 22 de octubre de 2024. Se expide sin visto bueno y sin firma cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2024-10-22",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite": "2024-12-28",
+    "dias_margen": 55
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-047."
+  },
+  {
+   "agreement_id": "GARR-SEC-048",
+   "tipo": "CERTIFICACION_REVOCACION_PODER",
+   "fecha": "2026-04-08",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P.",
+    "cargo": "Administrador único de Garrigues IP, S.L.P.",
+    "fundamento_facultad": "Artículo 109 RRM"
+   },
+   "texto": "CERTIFICA: Que el administrador único acordó el 7 de abril de 2026 revocar el poder conferido a D.ª Elvira Sanz Aróstegui el 22 de octubre de 2024, elevar la revocación a público, cancelar su inscripción y efectuar las notificaciones oportunas. El acta fue aprobada el mismo 7 de abril. Se expide sin visto bueno y sin atribución de firma cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2026-04-07",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite": "2026-06-13",
+    "dias_margen": 55
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-048 y GARR-SEC-047."
+  },
+  {
+   "agreement_id": "GARR-SEC-049",
+   "tipo": "CERTIFICACION_OTORGAMIENTO_PODER",
+   "fecha": "2024-11-13",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P.",
+    "cargo": "Administrador único de Garrigues Human Capital Services, S.L.P.",
+    "fundamento_facultad": "Artículo 109 RRM"
+   },
+   "texto": "CERTIFICA: Que el 12 de noviembre de 2024 se acordó conferir poder a D.ª Elvira Sanz Aróstegui para gestión administrativa ordinaria, cuentas bancarias, proveedores no profesionales, representación tributaria y de Seguridad Social, personal no profesional y recibos. Límites: actuación solidaria hasta 250.000,00 euros; mancomunada entre 250.000,01 y 1.000.000,00 euros; acuerdo previo por encima de 1.000.000,00 euros. Se excluyen la actividad profesional, dictámenes, actuaciones judiciales y subapoderamiento. Acta aprobada el 12 de noviembre de 2024. Certificación sin visto bueno ni firma cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2024-11-12",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite": "2025-01-18",
+    "dias_margen": 55
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-049."
+  },
+  {
+   "agreement_id": "GARR-SEC-050",
+   "tipo": "CERTIFICACION_REVOCACION_PODER",
+   "fecha": "2026-04-22",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P.",
+    "cargo": "Administrador único de Garrigues Human Capital Services, S.L.P.",
+    "fundamento_facultad": "Artículo 109 RRM"
+   },
+   "texto": "CERTIFICA: Que el 21 de abril de 2026 se revocó el poder de D.ª Elvira Sanz Aróstegui otorgado el 12 de noviembre de 2024 y se acordó elevar la revocación a público, cancelar la inscripción y notificarla. Acta aprobada el 21 de abril de 2026. Se expide sin visto bueno y sin firma cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2026-04-21",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite": "2026-06-27",
+    "dias_margen": 55
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-050 y GARR-SEC-049."
+  },
+  {
+   "agreement_id": "GARR-SEC-051",
+   "tipo": "CERTIFICACION_OTORGAMIENTO_PODER",
+   "fecha": "2024-12-04",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P.",
+    "cargo": "Administrador único de Garrigues Letrados de Soporte, S.L.P.",
+    "fundamento_facultad": "Artículo 109 RRM"
+   },
+   "texto": "CERTIFICA: Que el 3 de diciembre de 2024 se acordó conferir poder a D.ª Elvira Sanz Aróstegui para gestión ordinaria, cuentas bancarias, proveedores no profesionales, representación tributaria y de Seguridad Social, personal no profesional y recibos. Límites: actuación solidaria hasta 250.000,00 euros; mancomunada entre 250.000,01 y 1.000.000,00 euros; acuerdo previo por encima de 1.000.000,00 euros. Se excluyen actividad profesional, dictámenes, actuaciones judiciales y subapoderamiento. Acta aprobada el mismo día. Se expide sin visto bueno ni firma cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2024-12-03",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite": "2025-02-09",
+    "dias_margen": 56
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-051."
+  },
+  {
+   "agreement_id": "GARR-SEC-052",
+   "tipo": "CERTIFICACION_REVOCACION_PODER",
+   "fecha": "2026-05-06",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P.",
+    "cargo": "Administrador único de Garrigues Letrados de Soporte, S.L.P.",
+    "fundamento_facultad": "Artículo 109 RRM"
+   },
+   "texto": "CERTIFICA: Que el 5 de mayo de 2026 se revocó el poder de D.ª Elvira Sanz Aróstegui otorgado el 3 de diciembre de 2024 y se acordó elevar la revocación a público, cancelar su inscripción y notificarla. Acta aprobada el mismo día. Se expide sin visto bueno y sin firma cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2026-05-05",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite": "2026-07-11",
+    "dias_margen": 55
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-052 y GARR-SEC-051."
+  },
+  {
+   "agreement_id": "GARR-SEC-053",
+   "tipo": "CERTIFICACION_OTORGAMIENTO_PODER",
+   "fecha": "2025-01-29",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P., representada por D. Fernando Vives Ruiz",
+    "cargo": "Administrador único de Compañía Digital NewLaw, S.L.U.",
+    "fundamento_facultad": "Artículo 109 RRM"
+   },
+   "texto": "CERTIFICA: Que el 28 de enero de 2025 se acordó conferir poder a D. Íñigo Bermejo Larralde para contratación tecnológica; encargos de tratamiento y niveles de servicio; propiedad industrial e intelectual; representación ante prestadores de servicios de confianza y organismos técnicos; y cuentas bancarias. Límites: actuación solidaria hasta 150.000,00 euros; mancomunada entre 150.000,01 y 600.000,00 euros; acuerdo previo por encima de 600.000,00 euros. Se excluyen actos gratuitos sobre propiedad industrial o intelectual, compromisos sujetos a supervisión y subapoderamiento. Acta aprobada el 28 de enero de 2025. Certificación sin visto bueno ni firma cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2025-01-28",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite": "2025-04-04",
+    "dias_margen": 55
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-053."
+  },
+  {
+   "agreement_id": "GARR-SEC-054",
+   "tipo": "CERTIFICACION_OTORGAMIENTO_PODER_CONSEJO",
+   "fecha": "2025-02-12",
+   "otorgante_o_certificante": {
+    "nombre": "Samuel Fontán Aguirre",
+    "cargo": "Secretario no consejero del Consejo",
+    "fundamento_facultad": "Artículo 109.1 RRM, con visto bueno"
+   },
+   "texto": "CERTIFICA: Que el Consejo de Administración de EAD Trust European Agency of Digital Trust, S.L. se reunió el 11 de febrero de 2025, con asistencia de sus cinco consejeros, y adoptó por unanimidad conferir a D. Íñigo Bermejo Larralde poder para contratación tecnológica; encargos de tratamiento; propiedad industrial e intelectual; representación ante prestadores de servicios de confianza y organismos técnicos; y cuentas bancarias. Límites: solidario hasta 150.000,00 euros; mancomunado entre 150.000,01 y 600.000,00 euros; y acuerdo previo por encima de 600.000,00 euros. Se excluyen actos gratuitos sobre propiedad industrial o intelectual, compromisos sujetos a supervisión y subapoderamiento. El acta fue aprobada al final de la sesión. Se expide el 12 de febrero de 2025. Visto bueno: Irene Montalbán Crespo. No se atribuyen firmas cualificadas.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2025-02-11",
+     "marca": "SIMULADO"
+    },
+    "certificante_y_visto_bueno": {
+     "valor": "Samuel Fontán Aguirre / Irene Montalbán Crespo",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite": "2025-04-18",
+    "dias_margen": 55
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-054."
+  },
+  {
+   "agreement_id": "GARR-SEC-055",
+   "tipo": "CERTIFICACION_OTORGAMIENTO_PODER",
+   "fecha": "2025-09-17",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P.",
+    "cargo": "Administrador único de G-Advisory, Consultoría Técnica, Económica y Estratégica, S.L.P.",
+    "fundamento_facultad": "Artículo 109 RRM"
+   },
+   "texto": "CERTIFICA: Que el 16 de septiembre de 2025 se acordó conferir a D. Íñigo Bermejo Larralde poder para gestión administrativa ordinaria; cuentas bancarias; proveedores no profesionales; representación tributaria y ante la Seguridad Social; personal no profesional; y recibos. Límites: solidario hasta 150.000,00 euros; mancomunado entre 150.000,01 y 600.000,00 euros; acuerdo previo por encima de 600.000,00 euros. Se excluyen actividad profesional, dictámenes, actuaciones judiciales y subapoderamiento. Acta aprobada en esa fecha. Se expide sin visto bueno ni firma cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2025-09-16",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite": "2025-11-22",
+    "dias_margen": 55
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-055."
+  },
+  {
+   "agreement_id": "GARR-SEC-056",
+   "tipo": "CERTIFICACION_OTORGAMIENTO_PODER",
+   "fecha": "2024-03-06",
+   "otorgante_o_certificante": {
+    "nombre": "J&A Garrigues, S.L.P.",
+    "cargo": "Administrador único de Garrigues Consultoría de Empresa Familiar, S.L.P.",
+    "fundamento_facultad": "Artículo 109 RRM"
+   },
+   "texto": "CERTIFICA: Que el 5 de marzo de 2024 se acordó conferir poder a D.ª Nuria Cabo Ferreiro para gestión ordinaria; cuentas bancarias; proveedores no profesionales; representación tributaria y ante la Seguridad Social; personal no profesional; y recibos. Límites bancarios: solidario hasta 60.000,00 euros; mancomunado entre 60.000,01 y 300.000,00 euros; acuerdo previo por encima de 300.000,00 euros. Se excluyen actividad profesional, dictámenes, actuaciones judiciales y subapoderamiento. Acta aprobada el mismo día. Certificación sin visto bueno ni firma cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2024-03-05",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite": "2024-05-11",
+    "dias_margen": 55
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-056."
+  },
+  {
+   "agreement_id": "GARR-SEC-057",
+   "tipo": "CERTIFICACION_OTORGAMIENTO_PODER",
+   "fecha": "2024-04-17",
+   "otorgante_o_certificante": {
+    "nombre": "Garrigues Letrados de Soporte, S.L.P., por su representante persona física",
+    "cargo": "Administrador único de Violet Inversiones 2010, S.L.",
+    "fundamento_facultad": "Artículos 109 RRM y 212 bis LSC"
+   },
+   "texto": "CERTIFICA: Que el 16 de abril de 2024 se acordó conferir poder a D.ª Nuria Cabo Ferreiro para administrar y conservar el patrimonio; operar cuentas y depósitos; suscribir, reembolsar y transmitir instrumentos financieros negociados; presentar declaraciones tributarias y atender requerimientos; y otorgar recibos. Límites: solidario hasta 60.000,00 euros; mancomunado entre 60.000,01 y 300.000,00 euros; acuerdo previo por encima de 300.000,00 euros. Se excluyen inmuebles, participaciones no negociadas, garantías reales, avales, fianzas y subapoderamiento. Acta aprobada el 16 de abril. Se expide sin visto bueno y sin firma cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2024-04-16",
+     "marca": "SIMULADO"
+    },
+    "representante_persona_fisica": {
+     "valor": "Óscar Belda Campuzano",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite": "2024-06-22",
+    "dias_margen": 55
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-057."
+  },
+  {
+   "agreement_id": "GARR-SEC-058",
+   "tipo": "CERTIFICACION_OTORGAMIENTO_PODER",
+   "fecha": "2024-09-25",
+   "otorgante_o_certificante": {
+    "nombre": "Garrigues Letrados de Soporte, S.L.P., por su representante persona física",
+    "cargo": "Administrador único de EWOH Inversiones 2010, S.L.",
+    "fundamento_facultad": "Artículos 109 RRM y 212 bis LSC"
+   },
+   "texto": "CERTIFICA: Que el 24 de septiembre de 2024 se acordó conferir poder a D.ª Nuria Cabo Ferreiro para administrar y conservar patrimonio; operar cuentas y depósitos; suscribir, reembolsar y transmitir instrumentos financieros negociados; cumplir obligaciones tributarias; y otorgar recibos. Límites: solidario hasta 60.000,00 euros; mancomunado entre 60.000,01 y 300.000,00 euros; acuerdo previo por encima de 300.000,00 euros. Se excluyen inmuebles, participaciones no negociadas, garantías reales, avales, fianzas y subapoderamiento. Acta aprobada el mismo día. Certificación sin visto bueno ni firma cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2024-09-24",
+     "marca": "SIMULADO"
+    },
+    "representante_persona_fisica": {
+     "valor": "Óscar Belda Campuzano",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite": "2024-11-30",
+    "dias_margen": 55
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-058."
+  },
+  {
+   "agreement_id": "GARR-SEC-059",
+   "tipo": "CERTIFICACION_OTORGAMIENTO_PODER",
+   "fecha": "2024-10-09",
+   "otorgante_o_certificante": {
+    "nombre": "Garrigues Letrados de Soporte, S.L.P., por su representante persona física",
+    "cargo": "Administrador único de Garmen Inversiones 2013, S.L.",
+    "fundamento_facultad": "Artículos 109 RRM y 212 bis LSC"
+   },
+   "texto": "CERTIFICA: Que el 8 de octubre de 2024 se acordó conferir poder a D.ª Nuria Cabo Ferreiro para administrar y conservar patrimonio; operar cuentas y depósitos; suscribir, reembolsar y transmitir instrumentos financieros negociados; cumplir obligaciones tributarias; y otorgar recibos. Límites: solidario hasta 60.000,00 euros; mancomunado entre 60.000,01 y 300.000,00 euros; acuerdo previo por encima de 300.000,00 euros. Se excluyen inmuebles, participaciones no negociadas, garantías reales, avales, fianzas y subapoderamiento. Acta aprobada el mismo día. Certificación sin visto bueno ni firma cualificada.",
+   "datos_instrumentales": {
+    "fecha_aprobacion_acta": {
+     "valor": "2024-10-08",
+     "marca": "SIMULADO"
+    },
+    "representante_persona_fisica": {
+     "valor": "Óscar Belda Campuzano",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite": "2024-12-14",
+    "dias_margen": 55
+   },
+   "estado_resultante": "CERTIFIED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-059."
+  }
+ ],
+ "escrituras": [
+  {
+   "agreement_id": "GARR-SEC-045",
+   "tipo": "ESCRITURA_PODER_GENERAL",
+   "fecha": "2024-09-23",
+   "otorgante_o_certificante": {
+    "nombre": "D. Fernando Vives Ruiz",
+    "cargo": "Representante persona física de J&A Garrigues, S.L.P., administrador único de Compañía Digital NewLaw, S.L.U.",
+    "fundamento_facultad": "Representación orgánica conforme a los artículos 209, 212 bis, 233 y 234 LSC"
+   },
+   "texto": "NÚMERO DE PROTOCOLO: 1.842. ESCRITURA DE PODER GENERAL. En Madrid, a 23 de septiembre de 2024. Ante mí, D. Alberto Mena Cifuentes, Notario del Ilustre Colegio Notarial de Madrid, comparece D. Fernando Vives Ruiz, actuando en representación de J&A Garrigues, S.L.P., administradora única de Compañía Digital NewLaw, S.L.U. Tiene, a mi juicio, capacidad y legitimación suficientes. EXPONE: I. Que la sociedad poderdante tiene NIF B72893035. II. Que el administrador único adoptó el 19 de septiembre de 2024 el acuerdo incorporado a la certificación que se une a esta matriz. OTORGA: La sociedad confiere poder a D.ª Elvira Sanz Aróstegui para contratar, renovar y resolver servicios y licencias tecnológicas; suscribir encargos de tratamiento y acuerdos de nivel de servicio; solicitar, mantener, renovar y defender derechos de propiedad industrial e intelectual; representar a la sociedad ante prestadores de servicios de confianza y organismos técnicos; y abrir y cancelar cuentas y disponer de fondos. Las facultades serán solidarias hasta 250.000,00 euros; mancomunadas con otro apoderado entre 250.000,01 y 1.000.000,00 euros; y exigirán acuerdo previo del órgano de administración por encima de 1.000.000,00 euros. Quedan excluidos actos gratuitos sobre propiedad industrial o intelectual, compromisos sujetos a supervisión y subapoderamiento. Se incorpora la certificación expedida el 20 de septiembre de 2024. Hago las reservas y advertencias legales, incluida la necesidad de inscripción para la publicidad registral del poder general. Leída la escritura, el compareciente la aprueba y firma manuscritamente. La copia electrónica de demostración no incorpora ni atribuye firma electrónica cualificada.",
+   "datos_instrumentales": {
+    "protocolo": {
+     "valor": "1842/2024",
+     "marca": "SIMULADO"
+    },
+    "notario": {
+     "valor": "Alberto Mena Cifuentes",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite_presentacion": "2024-11-23",
+    "fecha_presentacion": "2024-09-24",
+    "dias_margen": 60
+   },
+   "estado_resultante": "INSTRUMENTED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-045 y su certificación."
+  },
+  {
+   "agreement_id": "GARR-SEC-046",
+   "tipo": "ESCRITURA_REVOCACION_PODER",
+   "fecha": "2026-03-28",
+   "otorgante_o_certificante": {
+    "nombre": "D. Fernando Vives Ruiz",
+    "cargo": "Representante del administrador único",
+    "fundamento_facultad": "Artículos 233 y 234 LSC"
+   },
+   "texto": "NÚMERO 731. ESCRITURA DE REVOCACIÓN DE PODER. En Madrid, a 28 de marzo de 2026. Ante mí, D. Alberto Mena Cifuentes, comparece D. Fernando Vives Ruiz, en representación de la administradora única de Compañía Digital NewLaw, S.L.U. EXPONE que el poder general otorgado a D.ª Elvira Sanz Aróstegui mediante escritura de 23 de septiembre de 2024 ha sido revocado por acuerdo de 24 de marzo de 2026. OTORGA: Revoca íntegramente y con efectos desde el 24 de marzo de 2026 el citado poder; solicita la cancelación de su inscripción; y manifiesta que se comunicará la revocación a la apoderada y a las contrapartes relevantes. Se incorpora la certificación de 25 de marzo de 2026. Hago las reservas y advertencias legales. La firma de la matriz es manuscrita; el prototipo no atribuye firma electrónica cualificada.",
+   "datos_instrumentales": {
+    "protocolo": {
+     "valor": "731/2026",
+     "marca": "SIMULADO"
+    },
+    "notario": {
+     "valor": "Alberto Mena Cifuentes",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite_presentacion": "2026-05-28",
+    "fecha_presentacion": "2026-03-30",
+    "dias_margen": 59
+   },
+   "estado_resultante": "INSTRUMENTED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-046."
+  },
+  {
+   "agreement_id": "GARR-SEC-047",
+   "tipo": "ESCRITURA_PODER_GENERAL",
+   "fecha": "2024-10-25",
+   "otorgante_o_certificante": {
+    "nombre": "Representante de J&A Garrigues, S.L.P.",
+    "cargo": "Administrador único de Garrigues IP, S.L.P.",
+    "fundamento_facultad": "Artículos 209, 212 bis, 233 y 234 LSC"
+   },
+   "texto": "NÚMERO 2.061. ESCRITURA DE PODER GENERAL. En Madrid, a 25 de octubre de 2024. Ante mí, D.ª Irene Valdés Roca, Notaria, comparece el representante de J&A Garrigues, S.L.P., administradora única de Garrigues IP, S.L.P. EXPONE la adopción del acuerdo de 22 de octubre de 2024. OTORGA poder a D.ª Elvira Sanz Aróstegui para gestión administrativa ordinaria; cuentas bancarias; proveedores no profesionales; representación tributaria y ante la Seguridad Social; personal no profesional; y recibos. Límites: solidario hasta 250.000,00 euros; mancomunado entre 250.000,01 y 1.000.000,00 euros; acuerdo previo por encima de 1.000.000,00 euros. Se excluyen actividad profesional, dictámenes, actuaciones judiciales y subapoderamiento. Se incorpora la certificación de 23 de octubre. Se advierte sobre inscripción y sobre la reserva de la actividad profesional a profesionales colegiados. La copia demo no contiene firma cualificada.",
+   "datos_instrumentales": {
+    "protocolo": {
+     "valor": "2061/2024",
+     "marca": "SIMULADO"
+    },
+    "notario": {
+     "valor": "Irene Valdés Roca",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite_presentacion": "2024-12-25",
+    "fecha_presentacion": "2024-10-28",
+    "dias_margen": 58
+   },
+   "estado_resultante": "INSTRUMENTED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-047."
+  },
+  {
+   "agreement_id": "GARR-SEC-048",
+   "tipo": "ESCRITURA_REVOCACION_PODER",
+   "fecha": "2026-04-10",
+   "otorgante_o_certificante": {
+    "nombre": "Representante de J&A Garrigues, S.L.P.",
+    "cargo": "Administrador único de Garrigues IP, S.L.P.",
+    "fundamento_facultad": "Artículos 233 y 234 LSC"
+   },
+   "texto": "NÚMERO 844. ESCRITURA DE REVOCACIÓN. En Madrid, a 10 de abril de 2026. Ante mí, D.ª Irene Valdés Roca, comparece el representante del administrador único de Garrigues IP, S.L.P. OTORGA: Revoca íntegramente el poder conferido a D.ª Elvira Sanz Aróstegui por escritura de 25 de octubre de 2024; solicita la cancelación registral y ordena su notificación. Se incorpora certificación de 8 de abril de 2026. Reservas y advertencias legales. Firma manuscrita; sin firma electrónica cualificada atribuida.",
+   "datos_instrumentales": {
+    "protocolo": {
+     "valor": "844/2026",
+     "marca": "SIMULADO"
+    },
+    "notario": {
+     "valor": "Irene Valdés Roca",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite_presentacion": "2026-06-10",
+    "fecha_presentacion": "2026-04-13",
+    "dias_margen": 58
+   },
+   "estado_resultante": "INSTRUMENTED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-048."
+  },
+  {
+   "agreement_id": "GARR-SEC-049",
+   "tipo": "ESCRITURA_PODER_GENERAL",
+   "fecha": "2024-11-15",
+   "otorgante_o_certificante": {
+    "nombre": "Representante de J&A Garrigues, S.L.P.",
+    "cargo": "Administrador único de Garrigues Human Capital Services, S.L.P.",
+    "fundamento_facultad": "Artículos 209, 212 bis, 233 y 234 LSC"
+   },
+   "texto": "NÚMERO 2.224. ESCRITURA DE PODER GENERAL. En Madrid, a 15 de noviembre de 2024. Ante mí, D. Alberto Mena Cifuentes, comparece el representante de J&A Garrigues, S.L.P., administradora única de Garrigues Human Capital Services, S.L.P. OTORGA poder a D.ª Elvira Sanz Aróstegui para gestión ordinaria; cuentas; proveedores no profesionales; representación tributaria y social; relaciones laborales no profesionales; y recibos. Límites: solidario hasta 250.000,00 euros; mancomunado entre 250.000,01 y 1.000.000,00 euros; acuerdo previo por encima de 1.000.000,00 euros. Se excluyen actividad profesional, dictámenes, actuaciones judiciales y subapoderamiento. Se incorpora certificación de 13 de noviembre. Advertencias legales e inscripción. Sin firma electrónica cualificada atribuida.",
+   "datos_instrumentales": {
+    "protocolo": {
+     "valor": "2224/2024",
+     "marca": "SIMULADO"
+    },
+    "notario": {
+     "valor": "Alberto Mena Cifuentes",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite_presentacion": "2025-01-15",
+    "fecha_presentacion": "2024-11-18",
+    "dias_margen": 58
+   },
+   "estado_resultante": "INSTRUMENTED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-049."
+  },
+  {
+   "agreement_id": "GARR-SEC-050",
+   "tipo": "ESCRITURA_REVOCACION_PODER",
+   "fecha": "2026-04-24",
+   "otorgante_o_certificante": {
+    "nombre": "Representante de J&A Garrigues, S.L.P.",
+    "cargo": "Administrador único",
+    "fundamento_facultad": "Artículos 233 y 234 LSC"
+   },
+   "texto": "NÚMERO 956. ESCRITURA DE REVOCACIÓN. En Madrid, a 24 de abril de 2026. Ante mí, D. Alberto Mena Cifuentes, comparece el representante del administrador único de Garrigues Human Capital Services, S.L.P. Revoca íntegramente el poder de D.ª Elvira Sanz Aróstegui formalizado el 15 de noviembre de 2024, solicita su cancelación y ordena notificarla. Se incorpora certificación de 22 de abril. Reservas y advertencias. Sin firma electrónica cualificada atribuida.",
+   "datos_instrumentales": {
+    "protocolo": {
+     "valor": "956/2026",
+     "marca": "SIMULADO"
+    },
+    "notario": {
+     "valor": "Alberto Mena Cifuentes",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite_presentacion": "2026-06-24",
+    "fecha_presentacion": "2026-04-27",
+    "dias_margen": 58
+   },
+   "estado_resultante": "INSTRUMENTED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-050."
+  },
+  {
+   "agreement_id": "GARR-SEC-051",
+   "tipo": "ESCRITURA_PODER_GENERAL",
+   "fecha": "2024-12-09",
+   "otorgante_o_certificante": {
+    "nombre": "Representante de J&A Garrigues, S.L.P.",
+    "cargo": "Administrador único de Garrigues Letrados de Soporte, S.L.P.",
+    "fundamento_facultad": "Artículos 209, 212 bis, 233 y 234 LSC"
+   },
+   "texto": "NÚMERO 2.391. ESCRITURA DE PODER GENERAL. En Madrid, a 9 de diciembre de 2024. Ante mí, D.ª Irene Valdés Roca, comparece el representante del administrador único. OTORGA a D.ª Elvira Sanz Aróstegui poder para gestión ordinaria; cuentas; proveedores no profesionales; representación tributaria y social; personal no profesional; y recibos. Límites: solidario hasta 250.000,00 euros; mancomunado entre 250.000,01 y 1.000.000,00 euros; acuerdo previo por encima de 1.000.000,00 euros. Se excluyen actividad profesional, dictámenes, actuaciones judiciales y subapoderamiento. Se incorpora certificación de 4 de diciembre. Advertencias legales e inscripción. Sin firma electrónica cualificada.",
+   "datos_instrumentales": {
+    "protocolo": {
+     "valor": "2391/2024",
+     "marca": "SIMULADO"
+    },
+    "notario": {
+     "valor": "Irene Valdés Roca",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite_presentacion": "2025-02-09",
+    "fecha_presentacion": "2024-12-10",
+    "dias_margen": 61
+   },
+   "estado_resultante": "INSTRUMENTED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-051."
+  },
+  {
+   "agreement_id": "GARR-SEC-052",
+   "tipo": "ESCRITURA_REVOCACION_PODER",
+   "fecha": "2026-05-08",
+   "otorgante_o_certificante": {
+    "nombre": "Representante de J&A Garrigues, S.L.P.",
+    "cargo": "Administrador único",
+    "fundamento_facultad": "Artículos 233 y 234 LSC"
+   },
+   "texto": "NÚMERO 1.072. ESCRITURA DE REVOCACIÓN. En Madrid, a 8 de mayo de 2026. Ante mí, D.ª Irene Valdés Roca, comparece el representante del administrador único de Garrigues Letrados de Soporte, S.L.P. Revoca íntegramente el poder otorgado a D.ª Elvira Sanz Aróstegui el 9 de diciembre de 2024, solicita su cancelación y dispone las notificaciones. Se incorpora certificación de 6 de mayo. Sin firma electrónica cualificada atribuida.",
+   "datos_instrumentales": {
+    "protocolo": {
+     "valor": "1072/2026",
+     "marca": "SIMULADO"
+    },
+    "notario": {
+     "valor": "Irene Valdés Roca",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite_presentacion": "2026-07-08",
+    "fecha_presentacion": "2026-05-11",
+    "dias_margen": 58
+   },
+   "estado_resultante": "INSTRUMENTED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-052."
+  },
+  {
+   "agreement_id": "GARR-SEC-053",
+   "tipo": "ESCRITURA_PODER_GENERAL",
+   "fecha": "2025-01-31",
+   "otorgante_o_certificante": {
+    "nombre": "D. Fernando Vives Ruiz",
+    "cargo": "Representante del administrador único",
+    "fundamento_facultad": "Artículos 209, 212 bis, 233 y 234 LSC"
+   },
+   "texto": "NÚMERO 214. ESCRITURA DE PODER GENERAL. En Madrid, a 31 de enero de 2025. Ante mí, D. Alberto Mena Cifuentes, comparece D. Fernando Vives Ruiz. OTORGA a D. Íñigo Bermejo Larralde poder para contratación tecnológica; encargos de tratamiento; propiedad industrial e intelectual; representación técnica; y cuentas bancarias. Límites: solidario hasta 150.000,00 euros; mancomunado entre 150.000,01 y 600.000,00 euros; acuerdo previo por encima de 600.000,00 euros. Se excluyen actos gratuitos sobre propiedad industrial o intelectual, compromisos sujetos a supervisión y subapoderamiento. Se incorpora certificación de 29 de enero. Advertencias e inscripción. Sin firma electrónica cualificada.",
+   "datos_instrumentales": {
+    "protocolo": {
+     "valor": "214/2025",
+     "marca": "SIMULADO"
+    },
+    "notario": {
+     "valor": "Alberto Mena Cifuentes",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite_presentacion": "2025-03-31",
+    "fecha_presentacion": "2025-02-03",
+    "dias_margen": 56
+   },
+   "estado_resultante": "INSTRUMENTED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-053."
+  },
+  {
+   "agreement_id": "GARR-SEC-054",
+   "tipo": "ESCRITURA_PODER_GENERAL",
+   "fecha": "2025-02-17",
+   "otorgante_o_certificante": {
+    "nombre": "Irene Montalbán Crespo",
+    "cargo": "Presidenta del Consejo de EAD Trust European Agency of Digital Trust, S.L.",
+    "fundamento_facultad": "Acuerdo del Consejo certificado conforme al artículo 109 RRM"
+   },
+   "texto": "NÚMERO 337. ESCRITURA DE PODER GENERAL. En Madrid, a 17 de febrero de 2025. Ante mí, D.ª Irene Valdés Roca, comparece D.ª Irene Montalbán Crespo, en representación de EAD Trust European Agency of Digital Trust, S.L. EXPONE que el Consejo acordó el 11 de febrero conferir poder a D. Íñigo Bermejo Larralde. OTORGA las facultades de contratación tecnológica; encargos de tratamiento; propiedad industrial e intelectual; representación ante prestadores de confianza y organismos técnicos; y cuentas bancarias. Límites: solidario hasta 150.000,00 euros; mancomunado entre 150.000,01 y 600.000,00 euros; acuerdo previo por encima de 600.000,00 euros. Se excluyen actos gratuitos sobre propiedad industrial o intelectual, compromisos sujetos a supervisión y subapoderamiento. Se incorpora certificación expedida por el secretario con visto bueno de la presidenta. Advertencias legales e inscripción. La firma es manuscrita; no se atribuye firma electrónica cualificada.",
+   "datos_instrumentales": {
+    "protocolo": {
+     "valor": "337/2025",
+     "marca": "SIMULADO"
+    },
+    "notario": {
+     "valor": "Irene Valdés Roca",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite_presentacion": "2025-04-17",
+    "fecha_presentacion": "2025-02-18",
+    "dias_margen": 58
+   },
+   "estado_resultante": "INSTRUMENTED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-054."
+  },
+  {
+   "agreement_id": "GARR-SEC-055",
+   "tipo": "ESCRITURA_PODER_GENERAL",
+   "fecha": "2025-09-19",
+   "otorgante_o_certificante": {
+    "nombre": "Representante de J&A Garrigues, S.L.P.",
+    "cargo": "Administrador único de G-Advisory, Consultoría Técnica, Económica y Estratégica, S.L.P.",
+    "fundamento_facultad": "Artículos 209, 212 bis, 233 y 234 LSC"
+   },
+   "texto": "NÚMERO 1.735. ESCRITURA DE PODER GENERAL. En Madrid, a 19 de septiembre de 2025. Ante mí, D. Alberto Mena Cifuentes, comparece el representante del administrador único. OTORGA poder a D. Íñigo Bermejo Larralde para gestión ordinaria; cuentas; proveedores no profesionales; representación tributaria y social; personal no profesional; y recibos. Límites: solidario hasta 150.000,00 euros; mancomunado entre 150.000,01 y 600.000,00 euros; acuerdo previo por encima de 600.000,00 euros. Se excluyen actividad profesional, dictámenes, actuaciones judiciales y subapoderamiento. Se incorpora certificación de 17 de septiembre. Advertencias legales e inscripción. Sin firma electrónica cualificada.",
+   "datos_instrumentales": {
+    "protocolo": {
+     "valor": "1735/2025",
+     "marca": "SIMULADO"
+    },
+    "notario": {
+     "valor": "Alberto Mena Cifuentes",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite_presentacion": "2025-11-19",
+    "fecha_presentacion": "2025-09-22",
+    "dias_margen": 58
+   },
+   "estado_resultante": "INSTRUMENTED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-055."
+  },
+  {
+   "agreement_id": "GARR-SEC-056",
+   "tipo": "ESCRITURA_PODER_GENERAL",
+   "fecha": "2024-03-08",
+   "otorgante_o_certificante": {
+    "nombre": "Representante de J&A Garrigues, S.L.P.",
+    "cargo": "Administrador único",
+    "fundamento_facultad": "Artículos 209, 212 bis, 233 y 234 LSC"
+   },
+   "texto": "NÚMERO 492. ESCRITURA DE PODER GENERAL. En Madrid, a 8 de marzo de 2024. Ante mí, D.ª Irene Valdés Roca, comparece el representante de la administradora única de Garrigues Consultoría de Empresa Familiar, S.L.P. OTORGA poder a D.ª Nuria Cabo Ferreiro para gestión ordinaria; cuentas; proveedores no profesionales; representación tributaria y social; personal no profesional; y recibos. Límites: solidario hasta 60.000,00 euros; mancomunado entre 60.000,01 y 300.000,00 euros; acuerdo previo por encima de 300.000,00 euros. Se excluyen actividad profesional, dictámenes, actuaciones judiciales y subapoderamiento. Se incorpora certificación de 6 de marzo. Advertencias legales e inscripción. Sin firma electrónica cualificada.",
+   "datos_instrumentales": {
+    "protocolo": {
+     "valor": "492/2024",
+     "marca": "SIMULADO"
+    },
+    "notario": {
+     "valor": "Irene Valdés Roca",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite_presentacion": "2024-05-08",
+    "fecha_presentacion": "2024-03-11",
+    "dias_margen": 58
+   },
+   "estado_resultante": "INSTRUMENTED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-056."
+  },
+  {
+   "agreement_id": "GARR-SEC-057",
+   "tipo": "ESCRITURA_PODER_GENERAL",
+   "fecha": "2024-04-22",
+   "otorgante_o_certificante": {
+    "nombre": "Óscar Belda Campuzano",
+    "cargo": "Representante persona física del administrador único",
+    "fundamento_facultad": "Artículos 212 bis, 233 y 234 LSC"
+   },
+   "texto": "NÚMERO 781. ESCRITURA DE PODER GENERAL. En Madrid, a 22 de abril de 2024. Ante mí, D. Alberto Mena Cifuentes, comparece D. Óscar Belda Campuzano, representante persona física de Garrigues Letrados de Soporte, S.L.P., administradora única de Violet Inversiones 2010, S.L. OTORGA poder a D.ª Nuria Cabo Ferreiro para administrar y conservar patrimonio; operar cuentas y depósitos; suscribir, reembolsar y transmitir instrumentos financieros negociados; presentar declaraciones tributarias; y otorgar recibos. Límites: solidario hasta 60.000,00 euros; mancomunado entre 60.000,01 y 300.000,00 euros; acuerdo previo por encima de 300.000,00 euros. Se excluyen inmuebles, participaciones no negociadas, garantías reales, avales, fianzas y subapoderamiento. Se incorpora certificación de 17 de abril. Advertencias legales e inscripción. Sin firma electrónica cualificada.",
+   "datos_instrumentales": {
+    "protocolo": {
+     "valor": "781/2024",
+     "marca": "SIMULADO"
+    },
+    "notario": {
+     "valor": "Alberto Mena Cifuentes",
+     "marca": "SIMULADO"
+    },
+    "representante_persona_fisica": {
+     "valor": "Óscar Belda Campuzano",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite_presentacion": "2024-06-22",
+    "fecha_presentacion": "2024-04-23",
+    "dias_margen": 60
+   },
+   "estado_resultante": "INSTRUMENTED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-057."
+  },
+  {
+   "agreement_id": "GARR-SEC-058",
+   "tipo": "ESCRITURA_PODER_GENERAL",
+   "fecha": "2024-09-27",
+   "otorgante_o_certificante": {
+    "nombre": "Óscar Belda Campuzano",
+    "cargo": "Representante persona física del administrador único",
+    "fundamento_facultad": "Artículos 212 bis, 233 y 234 LSC"
+   },
+   "texto": "NÚMERO 1.879. ESCRITURA DE PODER GENERAL. En Madrid, a 27 de septiembre de 2024. Ante mí, D.ª Irene Valdés Roca, comparece D. Óscar Belda Campuzano por el administrador único de EWOH Inversiones 2010, S.L. OTORGA a D.ª Nuria Cabo Ferreiro poder para administrar y conservar patrimonio; operar cuentas y depósitos; suscribir, reembolsar y transmitir instrumentos financieros negociados; cumplir obligaciones tributarias; y otorgar recibos. Límites: solidario hasta 60.000,00 euros; mancomunado entre 60.000,01 y 300.000,00 euros; acuerdo previo por encima de 300.000,00 euros. Se excluyen inmuebles, participaciones no negociadas, garantías reales, avales, fianzas y subapoderamiento. Se incorpora certificación de 25 de septiembre. Sin firma electrónica cualificada.",
+   "datos_instrumentales": {
+    "protocolo": {
+     "valor": "1879/2024",
+     "marca": "SIMULADO"
+    },
+    "notario": {
+     "valor": "Irene Valdés Roca",
+     "marca": "SIMULADO"
+    },
+    "representante_persona_fisica": {
+     "valor": "Óscar Belda Campuzano",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite_presentacion": "2024-11-27",
+    "fecha_presentacion": "2024-09-30",
+    "dias_margen": 58
+   },
+   "estado_resultante": "INSTRUMENTED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-058."
+  },
+  {
+   "agreement_id": "GARR-SEC-059",
+   "tipo": "ESCRITURA_PODER_GENERAL",
+   "fecha": "2024-10-11",
+   "otorgante_o_certificante": {
+    "nombre": "Óscar Belda Campuzano",
+    "cargo": "Representante persona física del administrador único",
+    "fundamento_facultad": "Artículos 212 bis, 233 y 234 LSC"
+   },
+   "texto": "NÚMERO 1.976. ESCRITURA DE PODER GENERAL. En Madrid, a 11 de octubre de 2024. Ante mí, D. Alberto Mena Cifuentes, comparece D. Óscar Belda Campuzano por el administrador único de Garmen Inversiones 2013, S.L. OTORGA a D.ª Nuria Cabo Ferreiro poder para administrar y conservar patrimonio; operar cuentas y depósitos; suscribir, reembolsar y transmitir instrumentos financieros negociados; cumplir obligaciones tributarias; y otorgar recibos. Límites: solidario hasta 60.000,00 euros; mancomunado entre 60.000,01 y 300.000,00 euros; acuerdo previo por encima de 300.000,00 euros. Se excluyen inmuebles, participaciones no negociadas, garantías reales, avales, fianzas y subapoderamiento. Se incorpora certificación de 9 de octubre. Advertencias e inscripción. Sin firma electrónica cualificada.",
+   "datos_instrumentales": {
+    "protocolo": {
+     "valor": "1976/2024",
+     "marca": "SIMULADO"
+    },
+    "notario": {
+     "valor": "Alberto Mena Cifuentes",
+     "marca": "SIMULADO"
+    },
+    "representante_persona_fisica": {
+     "valor": "Óscar Belda Campuzano",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_limite_presentacion": "2024-12-11",
+    "fecha_presentacion": "2024-10-14",
+    "dias_margen": 58
+   },
+   "estado_resultante": "INSTRUMENTED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-059."
+  }
+ ],
+ "asientos_registrales": [
+  {
+   "agreement_id": "GARR-SEC-045",
+   "tipo": "INSCRIPCION_PODER_GENERAL",
+   "fecha": "2024-10-01",
+   "otorgante_o_certificante": {
+    "nombre": "Registro Mercantil de Madrid",
+    "cargo": "Registrador Mercantil",
+    "fundamento_facultad": "Artículos 18 CCom y 6 RRM"
+   },
+   "texto": "Presentado telemáticamente el 24 de septiembre de 2024, asiento 1.845 del Diario 2024. Calificado favorablemente el título, se inscribe el poder general conferido a D.ª Elvira Sanz Aróstegui, con las facultades, límites y exclusiones contenidos en la escritura. Practicada la inscripción y archivada copia electrónica.",
+   "datos_instrumentales": {
+    "diario_asiento": {
+     "valor": "Diario 2024, asiento 1845",
+     "marca": "SIMULADO"
+    },
+    "tomo_folio_hoja_inscripcion": {
+     "valor": "Tomo 44120, folio 88, hoja M-SIM-72893035, inscripción 14.ª",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_caducidad_asiento": "2024-11-24",
+    "dias_margen_inscripcion": 54
+   },
+   "estado_resultante": "REGISTERED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "Escritura GARR-SEC-045."
+  },
+  {
+   "agreement_id": "GARR-SEC-046",
+   "tipo": "CANCELACION_PODER",
+   "fecha": "2026-04-07",
+   "otorgante_o_certificante": {
+    "nombre": "Registro Mercantil de Madrid",
+    "cargo": "Registrador Mercantil",
+    "fundamento_facultad": "Artículo 18 CCom"
+   },
+   "texto": "Presentada el 30 de marzo de 2026 la escritura de revocación. Calificado favorablemente el título, se cancela la inscripción del poder de D.ª Elvira Sanz Aróstegui y se extiende nota marginal de referencia.",
+   "datos_instrumentales": {
+    "diario_asiento": {
+     "valor": "Diario 2026, asiento 642",
+     "marca": "SIMULADO"
+    },
+    "datos_cancelacion": {
+     "valor": "Tomo 44120, folio 91, hoja M-SIM-72893035, inscripción 22.ª",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_caducidad_asiento": "2026-05-30",
+    "dias_margen_inscripcion": 53
+   },
+   "estado_resultante": "REGISTERED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-046."
+  },
+  {
+   "agreement_id": "GARR-SEC-047",
+   "tipo": "INSCRIPCION_PODER_GENERAL",
+   "fecha": "2024-11-05",
+   "otorgante_o_certificante": {
+    "nombre": "Registro Mercantil de Madrid",
+    "cargo": "Registrador Mercantil",
+    "fundamento_facultad": "Artículo 18 CCom"
+   },
+   "texto": "Presentada el 28 de octubre de 2024 la escritura de poder. Calificado favorablemente el título, se inscribe el poder de D.ª Elvira Sanz Aróstegui con sus límites cuantitativos y exclusiones profesionales.",
+   "datos_instrumentales": {
+    "diario_asiento": {
+     "valor": "Diario 2024, asiento 2078",
+     "marca": "SIMULADO"
+    },
+    "tomo_folio_hoja_inscripcion": {
+     "valor": "Tomo 44211, folio 42, hoja M-SIM-78523123, inscripción 31.ª",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_caducidad_asiento": "2024-12-28",
+    "dias_margen_inscripcion": 53
+   },
+   "estado_resultante": "REGISTERED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-047."
+  },
+  {
+   "agreement_id": "GARR-SEC-048",
+   "tipo": "CANCELACION_PODER",
+   "fecha": "2026-04-20",
+   "otorgante_o_certificante": {
+    "nombre": "Registro Mercantil de Madrid",
+    "cargo": "Registrador Mercantil",
+    "fundamento_facultad": "Artículo 18 CCom"
+   },
+   "texto": "Presentada el 13 de abril de 2026 la escritura de revocación. Se califica favorablemente y se cancela la inscripción del poder de D.ª Elvira Sanz Aróstegui.",
+   "datos_instrumentales": {
+    "diario_asiento": {
+     "valor": "Diario 2026, asiento 731",
+     "marca": "SIMULADO"
+    },
+    "datos_cancelacion": {
+     "valor": "Tomo 44211, folio 49, hoja M-SIM-78523123, inscripción 38.ª",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_caducidad_asiento": "2026-06-13",
+    "dias_margen_inscripcion": 54
+   },
+   "estado_resultante": "REGISTERED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-048."
+  },
+  {
+   "agreement_id": "GARR-SEC-049",
+   "tipo": "INSCRIPCION_PODER_GENERAL",
+   "fecha": "2024-11-25",
+   "otorgante_o_certificante": {
+    "nombre": "Registro Mercantil de Madrid",
+    "cargo": "Registrador Mercantil",
+    "fundamento_facultad": "Artículo 18 CCom"
+   },
+   "texto": "Presentada el 18 de noviembre de 2024 la escritura de poder. Calificado favorablemente el título, se inscribe el poder general conferido a D.ª Elvira Sanz Aróstegui.",
+   "datos_instrumentales": {
+    "diario_asiento": {
+     "valor": "Diario 2024, asiento 2229",
+     "marca": "SIMULADO"
+    },
+    "tomo_folio_hoja_inscripcion": {
+     "valor": "Tomo 44242, folio 101, hoja M-SIM-83697128, inscripción 18.ª",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_caducidad_asiento": "2025-01-18",
+    "dias_margen_inscripcion": 54
+   },
+   "estado_resultante": "REGISTERED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-049."
+  },
+  {
+   "agreement_id": "GARR-SEC-050",
+   "tipo": "CANCELACION_PODER",
+   "fecha": "2026-05-04",
+   "otorgante_o_certificante": {
+    "nombre": "Registro Mercantil de Madrid",
+    "cargo": "Registrador Mercantil",
+    "fundamento_facultad": "Artículo 18 CCom"
+   },
+   "texto": "Presentada el 27 de abril de 2026 la escritura de revocación. Calificado favorablemente el título, se cancela el poder de D.ª Elvira Sanz Aróstegui.",
+   "datos_instrumentales": {
+    "diario_asiento": {
+     "valor": "Diario 2026, asiento 818",
+     "marca": "SIMULADO"
+    },
+    "datos_cancelacion": {
+     "valor": "Tomo 44242, folio 108, hoja M-SIM-83697128, inscripción 25.ª",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_caducidad_asiento": "2026-06-27",
+    "dias_margen_inscripcion": 54
+   },
+   "estado_resultante": "REGISTERED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-050."
+  },
+  {
+   "agreement_id": "GARR-SEC-051",
+   "tipo": "INSCRIPCION_PODER_GENERAL",
+   "fecha": "2024-12-17",
+   "otorgante_o_certificante": {
+    "nombre": "Registro Mercantil de Madrid",
+    "cargo": "Registrador Mercantil",
+    "fundamento_facultad": "Artículo 18 CCom"
+   },
+   "texto": "Presentada el 10 de diciembre de 2024 la escritura de poder. Calificado favorablemente el título, se inscribe el poder general de D.ª Elvira Sanz Aróstegui.",
+   "datos_instrumentales": {
+    "diario_asiento": {
+     "valor": "Diario 2024, asiento 2398",
+     "marca": "SIMULADO"
+    },
+    "tomo_folio_hoja_inscripcion": {
+     "valor": "Tomo 44276, folio 33, hoja M-SIM-81552671, inscripción 27.ª",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_caducidad_asiento": "2025-02-10",
+    "dias_margen_inscripcion": 55
+   },
+   "estado_resultante": "REGISTERED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-051."
+  },
+  {
+   "agreement_id": "GARR-SEC-052",
+   "tipo": "CANCELACION_PODER",
+   "fecha": "2026-05-18",
+   "otorgante_o_certificante": {
+    "nombre": "Registro Mercantil de Madrid",
+    "cargo": "Registrador Mercantil",
+    "fundamento_facultad": "Artículo 18 CCom"
+   },
+   "texto": "Presentada el 11 de mayo de 2026 la escritura de revocación. Calificado favorablemente el título, se cancela el poder de D.ª Elvira Sanz Aróstegui.",
+   "datos_instrumentales": {
+    "diario_asiento": {
+     "valor": "Diario 2026, asiento 931",
+     "marca": "SIMULADO"
+    },
+    "datos_cancelacion": {
+     "valor": "Tomo 44276, folio 39, hoja M-SIM-81552671, inscripción 33.ª",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_caducidad_asiento": "2026-07-11",
+    "dias_margen_inscripcion": 54
+   },
+   "estado_resultante": "REGISTERED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-052."
+  },
+  {
+   "agreement_id": "GARR-SEC-053",
+   "tipo": "INSCRIPCION_PODER_GENERAL",
+   "fecha": "2025-02-10",
+   "otorgante_o_certificante": {
+    "nombre": "Registro Mercantil de Madrid",
+    "cargo": "Registrador Mercantil",
+    "fundamento_facultad": "Artículo 18 CCom"
+   },
+   "texto": "Presentada el 3 de febrero de 2025 la escritura de poder. Calificado favorablemente el título, se inscribe el poder general conferido a D. Íñigo Bermejo Larralde.",
+   "datos_instrumentales": {
+    "diario_asiento": {
+     "valor": "Diario 2025, asiento 219",
+     "marca": "SIMULADO"
+    },
+    "tomo_folio_hoja_inscripcion": {
+     "valor": "Tomo 44301, folio 57, hoja M-SIM-72893035, inscripción 17.ª",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_caducidad_asiento": "2025-04-03",
+    "dias_margen_inscripcion": 52
+   },
+   "estado_resultante": "REGISTERED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-053."
+  },
+  {
+   "agreement_id": "GARR-SEC-054",
+   "tipo": "INSCRIPCION_PODER_GENERAL_CON_SUBSANACION",
+   "fecha": "2025-03-05",
+   "otorgante_o_certificante": {
+    "nombre": "Registro Mercantil de Madrid",
+    "cargo": "Registrador Mercantil",
+    "fundamento_facultad": "Artículo 18 CCom"
+   },
+   "texto": "PRIMERA PRESENTACIÓN: 18 de febrero de 2025. NOTA DE CALIFICACIÓN: Se suspende la inscripción porque la copia presentada no permite comprobar la legitimación de la firma del secretario que expide la certificación incorporada. Defecto subsanable. SUBSANACIÓN: El 27 de febrero de 2025 se aporta diligencia notarial que acredita la legitimación de la firma y la vigencia del cargo certificante. NUEVA PRESENTACIÓN: 28 de febrero de 2025. CALIFICACIÓN DEFINITIVA: Subsanado el defecto, se inscribe el poder general conferido a D. Íñigo Bermejo Larralde con las facultades y límites de la escritura.",
+   "datos_instrumentales": {
+    "primer_asiento": {
+     "valor": "Diario 2025, asiento 328",
+     "marca": "SIMULADO"
+    },
+    "segundo_asiento": {
+     "valor": "Diario 2025, asiento 401",
+     "marca": "SIMULADO"
+    },
+    "tomo_folio_hoja_inscripcion": {
+     "valor": "Tomo 44342, folio 119, hoja M-SIM-85626240, inscripción 46.ª",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_caducidad_primer_asiento": "2025-04-18",
+    "fecha_inscripcion": "2025-03-05",
+    "dias_margen": 44
+   },
+   "estado_resultante": "REGISTERED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-054; defecto y subsanación simulados."
+  },
+  {
+   "agreement_id": "GARR-SEC-055",
+   "tipo": "INSCRIPCION_PODER_GENERAL",
+   "fecha": "2025-09-29",
+   "otorgante_o_certificante": {
+    "nombre": "Registro Mercantil de Madrid",
+    "cargo": "Registrador Mercantil",
+    "fundamento_facultad": "Artículo 18 CCom"
+   },
+   "texto": "Presentada el 22 de septiembre de 2025 la escritura de poder. Calificado favorablemente el título, se inscribe el poder general de D. Íñigo Bermejo Larralde, con límites cuantitativos y exclusiones profesionales.",
+   "datos_instrumentales": {
+    "diario_asiento": {
+     "valor": "Diario 2025, asiento 1739",
+     "marca": "SIMULADO"
+    },
+    "tomo_folio_hoja_inscripcion": {
+     "valor": "Tomo 44411, folio 77, hoja M-SIM-82801069, inscripción 52.ª",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_caducidad_asiento": "2025-11-22",
+    "dias_margen_inscripcion": 54
+   },
+   "estado_resultante": "REGISTERED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-055."
+  },
+  {
+   "agreement_id": "GARR-SEC-056",
+   "tipo": "INSCRIPCION_PODER_GENERAL",
+   "fecha": "2024-03-18",
+   "otorgante_o_certificante": {
+    "nombre": "Registro Mercantil de Madrid",
+    "cargo": "Registrador Mercantil",
+    "fundamento_facultad": "Artículo 18 CCom"
+   },
+   "texto": "Presentada el 11 de marzo de 2024 la escritura de poder. Calificado favorablemente el título, se inscribe el poder general de D.ª Nuria Cabo Ferreiro.",
+   "datos_instrumentales": {
+    "diario_asiento": {
+     "valor": "Diario 2024, asiento 487",
+     "marca": "SIMULADO"
+    },
+    "tomo_folio_hoja_inscripcion": {
+     "valor": "Tomo 44005, folio 65, hoja M-SIM-83752626, inscripción 21.ª",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_caducidad_asiento": "2024-05-11",
+    "dias_margen_inscripcion": 54
+   },
+   "estado_resultante": "REGISTERED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-056."
+  },
+  {
+   "agreement_id": "GARR-SEC-057",
+   "tipo": "INSCRIPCION_PODER_GENERAL_CON_SUBSANACION",
+   "fecha": "2024-05-19",
+   "otorgante_o_certificante": {
+    "nombre": "Registro Mercantil de Madrid",
+    "cargo": "Registrador Mercantil",
+    "fundamento_facultad": "Artículos 18 CCom y 282 LSC"
+   },
+   "texto": "PRIMERA PRESENTACIÓN: 23 de abril de 2024. NOTA DE CALIFICACIÓN: Se suspende la inscripción por constar cierre registral derivado de la falta de depósito de las cuentas anuales del ejercicio precedente, sin que el título presentado se encuentre entre las excepciones legalmente inscribibles. Defecto subsanable mediante depósito o acreditación de su improcedencia. SUBSANACIÓN: El 9 de mayo de 2024 se acredita el depósito de las cuentas pendientes. NUEVA PRESENTACIÓN: 13 de mayo de 2024. CALIFICACIÓN DEFINITIVA: Reabierta la hoja, se inscribe el poder general conferido a D.ª Nuria Cabo Ferreiro.",
+   "datos_instrumentales": {
+    "primer_asiento": {
+     "valor": "Diario 2024, asiento 774",
+     "marca": "SIMULADO"
+    },
+    "deposito_subsanador": {
+     "valor": "Depósito 2024/DS-1182",
+     "marca": "SIMULADO"
+    },
+    "segundo_asiento": {
+     "valor": "Diario 2024, asiento 941",
+     "marca": "SIMULADO"
+    },
+    "tomo_folio_hoja_inscripcion": {
+     "valor": "Tomo 44089, folio 12, hoja M-SIM-85944411, inscripción 9.ª",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículos 43 RRM y 282 LSC",
+    "fecha_caducidad_primer_asiento": "2024-06-23",
+    "fecha_inscripcion": "2024-05-19",
+    "dias_margen": 35
+   },
+   "estado_resultante": "REGISTERED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-057; cierre, depósito y subsanación simulados."
+  },
+  {
+   "agreement_id": "GARR-SEC-058",
+   "tipo": "INSCRIPCION_PODER_GENERAL",
+   "fecha": "2024-10-07",
+   "otorgante_o_certificante": {
+    "nombre": "Registro Mercantil de Madrid",
+    "cargo": "Registrador Mercantil",
+    "fundamento_facultad": "Artículo 18 CCom"
+   },
+   "texto": "Presentada el 30 de septiembre de 2024 la escritura de poder. Calificado favorablemente el título, se inscribe el poder general de D.ª Nuria Cabo Ferreiro.",
+   "datos_instrumentales": {
+    "diario_asiento": {
+     "valor": "Diario 2024, asiento 1886",
+     "marca": "SIMULADO"
+    },
+    "tomo_folio_hoja_inscripcion": {
+     "valor": "Tomo 44137, folio 93, hoja M-SIM-86021698, inscripción 11.ª",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_caducidad_asiento": "2024-11-30",
+    "dias_margen_inscripcion": 54
+   },
+   "estado_resultante": "REGISTERED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-058."
+  },
+  {
+   "agreement_id": "GARR-SEC-059",
+   "tipo": "INSCRIPCION_PODER_GENERAL",
+   "fecha": "2024-10-21",
+   "otorgante_o_certificante": {
+    "nombre": "Registro Mercantil de Madrid",
+    "cargo": "Registrador Mercantil",
+    "fundamento_facultad": "Artículo 18 CCom"
+   },
+   "texto": "Presentada el 14 de octubre de 2024 la escritura de poder. Calificado favorablemente el título, se inscribe el poder general conferido a D.ª Nuria Cabo Ferreiro.",
+   "datos_instrumentales": {
+    "diario_asiento": {
+     "valor": "Diario 2024, asiento 1984",
+     "marca": "SIMULADO"
+    },
+    "tomo_folio_hoja_inscripcion": {
+     "valor": "Tomo 44155, folio 44, hoja M-SIM-86825437, inscripción 13.ª",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 43 RRM",
+    "fecha_caducidad_asiento": "2024-12-14",
+    "dias_margen_inscripcion": 54
+   },
+   "estado_resultante": "REGISTERED",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-059."
+  }
+ ],
+ "depositos_cuentas": [
+  {
+   "agreement_id": "GARR-SEC-006",
+   "tipo": "DEPOSITO_CUENTAS_ANUALES",
+   "fecha": "2024-06-07",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de Compañía Digital NewLaw, S.L.U.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Se presentan para depósito las cuentas anuales del ejercicio 2023, la certificación de las decisiones del socio único, la aplicación del resultado y la documentación complementaria. No se acompaña escritura pública ni interviene notario. Calificada la documentación, se tiene por efectuado el depósito.",
+   "datos_instrumentales": {
+    "numero_deposito": {
+     "valor": "MAD-DEP-2024-00641",
+     "marca": "SIMULADO"
+    },
+    "registro": {
+     "valor": "Registro Mercantil de Madrid",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículos 279.1 LSC y 5.1 CC",
+    "fecha_limite": "2024-06-14",
+    "dias_margen": 7
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "DEPOSITADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-006."
+  },
+  {
+   "agreement_id": "GARR-SEC-008",
+   "tipo": "DEPOSITO_CUENTAS_ANUALES",
+   "fecha": "2024-07-03",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de EAD Trust European Agency of Digital Trust, S.L.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Se presentan las cuentas de 2023, certificación de aprobación, aplicación del resultado e informe de auditoría simulado. No existe escritura. Calificada favorablemente la documentación, se practica el depósito.",
+   "datos_instrumentales": {
+    "numero_deposito": {
+     "valor": "MAD-DEP-2024-00892",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículos 279.1 LSC y 5.1 CC",
+    "fecha_limite": "2024-07-11",
+    "dias_margen": 8
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "DEPOSITADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-008."
+  },
+  {
+   "agreement_id": "GARR-SEC-010",
+   "tipo": "DEPOSITO_CUENTAS_ANUALES",
+   "fecha": "2025-06-11",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de Compañía Digital NewLaw, S.L.U.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Presentadas las cuentas de 2024 y la certificación del socio único, sin escritura pública. Calificación favorable y depósito practicado.",
+   "datos_instrumentales": {
+    "numero_deposito": {
+     "valor": "MAD-DEP-2025-01108",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2025-06-20",
+    "dias_margen": 9
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "DEPOSITADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-010."
+  },
+  {
+   "agreement_id": "GARR-SEC-012",
+   "tipo": "DEPOSITO_CUENTAS_ANUALES",
+   "fecha": "2025-07-02",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de EAD Trust European Agency of Digital Trust, S.L.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Presentadas las cuentas de 2024, certificación de la junta e informe de auditoría simulado. Sin escritura. Depósito practicado.",
+   "datos_instrumentales": {
+    "numero_deposito": {
+     "valor": "MAD-DEP-2025-01576",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2025-07-10",
+    "dias_margen": 8
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "DEPOSITADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-012."
+  },
+  {
+   "agreement_id": "GARR-SEC-014",
+   "tipo": "DEPOSITO_CUENTAS_ANUALES",
+   "fecha": "2025-07-09",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de G-Advisory, Consultoría Técnica, Económica y Estratégica, S.L.P.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Presentadas las cuentas de 2024 y certificación de aprobación. Sin escritura ni intervención notarial. Depósito practicado.",
+   "datos_instrumentales": {
+    "numero_deposito": {
+     "valor": "MAD-DEP-2025-01681",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2025-07-17",
+    "dias_margen": 8
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "DEPOSITADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-014."
+  },
+  {
+   "agreement_id": "GARR-SEC-016",
+   "tipo": "DEPOSITO_CUENTAS_ANUALES",
+   "fecha": "2025-06-18",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de Garrigues IP, S.L.P.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Presentadas las cuentas de 2024 y la certificación del socio único. No se acompaña escritura. Depósito practicado.",
+   "datos_instrumentales": {
+    "numero_deposito": {
+     "valor": "MAD-DEP-2025-01244",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2025-06-27",
+    "dias_margen": 9
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "DEPOSITADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-016."
+  },
+  {
+   "agreement_id": "GARR-SEC-018",
+   "tipo": "DEPOSITO_CUENTAS_ANUALES",
+   "fecha": "2025-06-04",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de Garrigues Letrados de Soporte, S.L.P.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Presentadas las cuentas de 2024 y certificación del socio único. Sin escritura. Depósito practicado.",
+   "datos_instrumentales": {
+    "numero_deposito": {
+     "valor": "MAD-DEP-2025-01017",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2025-06-13",
+    "dias_margen": 9
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "DEPOSITADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-018."
+  },
+  {
+   "agreement_id": "GARR-SEC-020",
+   "tipo": "DEPOSITO_CUENTAS_ANUALES",
+   "fecha": "2025-06-25",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de Garrigues Human Capital Services, S.L.P.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Presentadas las cuentas de 2024 y la certificación del socio único. No se formaliza escritura. Depósito practicado.",
+   "datos_instrumentales": {
+    "numero_deposito": {
+     "valor": "MAD-DEP-2025-01398",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2025-07-03",
+    "dias_margen": 8
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "DEPOSITADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-020."
+  },
+  {
+   "agreement_id": "GARR-SEC-022",
+   "tipo": "DEPOSITO_CUENTAS_ANUALES",
+   "fecha": "2025-07-16",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de Garrigues Consultoría de Empresa Familiar, S.L.P.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Presentadas las cuentas de 2024 y certificación del socio único. Sin escritura pública. Depósito practicado.",
+   "datos_instrumentales": {
+    "numero_deposito": {
+     "valor": "MAD-DEP-2025-01806",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2025-07-24",
+    "dias_margen": 8
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "DEPOSITADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-022."
+  },
+  {
+   "agreement_id": "GARR-SEC-024",
+   "tipo": "DEPOSITO_CUENTAS_ANUALES",
+   "fecha": "2026-06-10",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de Compañía Digital NewLaw, S.L.U.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Presentadas las cuentas de 2025 y certificación del socio único. No existe escritura. Depósito practicado.",
+   "datos_instrumentales": {
+    "numero_deposito": {
+     "valor": "MAD-DEP-2026-01091",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-06-19",
+    "dias_margen": 9
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "DEPOSITADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-024."
+  },
+  {
+   "agreement_id": "GARR-SEC-026",
+   "tipo": "DEPOSITO_CUENTAS_ANUALES",
+   "fecha": "2026-07-01",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de EAD Trust European Agency of Digital Trust, S.L.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Presentadas las cuentas de 2025, certificación de la junta e informe de auditoría simulado. Sin escritura pública. Depósito practicado.",
+   "datos_instrumentales": {
+    "numero_deposito": {
+     "valor": "MAD-DEP-2026-01510",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-07-09",
+    "dias_margen": 8
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "DEPOSITADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-026."
+  },
+  {
+   "agreement_id": "GARR-SEC-028",
+   "tipo": "DEPOSITO_CUENTAS_CON_DEFECTO",
+   "fecha": "2026-07-08",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de G-Advisory, Consultoría Técnica, Económica y Estratégica, S.L.P.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Presentadas las cuentas de 2025 y certificación de aprobación. NOTA DE DEFECTOS: Falta la hoja de firmas del órgano de administración en uno de los ejemplares remitidos. Se suspende el depósito y se concede trámite de subsanación. A la fecha de corte del conjunto de datos no consta completada la subsanación. No se acompaña escritura.",
+   "datos_instrumentales": {
+    "numero_presentacion": {
+     "valor": "MAD-DEP-2026-01624",
+     "marca": "SIMULADO"
+    },
+    "nota_defecto": {
+     "valor": "ND-2026-441",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-07-16",
+    "dias_margen_presentacion": 8
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "SUBSANACION",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-028 y su incidencia original."
+  },
+  {
+   "agreement_id": "GARR-SEC-030",
+   "tipo": "DEPOSITO_CUENTAS_ANUALES",
+   "fecha": "2026-06-17",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de Garrigues IP, S.L.P.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Presentadas las cuentas de 2025 y certificación del socio único. Sin escritura. Depósito practicado.",
+   "datos_instrumentales": {
+    "numero_deposito": {
+     "valor": "MAD-DEP-2026-01207",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-06-26",
+    "dias_margen": 9
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "DEPOSITADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-030."
+  },
+  {
+   "agreement_id": "GARR-SEC-032",
+   "tipo": "DEPOSITO_CUENTAS_ANUALES",
+   "fecha": "2026-06-03",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de Garrigues Letrados de Soporte, S.L.P.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Presentadas las cuentas de 2025 y certificación del socio único. Sin escritura pública. Depósito practicado.",
+   "datos_instrumentales": {
+    "numero_deposito": {
+     "valor": "MAD-DEP-2026-00984",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-06-12",
+    "dias_margen": 9
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "DEPOSITADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-032."
+  },
+  {
+   "agreement_id": "GARR-SEC-034",
+   "tipo": "DEPOSITO_CUENTAS_ANUALES",
+   "fecha": "2026-06-24",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de Garrigues Human Capital Services, S.L.P.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Presentadas las cuentas de 2025 y certificación del socio único. Sin escritura. Depósito practicado.",
+   "datos_instrumentales": {
+    "numero_deposito": {
+     "valor": "MAD-DEP-2026-01345",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-07-02",
+    "dias_margen": 8
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "DEPOSITADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-034."
+  },
+  {
+   "agreement_id": "GARR-SEC-036",
+   "tipo": "PRESENTACION_DEPOSITO_CUENTAS",
+   "fecha": "2026-07-15",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de Garrigues Consultoría de Empresa Familiar, S.L.P.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Presentadas las cuentas de 2025 y certificación del socio único. No se acompaña escritura. A la fecha de corte la documentación permanece presentada y pendiente de calificación.",
+   "datos_instrumentales": {
+    "numero_presentacion": {
+     "valor": "MAD-DEP-2026-01741",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-07-23",
+    "dias_margen": 8
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "PRESENTADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-036."
+  },
+  {
+   "agreement_id": "GARR-SEC-038",
+   "tipo": "DEPOSITO_CUENTAS_ANUALES",
+   "fecha": "2026-05-20",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de Violet Inversiones 2010, S.L.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Presentadas las cuentas de 2025 y certificación de la junta. Sin escritura. Depósito practicado.",
+   "datos_instrumentales": {
+    "numero_deposito": {
+     "valor": "MAD-DEP-2026-00811",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-05-28",
+    "dias_margen": 8
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "DEPOSITADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-038."
+  },
+  {
+   "agreement_id": "GARR-SEC-040",
+   "tipo": "DEPOSITO_CUENTAS_ANUALES",
+   "fecha": "2026-05-22",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de EWOH Inversiones 2010, S.L.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Presentadas las cuentas de 2025 y certificación de la junta. Sin escritura. Depósito practicado.",
+   "datos_instrumentales": {
+    "numero_deposito": {
+     "valor": "MAD-DEP-2026-00842",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-05-30",
+    "dias_margen": 8
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "DEPOSITADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-040."
+  },
+  {
+   "agreement_id": "GARR-SEC-042",
+   "tipo": "DEPOSITO_CUENTAS_ANUALES",
+   "fecha": "2026-05-27",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de Garmen Inversiones 2013, S.L.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Presentadas las cuentas de 2025 y certificación de la junta. Sin escritura pública. Depósito practicado.",
+   "datos_instrumentales": {
+    "numero_deposito": {
+     "valor": "MAD-DEP-2026-00901",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-06-05",
+    "dias_margen": 9
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "DEPOSITADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-042."
+  },
+  {
+   "agreement_id": "GARR-SEC-044",
+   "tipo": "PRESENTACION_DEPOSITO_CUENTAS",
+   "fecha": "2026-07-10",
+   "otorgante_o_certificante": {
+    "nombre": "Órgano de administración de Garrigues Portugal, S.L.P.",
+    "cargo": "Presentante",
+    "fundamento_facultad": "Artículo 279 LSC"
+   },
+   "texto": "Presentadas las cuentas de 2025 y certificación de la junta. No se acompaña escritura ni interviene notario. A la fecha de corte el depósito está presentado y pendiente de calificación.",
+   "datos_instrumentales": {
+    "numero_presentacion": {
+     "valor": "MAD-DEP-2026-01656",
+     "marca": "SIMULADO"
+    }
+   },
+   "plazo": {
+    "precepto": "Artículo 279.1 LSC",
+    "fecha_limite": "2026-07-18",
+    "dias_margen": 8
+   },
+   "estado_resultante": "FILED",
+   "estado_deposito": "PRESENTADA",
+   "firmeza": "SINTETICO",
+   "procedencia": "SIMULADO",
+   "ancla": "GARR-SEC-044."
+  }
+ ],
+ "cadenas": [
+  {
+   "agreement_id": "GARR-SEC-001",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "NO_APLICA"
+  },
+  {
+   "agreement_id": "GARR-SEC-002",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "NO_APLICA"
+  },
+  {
+   "agreement_id": "GARR-SEC-003",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "NO_APLICA"
+  },
+  {
+   "agreement_id": "GARR-SEC-004",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "NO_APLICA"
+  },
+  {
+   "agreement_id": "GARR-SEC-005",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-006",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-007",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-008",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-009",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-010",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-011",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-012",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-013",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-014",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-015",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-016",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-017",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-018",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-019",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-020",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-021",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-022",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-023",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-024",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-025",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-026",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-027",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-028",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED",
+    "SUBSANACION_PENDIENTE"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-029",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-030",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-031",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-032",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-033",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-034",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-035",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-036",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "PRESENTACION_DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-037",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-038",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-039",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-040",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-041",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-042",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-043",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED"
+   ],
+   "cadena_externa": "FORMULACION_CUENTAS_SIN_SALIDA_EXTERNA"
+  },
+  {
+   "agreement_id": "GARR-SEC-044",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "FILED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "PRESENTACION_DEPOSITO"
+   ],
+   "escritura": false
+  },
+  {
+   "agreement_id": "GARR-SEC-045",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "INSTRUMENTED",
+    "FILED",
+    "REGISTERED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "ESCRITURA",
+    "INSCRIPCION"
+   ]
+  },
+  {
+   "agreement_id": "GARR-SEC-046",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "INSTRUMENTED",
+    "FILED",
+    "REGISTERED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "ESCRITURA",
+    "CANCELACION"
+   ]
+  },
+  {
+   "agreement_id": "GARR-SEC-047",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "INSTRUMENTED",
+    "FILED",
+    "REGISTERED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "ESCRITURA",
+    "INSCRIPCION"
+   ]
+  },
+  {
+   "agreement_id": "GARR-SEC-048",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "INSTRUMENTED",
+    "FILED",
+    "REGISTERED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "ESCRITURA",
+    "CANCELACION"
+   ]
+  },
+  {
+   "agreement_id": "GARR-SEC-049",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "INSTRUMENTED",
+    "FILED",
+    "REGISTERED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "ESCRITURA",
+    "INSCRIPCION"
+   ]
+  },
+  {
+   "agreement_id": "GARR-SEC-050",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "INSTRUMENTED",
+    "FILED",
+    "REGISTERED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "ESCRITURA",
+    "CANCELACION"
+   ]
+  },
+  {
+   "agreement_id": "GARR-SEC-051",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "INSTRUMENTED",
+    "FILED",
+    "REGISTERED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "ESCRITURA",
+    "INSCRIPCION"
+   ]
+  },
+  {
+   "agreement_id": "GARR-SEC-052",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "INSTRUMENTED",
+    "FILED",
+    "REGISTERED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "ESCRITURA",
+    "CANCELACION"
+   ]
+  },
+  {
+   "agreement_id": "GARR-SEC-053",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "INSTRUMENTED",
+    "FILED",
+    "REGISTERED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "ESCRITURA",
+    "INSCRIPCION"
+   ]
+  },
+  {
+   "agreement_id": "GARR-SEC-054",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "INSTRUMENTED",
+    "FILED",
+    "SUBSANACION",
+    "FILED",
+    "REGISTERED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "ESCRITURA",
+    "NOTA_DEFECTO",
+    "DILIGENCIA_SUBSANACION",
+    "INSCRIPCION"
+   ]
+  },
+  {
+   "agreement_id": "GARR-SEC-055",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "INSTRUMENTED",
+    "FILED",
+    "REGISTERED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "ESCRITURA",
+    "INSCRIPCION"
+   ]
+  },
+  {
+   "agreement_id": "GARR-SEC-056",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "INSTRUMENTED",
+    "FILED",
+    "REGISTERED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "ESCRITURA",
+    "INSCRIPCION"
+   ]
+  },
+  {
+   "agreement_id": "GARR-SEC-057",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "INSTRUMENTED",
+    "FILED",
+    "SUBSANACION",
+    "FILED",
+    "REGISTERED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "ESCRITURA",
+    "NOTA_DEFECTO_CIERRE_REGISTRAL",
+    "DEPOSITO_SUBSANADOR",
+    "INSCRIPCION"
+   ]
+  },
+  {
+   "agreement_id": "GARR-SEC-058",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "INSTRUMENTED",
+    "FILED",
+    "REGISTERED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "ESCRITURA",
+    "INSCRIPCION"
+   ]
+  },
+  {
+   "agreement_id": "GARR-SEC-059",
+   "secuencia": [
+    "DRAFT",
+    "PROPOSED",
+    "ADOPTED",
+    "CERTIFIED",
+    "INSTRUMENTED",
+    "FILED",
+    "REGISTERED"
+   ],
+   "instrumentos": [
+    "CERTIFICACION",
+    "ESCRITURA",
+    "INSCRIPCION"
+   ]
+  }
+ ],
+ "dudas": [
+  "Las fechas de aprobación de las actas son simuladas. En decisiones del socio único y acuerdos de administrador único se han hecho coincidir con la fecha de adopción; en juntas y consejo, con la aprobación al final de la sesión cuando así resulta del acuerdo.",
+  "Los nombres de secretarios, presidentes, representantes persona física y notarios son de ficción y se marcan SIMULADO.",
+  "Los datos de Diario, tomo, folio, hoja, inscripción, protocolo y depósito son íntegramente simulados.",
+  "No existen acuerdos de nombramiento o cese de administradores entre los 59 acuerdos recibidos; por ello no se ha aplicado materialmente el plazo del artículo 142 RRM.",
+  "GARR-SEC-028 permanece en SUBSANACION porque la fuente de origen no declara subsanación completada. No se ha alterado ese estado para forzar un cierre.",
+  "GARR-SEC-036 y GARR-SEC-044 permanecen PRESENTADAS y pendientes de calificación, conforme al estado del fichero de origen.",
+  "Debe confirmarse si el producto desea representar el depósito de cuentas mediante un estado específico DEPOSITED o mantener FILED con un subestado DEPOSITADA.",
+  "La denominación EWOH Inversiones 2010, S.L. y la de Garmen Inversiones 2013, S.L. siguen sujetas a la cautela de grafía indicada en la fuente.",
+  "Las certificaciones de poderes expedidas por administrador único no contienen visto bueno. La única certificación de poder con visto bueno es GARR-SEC-054, adoptada por un consejo colegiado.",
+  "Ninguna cuenta anual se eleva a público, se protocoliza o se presenta como acto inscribible.",
+  "Ningún artefacto atribuye a una persona una firma electrónica cualificada; las referencias a firma manuscrita, copia electrónica y huella de custodia describen únicamente la forma documental simulada."
+ ]
+}
