@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { buildCertificationPlan } from "../certification-snapshot";
+import { MEETING_ADOPTION_SNAPSHOT_ENGINE_VERSION } from "@/lib/rules-engine";
 import type { MeetingAdoptionSnapshot } from "@/lib/rules-engine";
 
 function snapshot(overrides: Partial<MeetingAdoptionSnapshot>): MeetingAdoptionSnapshot {
-  return {
+  // `base` se ANOTA a proposito: al hacer `{...base, ...overrides}` con
+  // overrides parcial, TypeScript solo conserva como requeridas las claves que
+  // base declara. Sin la anotacion, cada campo que faltaba salia de uno en uno
+  // segun se arreglaba el anterior. Anotado, el compilador los pide todos.
+  const base: MeetingAdoptionSnapshot = {
+    // Requerido por el tipo y con un unico valor admitido; produccion lo
+    // escribe en meeting-adoption-snapshot.ts:401. El fixture no lo ponia, y
+    // el spread de un Partial encima lo dejaba opcional en el resultado.
+    schema_version: "meeting-adoption-snapshot.v2",
+    engine_version: MEETING_ADOPTION_SNAPSHOT_ENGINE_VERSION,
     agenda_item_index: 1,
     resolution_text: "Aprobar acuerdo",
     materia: "APROBACION_CUENTAS",
@@ -51,9 +61,31 @@ function snapshot(overrides: Partial<MeetingAdoptionSnapshot>): MeetingAdoptionS
       warnings: [],
       explain: [],
     },
+    // Requeridos por el tipo desde v2. `certification-snapshot.ts` no los lee
+    // —se comprueba antes de anadirlos—, asi que son inertes para estas
+    // aserciones; los valores se eligen coherentes con el resto del fixture:
+    // capital_total y quorum_reached coinciden con vote_summary y
+    // societary_validity, y no hay votos pendientes porque `voters` esta vacio.
+    voting_context: {
+      tipo_social: "SA",
+      organo_tipo: "JUNTA_GENERAL",
+      adoption_mode: "MEETING",
+      primera_convocatoria: true,
+      total_miembros: 0,
+      capital_total: 100,
+      quorum_reached: true,
+      voto_calidad_habilitado: false,
+      voto_presidente: null,
+    },
+    vote_completeness: {
+      complete: true,
+      missing_vote_ids: [],
+      missing_conflict_reason_ids: [],
+      ignored_conflict_vote_ids: [],
+    },
     evaluated_at: "2026-04-27T00:00:00.000Z",
-    ...overrides,
   };
+  return { ...base, ...overrides };
 }
 
 describe("buildCertificationPlan", () => {
