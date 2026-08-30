@@ -1056,6 +1056,48 @@ describe("C1 — los 10 acuerdos de la Junta en Cloud", () => {
     expect(reqs!.every((r) => String(r.legal_basis).includes("39.5.b"))).toBe(true);
   });
 
+  it("el expediente explica sus DOS bases de cómputo, y ARGA no adquiere la clave", async () => {
+    // La fila de evaluación enseñaba `base_votos 16900` y
+    // `concurrencia_todas_las_clases 16908` juntas, sin decir que son bases
+    // distintas y con un porcentaje al lado que no sale de dividir ninguna.
+    // `rule_evaluation_results` es WORM y su explain entra en el hash, así que
+    // la nota vive en `agreements.compliance_explain`, que sí es mutable, y la
+    // pinta `NotaDeExpediente`.
+    const { data, error } = await garr.from("agreements")
+      .select("id, compliance_explain")
+      .in("id", acuerdos.map((a) => a.id));
+    expect(error).toBeNull();
+    expect(data).toHaveLength(acuerdos.length);
+    for (const fila of data!) {
+      const base = (fila.compliance_explain as Record<string, Record<string, Record<string, unknown>>>)
+        ?.c1_junta_socios_2026?.base_computo;
+      expect(base?.declarada).toBe(baseComputoJunta());
+      expect(base?.ambas_clases).toBe(baseComputoTodasLasClases());
+      expect(base?.diferencia).toBe(baseComputoTodasLasClases() - baseComputoJunta());
+      // La nota tiene que NOMBRAR las dos y decir de dónde sale la diferencia.
+      expect(String(base?.nota)).toContain(String(baseComputoJunta()));
+      expect(String(base?.nota)).toContain(String(baseComputoTodasLasClases()));
+      expect(String(base?.nota)).toContain("clase B");
+    }
+    // Control discriminante: ARGA no adquiere la clave.
+    const { data: enArga } = await arga.from("agreements")
+      .select("id").not("compliance_explain->c1_junta_socios_2026", "is", null).limit(5);
+    expect(enArga ?? []).toHaveLength(0);
+  });
+
+  it("la reunión declara que su HORA no está acreditada, y ARGA no", async () => {
+    // Sin esta bandera la pantalla pintaba las 00:00Z como «2:00» de Madrid en
+    // cuatro sitios. Las notas en prosa que lo explicaban no las lee nadie.
+    const { data, error } = await garr.from("meetings")
+      .select("id, quorum_data").eq("id", meetingId).maybeSingle();
+    expect(error).toBeNull();
+    expect((data!.quorum_data as Record<string, unknown>).hora_no_acreditada).toBe(true);
+
+    const { data: enArga } = await arga.from("meetings")
+      .select("id").not("quorum_data->hora_no_acreditada", "is", null).limit(5);
+    expect(enArga ?? []).toHaveLength(0);
+  });
+
   it("hay un SEGUNDO gate, por materia, y alcanza a 6 de los 10 acuerdos", async () => {
     // El test de arriba filtra `INFORME_PRECEPTIVO_ORGANO`, y su rotulo se leia
     // como «a los demas no les cae ningun preceptivo». Falso por partida doble:

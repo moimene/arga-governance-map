@@ -125,6 +125,8 @@ export interface AgreementFull {
   no_session_resolution_id: string | null;
   statutory_basis: string | null;
   compliance_snapshot: Record<string, unknown> | null;
+  /** Notas del expediente que la ficha pinta cuando existen (ver NotaDeExpediente). */
+  compliance_explain: Record<string, unknown> | null;
   approval_workflow: Record<string, unknown>[] | null;
   execution_mode: Record<string, unknown> | null;
   document_url: string | null;

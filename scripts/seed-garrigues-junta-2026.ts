@@ -363,6 +363,12 @@ export function buildQuorumData(votosPresenciales: number, votosSumaCenso: numbe
     // Declararlo activaría `v_is_universal` en el manifiesto autoritativo del
     // acta, que exige aceptaciones WORM individuales del orden del día.
     junta_universal: false,
+    // Bandera legible por MAQUINA. Las `notas` de abajo dicen lo mismo en prosa
+    // y no las renderiza ninguna superficie: la hora se pintaba como «2:00»
+    // —00:00Z en horario de Madrid— sin una sola advertencia, en cuatro sitios.
+    // Una Junta de S.L.P. a las dos de la madrugada es lo primero que ve un
+    // abogado. ARGA no lleva esta clave: sin ella el render no cambia.
+    hora_no_acreditada: true,
     notas: [
       "Reconstrucción demo sin efecto jurídico. El expediente real de la Junta de 06/05/2026 consta en el Registro Mercantil de Madrid; la plataforma lo reproduce, no lo sustituye.",
       "La hora de la sesión NO consta en la fuente disponible. `scheduled_start` se guarda a las 00:00Z para que la fecha sea correcta en UTC y en hora local de Madrid; la hora que pinte cualquier pantalla es un artefacto de renderizado, no un dato del expediente.",
@@ -628,6 +634,24 @@ export function buildAgreementRow(args: {
           tenant: "GARRIGUES",
         },
         mayoria: pack.mayoriaSL,
+        // Sin esto, la ficha ensenaba `base_votos 16900` y
+        // `concurrencia_todas_las_clases 16908` juntos, con un `concurrencia_pct
+        // 100` al lado: mas votos concurriendo que la base, y un 100 % que no
+        // sale de dividir ninguno de los dos. Son DOS bases y hay que decirlo.
+        base_computo: {
+          declarada: baseComputoJunta(),
+          criterio: "Votos de la clase A no autocartera",
+          ambas_clases: baseComputoTodasLasClases(),
+          diferencia: baseComputoTodasLasClases() - baseComputoJunta(),
+          nota:
+            `El porcentaje se calcula sobre la base DECLARADA de ${baseComputoJunta()} votos ` +
+            `(clase A no autocartera, criterio del usuario de 2026-08-29). Los ` +
+            `${baseComputoTodasLasClases()} votos computables de AMBAS clases del art. 7 de los ` +
+            `Estatutos son otra base: la diferencia son los ` +
+            `${baseComputoTodasLasClases() - baseComputoJunta()} votos de la clase B, que SI votan. ` +
+            `Sobre la base declarada los presenciales dan el 0,8875 % que imprime el acta.`,
+          registro: "docs/legal/2026-08-29-base-computo-junta-socios-garrigues.md",
+        },
         ...(subsuncion ? { subsuncion } : {}),
         required_majority_code: {
           valor: null,
@@ -842,7 +866,6 @@ export function evaluarMayoriaPunto(args: {
       "Reconstrucción demo sin efecto jurídico. El expediente real consta en el Registro Mercantil de Madrid; la plataforma lo reproduce, no lo sustituye.",
   };
   if (!evaluable) explain.motivo_no_evaluable = motivoNoEvaluable;
-
   return {
     punto: punto.numero,
     materia: punto.materia,

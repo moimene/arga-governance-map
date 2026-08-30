@@ -230,6 +230,75 @@ function AgreementArchivedDocLink({ agreementId }: { agreementId: string }) {
   );
 }
 
+type NotaBase = { declarada?: number; ambas_clases?: number; nota?: string; registro?: string };
+type NotaSubsuncion = { procedencia?: string; lecturaAplicada?: string; lecturaAlternativa?: string };
+
+/**
+ * Pinta la base de cómputo y la subsunción cuando el expediente las declara.
+ *
+ * Existe porque el `decision_text` de un acuerdo prometía que «la lectura
+ * alternativa consta en el expediente» y ninguna superficie leía esa clave: la
+ * promesa se veía, lo prometido no. Y porque la fila de evaluación enseñaba dos
+ * bases de cómputo distintas —los votos de una clase y los de ambas— juntas y
+ * sin decir que lo eran, con un porcentaje al lado que no salía de dividir
+ * ninguna de las dos.
+ *
+ * Gateado por la presencia del dato: un acuerdo sin estas claves no cambia.
+ */
+function NotaDeExpediente({ explain }: { explain: unknown }) {
+  const raiz = (explain as Record<string, unknown> | null)?.["c1_junta_socios_2026"] as
+    | Record<string, unknown>
+    | undefined;
+  const base = raiz?.base_computo as NotaBase | undefined;
+  const sub = raiz?.subsuncion as NotaSubsuncion | undefined;
+  if (!base?.nota && !sub?.lecturaAlternativa) return null;
+
+  return (
+    <div
+      className="mt-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3 text-xs text-[var(--g-text-secondary)]"
+      style={{ borderRadius: "var(--g-radius-sm)" }}
+    >
+      {base?.nota ? (
+        <div className={sub?.lecturaAlternativa ? "mb-3" : undefined}>
+          <p className="mb-1 font-medium text-[var(--g-text-primary)]">
+            Base de cómputo de la mayoría
+          </p>
+          <p>{base.nota}</p>
+          {base.registro ? (
+            <p className="mt-1 text-[var(--g-text-secondary)]">Criterio registrado en {base.registro}</p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {sub?.lecturaAlternativa ? (
+        <div>
+          <p className="mb-1 font-medium text-[var(--g-text-primary)]">
+            Mayoría aplicada por subsunción
+            {sub.procedencia ? (
+              <span
+                className="ml-2 inline-flex items-center bg-[var(--status-warning)] px-2 py-0.5 text-[10px] font-semibold text-[var(--g-text-inverse)]"
+                style={{ borderRadius: "var(--g-radius-full)" }}
+              >
+                {sub.procedencia}
+              </span>
+            ) : null}
+          </p>
+          {sub.lecturaAplicada ? (
+            <p className="mb-1">
+              <span className="font-medium text-[var(--g-text-primary)]">Lectura aplicada:</span>{" "}
+              {sub.lecturaAplicada}
+            </p>
+          ) : null}
+          <p>
+            <span className="font-medium text-[var(--g-text-primary)]">Lectura alternativa:</span>{" "}
+            {sub.lecturaAlternativa}
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function ExpedienteAcuerdo() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -789,6 +858,7 @@ export default function ExpedienteAcuerdo() {
                   <CheckRow ok={compliance.quorum_compliant} label="Quórum" />
                   <CheckRow ok={compliance.majority_compliant} label="Mayoría" />
                   <CheckRow ok={compliance.conflict_handled} label="Conflictos de interés" />
+                  <NotaDeExpediente explain={agreement.compliance_explain} />
                   {compliance.blocking_issues.length > 0 ? (
                     <div
                       className="mt-3 bg-[var(--g-sec-100)]/60 p-3 text-xs text-[var(--g-text-primary)]"
