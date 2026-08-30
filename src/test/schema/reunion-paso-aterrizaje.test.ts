@@ -58,6 +58,22 @@ describe("C1 — la reunión aterriza siempre en un paso que explica el hueco de
     expect(PASOS_CON_AVISO.has(paso)).toBe(true);
   });
 
+  it("el ORDEN de las comprobaciones importa, y esto cae si alguien lo cambia", () => {
+    // La versión anterior decía en su docstring que caía «porque alguien
+    // reordene las comprobaciones» y NO caía: `hasQuorum` es false en el dato
+    // real, así que intercambiar las ramas de quórum y resoluciones no cambiaba
+    // nada. Una aserción que no puede fallar no vigila el orden.
+    //
+    // Con las DOS banderas en true, el orden sí discrimina: quien se comprueba
+    // primero decide el paso. Y de ese orden depende toda la doctrina —que esta
+    // Junta aterrice siempre en un paso que explica el hueco del acta—.
+    const ambas = { meetingOpen: true, hasAttendees: true, hasQuorum: true, hasResolutions: true };
+    expect(deriveReunionInitialStep(ambas)).toBe(6);
+    expect(PASOS_CON_AVISO.has(deriveReunionInitialStep(ambas))).toBe(true);
+    // Control del método: con quórum pero sin resoluciones, el mismo input da 4.
+    expect(deriveReunionInitialStep({ ...ambas, hasResolutions: false })).toBe(4);
+  });
+
   it("el hueco EXISTE: sin resoluciones sí se aterriza donde el aviso no está", () => {
     // Sin esta aserción el fichero diría «no hay problema», que es falso. El
     // defecto es general y queda declarado; lo que no es, es alcanzable aquí.

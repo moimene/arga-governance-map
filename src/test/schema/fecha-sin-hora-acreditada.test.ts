@@ -39,6 +39,33 @@ describe("C1 — la hora que no consta no se pinta como si constara", () => {
     expect(medio).toMatch(/^\d{1,2} \w{3} \d{4}, \d{1,2}:\d{2}$/);              // mes abreviado, SIN segundos
     expect(largo).toMatch(/^\d{1,2} de \w+ de \d{4}, \d{1,2}:\d{2}$/);          // mes completo
     for (const v of [plano, medio, largo]) expect(v).not.toContain("no acreditada");
+
+    // Y los tres tienen que hablar del MISMO instante. Un mutante que metiera
+    // `timeZone: "UTC"` en la rama sin formato conserva la forma —y por tanto
+    // pasaba los tres regex de arriba— mientras desplaza dos horas todas las
+    // fechas de ARGA en las dos listas que usan esa rama. La forma no basta:
+    // hay que pinar que no se mueva el instante.
+    const hhmm = (v: string) => v.match(/(\d{1,2}):(\d{2})/)![0].padStart(5, "0");
+    expect(new Set([hhmm(plano), hhmm(medio), hhmm(largo)]).size).toBe(1);
+  });
+
+  it("la rama por defecto no fija zona horaria — y esto NO se puede probar por valor", () => {
+    // GOTCHA del repo, medido: `bun test` corre en UTC y la aplicación en la
+    // zona del usuario (Europe/Madrid aquí). Un mutante que meta
+    // `timeZone: "UTC"` en la rama por defecto desplaza DOS HORAS todas las
+    // fechas de ARGA en las dos listas que la usan… y dentro del runner no
+    // cambia absolutamente nada, porque allí las dos cosas coinciden.
+    //
+    // O sea que la aserción por valor no es débil: el ENTORNO la neutraliza.
+    // Ninguna comprobación de salida en `bun test` puede cazar un defecto de
+    // zona horaria. Por eso esto se pina en el fuente, que es la única capa
+    // donde el defecto es visible desde aquí.
+    const src = readFileSync("src/lib/secretaria/fecha-sin-hora-acreditada.ts", "utf8");
+    const porDefecto = src.match(/:\s*(d\.toLocaleString\([^;]*?\));/);
+    expect(porDefecto).not.toBeNull();
+    expect(porDefecto![1]).toBe('d.toLocaleString("es-ES")');   // sin opciones: ni timeZone ni nada
+    // Control del método: si la captura fuera de otra línea, esto no valdría.
+    expect(src).toContain("return formatoConHora ? d.toLocaleString");
   });
 
   it("y los PUNTOS DE LLAMADA conservan su formato — aquí es donde falló de verdad", () => {
@@ -51,9 +78,25 @@ describe("C1 — la hora que no consta no se pinta como si constara", () => {
       // Sin opciones → `toLocaleString("es-ES")` pelado.
       ["src/pages/secretaria/ConvocatoriasList.tsx", /fechaConHoraSiConsta\(c\.fecha_1, horaNoAcreditadaEn\(c\.rule_trace\)\)/],
       ["src/pages/secretaria/ReunionesLista.tsx", /fechaConHoraSiConsta\(m\.scheduled_start, horaNoAcreditadaEn\(m\.quorum_data\)\)/],
-      // Con su formato propio.
-      ["src/pages/secretaria/ReunionStepper.tsx", /dateStyle: "medium", timeStyle: "short"/],
-      ["src/pages/secretaria/ReunionStepper.tsx", /dateStyle: "long", timeStyle: "short"/],
+      // Con su formato propio, pinando la LLAMADA entera. Pinar el literal
+      // `dateStyle: "long"` suelto no valía: la línea 3919 del mismo fichero
+      // —`Generado el ${new Date().toLocaleString(..., { dateStyle: "long",
+      // timeStyle: "short" })}`— ya lo contenía, así que el pin lo satisfacía
+      // un señuelo que estaba ahí antes de que nadie lo escribiera como señuelo.
+      // Es la forma nº5 dentro del propio arreglo: cruzar el límite que uno
+      // cree estar respetando.
+      ["src/pages/secretaria/ReunionStepper.tsx",
+       /fechaConHoraSiConsta\(iso, horaNoAcreditada, \{ dateStyle: "medium", timeStyle: "short" \}\)/],
+      ["src/pages/secretaria/ReunionStepper.tsx",
+       /fechaConHoraSiConsta\(\s*m\.scheduled_start,\s*horaNoAcreditadaEn\(m\.quorum_data\),\s*\{ dateStyle: "long", timeStyle: "short" \}\s*\)/],
+      // H3: el `.ics` tenía la función probada y el CABLEADO sin cubrir. Quitar
+      // esta línea devolvía la Junta de las 2:00 al calendario de un tercero y
+      // pasaban 986 tests.
+      ["src/pages/secretaria/ConvocatoriaDetalle.tsx",
+       /hora_no_acreditada: horaNoAcreditadaEn\(conv\.rule_trace\)/],
+      // Y los dos productores del pipeline documental que quedaron fuera.
+      ["src/pages/secretaria/ActaDetalle.tsx", /hora_inicio: horaNoAcreditadaEn\(/],
+      ["src/hooks/useBoardPackData.ts", /quorum_data: rawMeeting\.quorum_data \?\? null/],
     ];
     for (const [ruta, patron] of fuentes) {
       const src = readFileSync(ruta, "utf8");

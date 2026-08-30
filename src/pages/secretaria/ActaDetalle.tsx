@@ -543,8 +543,16 @@ export default function ActaDetalle() {
     fecha_emision_iso: legalApprovalEffectiveAt ?? meetingDate,
     ciudad_emision: cityFromLocation(meeting?.location),
     lugar: meeting?.location ?? "Domicilio social",
-    hora_inicio: formatTimeOnly(meeting?.scheduled_start) || "Hora indicada en convocatoria",
-    hora_fin: formatTimeOnly(meeting?.scheduled_end),
+    // TERCER sitio del mismo fichero, y el que de verdad importaba: `actaVariables`
+    // es lo que se pasa a `ProcessDocxButton`. Se arreglaron los otros dos y este
+    // no, invirtiendo la prioridad que yo mismo había declarado —«no es una
+    // pantalla, es texto de documento»—.
+    hora_inicio: horaNoAcreditadaEn((meeting as { quorum_data?: unknown } | null)?.quorum_data)
+      ? "Hora indicada en convocatoria"
+      : formatTimeOnly(meeting?.scheduled_start) || "Hora indicada en convocatoria",
+    hora_fin: horaNoAcreditadaEn((meeting as { quorum_data?: unknown } | null)?.quorum_data)
+      ? ""
+      : formatTimeOnly(meeting?.scheduled_end),
     tipo_junta: isJunta ? "ordinaria" : "",
     presidente,
     secretario,

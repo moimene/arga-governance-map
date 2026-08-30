@@ -8,6 +8,7 @@ export interface BoardPackMeeting {
   id: string;
   slug: string | null;
   scheduled_start: string | null;
+  quorum_data?: Record<string, unknown> | null;
   meeting_type: string;
   status: string;
   location: string | null;
@@ -143,7 +144,7 @@ export function useBoardPackData(meetingId: string, entityId?: string | null): {
           const { data, error } = await supabase
             .from("meetings")
             .select(`
-              id, slug, scheduled_start, meeting_type, status, location,
+              id, slug, scheduled_start, meeting_type, status, location, quorum_data,
               governing_bodies ( id, name, body_type, entity_id, quorum_rule, entities ( common_name, es_cotizada ) ),
               president:president_id ( full_name ),
               secretary:secretary_id ( full_name )
@@ -374,6 +375,7 @@ export function useBoardPackData(meetingId: string, entityId?: string | null): {
     id: string;
     slug: string | null;
     scheduled_start: string | null;
+    quorum_data?: Record<string, unknown> | null;
     meeting_type: string;
     status: string;
     location: string | null;
@@ -417,6 +419,10 @@ export function useBoardPackData(meetingId: string, entityId?: string | null): {
         id: rawMeeting.id,
         slug: rawMeeting.slug,
         scheduled_start: rawMeeting.scheduled_start,
+        // Sin esta línea, la guarda de la portada era CÓDIGO MUERTO: la columna
+        // no se seleccionaba ni se mapeaba, así que `horaNoAcreditadaEn` era
+        // siempre falso y la portada podía imprimir una hora fabricada.
+        quorum_data: rawMeeting.quorum_data ?? null,
         meeting_type: rawMeeting.meeting_type,
         status: rawMeeting.status,
         location: rawMeeting.location,

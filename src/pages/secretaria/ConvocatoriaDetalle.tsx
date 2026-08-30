@@ -176,9 +176,14 @@ function buildConvocatoriaVariables(conv: ConvocatoriaDocContext) {
   const fecha1 = conv.fecha_1 ? new Date(conv.fecha_1) : null;
   const fecha2 = conv.fecha_2 ? new Date(conv.fecha_2) : null;
   const emittedAt = conv.fecha_emision ?? new Date().toISOString();
-  const horaJunta = fecha1
-    ? fecha1.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
-    : "—";
+  // Estas variables entran en el pipeline documental como `baseVariables`, así
+  // que la hora fabricada llegaría a cualquier plantilla que use la forma plana
+  // (`{{hora_junta}}`). Hoy la plantilla SLP activa usa la forma con namespace y
+  // no la imprime, pero eso es un accidente de qué plantilla está activa, no una
+  // garantía: es latente, no inocuo.
+  const horaJunta = !fecha1 || horaNoAcreditadaEn(conv.rule_trace)
+    ? "—"
+    : fecha1.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
   const horaSegunda = fecha2
     ? fecha2.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
     : "";
