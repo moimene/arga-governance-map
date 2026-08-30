@@ -90,6 +90,13 @@ function client() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
+// `SupabaseClient` a secas resuelve `Database = unknown`, y con un schema
+// desconocido `.select()` devuelve `GenericStringError[]`: por eso los
+// `as Row[]` de este fichero eran conversiones entre tipos que no se solapan.
+// El tipo se deriva de la fabrica real, que es lo que de verdad circula.
+type Cliente = ReturnType<typeof client>;
+
+
 function stableUuid(label: string) {
   const hash = createHash("sha1").update(`arga-secretaria-golden-path:${label}`).digest("hex").slice(0, 32).split("");
   hash[12] = "5";
@@ -164,7 +171,7 @@ function executionMode(mode: string, code: string, templateId?: string | null) {
 }
 
 async function mutate(
-  supabase: SupabaseClient,
+  supabase: Cliente,
   repairs: string[],
   label: string,
   // `PromiseLike`, no `Promise`: los llamantes pasan un PostgrestFilterBuilder,
@@ -181,14 +188,14 @@ async function mutate(
   repairs.push(`[OK] ${label}`);
 }
 
-async function fetchOne<T extends Row>(supabase: SupabaseClient, table: string, id: string) {
+async function fetchOne<T extends Row>(supabase: Cliente, table: string, id: string) {
   const { data, error } = await supabase.from(table).select("*").eq("id", id).maybeSingle();
   if (error) throw new Error(`${table}/${id}: ${error.message}`);
   return data as T | null;
 }
 
 async function patchRow(
-  supabase: SupabaseClient,
+  supabase: Cliente,
   repairs: string[],
   table: string,
   id: string,
@@ -200,7 +207,7 @@ async function patchRow(
 }
 
 async function ensureCondition(
-  supabase: SupabaseClient,
+  supabase: Cliente,
   repairs: string[],
   input: {
     label: string;
@@ -269,7 +276,7 @@ async function ensureCondition(
 }
 
 async function ensureAuthority(
-  supabase: SupabaseClient,
+  supabase: Cliente,
   repairs: string[],
   input: {
     label: string;
@@ -340,7 +347,7 @@ function isHiddenTestBody(body: Row) {
   return slug.startsWith("e2e-real-") || name.includes("[E2E REAL]") || Boolean(config.e2e_real_run_id);
 }
 
-async function normalizeBodies(supabase: SupabaseClient, repairs: string[]) {
+async function normalizeBodies(supabase: Cliente, repairs: string[]) {
   await patchRow(supabase, repairs, "governing_bodies", ARGA_CDA, {
     config: { organo_tipo: "CONSEJO_ADMIN", voto_calidad_presidente: true },
     quorum_rule: { quorum_asistencia: 0.5, mayoria_simple: 0.5, voto_calidad_presidente: true },
@@ -390,7 +397,7 @@ async function normalizeBodies(supabase: SupabaseClient, repairs: string[]) {
   }
 }
 
-async function closeE2EResidue(supabase: SupabaseClient, repairs: string[]) {
+async function closeE2EResidue(supabase: Cliente, repairs: string[]) {
   const { data: e2eConditions, error: conditionError } = await supabase
     .from("condiciones_persona")
     .select("id,metadata")
@@ -473,7 +480,7 @@ async function closeE2EResidue(supabase: SupabaseClient, repairs: string[]) {
   }
 }
 
-async function sanitizeFichaSocietariaData(supabase: SupabaseClient, repairs: string[]) {
+async function sanitizeFichaSocietariaData(supabase: Cliente, repairs: string[]) {
   await patchRow(supabase, repairs, "entities", ARGA_SEG, {
     registration_number: "A-00001001",
     materiality: "Critical",
@@ -577,7 +584,7 @@ async function sanitizeFichaSocietariaData(supabase: SupabaseClient, repairs: st
   }
 }
 
-async function seedCoreConditions(supabase: SupabaseClient, repairs: string[]) {
+async function seedCoreConditions(supabase: Cliente, repairs: string[]) {
   await ensureCondition(supabase, repairs, {
     label: "arga-jga-presidente",
     entityId: ARGA_SEG,
@@ -680,7 +687,7 @@ async function seedCoreConditions(supabase: SupabaseClient, repairs: string[]) {
   return { jgaSecretaryAuthority };
 }
 
-async function rescopeLegacyAgreements(supabase: SupabaseClient, repairs: string[]) {
+async function rescopeLegacyAgreements(supabase: Cliente, repairs: string[]) {
   await patchRow(supabase, repairs, "agreements", "00000000-0000-0000-0000-000000000202", {
     entity_id: CARTERA_SLU,
     body_id: CARTERA_SOCIO_UNICO,
@@ -716,7 +723,7 @@ async function rescopeLegacyAgreements(supabase: SupabaseClient, repairs: string
   });
 }
 
-async function normalizePolicyAgreements(supabase: SupabaseClient, repairs: string[]) {
+async function normalizePolicyAgreements(supabase: Cliente, repairs: string[]) {
   const { data: policies, error } = await supabase
     .from("agreements")
     .select("id,proposal_text,decision_text,status")
@@ -744,7 +751,7 @@ async function normalizePolicyAgreements(supabase: SupabaseClient, repairs: stri
   }
 }
 
-async function completeMeetingCensus(supabase: SupabaseClient, repairs: string[]) {
+async function completeMeetingCensus(supabase: Cliente, repairs: string[]) {
   const { data: bodies, error: bodyError } = await supabase
     .from("governing_bodies")
     .select("id,body_type,entity_id,config")
@@ -836,7 +843,7 @@ async function completeMeetingCensus(supabase: SupabaseClient, repairs: string[]
   }
 }
 
-async function linkLegacyCertification(supabase: SupabaseClient, repairs: string[], authorityId: string) {
+async function linkLegacyCertification(supabase: Cliente, repairs: string[], authorityId: string) {
   await patchRow(supabase, repairs, "certifications", "ff224b50-c2cb-5d5f-ad88-90e7ba6cf98c", {
     authority_evidence_id: authorityId,
   });
