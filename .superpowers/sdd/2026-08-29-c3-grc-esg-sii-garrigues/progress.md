@@ -232,3 +232,77 @@ MEDICIÓN EN VENTANA SERIALIZADA concedida por la orquestación, tras integrar e
   DELTA SIN RESIDUO: +23 pass y +23 tests = 9 (sii-tenant-scope) + 14 (sii-afirmaciones).
   Expects +34 = 16 + 17 de los dos ficheros nuevos + 1 de la aserción añadida al test del engine.
   Con la varianza aislada en ~29, este delta cuadra al dígito y es señal, no ruido.
+
+---
+
+## Gate de tipos — CERRADO (2026-08-30)
+
+`bun run typecheck` = **0**, con `scripts/` y los tests dentro del perímetro.
+Punto de partida: 176.
+
+### Contabilidad contra el baseline
+
+`6c61a27` es el commit inmediatamente anterior a abrir el gate. Medido HOY, en
+el mismo árbol, con el mismo runner:
+
+| | baseline `6c61a27` | HEAD `ee0862c` | Δ |
+|---|---|---|---|
+| tests | 3841 | 3842 | **+1** |
+| pass | 3684 | 3685 | **+1** |
+| skip | 152 | 152 | **0** |
+| fail | 5 | 5 | **0** |
+| aserciones | 20 695 | 20 697 | **+2** |
+
+El +1/+2 es identificable: el test que protege la cita legal del organoTipo por
+defecto (`b1532a0`), que tiene exactamente dos aserciones. **Ninguna aserción
+perdida en 21 commits.**
+
+Los **5 fallos están también en el baseline**, así que no son de esta serie.
+Son dato en Cloud: la reunión `e0beed92…` tiene 10 acuerdos y el test espera 9.
+El décimo es `MODIFICACION_ESTATUTOS`, creado el **2026-08-30 a las 04:52 en
+solitario**, nueve horas después de los otros nueve (que entran en 0,7 s el
+29 a las 19:16). El test que cae se llama *"…y ninguno es la modificación
+bloqueada"*. Es de C1 y está reportado: o es residuo de su verificación viva, o
+el bloqueo no bloqueó — eso lo dice C1, no yo.
+
+Nota sobre la cifra que dio ORQUESTACION (3689 pass / 20 820 expects): es la
+misma suite antes de que apareciera el décimo acuerdo. 3689 − 3684 = los 5 que
+ahora caen, y 20 820 − 20 695 = 125 aserciones que esos 5 tests ya no llegan a
+ejecutar al abortar. También cuadra.
+
+### Criterio aplicado
+
+Neutralidad medida contra copia de seguridad en **cada** familia, ejecutando
+antes y después: 45/99, 18/52, 656/1660, 6/16, 54/152, 29/86, 14/41, 41/407,
+9/42, 66/150, 19/332, 5/22, 14/126, 10/26, 4/22, 28/486, 1226/3381.
+
+Lo que NO se hizo, que importa tanto como lo hecho:
+- **No** se completó el fixture del "rule pack legacy" a los cinco tipos
+  sociales: habría borrado el escenario que el test existe para cubrir. El
+  desajuste estaba en el contrato de producción y ahí se corrigió.
+- **No** se tocó `types.ts:114-115`. Convertir `Record<TipoSocial, …>` en
+  parcial es contrato del motor de reglas, ripplea a todos sus consumidores y
+  podría ocultar tipos que faltan en otro sitio.
+- **No** se tocó `SUPABASE_SERVICE_ROLE_KEY` ni `TipoSocialConvocatoria`
+  (dominio cerrado por decisión legal ITEM-119/DL-4), ni `votacion-engine.ts` /
+  `majority-evaluator.ts` (reservados a C1), ni `package.json`.
+
+### Hallazgos reales que destapó el gate
+
+1. `buildReport` declaraba `mode: "report" | "apply"` mientras el llamante le
+   pasa también `"plan"` — el script TIENE modo plan y lo imprime.
+2. `patchQuorumDataSourceLinks` afirmaba por tipo que BORRA todo lo que
+   `quorum_data` ya traía, cuando en ejecución lo conserva.
+3. `ReturnType<typeof createClient>` instancia los genéricos con sus valores
+   por defecto (`unknown`/`never`), que no es lo que devuelve la llamada real.
+4. Los embeds to-one de PostgREST venían tipados como array en cinco sitios.
+5. Dos `@ts-expect-error` que ya no suprimían nada.
+6. El fixture de snapshot llevaba tres campos requeridos sin poner desde v2.
+
+### Deuda anotada, no cerrada
+
+- 39 clientes Supabase sin `Database`; el fichero de tipos generado (340 KB)
+  tiene **0 importadores**. Tiparlos haría innecesarios varios `.returns<T>()`.
+- `TenantBranding` no declara `modules`.
+- El `organoTipo` por defecto: el motor dice Junta y `normalizeBodyTypeForRpc`
+  dice Consejo. Alcanzable desde dato; es criterio legal, no de tipos.
