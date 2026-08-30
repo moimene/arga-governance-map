@@ -29,17 +29,6 @@ interface Row {
 }
 
 async function main() {
-  const { data, error } = await supabase
-    .from("plantilla_capa3_overrides_por_entidad")
-    .select(`
-      entity_id, plantilla_id, campo, compatible_with_canonical_version,
-      plantillas_protegidas:plantilla_id ( version )
-    `);
-  if (error) {
-    console.error("Failed to load overrides:", error.message);
-    process.exit(1);
-  }
-
   type Joined = {
     entity_id: string;
     plantilla_id: string;
@@ -48,8 +37,23 @@ async function main() {
     plantillas_protegidas: { version: string } | null;
   };
 
+  const { data, error } = await supabase
+    .from("plantilla_capa3_overrides_por_entidad")
+    .select(`
+      entity_id, plantilla_id, campo, compatible_with_canonical_version,
+      plantillas_protegidas:plantilla_id ( version )
+    `)
+    // `plantillas_protegidas:plantilla_id` es un embed por FK: PostgREST
+    // devuelve un OBJETO. Se declara por el canal de la libreria, que evita
+    // el `as unknown as` que hacia falta para forzar la conversion.
+    .returns<Joined[]>();
+  if (error) {
+    console.error("Failed to load overrides:", error.message);
+    process.exit(1);
+  }
+
   const obsoletos: Row[] = [];
-  for (const r of (data ?? []) as Joined[]) {
+  for (const r of data ?? []) {
     const currentV = r.plantillas_protegidas?.version;
     if (currentV && r.compatible_with_canonical_version !== currentV) {
       obsoletos.push({

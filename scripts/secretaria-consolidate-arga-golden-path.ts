@@ -536,12 +536,16 @@ async function sanitizeFichaSocietariaData(supabase: Cliente, repairs: string[])
     .select("id,person_id,fecha_fin,metadata,person:person_id(id,tax_id,person_type)")
     .eq("tenant_id", DEMO_TENANT)
     .eq("entity_id", ARGA_SEG)
-    .eq("estado", "VIGENTE");
+    .eq("estado", "VIGENTE")
+    // El embed va por FK: PostgREST devuelve un OBJETO, no un array. Sin tipos
+    // de `Database` TS no conoce la cardinalidad, asi que se declara por el
+    // canal de la libreria en vez de castear el resultado.
+    .returns<Array<Row & { person?: Row | null }>>();
   if (conditionError) throw new Error(`conditions for ficha probe: ${conditionError.message}`);
 
   const seenPersons = new Set<string>();
   let personIndex = 0;
-  for (const condition of (conditions ?? []) as Array<Row & { person?: Row | null }>) {
+  for (const condition of conditions ?? []) {
     if (typeof condition.fecha_fin === "string" && condition.fecha_fin < today()) {
       await patchRow(supabase, repairs, "condiciones_persona", condition.id, {
         fecha_fin: "2029-12-31",
