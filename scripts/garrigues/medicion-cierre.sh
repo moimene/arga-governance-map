@@ -15,6 +15,9 @@ set -euo pipefail
 
 ORIGEN="$(cd "$(dirname "$0")/../.." && pwd)"
 DESTINO="${1:-/tmp/c3-medicion-$$}"
+# modo A = con las carpetas fuente enlazadas (por defecto)
+# modo B = SIN ellas, que es como se ve el repo en un arbol limpio o en CI
+MODO="${2:-A}"
 
 # `|| true` obligatorio: con `pipefail`, `grep -v` devuelve 1 cuando no
 # selecciona ninguna linea —o sea, cuando el arbol esta LIMPIO— y `set -e`
@@ -44,9 +47,14 @@ ln -sfn "$ORIGEN/node_modules" "$DESTINO/node_modules"
 [ -f "$ORIGEN/.env" ] && cp "$ORIGEN/.env" "$DESTINO/.env"
 # Las carpetas fuente son symlinks fuera del repo: se replican para poder medir
 # en el modo "con carpetas fuente".
-for enlace in "version garrigues" "DOC GRC"; do
-  [ -e "$ORIGEN/$enlace" ] && ln -sfn "$(readlink "$ORIGEN/$enlace" || echo "$ORIGEN/$enlace")" "$DESTINO/$enlace"
-done
+if [ "$MODO" = "A" ]; then
+  for enlace in "version garrigues" "DOC GRC"; do
+    [ -e "$ORIGEN/$enlace" ] && ln -sfn "$(readlink "$ORIGEN/$enlace" || echo "$ORIGEN/$enlace")" "$DESTINO/$enlace"
+  done
+  echo "modo A: con carpetas fuente"
+else
+  echo "modo B: SIN carpetas fuente (arbol limpio / CI)"
+fi
 
 cd "$DESTINO"
 echo "=== typecheck ===" && { bun run typecheck 2>&1 | grep -c "error TS" || true; }
