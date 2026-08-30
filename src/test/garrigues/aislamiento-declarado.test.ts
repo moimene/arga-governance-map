@@ -55,9 +55,36 @@ describe("C3 Tarea 8 — la declaración de aislamiento cuadra con Cloud", () =>
     for (const t of CON_AUSENCIA_DECLARADA) {
       expect(t.motivo, `${t.tabla} declara una ausencia sin motivo`).toBeTruthy();
       expect(t.motivo!.texto.length).toBeGreaterThan(60);
-      // La fuente tiene que apuntar a algo comprobable: una política con su
-      // apartado, o la decisión con su commit.
-      expect(t.motivo!.fuente).toMatch(/§|commit|art\./);
+      // La fuente tiene que apuntar a algo COMPROBABLE. Dos formas valen, y la
+      // segunda es más fuerte que la primera:
+      //
+      //   - una cita localizable —política con apartado, artículo, commit—, o
+      //   - una `alternativa`, que no es prosa: el test de arriba va a Cloud y
+      //     comprueba que el dato está donde la declaración dice.
+      //
+      // Se amplía el guard porque era estrecho de origen —lo escribí cuando
+      // todos mis motivos eran citas de política—, no porque me estorbara: un
+      // invariante que la máquina verifica es mejor fuente que una referencia
+      // que nadie sigue. Lo que NO se admite sigue siendo un motivo sin nada
+      // detrás.
+      const citaLocalizable = /§|commit|art\./.test(t.motivo!.fuente);
+      expect(citaLocalizable || !!t.alternativa,
+        `${t.tabla}: motivo sin cita localizable NI alternativa comprobable`).toBe(true);
+    }
+  });
+
+  it("donde se declara una alternativa, el dato SÍ está allí", async () => {
+    // Lo que convierte la inferencia en invariante. Si alguien migrara las
+    // plantillas a `document_templates`, esta mitad bajaría a cero y la
+    // declaración dejaría de cuadrar — que es justo lo que debe pasar.
+    const conAlternativa = AISLAMIENTO_DECLARADO.filter((t) => t.alternativa);
+    expect(conAlternativa.length).toBeGreaterThan(0);
+    for (const t of conAlternativa) {
+      const { data, error } = await garr.from(t.alternativa!.tabla)
+        .select("id").eq("tenant_id", GARRIGUES).limit(500);
+      expect(error, `${t.alternativa!.tabla}`).toBeNull();
+      expect(data.length, `${t.tabla} declara que el dato vive en ${t.alternativa!.tabla}`)
+        .toBeGreaterThanOrEqual(t.alternativa!.minimo);
     }
   });
 

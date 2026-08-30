@@ -49,6 +49,17 @@ export type TablaDeclarada = {
     readonly arga?: readonly string[];
     readonly garrigues?: readonly string[];
   };
+  /**
+   * Dónde vive el dato cuando la tabla está vacía porque el tenant usa OTRA
+   * superficie. Convierte una inferencia —«supongo que no usa esta tabla»— en
+   * un invariante comprobable: si alguien migra el dato, la mitad de aquí baja
+   * a cero y la declaración rompe. Sin esto, «vacía por procedencia» sería
+   * indistinguible de «vacía porque se rompió el seed».
+   */
+  readonly alternativa?: {
+    readonly tabla: string;
+    readonly minimo: number;
+  };
 };
 
 export const AISLAMIENTO_DECLARADO: readonly TablaDeclarada[] = [
@@ -75,6 +86,25 @@ export const AISLAMIENTO_DECLARADO: readonly TablaDeclarada[] = [
     marcadores: {
       garrigues: ["RSK-GARR-PEN-010", "RSK-GARR-PEN-069"],
     },
+  },
+  {
+    // Está en DOMAIN_TABLES del gate de aislamiento y su dirección
+    // ARGA→Garrigues es vacua: el `console.warn` de ese fichero la venía
+    // señalando sin asertarla.
+    tabla: "document_templates",
+    arga: "ALGUNA",
+    garrigues: "NINGUNA",
+    motivo: {
+      texto:
+        "Este tenant no usa esta superficie: sus plantillas viven en " +
+        "`plantillas_protegidas`, donde G3 dejó las 6 del núcleo en estado ACTIVA. La " +
+        "ausencia aquí no es un seed roto, es que el dato está en otro sitio — y por eso se " +
+        "declara con su alternativa, para que la afirmación sea comprobable y no una " +
+        "suposición.",
+      fuente: "G3, 6 plantillas núcleo del tenant (CLAUDE.md, sección Tenant Garrigues)",
+    },
+    alternativa: { tabla: "plantillas_protegidas", minimo: 1 },
+    marcadores: {},
   },
   {
     tabla: "action_plans",
