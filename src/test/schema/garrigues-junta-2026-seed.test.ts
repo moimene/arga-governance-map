@@ -112,6 +112,10 @@ describe("C1 — orden del día de la Junta de Socios 2026 (módulo puro)", () =
     }
     // Los 3 son exactamente esos: Centro de Estudios, sostenibilidad e informe de gestión.
     expect(puntosSinMateriaAcreditada().map((p) => p.numero)).toEqual(["5", "8", "9"]);
+    // Sin esta guarda, `every` sobre una lista vacia da true y la asercion no
+    // mide nada: probado mutando `puntosQueMaterializan()` a [] — 20 tests caen
+    // y esta seguia verde.
+    expect(puntosQueMaterializan().length).toBeGreaterThan(0);
     expect(puntosQueMaterializan().every((p) => p.nota === undefined)).toBe(true);
   });
 
@@ -606,7 +610,9 @@ describe("C1 — los acuerdos de la Junta (módulo puro)", () => {
     expect(sub.consecuenciaNoAplicada).toContain("39.5.b.i");
     // Los otros nueve resuelven por cita directa: una subsunción vacía en todos
     // haría que esta etiqueta no distinguiera nada.
-    for (const p of puntosConAcuerdo().filter((x) => x.numero !== "1.1")) {
+    const otros = puntosConAcuerdo().filter((x) => x.numero !== "1.1");
+    expect(otros.length).toBeGreaterThan(0);   // un `for` sobre [] no asierta nada
+    for (const p of otros) {
       expect(subsuncionDe(p.numero)).toBeNull();
     }
   });
@@ -646,6 +652,10 @@ describe("C1 — los acuerdos de la Junta (módulo puro)", () => {
 
   it("los 10 tienen texto, y el INFERIDO no identifica a ninguna persona del acta", () => {
     const personas = [...SOCIOS_PRESENCIALES, MESA_PRESIDENTA, MESA_SECRETARIO, REPRESENTANTE_UNICO];
+    // Esta es la asercion que sostiene la afirmacion de riesgo legal («el texto
+    // INFERIDO no nombra a nadie»). Con la lista vacia pasaria sin mirar nada.
+    expect(puntosConAcuerdo().length).toBe(10);
+    expect(personas.length).toBeGreaterThan(0);
     for (const p of puntosConAcuerdo()) {
       const t = textoAcuerdo(p.numero);
       expect(t.propuesta.length).toBeGreaterThan(40);
@@ -1015,7 +1025,7 @@ describe("C1 — los 10 acuerdos de la Junta en Cloud", () => {
     expect(garrVeArga ?? []).toHaveLength(0);
   });
 
-  it("el gate del informe preceptivo dispara en 4 acuerdos y solo en esos 4", async () => {
+  it("el gate de informe preceptivo POR ORGANO dispara en 4 acuerdos y solo en esos 4", async () => {
     const { data: reqs, error } = await garr.from("agreement_document_requirements")
       .select("agreement_id, requirement_code, blocking_policy, fase, title, legal_basis")
       .in("agreement_id", acuerdos.map((a) => a.id))
@@ -1032,15 +1042,54 @@ describe("C1 — los 10 acuerdos de la Junta en Cloud", () => {
     expect(sinGate).toHaveLength(acuerdos.length - CON_GATE.size);
     expect(sinGate.length).toBeGreaterThan(0);
     // El décimo acuerdo entra por aquí: bajo la lectura aplicada del art. 30.2.a)
-    // el art. 39.5.b.i lo llevaría al informe preceptivo, pero el gate demo NO se
-    // amplía sobre una subsunción etiquetada INFERIDO. Si alguien lo añade al
-    // config del órgano, esta línea cae y hay que ir al Comité Legal, no al test.
+    // el art. 39.5.b.i lo llevaría al informe preceptivo del Consejo de Socios,
+    // pero ESTE gate —el de órgano— no se amplía sobre una subsunción etiquetada
+    // INFERIDO. Ojo al alcance de la frase: el acuerdo SÍ adquiere el otro gate,
+    // el de materia (test siguiente). «Sin gate» aquí significa sin el de órgano.
+    // Si alguien lo añade al config del órgano, esta línea cae y hay que ir al
+    // Comité Legal, no al test.
     expect(sinGate.map((a) => a.agreement_kind)).toContain(MATERIA_ESTATUTOS);
     // Las columnas reales son `blocking_policy` y `fase`, no `blocking`/`phase`.
     expect(reqs!.every((r) => r.blocking_policy === "BLOCKING" && r.fase === "PRE_CONVOCATORIA")).toBe(true);
     // El copy nombra al órgano informante y su artículo.
     expect(reqs!.every((r) => String(r.title).includes("Consejo de Socios"))).toBe(true);
     expect(reqs!.every((r) => String(r.legal_basis).includes("39.5.b"))).toBe(true);
+  });
+
+  it("hay un SEGUNDO gate, por materia, y alcanza a 6 de los 10 acuerdos", async () => {
+    // El test de arriba filtra `INFORME_PRECEPTIVO_ORGANO`, y su rotulo se leia
+    // como «a los demas no les cae ningun preceptivo». Falso por partida doble:
+    // existe un segundo gate POR MATERIA, alcanza a SEIS acuerdos, y TRES llevan
+    // los dos a la vez. Ninguno de los dos gates se mide solo. (El assert 5 de la
+    // migracion 20260830120000 tiene el mismo rotulo estrecho: cierto del
+    // _ORGANO unicamente. La migracion esta aplicada y no se reescribe.)
+    const { data, error } = await garr.from("agreement_document_requirements")
+      .select("agreement_id, blocking_policy, fase")
+      .in("agreement_id", acuerdos.map((a) => a.id))
+      .eq("requirement_code", "INFORME_PRECEPTIVO_MATERIA");
+    expect(error).toBeNull();
+    const porMateria = new Set((data ?? []).map(
+      (r) => acuerdos.find((a) => a.id === r.agreement_id)!.agreement_kind));
+    expect(porMateria).toEqual(new Set([
+      "ADMISION_SOCIO_CUOTA",
+      "CONTINUIDAD_SOCIO_POST_60",
+      "EXCLUSION_SOCIO_ESTATUTARIA",
+      "INTEGRACION_DESPACHO_AUMENTO_SIN_PREFERENCIA",
+      MATERIA_ESTATUTOS,
+      "RETRIBUCION_PRESTACIONES_ACCESORIAS",
+    ]));
+    // Los dos gates son distintos en fuerza y en fase: el de organo BLOQUEA antes
+    // de convocar; el de materia admite override y actua con la convocatoria.
+    for (const r of data!) {
+      expect(r.blocking_policy).toBe("OVERRIDE_REQUIRED");
+      expect(r.fase).toBe("CONVOCATORIA");
+    }
+    // Y se solapan: tres acuerdos llevan los dos. La modificacion de estatutos
+    // lleva solo el de materia — por eso no esta en CON_GATE.
+    expect([...CON_GATE].filter((k) => porMateria.has(k))).toHaveLength(3);
+    expect(CON_GATE.has(MATERIA_ESTATUTOS)).toBe(false);
+    expect(porMateria.has(MATERIA_ESTATUTOS)).toBe(true);
+
   });
 
   it("los acuerdos sin contenido acreditado van marcados y no nombran a ningún socio", async () => {
