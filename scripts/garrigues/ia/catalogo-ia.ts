@@ -58,7 +58,15 @@ export type SistemaIA = {
 };
 
 const COMITE = "garrigues-comite-gobernanza-ia" as const;
-const PI30 = "PI-30 (Edición 02, julio 2025), apartado 3.1.1 «Herramientas corporativas»";
+// La referencia dice EXACTAMENTE qué cubre. La política nombra la herramienta y
+// la declara corporativa; no dice quién la fabrica ni para qué se usa. Dejar
+// `vendor` y `use_case` bajo una referencia que sólo pone «PI-30 §3.1.1» los
+// presentaba como si constaran en la fuente — que es el defecto que este carril
+// retira de la consola, en pequeño y dentro de casa.
+const PI30 =
+  "PI-30 (Edición 02, julio 2025), apartado 3.1.1 «Herramientas corporativas»: de ahí " +
+  "salen el nombre y su condición de herramienta corporativa aprobada. El proveedor y " +
+  "el caso de uso NO constan en la política; son descripción general del producto.";
 const PROHIBICION_GRAFICOS =
   "PI-30 §3.2(d): no se permite generar contenidos gráficos ni audiovisuales. El uso " +
   "extraordinario exige informe al Departamento de Intangibles y autorización del Comité " +
