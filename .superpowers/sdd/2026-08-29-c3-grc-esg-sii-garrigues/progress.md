@@ -352,3 +352,61 @@ reasignarlos en silencio.
 **No ejecutado a propósito:** `seed-garrigues-penal.ts --apply`, porque también
 escribe en `controls`, congelada en este carril. El enlace va por script propio
 que solo toca `findings` y `risks`. Idempotente: 2ª pasada 0/0/8.
+
+---
+
+## Tarea 6 — CERRADA (2026-08-30)
+
+Commit `23c43b7`. `/conflictos` de Garrigues tiene 5 situaciones y ninguna se
+atribuye a una persona.
+
+- **Ningún nombre del censo**, comprobado contra las 406 personas traídas de
+  Cloud, por nombre completo y por apellido. `person_id` NULL en todas, forzado
+  por el seed y verificado a la salida.
+- **Fallo propio, corregido:** la primera versión del test leía solo las
+  descripciones de **Cloud**, así que meter «Fernando Vives Ruiz» en el
+  catálogo NO la hacía caer — el nombre entra por el catálogo y el guard no lo
+  veía hasta que alguien sembrara. Ahora comprueba las dos fuentes; las dos
+  mutaciones caen.
+- **Acotado a personas físicas**, y no es debilitarlo: los nombres de personas
+  jurídicas contienen palabras comunes («Sociedad») que salen en cualquier
+  descripción societaria.
+- **Dos CHECK que hablan otro idioma.** `conflict_type` clasifica por DURACIÓN
+  ('Permanente'|'Situacional') y PI-02 por naturaleza: queda NULL. `status`
+  solo admite tres valores, así que «en chequeo» vive aparte en `estadoTexto`.
+- **Crash real:** `c.conflict_type.toUpperCase()` sin guarda sobre columna
+  nullable reventaba la pantalla entera.
+
+## Tarea 7 — EN CURSO
+
+Commits `c20824d` (clasificador), `43a501c` (catálogo PI-31), `+` (portal).
+
+**Hecho:**
+- **Paso 6, y eran TRES siglas y no una.** `ia`, `dora`/`tic` y `ceo`, todas
+  con `includes()` sobre terminaciones corrientes del castellano. Medido: 4 de
+  cada 5 frases de prueba abrían un subexpediente DORA hacia DGSFP/CNMV/EBA, y
+  «buceo» escalaba al Consejo de Administración.
+- **Roles reales de PI-31**, cotejados literal contra el PDF con
+  `pdftotext -layout`. El cotejo cazó una cita mía truncada con punto final que
+  la fuente no tiene.
+- **Pasos 3 y 4 (parte visible):** bloque de canales externos en el portal, con
+  el matiz del art. 25 —el interno es preferente pero no obligatorio ni previo—
+  y los dos roles con su sustitución por conflicto.
+
+**Pendiente:**
+- Paso 4 (resto): `whistleblowing-engine.ts:541` sigue diciendo «Presidencia de
+  la Comisión de Auditoría y Control» y `:354`/`:454` «Comité de Cumplimiento».
+  Son literales del motor COMPARTIDO: hay que parametrizarlos por tenant sin
+  alterar el camino de ARGA.
+- Paso 5: tres casos demo de despacho, etiquetados como simulados.
+
+## Estado de la rama
+
+```
+bun test ....... 3777 pass · 152 skip · 0 fail · 21.338 expects · 3929 tests
+lint ........... limpio
+typecheck ...... 1  ← de C1 (`compliance-gates.test.ts`), intacto y reportado
+```
+
+Delta contra `11fcf51` (3730 / 152 / 0 · 21.185 · 3882): **+47 pass, +153
+aserciones, +47 tests, 0 fail, skip sin mover.**
