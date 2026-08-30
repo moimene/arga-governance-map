@@ -24,8 +24,8 @@ const mockPackOrdinaria: RulePack = {
   organoTipo: 'JUNTA_GENERAL',
   modosAdopcionPermitidos: ['MEETING', 'UNIVERSAL', 'NO_SESSION'],
   convocatoria: {
-    antelacionDias: { SA: { valor: 30, fuente: 'LEY' }, SL: { valor: 0, fuente: 'LEY' } },
-    canales: { SA: ['BORME'], SL: ['PERSONALIZADA'] },
+    antelacionDias: { SA: { valor: 30, fuente: 'LEY' }, SL: { valor: 0, fuente: 'LEY' } , SAU: { valor: 30, fuente: 'LEY' }, SLU: { valor: 0, fuente: 'LEY' }, SLP: { valor: 0, fuente: 'LEY' } },
+    canales: { SA: ['BORME'], SL: ['PERSONALIZADA'] , SAU: ['BORME'], SLU: ['PERSONALIZADA'], SLP: ['PERSONALIZADA'] },
     contenidoMinimo: ['orden_del_dia'],
     documentosObligatorios: [{ id: 'DOC001', nombre: 'Balance' }],
   },
@@ -79,7 +79,7 @@ const mockPackReforzada: RulePack = {
   modosAdopcionPermitidos: ['MEETING', 'UNIVERSAL'],
   convocatoria: {
     ...mockPackOrdinaria.convocatoria,
-    antelacionDias: { SA: { valor: 60, fuente: 'LEY' }, SL: { valor: 15, fuente: 'LEY' } },
+    antelacionDias: { SA: { valor: 60, fuente: 'LEY' }, SL: { valor: 15, fuente: 'LEY' } , SAU: { valor: 60, fuente: 'LEY' }, SLU: { valor: 15, fuente: 'LEY' }, SLP: { valor: 15, fuente: 'LEY' } },
   },
   constitucion: {
     quorum: {

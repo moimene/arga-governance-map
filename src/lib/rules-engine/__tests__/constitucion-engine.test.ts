@@ -26,8 +26,8 @@ describe('constitucion-engine', () => {
       organoTipo: 'JUNTA_GENERAL',
       modosAdopcionPermitidos: ['MEETING'],
       convocatoria: {
-        antelacionDias: { SA: { valor: 15, fuente: 'LEY' }, SL: { valor: 5, fuente: 'LEY' } },
-        canales: { SA: ['BORME'], SL: ['NOTIFICACION'] },
+        antelacionDias: { SA: { valor: 15, fuente: 'LEY' }, SL: { valor: 5, fuente: 'LEY' } , SAU: { valor: 15, fuente: 'LEY' }, SLU: { valor: 5, fuente: 'LEY' }, SLP: { valor: 5, fuente: 'LEY' } },
+        canales: { SA: ['BORME'], SL: ['NOTIFICACION'] , SAU: ['BORME'], SLU: ['NOTIFICACION'], SLP: ['NOTIFICACION'] },
         contenidoMinimo: [],
       },
       constitucion: {

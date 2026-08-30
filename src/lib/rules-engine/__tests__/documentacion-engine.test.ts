@@ -21,8 +21,8 @@ const mockPackOrdinaria: RulePack = {
   organoTipo: 'JUNTA_GENERAL',
   modosAdopcionPermitidos: ['MEETING', 'UNIVERSAL', 'NO_SESSION'],
   convocatoria: {
-    antelacionDias: { SA: { valor: 30, fuente: 'LEY' }, SL: { valor: 0, fuente: 'LEY' } },
-    canales: { SA: ['BORME'], SL: ['PERSONALIZADA'] },
+    antelacionDias: { SA: { valor: 30, fuente: 'LEY' }, SL: { valor: 0, fuente: 'LEY' } , SAU: { valor: 30, fuente: 'LEY' }, SLU: { valor: 0, fuente: 'LEY' }, SLP: { valor: 0, fuente: 'LEY' } },
+    canales: { SA: ['BORME'], SL: ['PERSONALIZADA'] , SAU: ['BORME'], SLU: ['PERSONALIZADA'], SLP: ['PERSONALIZADA'] },
     contenidoMinimo: ['orden_del_dia', 'balance'],
     documentosObligatorios: [
       { id: 'DOC001', nombre: 'Balance de cuentas' },

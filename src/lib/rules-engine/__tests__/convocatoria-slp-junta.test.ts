@@ -37,10 +37,16 @@ function createTestPack(overrides?: Partial<RulePack>): RulePack {
       antelacionDias: {
         SA: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
         SL: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+        SAU: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
+        SLU: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+        SLP: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
       },
       canales: {
         SA: ['BORME', 'WEB_SOCIEDAD'],
         SL: ['BUROFAX', 'EMAIL_CERTIFICADO'],
+        SAU: ['BORME', 'WEB_SOCIEDAD'],
+        SLU: ['BUROFAX', 'EMAIL_CERTIFICADO'],
+        SLP: ['BUROFAX', 'EMAIL_CERTIFICADO'],
       },
       contenidoMinimo: ['Orden del día', 'Lugar', 'Hora', 'Fecha'],
       documentosObligatorios: [
