@@ -124,7 +124,7 @@ describe("B1 — las FK llevan coherencia de tenant", () => {
       // `toContain("ALTER TABLE x")` lo satisface CUALQUIER ALTER: sustituir la
       // clave compuesta por un ADD COLUMN dejaba el gate verde y a las hijas sin
       // padre al que colgarse por (tenant_id, id).
-      expect(new RegExp(`ALTER TABLE ${previo}[\\s\\S]{0,200}?UNIQUE \\(tenant_id, id\\)`).test(sql),
+      expect(new RegExp(`ALTER TABLE ${previo}[^;]{0,200}?UNIQUE \\(tenant_id, id\\)`).test(sql),
         `${previo} no expone UNIQUE (tenant_id, id)`).toBe(true);
     }
   });
