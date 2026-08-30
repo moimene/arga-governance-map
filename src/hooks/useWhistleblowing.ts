@@ -26,6 +26,7 @@ import {
   evaluateAntiRetaliationRisk,
 } from "@/lib/sii/whistleblowing-engine";
 import { SII_ORGANOS_GARRIGUES, SII_TENANT } from "../../scripts/garrigues/sii/canal-interno";
+import { casosDemoGarrigues } from "../../scripts/garrigues/sii/casos-demo";
 
 
 
@@ -371,7 +372,14 @@ const ARGA_TENANT = "00000000-0000-0000-0000-000000000001";
  * Tarea 7; hasta entonces arranca vacío, que es honesto: no tiene ninguno.
  */
 function initialReportsFor(tenantId: string): WhistleblowingReport[] {
-  return tenantId === ARGA_TENANT ? INITIAL_SII_REPORTS : [];
+  if (tenantId === ARGA_TENANT) return INITIAL_SII_REPORTS;
+  // Los tres de Garrigues son SIMULADOS y se dice en pantalla; su materia sí
+  // es la que la normativa del despacho contempla. Cualquier otro tenant
+  // arranca vacío, que es lo honesto: no tiene ninguno.
+  if (tenantId === SII_TENANT) {
+    return casosDemoGarrigues("J&A Garrigues, S.L.P.") as WhistleblowingReport[];
+  }
+  return [];
 }
 
 function getStoredReports(tenantId: string): WhistleblowingReport[] {
