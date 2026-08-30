@@ -302,8 +302,11 @@ describe("A4 — la pestaña FRIA lee el expediente real", () => {
   });
 
   it("sin FRIA registrada hay estado vacío honesto, no una ficha aprobada", () => {
-    expect(/no tiene evaluaci[óo]n de impacto/i.test(src()),
-      "falta el estado vacío honesto cuando no hay FRIA").toBe(true);
+    // El copy pasó de «no tiene evaluación registrada» a la ausencia acreditada
+    // por decisión del usuario: decir que falta un documento presupone que era
+    // exigible, y eso es justamente lo que no consta.
+    expect(/no consta acreditado que el art[íi]culo 27 alcance/i.test(src()),
+      "falta el estado de ausencia acreditada cuando no hay FRIA").toBe(true);
   });
 
   it("un fallo de lectura NO se presenta como ausencia de evaluación", () => {
@@ -402,5 +405,36 @@ describe("La puerta de entrada no promete lo que el producto oculta", () => {
     // alcanza. Si el gate estuviera mirando el tenant equivocado, esto lo
     // delataría en vez de taparlo.
     expect(LOGIN_BRANDS.arga, "no existe la marca de ARGA").toBeDefined();
+  });
+});
+
+describe("FRIA — ausencia acreditada, no ausencia a secas", () => {
+  const src = () => read(DETALLE);
+
+  it("no dictamina: dice que NO CONSTA, no que no aplique", () => {
+    // La diferencia entre «no aplica» y «no consta» es la diferencia entre un
+    // dictamen y un estado de conocimiento. Esta consola no tiene el dictamen.
+    const s = src();
+    expect(/no consta acreditad/i.test(s), "falta la fórmula de ausencia acreditada").toBe(true);
+    for (const re of [/\bno (le )?aplica\b/i, /no es exigible/i, /queda excluid/i]) {
+      expect(re.test(s), `la pestaña dictamina en vez de constatar: ${re}`).toBe(false);
+    }
+  });
+
+  it("enuncia las DOS condiciones del art. 27, cada una con su fuente", () => {
+    const s = src();
+    // Condición del sistema y condición del sujeto, y de dónde sale cada cosa.
+    expect(/anexo III/i.test(s), "no enuncia la condición del sistema").toBe(true);
+    expect(/servicios p[úu]blicos/i.test(s), "no enuncia la condición del desplegador").toBe(true);
+    expect(/PI-30/.test(s), "no cita la fuente interna que sostiene lo que sí consta").toBe(true);
+  });
+
+  it("no afirma haber descartado lo que sólo no consta", () => {
+    // El anexo III tiene ocho puntos y no se han cotejado uno a uno contra un
+    // inventario que aún no está sembrado.
+    const s = src();
+    for (const re of [/descartad[oa]/i, /se ha comprobado que no/i]) {
+      expect(re.test(s), `afirma un descarte no acreditado: ${re}`).toBe(false);
+    }
   });
 });
