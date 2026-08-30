@@ -41,10 +41,13 @@ vi.mock("@/integrations/supabase/client", () => ({
       const chain: {
         select: (columns: string) => typeof chain;
         eq: (column: string, value: string) => typeof chain;
-        then: <T>(
+        // Un thenable devuelve `Promise<T | E>`, no `Promise<T>`: el segundo
+        // parametro tambien produce valor. La firma anterior omitia esa rama y
+        // por eso la implementacion no encajaba con su propia declaracion.
+        then: <T, E = never>(
           resolve: (value: { data: typeof overrideRows; error: null }) => T,
-          reject?: (reason: unknown) => unknown,
-        ) => Promise<T>;
+          reject?: (reason: unknown) => E,
+        ) => Promise<T | E>;
       } = {
         select: (columns) => {
           queryCalls.push({ kind: "select", key: columns });
@@ -99,7 +102,13 @@ describe("useRuleParamOverrides", () => {
     ]);
     const queryKey = ["ruleParamOverrides", TENANT_ID, ENTITY_ID];
     expect(queryClient.getQueryData(queryKey)).toEqual(overrideRows);
-    expect(queryClient.getQueryCache().find({ queryKey })?.options.staleTime).toBe(60_000);
+    // `Query.options` esta tipado como `QueryOptions`, que no declara
+    // `staleTime` aunque en ejecucion esta ahi: es opcion de observador y
+    // TanStack la guarda en la query. Se declara lo que se lee.
+    const opciones = queryClient.getQueryCache().find({ queryKey })?.options as
+      | { staleTime?: number }
+      | undefined;
+    expect(opciones?.staleTime).toBe(60_000);
   });
 
   it("does not query without entityId or tenantId", async () => {

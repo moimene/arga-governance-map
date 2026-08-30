@@ -1,6 +1,7 @@
 // src/hooks/__tests__/usePlantillaWithOverrides.test.ts
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { applyCapa3Overrides } from "../usePlantillaWithOverrides";
+import type { Capa3OverrideRow } from "../usePlantillaWithOverrides";
 
 describe("applyCapa3Overrides — pure merge function", () => {
   afterEach(() => {
@@ -18,7 +19,7 @@ describe("applyCapa3Overrides — pure merge function", () => {
 
   it("applies default_value_override on matching campo", () => {
     const canonical = [{ campo: "x", obligatoriedad: "OPCIONAL", default: "old" }];
-    const overrides = [
+    const overrides: Capa3OverrideRow[] = [
       {
         campo: "x",
         default_value_override: "new",
@@ -33,7 +34,7 @@ describe("applyCapa3Overrides — pure merge function", () => {
 
   it("applies opciones_override and obligatoriedad_override together", () => {
     const canonical = [{ campo: "y", obligatoriedad: "OPCIONAL", opciones: ["A", "B", "C"] }];
-    const overrides = [
+    const overrides: Capa3OverrideRow[] = [
       {
         campo: "y",
         default_value_override: null,
@@ -49,7 +50,7 @@ describe("applyCapa3Overrides — pure merge function", () => {
 
   it("ignores overrides for campos not in canonical", () => {
     const canonical = [{ campo: "z", obligatoriedad: "OPCIONAL" }];
-    const overrides = [
+    const overrides: Capa3OverrideRow[] = [
       {
         campo: "no_existe",
         default_value_override: "x",
@@ -64,7 +65,7 @@ describe("applyCapa3Overrides — pure merge function", () => {
 
   it("does not filter overrides when canonicalVersion is omitted (legacy behavior)", () => {
     const canonical = [{ campo: "x", obligatoriedad: "OPCIONAL", default: "old" }];
-    const overrides = [
+    const overrides: Capa3OverrideRow[] = [
       {
         campo: "x",
         default_value_override: "new",
@@ -80,7 +81,7 @@ describe("applyCapa3Overrides — pure merge function", () => {
 
   it("applies override when compatible_with_canonical_version matches canonicalVersion", () => {
     const canonical = [{ campo: "x", obligatoriedad: "OPCIONAL", default: "old" }];
-    const overrides = [
+    const overrides: Capa3OverrideRow[] = [
       {
         campo: "x",
         default_value_override: "new",
@@ -97,7 +98,7 @@ describe("applyCapa3Overrides — pure merge function", () => {
 
   it("ignores override (with console.warn) when compatible_with_canonical_version mismatches", () => {
     const canonical = [{ campo: "x", obligatoriedad: "OPCIONAL", default: "old" }];
-    const overrides = [
+    const overrides: Capa3OverrideRow[] = [
       {
         campo: "x",
         default_value_override: "new_stale",
@@ -122,7 +123,7 @@ describe("applyCapa3Overrides — pure merge function", () => {
       { campo: "a", default: "a-old" },
       { campo: "b", default: "b-old" },
     ];
-    const overrides = [
+    const overrides: Capa3OverrideRow[] = [
       {
         campo: "a",
         default_value_override: "a-new",
