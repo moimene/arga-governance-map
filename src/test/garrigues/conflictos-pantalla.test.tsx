@@ -119,4 +119,25 @@ describe("C3 Tarea 6 — la pantalla de conflictos", () => {
     expect(kpi.textContent!.startsWith("0")).toBe(true);
     expect(kpi.textContent).not.toContain("—");
   });
+
+  it("con clasificación MIXTA muestra la cifra, y eso es literalmente cierto", async () => {
+    // El caso que faltaba, señalado por la lente adversarial.
+    //
+    // La etiqueta dice «Conflictos permanentes DECLARADOS». Con una fila
+    // declarada permanente y otra sin clasificar, «1» es cierto: la segunda no
+    // ha sido declarada permanente. Lo que no era cierto es el caso anterior
+    // —«0 declarados» con TODAS sin clasificar—, porque ahí lo ausente no es
+    // el valor sino la dimensión entera, y dos ceros leen «no hay conflictos».
+    //
+    // Se pina para que quede claro que es una decisión y no un descuido: si
+    // alguien quiere que el mixto avise de las no clasificadas, es cambio de
+    // producto, y este test se lo pondrá delante.
+    await montar(CONFLICTOS_TENANT, [
+      { ...FILA_SIN_TIPO, id: "m1", code: "COI-GARR-01", conflict_type: "Permanente" },
+      { ...FILA_SIN_TIPO, id: "m2", code: "COI-GARR-02" },
+    ]);
+    const permanentes = screen.getByText("Conflictos permanentes declarados").parentElement!;
+    expect(permanentes.textContent!.startsWith("1")).toBe(true);
+    expect(permanentes.textContent).not.toContain("—");
+  });
 });

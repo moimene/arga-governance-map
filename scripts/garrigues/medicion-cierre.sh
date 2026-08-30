@@ -59,6 +59,7 @@ fi
 cd "$DESTINO"
 echo "=== typecheck ===" && { bun run typecheck 2>&1 | grep -c "error TS" || true; }
 echo "=== lint ==="      && bun run lint 2>&1 | tail -2
+echo "=== build ==="     && bun run build 2>&1 | tail -2
 echo "=== test ==="      && bun test 2>&1 | tail -5
 echo
 echo "medido en: $DESTINO"

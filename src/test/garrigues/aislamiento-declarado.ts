@@ -117,7 +117,7 @@ export const AISLAMIENTO_DECLARADO: readonly TablaDeclarada[] = [
         "acción y no publica los planes concretos. Sembrar planes verosímiles los haría " +
         "indistinguibles de los reales, así que la decisión del carril fue no sembrar ninguno y " +
         "explicar la ausencia en pantalla.",
-      fuente: "PPD-01 §246; decisión de la Tarea 5 del carril C3 (commit 22d0579)",
+      fuente: "PPD-01 §4.2; decisión de la Tarea 5 del carril C3 (commit 22d0579)",
     },
     marcadores: {},
   },

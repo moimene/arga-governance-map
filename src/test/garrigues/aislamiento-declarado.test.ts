@@ -17,6 +17,7 @@ import {
   CON_AUSENCIA_DECLARADA,
   GARRIGUES,
 } from "./aislamiento-declarado";
+import { verificarCita } from "./cita-verificable";
 
 describe("C3 Tarea 8 — la declaración de aislamiento cuadra con Cloud", () => {
   let arga: SupabaseClient;
@@ -70,6 +71,20 @@ describe("C3 Tarea 8 — la declaración de aislamiento cuadra con Cloud", () =>
       const citaLocalizable = /§|commit|art\./.test(t.motivo!.fuente);
       expect(citaLocalizable || !!t.alternativa,
         `${t.tabla}: motivo sin cita localizable NI alternativa comprobable`).toBe(true);
+
+      // Y si la cita apunta a un apartado de un documento interno, ese apartado
+      // tiene que EXISTIR en su índice. El regex de arriba es de FORMA: acepta
+      // «§246» igual que «§4.2», y «§246» no existe — son posiciones de párrafo
+      // del volcado del PDF escritas con signo de apartado. Lo cazó la lente
+      // adversarial, y tenía razón: el mecanismo que este fichero presentaba
+      // como su logro era imposible de fallar.
+      const verificada = verificarCita(t.motivo!.fuente);
+      if (verificada) {
+        expect(
+          verificada.existe,
+          `${t.tabla}: cita a ${verificada.codigo} §${verificada.apartado}, que NO está en su índice`,
+        ).toBe(true);
+      }
     }
   });
 
