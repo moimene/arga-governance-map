@@ -48,6 +48,7 @@ function rulePack(overrides: Partial<RulePack> & Record<string, unknown> = {}): 
         SL: { valor: 15, fuente: "LEY", referencia: "Art. 176 LSC" },
         SAU: { valor: 30, fuente: "LEY", referencia: "Art. 176 LSC" },
         SLU: { valor: 15, fuente: "LEY", referencia: "Art. 176 LSC" },
+        SLP: { valor: 15, fuente: "LEY", referencia: "Art. 176 LSC" },
       },
       canales: {
         SA: ["BORME", "WEB"],

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import JSZip from "jszip";
+import type { ArchiveMetadata } from "@/lib/doc-gen/storage-archiver";
 import { buildSecretariaDocumentGenerationRequest } from "@/lib/secretaria/document-generation-boundary";
 import { LEGAL_TEAM_TEMPLATE_FIXTURES } from "@/lib/secretaria/legal-template-fixtures";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
@@ -150,7 +151,7 @@ describe("motor-plantillas composer smoke", () => {
       templateId: template.id,
       requestedAt: "2026-05-03T10:00:00.000Z",
     });
-    let capturedMetadata: Record<string, unknown> | null = null;
+    let capturedMetadata: ArchiveMetadata | null = null;
 
     const result = await composeDocument(
       request,
