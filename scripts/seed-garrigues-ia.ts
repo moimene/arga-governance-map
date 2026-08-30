@@ -159,7 +159,7 @@ async function main() {
     const existente = porCodigo.get(s.code);
     const accion = existente ? "actualiza" : "alta     ";
     console.log(`  ${accion} ${s.code.padEnd(12)} ${s.name.padEnd(24)} [${s.provenance}]`);
-    if (!COMMIT) { existente ? actualizaciones++ : altas++; continue; }
+    if (!COMMIT) { if (existente) actualizaciones++; else altas++; continue; }
 
     if (existente) {
       const { error: e } = await db.from("ai_systems").update(fila)
