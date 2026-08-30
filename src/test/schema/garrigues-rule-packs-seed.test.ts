@@ -325,7 +325,9 @@ describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant,
       .from("condiciones_persona")
       .select("person_id, person:person_id(full_name)")
       .eq("tipo_condicion", "ADMIN_UNICO")
-      .maybeSingle();
+      // to-ONE por la FK: PostgREST devuelve objeto, no array (ver nota gemela
+      // en garrigues-gobierno-seed.test.ts).
+      .maybeSingle<{ person_id: string; person: { full_name: string } | null }>();
     expect(eAdmin).toBeNull();
     expect(adminUnico?.person?.full_name).toBe("Fernando Vives Ruiz");
 

@@ -59,7 +59,14 @@ describe("G2 — el gobierno de la matriz Garrigues en Cloud refleja los seeds T
     if (!authed || !garr) { expect(true).toBe(true); return; }
     const { data, error } = await garr.from("condiciones_persona")
       .select("fecha_inicio, fecha_fin, inscripcion_rm_referencia, person:person_id(full_name)")
-      .eq("tipo_condicion", "ADMIN_UNICO").maybeSingle();
+      // El embed `person:person_id(...)` es to-ONE por la FK, asi que PostgREST
+      // devuelve un OBJETO. Sin tipos de `Database`, TS no puede saber la
+      // cardinalidad y asume array: la forma se declara aqui, sin castear.
+      .eq("tipo_condicion", "ADMIN_UNICO")
+      .maybeSingle<{
+        fecha_inicio: string; fecha_fin: string;
+        inscripcion_rm_referencia: string; person: { full_name: string } | null;
+      }>();
     expect(error).toBeNull();
     expect(data?.person?.full_name).toBe("Fernando Vives Ruiz");
     expect(data?.fecha_fin).toBe("2032-06-30");
