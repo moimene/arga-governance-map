@@ -623,6 +623,7 @@ export default function ExpedienteAcuerdo() {
 
           {ruleEvaluations.length > 0 && (
             <Card icon={<Scale className="h-4 w-4" />} title="Validación normativa">
+              <EvaluacionNoSelladaAviso results={ruleEvaluations} />
               <div className="space-y-2">
                 {(() => {
                   const grouped = ruleEvaluations.reduce(
@@ -1308,6 +1309,51 @@ function FactRow({ label, present }: { label: string; present: boolean }) {
       <span className="ml-auto text-[10px] text-[var(--g-text-secondary)]">
         {present ? "presente" : "no"}
       </span>
+    </div>
+  );
+}
+
+/**
+ * C1 — la evaluación que se está enseñando puede NO estar sellada en servidor.
+ *
+ * La vía sellada (`fn_secretaria_server_resolution_evaluation`) solo cubre
+ * órganos de administración con un asiento por miembro. Una Junta de socios
+ * ponderada por participaciones no pasa por ella, así que su mayoría la calcula
+ * el motor de reglas en el cliente. Eso hay que decirlo **donde se ve el
+ * resultado**, no en un tooltip ni en un comentario del seed.
+ *
+ * El aviso lo dispara el DATO —cada evaluación declara su sello en `explain`—,
+ * no la ruta ni el tenant: una fila sellada en servidor no lo pinta, y la que
+ * no lo está lo pinta aunque nadie se acuerde de configurarlo.
+ */
+function EvaluacionNoSelladaAviso({ results }: { results: RuleEvaluationResult[] }) {
+  const noSelladas = results.filter(
+    (r) => (r.explain as { sello?: unknown } | null)?.sello === "NO_SELLADO_EN_SERVIDOR",
+  );
+  if (noSelladas.length === 0) return null;
+  const motivo = String(
+    (noSelladas[0].explain as { sello_motivo?: unknown }).sello_motivo ?? "",
+  );
+
+  return (
+    <div
+      className="mb-4 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-3"
+      style={{ borderRadius: "var(--g-radius-md)" }}
+    >
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--g-text-primary)]">
+        <AlertTriangle className="h-3.5 w-3.5 text-[var(--status-warning)]" aria-hidden="true" />
+        Evaluación no sellada en servidor
+      </div>
+      <p className="mt-1 text-[11px] leading-relaxed text-[var(--g-text-secondary)]">
+        {noSelladas.length === results.length
+          ? "Esta evaluación la calculó el motor de reglas en el cliente."
+          : `${noSelladas.length} de ${results.length} evaluaciones las calculó el motor de reglas en el cliente.`}{" "}
+        Es un cálculo de apoyo a la revisión, no un resultado autoritativo: no está
+        sellado ni es oponible.
+      </p>
+      {motivo ? (
+        <p className="mt-1 text-[11px] leading-relaxed text-[var(--g-text-secondary)]">{motivo}</p>
+      ) : null}
     </div>
   );
 }

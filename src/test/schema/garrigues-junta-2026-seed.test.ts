@@ -7,6 +7,7 @@
 //      login falla, `beforeAll` lanza y los tests revientan. Una sonda que se salta
 //      a sí misma es un gate verde que no asierta nada.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { GARRIGUES_DEMO_EMAIL, GARRIGUES_TENANT, sesionDe } from "../helpers/supabase-test-client";
 import {
@@ -39,14 +40,23 @@ import {
   CENSO_TOTAL,
 } from "../../../scripts/garrigues/capital/estructura-art7";
 import {
+  ADOPCION_LA_CERTIFICA_EL_ACTA,
   buildAgendaRow,
   buildAgreementRow,
   buildAttendeeRows,
   buildQuorumData,
+  buildResolutionRow,
   censoPrecondicion,
+  concurrenciaCertificada,
+  etapaEvaluacion,
+  evaluarMayoriaPunto,
+  MEETING_VOTES_VACIA,
+  SELLO_CLIENTE,
   type PackResuelto,
   type SocioCenso,
 } from "../../../scripts/seed-garrigues-junta-2026";
+import { esFormulaEvaluable } from "../../../src/lib/rules-engine/majority-evaluator";
+import type { RulePack } from "../../../src/lib/rules-engine/types";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -1032,6 +1042,323 @@ describe("C1 — los 10 acuerdos de la Junta en Cloud", () => {
     expect((propias ?? []).length).toBeGreaterThan(0);
     // Y al revés: Garrigues tampoco ve los de ARGA.
     const { data: alReves } = await garr.from("agreements").select("id").neq("tenant_id", GARRIGUES_TENANT);
+    expect(alReves ?? []).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────── Task 7 ──
+
+/** Las 4 fórmulas reales que los packs del tenant traen para esta Junta. */
+const F_80 = "favor >= 4/5_votos_totales";              // art. 30.3.b) Estatutos
+const F_2_3 = "favor >= 2/3_votos_totales";             // art. 30.2 Estatutos
+const F_30_1 = "favor > 1/2_votos_capital";             // art. 30.1 Estatutos
+const F_DOBLE = "favor >= 2/3_votos_totales + mayoria_socios_profesionales"; // art. 30.2.g + art. 15 Ley 2/2007
+
+describe("C1 — el motor evalúa la mayoría de la Junta (módulo puro)", () => {
+  /**
+   * Pack sintético: lo único que cambia entre casos es la FÓRMULA, que es
+   * exactamente la variable cuyo efecto hay que demostrar. Las cadenas son las
+   * reales de los packs del tenant, y la sonda de Cloud comprueba después que
+   * los packs sembrados siguen trayendo esas mismas cadenas.
+   */
+  const packDe = (materia: string, formula: string): RulePack =>
+    ({
+      id: `TEST_${materia}`,
+      materia,
+      clase: "ESTATUTARIA",
+      organoTipo: "JUNTA_GENERAL",
+      modosAdopcionPermitidos: ["MEETING"],
+      votacion: {
+        mayoria: { SL: { formula, fuente: "ESTATUTOS", referencia: "art. 30 de los Estatutos" } },
+        abstenciones: "no_cuentan",
+      },
+    }) as unknown as RulePack;
+
+  const corre = (materia: string, formula: string, concurrenciaVotos: number) =>
+    evaluarMayoriaPunto({
+      punto: puntosConAcuerdo().find((p) => p.materia === materia)!,
+      pack: packDe(materia, formula),
+      packId: `TEST_${materia}`,
+      version: "1.0.0",
+      baseVotos: baseComputoJunta(),
+      concurrenciaVotos,
+      concurrenciaTodasLasClases: baseComputoTodasLasClases(),
+    });
+
+  it("el umbral lo calcula el motor y sale distinto para cada fórmula", () => {
+    // 80 % de 16.900 = 13.520. Si esto fuera un rótulo, las tres darían igual.
+    expect(corre("ADMISION_SOCIO_CUOTA", F_80, baseComputoJunta()).umbralVotos).toBe(13_520);
+    expect(corre("MODIFICACION_ESTATUTOS", F_2_3, baseComputoJunta()).umbralVotos)
+      .toBeCloseTo((2 * baseComputoJunta()) / 3, 6);
+    expect(corre("APROBACION_CUENTAS", F_30_1, baseComputoJunta()).umbralVotos).toBe(8_450);
+  });
+
+  it("MUTACIÓN — bajar la concurrencia por debajo del 80 % vuelca el veredicto de la admisión", () => {
+    // Con el censo íntegro concurrido, el 80 % del art. 30.3.b) es alcanzable.
+    expect(corre("ADMISION_SOCIO_CUOTA", F_80, baseComputoJunta()).ok).toBe(true);
+    // Un solo voto por debajo del umbral y deja de serlo. El motor CORRE: el
+    // resultado depende de la entrada, no de la etiqueta del acuerdo.
+    expect(corre("ADMISION_SOCIO_CUOTA", F_80, 13_519).ok).toBe(false);
+    // Y el umbral es `>=`, no `>`: justo en 13.520 se alcanza.
+    expect(corre("ADMISION_SOCIO_CUOTA", F_80, 13_520).ok).toBe(true);
+  });
+
+  it("MUTACIÓN — con la MISMA concurrencia, la fórmula decide el veredicto", () => {
+    // 12.000 votos: pasan los 2/3 (11.266,67) y no pasan los 4/5 (13.520).
+    expect(corre("MODIFICACION_ESTATUTOS", F_2_3, 12_000).ok).toBe(true);
+    expect(corre("ADMISION_SOCIO_CUOTA", F_80, 12_000).ok).toBe(false);
+    // Y la del art. 30.1 (mayoría de los votos del capital) pasa de sobra.
+    expect(corre("APROBACION_CUENTAS", F_30_1, 12_000).ok).toBe(true);
+  });
+
+  it("la doble mayoría de la exclusión NO se evalúa, y se dice por qué", () => {
+    // El motor no sabe computar «mayoría de socios profesionales» —es una
+    // mayoría de SOCIOS, no de votos— y el acta no transcribe el desglose
+    // nominal que haría falta. Ante una fórmula desconocida `evaluateFormula`
+    // devuelve «no alcanzada» con umbral 0: persistir ese false diría que la
+    // mayoría falló cuando lo que pasa es que no se evaluó.
+    expect(esFormulaEvaluable(F_DOBLE)).toBe(false);
+    const e = corre("EXCLUSION_SOCIO_ESTATUTARIA", F_DOBLE, baseComputoJunta());
+    expect(e.evaluable).toBe(false);
+    expect(e.umbralVotos).toBeNull();
+    expect(e.ok).toBe(false);
+    // WARNING, no BLOCKING: el motor no dice que el acuerdo falle, dice que no
+    // puede pronunciarse. Pintarlo en rojo afirmaría lo primero.
+    expect(e.severity).toBe("WARNING");
+    expect(e.warnings.join(" ")).toContain("mayoría de SOCIOS");
+    expect(String(e.explain.veredicto)).toContain("NO EVALUADO");
+    // Y las tres que sí evalúa siguen evaluándose: si el motor hubiera dejado de
+    // reconocer las fórmulas, este caso pasaría solo y sería indistinguible.
+    expect(esFormulaEvaluable(F_80)).toBe(true);
+    expect(esFormulaEvaluable(F_2_3)).toBe(true);
+    expect(esFormulaEvaluable(F_30_1)).toBe(true);
+  });
+
+  it("la evaluación declara que NO está sellada en servidor y qué escenario evaluó", () => {
+    const e = corre("ADMISION_SOCIO_CUOTA", F_80, baseComputoJunta());
+    expect(e.explain.sello).toBe(SELLO_CLIENTE);
+    expect(e.explain.sello).toBe("NO_SELLADO_EN_SERVIDOR");
+    expect(String(e.explain.sello_motivo)).toContain("fn_secretaria_server_resolution_evaluation");
+    expect(String(e.explain.escenario)).toContain("no el escrutinio");
+    // La adopción la certifica el acta; esta evaluación no la decide.
+    expect(e.explain.adopcion).toBe(ADOPCION_LA_CERTIFICA_EL_ACTA);
+    expect(e.explain.desglose_nominal).toBe(MEETING_VOTES_VACIA);
+    expect(String(e.explain.desglose_nominal)).toContain("meeting_votes queda VACÍA");
+    // `explain` es PLANO: la ficha renderiza cada valor con String(value) y un
+    // objeto anidado saldría como "[object Object]".
+    expect(Object.values(e.explain).every((v) => typeof v !== "object")).toBe(true);
+  });
+
+  it("las dos bases NO se mezclan: el motor recibe 16.900 y 16.908 viaja como conciliación", () => {
+    const e = corre("ADMISION_SOCIO_CUOTA", F_80, baseComputoJunta());
+    expect(e.explain.base_votos).toBe(16_900);
+    expect(e.explain.base_votos).toBe(baseComputoJunta());
+    expect(e.explain.concurrencia_todas_las_clases).toBe(16_908);
+    expect(e.explain.concurrencia_todas_las_clases).toBe(baseComputoTodasLasClases());
+    expect(e.explain.base_computo).toBe("VOTOS_CLASE_A_NO_AUTOCARTERA");
+    // El umbral se mide sobre la declarada: 4/5 de 16.908 daría 13.526,4.
+    expect(e.umbralVotos).toBe(13_520);
+    expect(e.umbralVotos).not.toBe((4 * baseComputoTodasLasClases()) / 5);
+  });
+
+  it("la concurrencia se mide sobre la base declarada y sobre la íntegra, por separado", () => {
+    const socios = [...SOCIOS_PRESENCIALES.map((n) => socio(n)), socio("Socia Representada", "A"), socio("Socio Clase B", "B")];
+    const filas = buildAttendeeRows("m", socios, `id-${REPRESENTANTE_UNICO}`);
+    const c = concurrenciaCertificada(socios, filas);
+    // 4 socios de cuota × 50 votos = 200 en la base declarada; +1 de clase B.
+    expect(c.socios).toBe(4);
+    expect(c.votos).toBe(200);
+    expect(c.votosTodasLasClases).toBe(201);
+    expect(c.votosTodasLasClases - c.votos).toBe(1);   // el voto de clase B, fuera de la base
+  });
+
+  it("la resolución enlaza por agreement_id y NO deja que el DEFAULT escriba SIMPLE", () => {
+    const punto = puntosConAcuerdo().find((p) => p.materia === "APROBACION_CUENTAS")!;
+    const fila = buildResolutionRow("m-1", punto, "ag-1");
+    expect(fila.agreement_id).toBe("ag-1");
+    expect(fila.agenda_item_index).toBe(ordinalEnOrdenDelDia(punto.numero));
+    expect(fila.status).toBe("ADOPTED");
+    // DECISION exige agenda_items.kind = DECISORIO, que es lo que Task 6 escribió.
+    expect(fila.kind_resolution).toBe("DECISION");
+    // La columna tiene DEFAULT 'SIMPLE': omitirla escribiría una mayoría que no
+    // es la aplicable. Va a NULL explícito, igual que en `agreements`.
+    expect(fila.required_majority_code).toBeNull();
+    expect("required_majority_code" in fila).toBe(true);
+    expect(fila.resolution_text).toBe(textoAcuerdo(punto.numero).decision);
+    expect(fila.tenant_id).toBe(GARRIGUES_TENANT);   // la tabla NO tiene default
+  });
+
+  it("la ficha del acuerdo lee ESTA clave: el aviso y el dato no pueden divergir", () => {
+    // Verificar un RÓTULO no prueba la ARISTA. El aviso «no sellada en servidor»
+    // de `ExpedienteAcuerdo` se dispara leyendo `explain.sello`; si alguien
+    // renombrara la clave en el seed o en la página, el aviso dejaría de
+    // pintarse EN SILENCIO y todas las demás aserciones seguirían verdes.
+    const ficha = readFileSync("src/pages/secretaria/ExpedienteAcuerdo.tsx", "utf8");
+    expect(ficha).toContain(`sello === "${SELLO_CLIENTE}"`);
+    expect(ficha).toContain("sello_motivo");
+    // Y el aviso cuelga de la tarjeta donde se ve el resultado, no de un tooltip.
+    expect(ficha).toMatch(/title="Validación normativa">\s*\n\s*<EvaluacionNoSelladaAviso/);
+  });
+
+  it("cada punto tiene su propia etapa: dos acuerdos no comparten registro", () => {
+    const etapas = puntosConAcuerdo().map((p) => etapaEvaluacion(p.numero));
+    expect(new Set(etapas).size).toBe(etapas.length);
+    expect(etapas).toContain("MAYORIA_JUNTA_2026_PUNTO_1.1");
+  });
+});
+
+describe("C1 — resoluciones, votos y evaluación de la Junta en Cloud", () => {
+  // ⚠ Este bloque queda ROJO hasta que se ejecute el seed con permiso de
+  // escritura: `bun run scripts/seed-garrigues-junta-2026.ts --commit`.
+  // La tarea que lo escribió tenía prohibido escribir en Cloud. No se le pone
+  // graceful-skip: una sonda que se salta a sí misma es un gate verde que no
+  // asierta nada, y este bloque es justo el que prueba que la evaluación llegó.
+  let garr: SupabaseClient;
+  let arga: SupabaseClient;
+  let meetingId: string;
+  type Resolucion = {
+    id: string;
+    agenda_item_index: number;
+    agreement_id: string | null;
+    status: string;
+    required_majority_code: string | null;
+    kind_resolution: string;
+    resolution_type: string;
+  };
+  type Evaluacion = {
+    id: string;
+    agreement_id: string;
+    etapa: string;
+    ok: boolean;
+    severity: string;
+    explain: Record<string, unknown> | null;
+    warnings: unknown;
+    rule_pack_id: string | null;
+    rule_pack_version: string | null;
+    evaluation_hash: string | null;
+  };
+  let resoluciones: Resolucion[] = [];
+  let evaluaciones: Evaluacion[] = [];
+  let acuerdoPorId = new Map<string, string>();
+
+  beforeAll(async () => {
+    // Sesión COMPARTIDA y memoizada (patrón de C3): 2 logins en toda la suite.
+    [garr, arga] = await Promise.all([sesionDe("GARRIGUES"), sesionDe("ARGA")]);
+
+    const { data: m, error: eM } = await garr.from("meetings").select("id").eq("slug", MEETING_SLUG).maybeSingle();
+    if (eM) throw new Error(`meetings ${MEETING_SLUG}: ${eM.message}`);
+    if (!m) throw new Error(`No existe la reunión ${MEETING_SLUG}: ejecuta antes el seed.`);
+    meetingId = m.id;
+
+    const { data: res, error: eRes } = await garr.from("meeting_resolutions")
+      .select("id, agenda_item_index, agreement_id, status, required_majority_code, kind_resolution, resolution_type")
+      .eq("meeting_id", meetingId);
+    if (eRes) throw new Error(`meeting_resolutions: ${eRes.message}`);
+    resoluciones = res ?? [];
+
+    const { data: ags, error: eAgs } = await garr.from("agreements")
+      .select("id, agreement_kind").eq("tenant_id", GARRIGUES_TENANT).eq("parent_meeting_id", meetingId);
+    if (eAgs) throw new Error(`agreements: ${eAgs.message}`);
+    acuerdoPorId = new Map((ags ?? []).map((a) => [a.id, a.agreement_kind]));
+
+    const { data: evs, error: eEvs } = await garr.from("rule_evaluation_results")
+      .select("id, agreement_id, etapa, ok, severity, explain, warnings, rule_pack_id, rule_pack_version, evaluation_hash")
+      .in("agreement_id", [...acuerdoPorId.keys()]);
+    if (eEvs) throw new Error(`rule_evaluation_results: ${eEvs.message}`);
+    evaluaciones = evs ?? [];
+  }, 30_000);
+
+  // SIN afterAll con signOut: la sesión es COMPARTIDA.
+
+  it("cada acuerdo tiene su resolución enlazada por agreement_id, no por texto", () => {
+    expect(resoluciones).toHaveLength(10);
+    expect(resoluciones.every((r) => r.agreement_id !== null)).toBe(true);
+    expect(new Set(resoluciones.map((r) => r.agreement_id)).size).toBe(10);
+    expect(resoluciones.every((r) => r.status === "ADOPTED")).toBe(true);
+    expect(resoluciones.every((r) => r.kind_resolution === "DECISION")).toBe(true);
+    // El enlace es real: cada agreement_id es uno de los 10 acuerdos de la Junta.
+    expect(resoluciones.every((r) => acuerdoPorId.has(r.agreement_id!))).toBe(true);
+    // El ordinal es el del orden del día, con sus huecos y sin renumerar.
+    expect(resoluciones.map((r) => r.agenda_item_index).sort((a, b) => a - b))
+      .toEqual(puntosConAcuerdo().map((p) => ordinalEnOrdenDelDia(p.numero)).sort((a, b) => a - b));
+    // Nadie escribió SIMPLE por el DEFAULT de la columna.
+    expect(resoluciones.every((r) => r.required_majority_code === null)).toBe(true);
+  });
+
+  it("meeting_votes está VACÍA para esta Junta, y el expediente dice por qué", async () => {
+    const { data, error } = await garr.from("meeting_votes").select("id")
+      .in("resolution_id", resoluciones.map((r) => r.id));
+    expect(error).toBeNull();
+    // El acta no transcribe el desglose nominal: escribirlo atribuiría un voto a
+    // 346 personas identificadas. La ausencia es la decisión, no un olvido...
+    expect(data ?? []).toHaveLength(0);
+    // ...y por eso el motivo VIAJA en el expediente. Sin esto, «no hay filas»
+    // sería indistinguible de «se olvidaron».
+    expect(evaluaciones.length).toBeGreaterThan(0);
+    expect(evaluaciones.every((e) => e.explain?.desglose_nominal === MEETING_VOTES_VACIA)).toBe(true);
+    // Control discriminante: la aserción de arriba sería vacua si no hubiera
+    // resoluciones sobre las que buscar votos.
+    expect(resoluciones.length).toBe(10);
+  });
+
+  it("los 10 acuerdos llevan la evaluación del motor, con su umbral sobre la base declarada", () => {
+    expect(evaluaciones).toHaveLength(10);
+    expect(new Set(evaluaciones.map((e) => e.agreement_id)).size).toBe(10);
+    expect(new Set(evaluaciones.map((e) => e.etapa)).size).toBe(10);
+    expect(evaluaciones.every((e) => e.evaluation_hash !== null)).toBe(true);
+    // La base es la declarada (16.900). NUNCA la íntegra de 16.908.
+    expect(evaluaciones.every((e) => e.explain?.base_votos === baseComputoJunta())).toBe(true);
+    expect(evaluaciones.every((e) => e.explain?.concurrencia_todas_las_clases === baseComputoTodasLasClases())).toBe(true);
+    // El umbral del 80 % del art. 30.3.b) son 13.520 votos, calculados por el motor.
+    const admision = evaluaciones.find((e) => acuerdoPorId.get(e.agreement_id) === "ADMISION_SOCIO_CUOTA");
+    expect(admision).toBeDefined();
+    expect(admision!.explain?.umbral_votos).toBe(13_520);
+    expect(String(admision!.explain?.formula)).toBe(F_80);
+    expect(admision!.ok).toBe(true);
+  });
+
+  it("la evaluación declara NO SELLADA EN SERVIDOR — que es lo que la ficha pinta", () => {
+    // Sin esto, los tres `every` de abajo pasarían sobre un array VACÍO: verde
+    // mudo. La sonda tiene que ponerse roja mientras no haya evaluaciones.
+    expect(evaluaciones).toHaveLength(10);
+    expect(evaluaciones.every((e) => e.explain?.sello === SELLO_CLIENTE)).toBe(true);
+    expect(evaluaciones.every((e) => String(e.explain?.sello_motivo ?? "").includes("fn_secretaria_server_resolution_evaluation"))).toBe(true);
+    // El aviso de la ficha se dispara por ESTE dato (`explain.sello`), no por la
+    // ruta ni por el tenant: si la clave cambiara de nombre, el aviso caería en
+    // silencio y este caso es lo único que lo impide.
+    expect(evaluaciones.every((e) => e.explain?.sello === "NO_SELLADO_EN_SERVIDOR")).toBe(true);
+  });
+
+  it("la que el motor NO sabe evaluar va marcada, y es exactamente la doble mayoría", () => {
+    const noEvaluadas = evaluaciones.filter((e) => String(e.explain?.veredicto ?? "").includes("NO EVALUADO"));
+    // Derivado, no pinado: si mañana el motor aprende la doble mayoría, este caso
+    // se entera. Un `toBe(1)` a mano no distinguiría eso de una regresión.
+    expect(noEvaluadas.map((e) => acuerdoPorId.get(e.agreement_id))).toEqual(["EXCLUSION_SOCIO_ESTATUTARIA"]);
+    expect(noEvaluadas.every((e) => e.severity === "WARNING")).toBe(true);
+    expect(noEvaluadas.every((e) => e.explain?.umbral_votos === "NO EVALUABLE")).toBe(true);
+    // Control discriminante: las otras 9 SÍ se evaluaron y traen umbral numérico.
+    const evaluadas = evaluaciones.filter((e) => !String(e.explain?.veredicto ?? "").includes("NO EVALUADO"));
+    expect(evaluadas).toHaveLength(9);
+    expect(evaluadas.every((e) => typeof e.explain?.umbral_votos === "number")).toBe(true);
+  });
+
+  it("ARGA no ve nada de esto y conserva sus propias evaluaciones", async () => {
+    // Que ARGA no vea lo de Garrigues solo dice algo si Garrigues tiene algo.
+    expect(resoluciones).toHaveLength(10);
+    expect(evaluaciones).toHaveLength(10);
+    const { data: cruzado, error: eCruz } = await arga.from("meeting_resolutions").select("id").eq("meeting_id", meetingId);
+    expect(eCruz).toBeNull();
+    expect(cruzado ?? []).toHaveLength(0);
+    const { data: cruzadoEval } = await arga.from("rule_evaluation_results").select("id").eq("tenant_id", GARRIGUES_TENANT);
+    expect(cruzadoEval ?? []).toHaveLength(0);
+    // Sin esto las dos aserciones de arriba serían vacuas.
+    const { data: propias, error: eProp } = await arga.from("meeting_resolutions").select("id").limit(50);
+    expect(eProp).toBeNull();
+    expect((propias ?? []).length).toBeGreaterThan(0);
+    const { data: propiasEval } = await arga.from("rule_evaluation_results").select("id").limit(50);
+    expect((propiasEval ?? []).length).toBeGreaterThan(0);
+    // Y al revés: Garrigues tampoco ve las de ARGA.
+    const { data: alReves } = await garr.from("rule_evaluation_results").select("id").neq("tenant_id", GARRIGUES_TENANT);
     expect(alReves ?? []).toHaveLength(0);
   });
 });

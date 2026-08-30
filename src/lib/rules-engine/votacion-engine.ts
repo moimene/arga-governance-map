@@ -332,7 +332,11 @@ export function evaluarVotacion(
       majoritySpec = pack.votacion.mayoria.CONSEJO;
     } else if (input.tipoSocial === 'SA' || input.tipoSocial === 'SAU') {
       majoritySpec = pack.votacion.mayoria.SA;
-    } else if (input.tipoSocial === 'SL' || input.tipoSocial === 'SLU') {
+    } else if (input.tipoSocial === 'SL' || input.tipoSocial === 'SLU' || input.tipoSocial === 'SLP') {
+      // C1 — la SLP lee la rama SL, mismo criterio que `effective-rule.ts:89`.
+      // Sin esta rama `majoritySpec` quedaba undefined y el motor devolvía
+      // `majority_spec_missing` en BLOCKING para toda sociedad profesional:
+      // una mayoría que sí está en el pack se presentaba como inexistente.
       majoritySpec = pack.votacion.mayoria.SL;
     }
 

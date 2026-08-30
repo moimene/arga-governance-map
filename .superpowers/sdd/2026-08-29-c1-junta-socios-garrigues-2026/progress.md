@@ -58,7 +58,7 @@ Reportado al orquestador y elevado al usuario, que decidió la base de clase A *
 | 5 | Reunión, asistencia y censo WORM | **COMPLETA EN LO APLICABLE** ([informe](task-5-report.md)): 1 reunión + 346 asistentes, 150 votos presenciales. **El censo WORM no se crea**: `fn_crear_censo_snapshot` lleva la fórmula vieja en línea y la tabla es inmutable | 4 errores del plan cazados antes de aplicar, uno de ellos irreversible | 25 pass / 0 fail · lint 0 · tsc 0 |
 | 6-bis | El décimo acuerdo (`MODIFICACION_ESTATUTOS`, art. 36) | **COMPLETA** ([informe](task-6bis-report.md)). 2/3 por el art. 30.2.a, etiquetado `INFERIDO` con la lectura alternativa nombrada. **10/10 acuerdos** | — | 46 pass / 0 fail · lint 0 · tsc 0 |
 | 6 | Los acuerdos con resolución por materia | **COMPLETA con 9 de 10** ([informe](task-6-report.md)). El décimo (`MODIFICACION_ESTATUTOS`) bloqueado: el art. 36 no existe en los Estatutos entregados | sin ronda separada, por instrucción de cierre — declarado en el informe | 42 pass / 0 fail en su sonda · lint 0 · tsc 0 |
-| 7 | Resoluciones y votaciones | pendiente | — | — |
+| 7 | Resoluciones y evaluación del motor | **COMPLETA** ([informe](task-7-report.md)). Cuarta vía: `meeting_votes` vacía, el motor evalúa umbral y alcanzabilidad. **P0 destapado: el motor nunca supo evaluar una SLP** | control discriminante ARGA antes/después + positivo SLP | 62 pass / 0 fail · lint 0 · tsc 0 |
 | 8 | Acta por RPC + certificación sin VºBº | pendiente | — | — |
 | 9 | Ciclo registral (13/07/2026, anuncios 960 y 961) | pendiente | — | — |
 | 10 | Verificación viva, control ARGA y cierre | pendiente | — | — |
