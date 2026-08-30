@@ -3,7 +3,7 @@
 # NO EDITAR MANUALMENTE — regenerar con: bun run scripts/generate-variable-contract.ts
 
 version: "1.0.0"
-fecha_generacion: "2026-05-15T12:00:39.263Z"
+fecha_generacion: "2026-08-30T07:49:04.565Z"
 fecha_congelacion: null  # Se rellena al congelar
 
 bloques:
@@ -266,6 +266,9 @@ bloques:
           estatutosPermitenSinSesion:
             tipo: "boolean"
             requerido: true
+          tipoSocial:
+            tipo: "TipoSocial"
+            requerido: true
           firmas:
             tipo: "Array<{ adminId: string"
             requerido: true
@@ -440,7 +443,7 @@ bloques:
       EvaluacionResult:
         campos:
           etapa:
-            tipo: "string"
+            tipo: "EtapaEvaluacion"
             requerido: true
           ok:
             tipo: "boolean"
@@ -577,6 +580,9 @@ bloques:
           warnings:
             tipo: "string[]"
             requerido: true
+          pacto_blocking_issues:
+            tipo: "string[]"
+            requerido: false
           snapshot_hash:
             tipo: "string"
             requerido: false
@@ -702,6 +708,8 @@ bloques:
       ComplianceGateStatus:
         campos: {}
       ComplianceGateKind:
+        campos: {}
+      EtapaEvaluacion:
         campos: {}
       AgendaItemGateMode:
         campos: {}
@@ -843,6 +851,12 @@ bloques:
           jurisdiction:
             tipo: "string"
             requerido: false
+          organoNoticeDays:
+            tipo: "number"
+            requerido: false
+          fechaPublicacion:
+            tipo: "string"
+            requerido: false
       ConvocatoriaOutput:
         campos:
           fechaLimitePublicacion:
@@ -946,6 +960,9 @@ bloques:
             requerido: false
           esEmpate:
             tipo: "boolean"
+            requerido: false
+          votoPresidente:
+            tipo: "'FAVOR' | 'CONTRA' | 'ABSTENCION' | null"
             requerido: false
           decisionFirmada:
             tipo: "boolean"

@@ -35,6 +35,11 @@
  * EAD Trust: `CANAL_ESTATUTARIO` nombra el canal del acto real, nada más.
  */
 
+// Task 9. La captura de Carril B de la matriz: es la ÚNICA fuente de los datos
+// registrales de este módulo. Import estático de un JSON del repo — el módulo
+// sigue siendo puro (sin red, sin `fs`).
+import borme from "../borme/jya-garrigues-slp.json";
+
 export type PuntoOrdenDia = {
   /** "1.1", "1.2", "2".."12" y "acta". Clave de enlace con el acuerdo en Task 6. */
   numero: string;
@@ -84,6 +89,41 @@ export const STATUTORY_BASIS =
 
 /** Domicilio social inscrito (RM de Madrid, hoja M-190538). */
 export const LUGAR_JUNTA = "Domicilio social: Plaza de Colón, 2, 28046 Madrid";
+
+/**
+ * Identidad lógica de la reunión materializada. `meetings.slug` SÍ existe y es
+ * UNIQUE global, así que este valor es la clave de idempotencia del seed de la
+ * reunión — a diferencia de la convocatoria, que no tiene columna `slug`.
+ */
+export const MEETING_SLUG = "garrigues-junta-socios-06-05-2026";
+
+/**
+ * Mesa de la Junta (spec §3.6, del certificado del acta).
+ *
+ * Ninguno de los dos es un cargo permanente del órgano: la Presidenta lo es
+ * **como socia y senior partner** (art. 29.2 de los Estatutos) y el Secretario
+ * fue **elegido por unanimidad de los asistentes en la propia sesión**. Por eso
+ * no existe —ni se fabrica— `authority_evidence` de la Junta para ninguno de
+ * los dos: la mesa de una Junta se constituye en la sesión, no viene de un
+ * nombramiento previo inscrito.
+ */
+export const MESA_PRESIDENTA = "Rosa Zarza Jimeno";
+export const MESA_SECRETARIO = "Roberto Delgado Gil";
+
+/**
+ * Los 3 socios que asistieron con presencia física, y el único representante.
+ *
+ * El certificado dice literalmente que «los socios que asistieron representados
+ * lo fueron por el socio D. Roberto Delgado Gil», que exhibió las cartas de
+ * delegación a la Presidenta. Son 343 delegaciones a **una misma persona**, no
+ * un reparto entre varios representantes.
+ *
+ * Estos nombres se contrastan en el preflight del seed contra la transcripción
+ * `scripts/garrigues/censo/socios-acta-2026-05-06.json` y contra los titulares
+ * reales de `capital_holdings` en Cloud: tres fuentes que deben coincidir.
+ */
+export const SOCIOS_PRESENCIALES = ["Fernando Vives Ruiz", MESA_PRESIDENTA, MESA_SECRETARIO];
+export const REPRESENTANTE_UNICO = MESA_SECRETARIO;
 
 /**
  * La hora **no consta** en la fuente disponible, y esta constante no puede
@@ -298,4 +338,390 @@ export function convocatoriaText(): string {
     "",
     "Registro técnico realizado por la Secretaría Societaria en el entorno DEMO. No constituye una convocatoria emitida ni evidencia final productiva. Esta reconstrucción no produce remisión, entrega ni acuse, y no afirma ninguna actuación, interposición, mensajería ni custodia de EAD Trust sobre este documento.",
   ].join("\n");
+}
+
+// ─────────────────────────────────────────── Task 6: los acuerdos y su regla ──
+
+/**
+ * El punto 1.1 estuvo bloqueado en Task 6 y **dejó de estarlo el 2026-08-30**.
+ *
+ * Task 6 no lo materializó por dos motivos, y hoy ninguno de los dos se sostiene:
+ *
+ *  1. *«El art. 36 no consta en el texto entregado; la numeración salta de 35 a
+ *     37.»* **Falso, y se pudo comprobar sin fuente nueva.** El cotejo del Comité
+ *     Legal sobre el texto vigente
+ *     (`docs/legal/2026-08-04-decisiones-comite-legal-slp-garrigues.md`, apartado
+ *     del 2026-08-05) dice literalmente: «Mandato administradores (art. 36, Insc.
+ *     960ª): 6 años reelegibles», que además cuadra con el mandato de Vives
+ *     30/06/2026 → 30/06/2032. Y el BORME lo corrobora por segunda vía: anuncio
+ *     338618/2026, I/A 960, «se modifica el artículo 36 … por el cambio del plazo
+ *     de duración de los administradores».
+ *  2. *«Sin artículo que cotejar no hay mayoría que citar.»* Eso sí era cierto: la
+ *     mayoría no salía de una cita. **Sigue sin salir de una cita** — sale de una
+ *     SUBSUNCIÓN decidida por el usuario, y por eso va etiquetada. Ver
+ *     `SUBSUNCION_ART36`.
+ *
+ * Lo que cambió no es el dato: es que ahora hay una decisión, y está fechada,
+ * atribuida y contrastable, con su lectura alternativa al lado.
+ */
+export type Subsuncion = {
+  /** NO es `Fuente` (tipo cerrado, sin 'INFERIDO'): lo inferido es la subsunción. */
+  procedencia: "INFERIDO";
+  decididoPor: string;
+  objeto: string;
+  lecturaAplicada: string;
+  lecturaAlternativa: string;
+  efectoSiSeRevisa: string;
+  consecuenciaNoAplicada: string;
+  registroCanonico: string;
+};
+
+/**
+ * La subsunción del punto 1.1 en el art. 30.2.a), **etiquetada `INFERIDO`**.
+ *
+ * Copia fiel de `reglaEspecifica.subsuncionArt36` del pack
+ * `GARR_MODIFICACION_ESTATUTOS` (migración `20260830120000`). Se duplica aquí a
+ * propósito: el pack la lleva al dato y este módulo la lleva al
+ * `compliance_explain` del acuerdo, que es lo que la ficha enseña. La sonda
+ * contrasta las dos copias, así que una divergencia se ve.
+ *
+ * **La `fuente` de la mayoría es `ESTATUTOS` y eso es correcto** — la mayoría sale
+ * de los Estatutos. Lo `INFERIDO` es el paso de razonamiento que lleva ESTE
+ * acuerdo a ESE artículo, y por eso vive en su propia clave.
+ */
+export const SUBSUNCION_ART36: Subsuncion = {
+  procedencia: "INFERIDO",
+  decididoPor: "el usuario, 2026-08-30",
+  objeto:
+    "el art. 36 regula el plazo de duración de los administradores (BORME 338618/2026, I/A 960; y cotejo del Comité Legal de 2026-08-05: mandato de 6 años reelegibles)",
+  lecturaAplicada:
+    "El art. 30.2.a) —nombramiento, reelección y separación de los administradores— alcanza a modificar el artículo que regula su plazo, de modo que la modificación del art. 36 se adopta por la mayoría reforzada de 2/3.",
+  lecturaAlternativa:
+    "el art. 30.2.f) tasa quince artículos (1, 2, 9, 10, 11, 12, 13, 17, 18, 19, 20, 21, 26, 42 y 47) y el 36 no figura; por esa vía la modificación iría por la mayoría general del art. 30.1",
+  efectoSiSeRevisa:
+    "Si el Comité Legal acoge la lectura alternativa, cambia la mayoría de este pack (2/3 → art. 30.1) y decae el perímetro del art. 39.5.b.i para este acuerdo. No hay captura emitida que rectificar: la ficha enseña las dos lecturas.",
+  consecuenciaNoAplicada:
+    "Bajo la lectura aplicada, el art. 39.5.b.i llevaría este acuerdo al informe preceptivo del Consejo de Socios. El gate demo NO se amplía sobre una subsunción INFERIDA: su config son 4 materias FIRMES y sigue disparando en 4.",
+  registroCanonico: "docs/legal/2026-08-30-modificacion-art-36-mayoria-aplicada.md",
+};
+
+/** Los puntos cuyo contenido descansa en una subsunción etiquetada, por número. */
+export const SUBSUNCION_POR_PUNTO: Record<string, Subsuncion> = {
+  "1.1": SUBSUNCION_ART36,
+};
+
+/** La subsunción del punto, o `null` si su regla sale de una cita directa. */
+export const subsuncionDe = (numero: string): Subsuncion | null =>
+  SUBSUNCION_POR_PUNTO[numero] ?? null;
+
+/**
+ * Los puntos que producen un `agreements`. **Hoy son los 10 que materializan**:
+ * desde que cayó el bloqueo del 1.1 no hay ninguno excluido.
+ *
+ * No se colapsa contra `puntosQueMaterializan` aunque devuelvan lo mismo: son dos
+ * preguntas distintas —«¿está en el orden del día como decisorio?» y «¿tiene
+ * acuerdo en el expediente?»— y la segunda ya divergió una vez. Mantenerla
+ * separada es lo que permitió bloquear y desbloquear sin tocar Task 4.
+ */
+export const puntosConAcuerdo = (): PuntoOrdenDia[] => puntosQueMaterializan();
+
+/**
+ * Ordinal 1-based del punto dentro de `ORDEN_DEL_DIA`.
+ *
+ * Es el mismo entero que la plataforma usaría en
+ * `agenda_items.source_convocatoria_item_index` para apuntar al elemento del
+ * array `convocatorias.agenda_items`. Aquí ese vínculo por FK **no puede
+ * escribirse** —`fn_secretaria_guard_convocation_agenda_binding` exige que la
+ * convocatoria esté EMITIDA e inmutable y ésta está en BORRADOR—, así que el
+ * ordinal se conserva en `agenda_items.order_number`, que es la columna que la
+ * arista real (`agreements.agenda_item_id`) alcanza.
+ *
+ * Los huecos (1, 6, 9, 10, 14) son los puntos sin acuerdo: no se renumera, para
+ * que el ordinal siga apuntando al mismo elemento de la convocatoria.
+ */
+export function ordinalEnOrdenDelDia(numero: string): number {
+  const idx = ORDEN_DEL_DIA.findIndex((p) => p.numero === numero);
+  if (idx < 0) throw new Error(`ordinal: el punto ${numero} no está en el orden del día`);
+  return idx + 1;
+}
+
+/**
+ * Texto del acuerdo por punto.
+ *
+ * `contenido` califica **el contenido del acuerdo**, no su redacción: ningún
+ * literal del certificado obra en el repo, así que todos los textos son
+ * reconstrucción y todos lo dicen.
+ *
+ *  - `ACREDITADO` — lo decidido consta en fuente externa (tabla vinculante del
+ *    plan, confirmada por BORME para 1.1, 1.2, 6 y 10; art. 31.3 de los Estatutos
+ *    para el 12).
+ *  - `INFERIDO` — el certificado recoge el punto pero no lo que se decidió.
+ *    Estos textos **no identifican a ninguna persona**: nombrar a un socio
+ *    excluido o admitido a partir de un punto del orden del día sería inventar
+ *    el contenido de un acuerdo sobre una persona concreta.
+ */
+export type TextoAcuerdo = {
+  contenido: "ACREDITADO" | "INFERIDO";
+  propuesta: string;
+  decision: string;
+};
+
+const DISCLAIMER =
+  "Reconstrucción demo sin efecto jurídico: el certificado del acta no transcribe el literal del acuerdo.";
+
+export const TEXTOS_ACUERDO: Record<string, TextoAcuerdo> = {
+  "1.1": {
+    // ACREDITADO por dos vías independientes: el BORME (qué artículo y qué
+    // regula) y el cotejo del Comité Legal de 2026-08-05 (el plazo: 6 años).
+    // Lo que NO está acreditado es la disposición transitoria que enuncia el
+    // título del punto, y el texto lo dice en vez de reconstruirla.
+    contenido: "ACREDITADO",
+    propuesta:
+      "Modificar el artículo 36 de los Estatutos Sociales, que regula el plazo de duración del cargo de administrador, fijándolo en seis años reelegibles.",
+    decision:
+      `Se acuerda modificar el artículo 36 de los Estatutos Sociales, relativo al plazo de duración del cargo de administrador, que queda fijado en seis años reelegibles. La modificación quedó inscrita el 13 de julio de 2026 (BORME, anuncio 338618/2026, inscripción 960 de la hoja M-190538). El orden del día enuncia además una disposición transitoria de conversión a Consejo de Administración que la fuente disponible no acredita, y este texto no la reconstruye. La mayoría aplicada es la reforzada de dos tercios del artículo 30.2.a de los Estatutos, por subsunción etiquetada INFERIDO cuya lectura alternativa consta en el expediente. ${DISCLAIMER}`,
+  },
+  "1.2": {
+    contenido: "ACREDITADO",
+    propuesta:
+      "Cesar y reelegir a D. Fernando Vives Ruiz como Administrador Único de J&A Garrigues, S.L.P., con mandato hasta el 30 de junio de 2032, previo informe preceptivo del Consejo de Socios.",
+    decision:
+      `Se acuerda el cese y la reelección de D. Fernando Vives Ruiz como Administrador Único de J&A Garrigues, S.L.P., con mandato hasta el 30 de junio de 2032. ${DISCLAIMER}`,
+  },
+  "2": {
+    contenido: "INFERIDO",
+    propuesta:
+      "Declarar la exclusión estatutaria de los socios incursos en la causa de retiro por edad del artículo 21.1.e de los Estatutos, previo informe preceptivo del Consejo de Socios.",
+    decision:
+      `Se acuerda la exclusión estatutaria de los socios afectados por la causa del artículo 21.1.e de los Estatutos. El certificado no transcribe el acuerdo ni identifica a los socios afectados, y este texto no los identifica. ${DISCLAIMER}`,
+  },
+  "3": {
+    contenido: "INFERIDO",
+    propuesta:
+      "Aprobar la continuidad como socios de quienes han alcanzado la edad de retiro, a propuesta del Órgano de Administración y previo informe preceptivo del Consejo de Socios.",
+    decision:
+      `Se acuerda la continuidad de los socios afectados conforme al artículo 21.1.e de los Estatutos. El certificado no transcribe el acuerdo ni identifica a los socios afectados, y este texto no los identifica. ${DISCLAIMER}`,
+  },
+  "4": {
+    contenido: "INFERIDO",
+    propuesta:
+      "Admitir como Socios de Cuota a los profesionales propuestos por el Órgano de Administración, previo informe preceptivo del Consejo de Socios.",
+    decision:
+      `Se acuerda la admisión como Socios de Cuota de los profesionales propuestos. El certificado no transcribe el acuerdo ni identifica a los admitidos, y este texto no los identifica. ${DISCLAIMER}`,
+  },
+  "6": {
+    contenido: "ACREDITADO",
+    propuesta:
+      "Aprobar la integración del despacho BSVV mediante aumento del capital social con supresión del derecho de preferencia, previo informe del Administrador Único sobre la supresión.",
+    decision:
+      `Se acuerda la integración del despacho BSVV mediante aumento del capital social con supresión del derecho de preferencia. ${DISCLAIMER}`,
+  },
+  "7": {
+    contenido: "INFERIDO",
+    propuesta:
+      "Examinar y aprobar las cuentas anuales individuales y consolidadas del ejercicio 2025.",
+    decision:
+      `Se acuerda aprobar las cuentas anuales individuales y consolidadas del ejercicio 2025. El certificado del acta se expidió para el depósito de esas cuentas, pero no transcribe el acuerdo ni su aplicación del resultado. ${DISCLAIMER}`,
+  },
+  "10": {
+    contenido: "ACREDITADO",
+    propuesta:
+      "Reelegir a Lillo Auditores Asociados, S.L. como auditor de cuentas de la sociedad.",
+    decision:
+      `Se acuerda la reelección de Lillo Auditores Asociados, S.L. como auditor de cuentas. ${DISCLAIMER}`,
+  },
+  "11": {
+    contenido: "INFERIDO",
+    propuesta:
+      "Aprobar la retribución de las prestaciones accesorias del ejercicio, a propuesta del Órgano de Administración y previo informe del Consejo de Socios.",
+    decision:
+      `Se acuerda la retribución de las prestaciones accesorias. El certificado no transcribe el acuerdo ni sus importes, y este texto no los reconstruye. ${DISCLAIMER}`,
+  },
+  "12": {
+    contenido: "ACREDITADO",
+    propuesta:
+      "Delegar las facultades necesarias para elevar a instrumento público los acuerdos adoptados.",
+    decision:
+      `Se acuerda delegar las facultades para elevar a instrumento público los acuerdos adoptados. Es un acuerdo de cobertura: conforme al artículo 31.3 de los Estatutos, la elevación corresponde a quien tiene facultad de certificar y «también podrá realizarse por cualquiera de los administradores sin necesidad de delegación expresa», de modo que con Administrador Único que además certifica la delegación no es necesaria. ${DISCLAIMER}`,
+  },
+};
+
+/** El texto del punto, o error: un acuerdo sin texto no se escribe en blanco. */
+export function textoAcuerdo(numero: string): TextoAcuerdo {
+  const t = TEXTOS_ACUERDO[numero];
+  if (!t) throw new Error(`texto de acuerdo: falta el punto ${numero}`);
+  return t;
+}
+
+// ───────────────────────── Task 9: el ciclo registral, la inscripción y el BORME ──
+
+/**
+ * Acto del BORME tal y como lo transcribe la captura de Carril B. Solo se
+ * declaran las claves que este módulo lee; el fichero trae alguna más.
+ */
+type ActoBorme = {
+  fecha: string;
+  tipo: string;
+  anuncio?: string;
+  registral?: string;
+  detalle?: string;
+  cargo?: string;
+  persona?: string;
+  nota?: string;
+};
+
+const ACTOS_BORME = borme.actos as ActoBorme[];
+
+/**
+ * Qué anuncio del BORME inscribe qué punto de esta Junta.
+ *
+ * **Esta tabla no contiene ni una fecha, ni un número de inscripción, ni un
+ * dato registral.** Solo el par anuncio ↔ punto y de dónde sale ese vínculo.
+ * Todo lo demás se DERIVA de `scripts/garrigues/borme/jya-garrigues-slp.json`
+ * en `inscripcionesDeLaJunta()`, que además falla si el anuncio no está en el
+ * fichero o si sus actos no coinciden en fecha y datos registrales. Un dato
+ * inventado no tiene por dónde entrar: no hay sitio donde escribirlo.
+ *
+ * **Los dos vínculos NO tienen la misma procedencia y por eso se etiquetan por
+ * separado.** El del 338618 lo dice el propio extracto en sus notas; el del
+ * 338619 lo dice la spec, y su acto en el fichero no lleva nota de vínculo.
+ */
+const VINCULO_ANUNCIO_PUNTO: ReadonlyArray<{
+  anuncio: string;
+  puntos: readonly string[];
+  vinculo: string;
+}> = [
+  {
+    anuncio: "338618/2026",
+    puntos: ["1.1", "1.2"],
+    vinculo:
+      "El propio extracto lo dice: sus tres actos llevan nota de vínculo con esta Junta — «Inscripción del acuerdo 1.1 de la Junta de Socios de 06/05/2026», «Reelección acordada por la Junta de 06/05/2026 (hasta 30/06/2032)» y «Terminación anticipada del mandato anterior…, acuerdo 1.1 de la Junta».",
+  },
+  {
+    anuncio: "338619/2026",
+    puntos: ["4"],
+    vinculo:
+      "Lo afirma la captura de Carril B en la spec de gobernanza del tenant (2026-08-03, apartado «Ciclo registral confirmado por BORME»), que enumera exactamente dos anuncios para esta Junta: 338618 (I/A 960) y 338619 (I/A 961, alta del socio Silva Castañón). ATENCIÓN: a diferencia del 338618, el acto de este anuncio NO lleva nota de vínculo en el fichero de Carril B — el vínculo es de la spec, no del extracto. Además el extracto da de alta a Silva Castañón con el cargo registral «Soc.Prof.» por compra de las participaciones 163A-164A: dos títulos de clase A, que es exactamente el patrón de socio de cuota del art. 7 (`SOCIOS_CUOTA` en `estructura-art7.ts`).",
+  },
+];
+
+/**
+ * Puntos con otro acto del BORME que un revisor va a proponer como su
+ * inscripción, con el motivo por el que NO se usa.
+ *
+ * Solo el número de anuncio y el motivo: los datos del acto se derivan del
+ * fichero igual que los de las inscripciones acreditadas.
+ */
+const CANDIDATO_DESCARTADO: Record<string, { anuncio: string; motivo: string }> = {
+  "10": {
+    anuncio: "304964/2026",
+    motivo:
+      "Es posterior a la Junta (19/06/2026) y podría ser la inscripción de este punto, pero el vínculo NO consta: el acto no lleva la nota que sí llevan los del anuncio 338618, la captura de Carril B solo confirma dos anuncios para esta Junta, y el cargo que reelige es «Aud.C.Con.» (auditor de cuentas consolidadas) mientras el punto 10 del orden del día habla del auditor de la sociedad. Se deja anotado en vez de adoptarlo o de callarlo: la duda es el dato.",
+  },
+};
+
+export type InscripcionAcreditada = {
+  /** Número de anuncio del BORME, verbatim de la fuente ("338618/2026"). */
+  anuncio: string;
+  /** Puntos del orden del día que cubre. Puede ser MÁS DE UNO. */
+  puntos: readonly string[];
+  /** Fecha del asiento según la fuente ("2026-07-13"). */
+  fecha: string;
+  /** Datos registrales verbatim ("S 8, H M-190538, I/A 960"). */
+  registral: string;
+  /** Ordinal de la inscripción, DERIVADO de `registral` ("960"). */
+  numeroInscripcion: string;
+  /** Tipos de acto del BORME que el anuncio agrupa. */
+  actos: readonly string[];
+  /** De dónde sale el vínculo con esta Junta. No todos son iguales. */
+  vinculo: string;
+};
+
+/**
+ * Las inscripciones acreditadas de esta Junta, derivadas de la fuente.
+ *
+ * Lanza —no devuelve un hueco— si el anuncio no está en el fichero, si sus
+ * actos discrepan en fecha o en datos registrales, si el `registral` no trae
+ * el ordinal `I/A`, o si el punto no existe en el orden del día. Cualquiera de
+ * esas cuatro cosas significaría que la fuente y este módulo han dejado de
+ * hablar del mismo expediente.
+ */
+export function inscripcionesDeLaJunta(): InscripcionAcreditada[] {
+  return VINCULO_ANUNCIO_PUNTO.map(({ anuncio, puntos, vinculo }) => {
+    const actos = ACTOS_BORME.filter((a) => a.anuncio === anuncio);
+    if (!actos.length) {
+      throw new Error(`inscripción: el anuncio ${anuncio} no está en la captura BORME de la matriz`);
+    }
+    const fechas = new Set(actos.map((a) => a.fecha));
+    const registrales = new Set(actos.map((a) => a.registral ?? ""));
+    if (fechas.size !== 1 || registrales.size !== 1) {
+      throw new Error(
+        `inscripción ${anuncio}: sus ${actos.length} actos no coinciden — fechas {${[...fechas].join(", ")}}, registral {${[...registrales].join(" | ")}}`,
+      );
+    }
+    const registral = [...registrales][0];
+    const ordinal = /\bI\/A\s+(\d+)\b/.exec(registral);
+    if (!ordinal) {
+      throw new Error(`inscripción ${anuncio}: «${registral}» no trae el ordinal I/A de la inscripción`);
+    }
+    // El punto tiene que existir en el orden del día: si alguien renombra un
+    // punto, esto revienta en vez de dejar una inscripción colgando de nada.
+    for (const p of puntos) ordinalEnOrdenDelDia(p);
+    return {
+      anuncio,
+      puntos,
+      fecha: [...fechas][0],
+      registral,
+      numeroInscripcion: ordinal[1],
+      actos: actos.map((a) => a.tipo),
+      vinculo,
+    };
+  });
+}
+
+/** La inscripción que cubre el punto, o `null` si la fuente no acredita ninguna. */
+export function inscripcionDePunto(numero: string): InscripcionAcreditada | null {
+  return inscripcionesDeLaJunta().find((i) => i.puntos.includes(numero)) ?? null;
+}
+
+/** El acto del BORME descartado para el punto, con sus datos y el motivo. */
+export function candidatoDescartadoDePunto(numero: string): {
+  anuncio: string;
+  fecha: string;
+  registral: string;
+  actos: string[];
+  motivo: string;
+} | null {
+  const candidato = CANDIDATO_DESCARTADO[numero];
+  if (!candidato) return null;
+  const actos = ACTOS_BORME.filter((a) => a.anuncio === candidato.anuncio);
+  if (!actos.length) {
+    throw new Error(`candidato descartado del punto ${numero}: el anuncio ${candidato.anuncio} no está en la captura BORME`);
+  }
+  return {
+    anuncio: candidato.anuncio,
+    fecha: actos[0].fecha,
+    registral: actos[0].registral ?? "",
+    actos: actos.map((a) => `${a.tipo}${a.cargo ? ` · ${a.cargo}` : ""}${a.persona ? ` · ${a.persona}` : ""}`),
+    motivo: candidato.motivo,
+  };
+}
+
+/** Por qué un acuerdo inscribible puede quedarse sin inscripción en el expediente. */
+export const MOTIVO_SIN_INSCRIPCION =
+  "Sin inscripción acreditada: no consta anuncio del BORME que ate este acuerdo a un asiento del Registro Mercantil. La captura de Carril B confirma DOS anuncios para la Junta de 06/05/2026 —338618/2026 (I/A 960) y 338619/2026 (I/A 961)— y ningún otro acto del fichero lleva la nota de vínculo con esta Junta que sí llevan los del 338618. No se le atribuye fecha, ni anuncio, ni número de inscripción, ni protocolo notarial: el expediente queda visiblemente incompleto en lugar de completarse por inferencia.";
+
+/**
+ * La elevación a público: **no acreditada para ninguno de los acuerdos**.
+ *
+ * El art. 31.3 de los Estatutos explica quién PODRÍA elevarlos; no acredita que
+ * nadie los elevara, ni ante qué notario, ni con qué protocolo, ni cuándo.
+ */
+export const ELEVACION_NO_ACREDITADA =
+  "Elevación a instrumento público no acreditada: no consta notario, ni número de protocolo, ni fecha de escritura en ninguna fuente del repositorio, para ninguno de los acuerdos de esta Junta. El art. 31.3 de los Estatutos permite que la elevación la haga cualquiera de los administradores «sin necesidad de delegación expresa», pero eso explica la FACULTAD, no acredita el ACTO. Las columnas de instrumento quedan a NULL.";
+
+/** Un anuncio que cubre varios acuerdos es UNA inscripción, no varias. */
+export function notaAnuncioCompartido(insc: InscripcionAcreditada): string | null {
+  if (insc.puntos.length < 2) return null;
+  return `El anuncio ${insc.anuncio} (inscripción ${insc.numeroInscripcion}) cubre ${insc.puntos.length} acuerdos de esta Junta —puntos ${insc.puntos.join(" y ")}—: es UNA sola inscripción con varios acuerdos dentro, no ${insc.puntos.length} inscripciones distintas. Como registry_filings.agreement_id es singular hay un expediente por acuerdo, y los ${insc.puntos.length} comparten anuncio, fecha y número de inscripción.`;
 }

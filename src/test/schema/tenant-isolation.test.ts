@@ -10,6 +10,7 @@ import {
   DEMO_ENTITY_ARGA,
   GARRIGUES_TENANT,
   GARRIGUES_DEMO_EMAIL,
+  sesionDe,
 } from "../helpers/supabase-test-client";
 
 const SUPABASE_URL =
@@ -40,25 +41,15 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
   let authed = false;
 
   beforeAll(async () => {
-    try {
-      arga = anonClient();
-      garr = anonClient();
-      const [a, g] = await Promise.all([
-        arga.auth.signInWithPassword({ email: ARGA_EMAIL, password: DEMO_PASSWORD }),
-        garr.auth.signInWithPassword({ email: GARRIGUES_DEMO_EMAIL, password: DEMO_PASSWORD }),
-      ]);
-      authed = !a.error && !g.error;
-      if (a.error) console.warn(`[tenant-isolation] login ARGA falló: ${a.error.message}`);
-      if (g.error) console.warn(`[tenant-isolation] login Garrigues falló: ${g.error.message}`);
-    } catch {
-      authed = false;
-    }
+    // Sesión COMPARTIDA y memoizada: la suite entera hace 2 logins en vez de
+    // ~40. `sesionDe` LANZA si no puede autenticar, así que el gate se pone
+    // rojo en vez de saltarse en silencio.
+    [arga, garr] = await Promise.all([sesionDe("ARGA"), sesionDe("GARRIGUES")]);
+    authed = true;
   }, 30_000);
 
-  afterAll(async () => {
-    try { await arga?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
-    try { await garr?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
-  });
+  // SIN afterAll con signOut: la sesión es COMPARTIDA. Cerrarla aquí dejaría
+  // sin autenticar a todas las sondas que corran después de esta.
 
   it("el perfil del usuario Garrigues resuelve a su tenant", async () => {
     if (!authed || !garr) { expect(true).toBe(true); return; }

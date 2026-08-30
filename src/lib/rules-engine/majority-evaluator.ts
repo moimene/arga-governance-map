@@ -156,6 +156,22 @@ function canonicalFormula(formula: string) {
   if (normalized === 'favor > 0.5 * capital_presente') return 'favor > 1/2_capital_presente';
   if (normalized === '>= 2/3 emitidos siempre') return 'favor >= 2/3_emitidos';
   if (normalized === '>= 2/3 capital') return 'favor >= 2/3_capital';
+  // C1 — mayorías estatutarias de la SLP (arts. 30.1, 30.2 y 30.3 de los
+  // Estatutos de J&A Garrigues, S.L.P.). Su base es «los votos correspondientes
+  // a las participaciones sociales en las que se divide el capital social», que
+  // es lo que `VotosInput.capital_total` transporta cuando el caller lo carga en
+  // VOTOS y no en euros. Las dos primeras son ALIAS de fórmulas que ya existían
+  // con otro nombre; solo la de 4/5 estrena rama. Estas cadenas solo aparecen
+  // hoy en los packs del tenant Garrigues (verificado en Cloud): ARGA no cambia.
+  //
+  // NO se canonicaliza `favor >= 2/3_votos_totales + mayoria_socios_profesionales`
+  // (doble mayoría del art. 30.2.g Estatutos + art. 15 Ley 2/2007). Mapearla a la
+  // rama de 2/3 evaluaría la primera condición y dejaría caer la segunda —una
+  // mayoría de SOCIOS, no de votos— en silencio. Queda deliberadamente fuera:
+  // `esFormulaEvaluable` la reporta como no evaluable en vez de fingir veredicto.
+  if (normalized === 'favor > 1/2_votos_capital') return 'favor > 1/2_capital_total_con_voto';
+  if (normalized === 'favor >= 2/3_votos_totales') return 'favor >= 2/3_capital';
+  if (normalized === 'favor >= 4/5_votos_totales') return 'favor >= 4/5_capital';
   if (
     normalized === 'reforzada art. 201.2 lsc' ||
     normalized === '> 1/2 presente en 1a; >= 2/3 emitidos si < 50% en 2a'
@@ -255,6 +271,12 @@ function evaluateFormula(
 
   // 2/3 of present/concurrent capital
   if (formulaActual === 'favor >= 2/3_capital_presente') {
+    // Sin base no hay mayoria reforzada que proclamar: con la base a 0 el umbral
+    // es 0 y `favor >= 0` daria por alcanzados los dos tercios con cero votos.
+    // Misma guarda que ya aplica `lsc_201_2_reforzada` mas abajo.
+    if (capital_presente <= 0) {
+      return { alcanzada: false, valorRequerido: 1, valorObtenido: favor };
+    }
     const requerido = (2 * capital_presente) / 3;
     return {
       alcanzada: favor >= requerido,
@@ -265,7 +287,29 @@ function evaluateFormula(
 
   // 2/3 of total capital
   if (formulaActual === 'favor >= 2/3_capital') {
+    // Sin base no hay mayoria reforzada que proclamar: con la base a 0 el umbral
+    // es 0 y `favor >= 0` daria por alcanzados los dos tercios con cero votos.
+    // Misma guarda que ya aplica `lsc_201_2_reforzada` mas abajo.
+    if (capital_total <= 0) {
+      return { alcanzada: false, valorRequerido: 1, valorObtenido: favor };
+    }
     const requerido = (2 * capital_total) / 3;
+    return {
+      alcanzada: favor >= requerido,
+      valorRequerido: requerido,
+      valorObtenido: favor,
+    };
+  }
+
+  // 4/5 (80 %) del total. Art. 30.3.b) de los Estatutos de la SLP: la admisión
+  // de un nuevo socio de cuota exige el 80 % de los votos, no de los emitidos.
+  if (formulaActual === 'favor >= 4/5_capital') {
+    // Sin base no hay mayoria reforzada que proclamar: con `capital_total = 0`
+    // el umbral es 0 y `favor >= 0` daria por alcanzado un 80% con cero votos.
+    if (capital_total <= 0) {
+      return { alcanzada: false, valorRequerido: 1, valorObtenido: favor };
+    }
+    const requerido = (4 * capital_total) / 5;
     return {
       alcanzada: favor >= requerido,
       valorRequerido: requerido,
@@ -343,4 +387,23 @@ function evaluateFormula(
 
   // Unknown formula — default to false
   return { alcanzada: false, valorRequerido: 0, valorObtenido: 0 };
+}
+
+/**
+ * ¿Sabe el motor evaluar esta fórmula, o caería en la rama por defecto?
+ *
+ * `evaluateFormula` devuelve `{alcanzada:false, valorRequerido:0, valorObtenido:0}`
+ * ante una fórmula que no reconoce. Ese `false` es indistinguible de una mayoría
+ * realmente no alcanzada, y persistirlo como veredicto sería afirmar que la regla
+ * se evaluó cuando no se evaluó. Quien vaya a guardar un resultado debe poder
+ * preguntar antes.
+ *
+ * La comprobación es una SONDA sobre el propio evaluador, no una segunda lista de
+ * fórmulas soportadas: una lista duplicada se desincronizaría el día que alguien
+ * añada una rama. Con `favor = 1` toda rama conocida devuelve `valorObtenido = 1`
+ * (siempre copia `favor`) y solo la rama por defecto devuelve 0.
+ */
+export function esFormulaEvaluable(formula: string): boolean {
+  const probe = evaluateFormula(canonicalFormula(formula), 1, 0, 1, 1, 1, 1, 1);
+  return probe.valorObtenido === 1;
 }

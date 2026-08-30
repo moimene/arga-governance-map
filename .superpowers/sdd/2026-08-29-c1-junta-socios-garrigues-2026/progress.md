@@ -55,9 +55,102 @@ Reportado al orquestador y elevado al usuario, que decidió la base de clase A *
 | 2 | Estructura art. 7 como módulo puro + regresión | **COMPLETA** ([informe](task-2-report.md)) | 12 mutantes, 2 escapaban (ambos cerrados) + 1 P1 + 5 P2 | 20 pass / 0 fail en el fichero; suite completa en el reporte de merge |
 | 3 | Capital de la matriz a FIRME en Cloud | **COMPLETA** ([informe](task-3-report.md)) | 2 P1 + 9 P2; 4 mutantes escapaban, los 4 cerrados | 46 pass / 0 fail en los 4 ficheros de capital; suite completa en el reporte de merge |
 | 4 | Convocatoria 21/04 → 06/05 con los 12 puntos reales | **COMPLETA** ([informe](task-4-report.md)) — en `BORRADOR`: `fn_emit_convocatoria` es CDA-only | 4 P1 (todos de superficie) + 5 de 11 mutantes escapando | 15 pass / 0 fail en su sonda · lint 0 · tsc 0 · build OK |
-| 5 | Reunión, asistencia y censo WORM | **BLOQUEADA** — no se crea `censo_snapshot` hasta resolver la magnitud de `parte_votante_current` (ver `docs/legal/…-base-computo…` §7) | — | — |
-| 6 | Los 10 acuerdos con resolución por materia | pendiente | — | — |
-| 7 | Resoluciones y votaciones | pendiente | — | — |
-| 8 | Acta por RPC + certificación sin VºBº | pendiente | — | — |
-| 9 | Ciclo registral (13/07/2026, anuncios 960 y 961) | pendiente | — | — |
+| 5 | Reunión, asistencia y censo WORM | **COMPLETA EN LO APLICABLE** ([informe](task-5-report.md)): 1 reunión + 346 asistentes, 150 votos presenciales. **El censo WORM no se crea**: `fn_crear_censo_snapshot` lleva la fórmula vieja en línea y la tabla es inmutable | 4 errores del plan cazados antes de aplicar, uno de ellos irreversible | 25 pass / 0 fail · lint 0 · tsc 0 |
+| 6-bis | El décimo acuerdo (`MODIFICACION_ESTATUTOS`, art. 36) | **COMPLETA** ([informe](task-6bis-report.md)). 2/3 por el art. 30.2.a, etiquetado `INFERIDO` con la lectura alternativa nombrada. **10/10 acuerdos** | — | 46 pass / 0 fail · lint 0 · tsc 0 |
+| 6 | Los acuerdos con resolución por materia | **COMPLETA con 9 de 10** ([informe](task-6-report.md)). El décimo (`MODIFICACION_ESTATUTOS`) bloqueado: el art. 36 no existe en los Estatutos entregados | sin ronda separada, por instrucción de cierre — declarado en el informe | 42 pass / 0 fail en su sonda · lint 0 · tsc 0 |
+| 7 | Resoluciones y evaluación del motor | **COMPLETA** ([informe](task-7-report.md)). Cuarta vía: `meeting_votes` vacía, el motor evalúa umbral y alcanzabilidad. **P0 destapado: el motor nunca supo evaluar una SLP** | control discriminante ARGA antes/después + positivo SLP | 62 pass / 0 fail · lint 0 · tsc 0 |
+| 8 | Acta y certificación | **COMPLETA POR LA CUARTA VÍA** ([diseño](../../../docs/superpowers/specs/2026-08-30-c1-task8-acta-certificacion-diseno.md)). La plataforma **no puede** emitir el acta de una Junta y esto no lo cambia: se acredita por su huella registral (asiento I/A 960) y se dice que no se ha generado | diseño llevado a orquestación antes de escribir; 3 opciones rechazadas por escrito, incluida la de saltarse el guard | 3732 pass / 0 fail · lint 0 · tsc 0 · build OK · verificación viva con control de tenant |
+| 9 | Ciclo registral | **COMPLETA** ([informe](task-9-report.md)). 3 acuerdos INSCRITA en 2 anuncios reales, 4 en PREPARADA sin fecha ni anuncio ni protocolo. Cero invención | controles de no-invención medidos en Cloud | 74 pass / 0 fail · lint 0 · tsc 0 |
 | 10 | Verificación viva, control ARGA y cierre | pendiente | — | — |
+
+## Ronda de fixes tras las tres lentes adversariales de rama (2026-08-30)
+
+Tres lentes en paralelo sobre `2bbdbb6`. **Ninguna volvió limpia.**
+
+| Lente | Qué atacaba | Resultado |
+|---|---|---|
+| A | El motor y el par ARGA/SLP | 2 P0 + 3 P1. Las 12 fórmulas previas byte-idénticas (1.012.320 comparaciones **con canario**) |
+| B | El seed, los gates y las aserciones | 3 P1 + 7 P2. No pudo medir la suite: otro agente escribía en el worktree durante su ejecución |
+| C | Qué **afirma** el expediente en pantalla | 1 P0 + 5 P1 + 4 P2, medidos en vivo con servidor propio de esta rama |
+
+### Cerrados en esta ronda
+
+| # | Hallazgo | Commit |
+|---|---|---|
+| A-P0-1 | Abrir la rama SL para las SLP convertía un fallo cerrado en **adopción** cuando el pack era el fallback de prototipo, que no trae la mayoría de nadie: la inventa (`favor > contra`) | `6727a13` |
+| A-P1 | La rama nueva de 4/5 daba por alcanzado el 80 % con `capital_total = 0` | `6727a13` |
+| B-P1 | `censoPrecondicion` **muestreaba** un socio por clase: con 344 de 345 mal sembrados devolvía `ok:true`, en el gate que existe para no congelar un peso contrario al art. 7 en un registro **inmutable** | `6727a13` |
+| B-P1 | El rótulo del gate preceptivo decía menos de lo que se leía (ver abajo) | `2077524` |
+| B-P1 | Tres aserciones pasaban en vacío (probado por mutación) | `2077524` |
+
+**Sobre el discriminador del A-P0-1.** La orquestación refutó mi primera propuesta —bloquear si `fuente === 'SISTEMA'`— midiendo 6 packs reales del tenant con esa etiqueta. Al desglosar, `fuente` **no vive en `votacion.mayoria.fuente` sino por rama de tipo social**: las seis ramas `SL` son `LEY` (arts. 30.2/30.3 de los Estatutos) y las `SISTEMA` son ramas SA/CONSEJO rotuladas *«rama no aplicable»*, que la SLP nunca lee. La refutación medía la cadena en el payload, no el spec seleccionado. **Pero su razón de fondo es la correcta y se siguió**: `fuente` es una etiqueta que correlaciona; el hecho es «este pack es el fallback», y el hecho ya viaja en el propio pack (`reglaEspecifica.prototype_fallback`). Ponerlo ahí —y no en el call site del stepper, que era la alternativa propuesta— hace que la guarda valga para **todo llamante del motor**.
+
+Medición con canario (el caso E prueba que el probe corrió en ambas versiones):
+
+```
+                                       origin/main                 HEAD
+A prototipo + SLP ......... BLOCKING majority_spec_missing   BLOCKING (igual)
+B pack REAL 30.3.b + SLP .. BLOCKING majority_spec_missing   OK ADOPTADO   ← ganancia
+C 4/5 con base 0 .......... BLOCKING                          BLOCKING     ← guarda nueva
+D control SL .............. OK                                OK
+E canario SA .............. BLOCKING                          OK           ← prueba de ejecución
+```
+
+**El gate preceptivo era MAYOR de lo que reportó la lente B.** Medido en Cloud: `INFORME_PRECEPTIVO_ORGANO` en **4** acuerdos (BLOCKING · PRE_CONVOCATORIA) y `INFORME_PRECEPTIVO_MATERIA` en **6** (OVERRIDE_REQUIRED · CONVOCATORIA), con **3 acuerdos llevando los dos**. La lente reportó «el décimo acuerdo sí adquirió uno»: cierto, pero eran seis. Ninguno de los dos gates se medía solo.
+
+### Escalados, NO cerrados
+
+| # | Hallazgo | Por qué no lo cierro |
+|---|---|---|
+| C-P0 | `useAgreementCompliance.ts:580-605` compara `"convocatoria"` en minúscula contra `'CONVOCATORIA'` del motor: los tres `find` fallan siempre y caen al `?? true`. La ficha corona con **✓ verde en Convocatoria, Quórum y Mayoría** sobre una Junta con 0 votos, constitución BLOCKING y convocatoria en BORRADOR | `git diff origin/main..HEAD` de ese fichero está **vacío**: es de ARGA y anterior a mí. **Aviso de secuencia: arreglarlo solo empeora la pantalla** — hoy el `?? true` tapa que la rama de 2/3 da «alcanzada» con `0 >= 0`, y esa la usa ARGA en 7 packs |
+| A-P0-2 | El stepper calcula la base de la mayoría desde los asistentes, no desde el censo | Medido por la orquestación: afecta a ARGA hoy. Escalado al usuario |
+| C-P1 ×4 | «Estado instrumento: Inscrita» sin escritura · la hora fabricada 2:00 en cuatro sitios · «la lectura alternativa consta en el expediente» que ninguna pantalla lee · `base_votos 16900` y `concurrencia 16908` juntos sin decir que son bases distintas | Superficie pre-existente, pero es mi expediente el que los hace visibles. Pendiente de decisión |
+| A-P1 / C-P2 | `favor > 1/3_capital` y `decision_unica` el motor no las evalúa. **No es latente**: `GARR_CONSEJO_EAD` v1.1.0 —el pack que versionó mi Task 1— lleva la primera, así que un acuerdo del CdA de EAD adoptado 6 de 7 se presenta como mayoría no alcanzada | ARGA la tiene en 4 packs. Anotado por instrucción expresa |
+| — | Seis packs con las mayorías estatutarias literales del art. 30 llevan `fuente: 'SISTEMA'` en sus ramas de relleno, y el explain imprime la fuente | Procedencia mal etiquetada en el registro jurídico. Anotado, no tocado |
+
+**Gates tras la ronda:** 76 pass / 0 fail en la sonda de la Junta · 819 pass / 144 skip / 0 fail en `src/test/schema/` · 729 pass / 0 fail en motor + sonda · lint 0 · typecheck 0. Medidos en worktree propio. `origin/main` ha avanzado con trabajo de C3: **hay que rebasar antes de la medición final de cierre**.
+
+
+## Task 8 — el límite, con las palabras exactas
+
+**Esto NO es la Task 8 «hecha» en el sentido de capacidad. La cadena del GOAL
+queda completa como EXPEDIENTE, no como CAPACIDAD.** El sistema sigue sin poder
+emitir el acta de una Junta de Socios, ni su certificación.
+
+`fn_secretaria_build_minute_legal_manifest` lo cierra **a propósito**, con su
+comentario delante, para **toda Junta de cualquier tenant**: su modelo exige
+censo `POLITICO` y que la asistencia cubra **cada asiento**, que es el modelo de
+un órgano colegiado de asiento único. Una Junta de Socios vota por
+participaciones, no por asientos. Y sin acta no hay certificación:
+`fn_generar_certificacion` exige un acta y la variante sin sesión es un rechazo
+puro —su cuerpo entero es un `RAISE EXCEPTION`—.
+
+Corrección de partida que hubo que hacer: **no son «los tres muros de
+`fn_generar_acta`»** que este carril citó dos días. `fn_generar_acta` no tiene
+ninguno; son **33 `RAISE EXCEPTION`** y viven en el manifiesto. Segunda vez que
+este carril inventa un hecho técnico por acumulación (la primera fue
+`fn_secretaria_evaluate_meeting_vote`, que no existe). Norma: **al citar una
+función, un muro o un contrato, abrirlo.**
+
+### La brecha de capacidad, nombrada y no enterrada
+
+Abrirla de verdad exige escribir *the dedicated capital evaluator* que el propio
+mensaje de error nombra: quórum y mayoría **sobre censo** para una Junta. Eso
+**subsume el P0-2 que el usuario acotó hoy a SLP dejando ARGA intacta**, y lo
+reabre en lo ancho. No es tarea de un carril. Escalada al usuario como brecha de
+capacidad, no como pregunta bloqueante.
+
+### Lo que se rechazó, escrito para que nadie lo reproponga
+
+| Rechazada | Por qué |
+|---|---|
+| Censo `POLITICO` y pasar la Junta por colegiada | Afirmaría un voto por cabeza, 346 asientos de peso 1, en un órgano que vota por capital. **Falso en Derecho** |
+| Declararla universal | Cerrada además, y **falsa**: hubo convocatoria con 15 días (arts. 27.3/27.4) |
+| `set_config('app.secretaria_authoritative_rpc','1')` y luego INSERT | Es la única puerta que queda abierta técnicamente para un `service_role`, y es **fabricar evidencia jurídica autoritativa saltándose su guardia** |
+
+### Estado que sostiene la cuarta vía
+
+`minutes` = **0** y `certifications` = **0** en Garrigues (ARGA: 12 actas por el
+camino que sí le corresponde). Hay un test que **cae si aparece una fila**, con
+control discriminante para que los dos ceros no sean indistinguibles de una
+consulta ciega. Hoy el 0 es imposibilidad técnica; mañana será una decisión.

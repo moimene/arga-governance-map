@@ -23,6 +23,7 @@ import {
   Lock,
 } from "lucide-react";
 import { useAgreement, useAgreementCompliance, type ComplianceResult } from "@/hooks/useAgreementCompliance";
+import { ActaAcreditadaNotice } from "@/components/secretaria/ActaAcreditadaNotice";
 import { useAgreementSignedDocumentUrl } from "@/hooks/useEvidenceBundleSignedUrl";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { useQTSPVerification } from "@/hooks/useQTSPVerification";
@@ -226,6 +227,75 @@ function AgreementArchivedDocLink({ agreementId }: { agreementId: string }) {
       <span className="text-xs text-[var(--g-text-secondary)]">
         Promocion a expediente pendiente de {REVIEW_STATE_VIEW}.
       </span>
+    </div>
+  );
+}
+
+type NotaBase = { declarada?: number; ambas_clases?: number; nota?: string; registro?: string };
+type NotaSubsuncion = { procedencia?: string; lecturaAplicada?: string; lecturaAlternativa?: string };
+
+/**
+ * Pinta la base de cómputo y la subsunción cuando el expediente las declara.
+ *
+ * Existe porque el `decision_text` de un acuerdo prometía que «la lectura
+ * alternativa consta en el expediente» y ninguna superficie leía esa clave: la
+ * promesa se veía, lo prometido no. Y porque la fila de evaluación enseñaba dos
+ * bases de cómputo distintas —los votos de una clase y los de ambas— juntas y
+ * sin decir que lo eran, con un porcentaje al lado que no salía de dividir
+ * ninguna de las dos.
+ *
+ * Gateado por la presencia del dato: un acuerdo sin estas claves no cambia.
+ */
+function NotaDeExpediente({ explain }: { explain: unknown }) {
+  const raiz = (explain as Record<string, unknown> | null)?.["c1_junta_socios_2026"] as
+    | Record<string, unknown>
+    | undefined;
+  const base = raiz?.base_computo as NotaBase | undefined;
+  const sub = raiz?.subsuncion as NotaSubsuncion | undefined;
+  if (!base?.nota && !sub?.lecturaAlternativa) return null;
+
+  return (
+    <div
+      className="mt-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3 text-xs text-[var(--g-text-secondary)]"
+      style={{ borderRadius: "var(--g-radius-sm)" }}
+    >
+      {base?.nota ? (
+        <div className={sub?.lecturaAlternativa ? "mb-3" : undefined}>
+          <p className="mb-1 font-medium text-[var(--g-text-primary)]">
+            Base de cómputo de la mayoría
+          </p>
+          <p>{base.nota}</p>
+          {base.registro ? (
+            <p className="mt-1 text-[var(--g-text-secondary)]">Criterio registrado en {base.registro}</p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {sub?.lecturaAlternativa ? (
+        <div>
+          <p className="mb-1 font-medium text-[var(--g-text-primary)]">
+            Mayoría aplicada por subsunción
+            {sub.procedencia ? (
+              <span
+                className="ml-2 inline-flex items-center bg-[var(--status-warning)] px-2 py-0.5 text-[10px] font-semibold text-[var(--g-text-inverse)]"
+                style={{ borderRadius: "var(--g-radius-full)" }}
+              >
+                {sub.procedencia}
+              </span>
+            ) : null}
+          </p>
+          {sub.lecturaAplicada ? (
+            <p className="mb-1">
+              <span className="font-medium text-[var(--g-text-primary)]">Lectura aplicada:</span>{" "}
+              {sub.lecturaAplicada}
+            </p>
+          ) : null}
+          <p>
+            <span className="font-medium text-[var(--g-text-primary)]">Lectura alternativa:</span>{" "}
+            {sub.lecturaAlternativa}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -623,6 +693,7 @@ export default function ExpedienteAcuerdo() {
 
           {ruleEvaluations.length > 0 && (
             <Card icon={<Scale className="h-4 w-4" />} title="Validación normativa">
+              <EvaluacionNoSelladaAviso results={ruleEvaluations} />
               <div className="space-y-2">
                 {(() => {
                   const grouped = ruleEvaluations.reduce(
@@ -788,6 +859,16 @@ export default function ExpedienteAcuerdo() {
                   <CheckRow ok={compliance.quorum_compliant} label="Quórum" />
                   <CheckRow ok={compliance.majority_compliant} label="Mayoría" />
                   <CheckRow ok={compliance.conflict_handled} label="Conflictos de interés" />
+                  <NotaDeExpediente explain={agreement.compliance_explain} />
+                  <ActaAcreditadaNotice
+                    contexto="ficha"
+                    acreditacion={
+                      (
+                        (agreement.compliance_explain as Record<string, Record<string, unknown>> | null)
+                          ?.c1_junta_socios_2026 as Record<string, unknown> | undefined
+                      )?.acta_certificacion
+                    }
+                  />
                   {compliance.blocking_issues.length > 0 ? (
                     <div
                       className="mt-3 bg-[var(--g-sec-100)]/60 p-3 text-xs text-[var(--g-text-primary)]"
@@ -1308,6 +1389,51 @@ function FactRow({ label, present }: { label: string; present: boolean }) {
       <span className="ml-auto text-[10px] text-[var(--g-text-secondary)]">
         {present ? "presente" : "no"}
       </span>
+    </div>
+  );
+}
+
+/**
+ * C1 — la evaluación que se está enseñando puede NO estar sellada en servidor.
+ *
+ * La vía sellada (`fn_secretaria_server_resolution_evaluation`) solo cubre
+ * órganos de administración con un asiento por miembro. Una Junta de socios
+ * ponderada por participaciones no pasa por ella, así que su mayoría la calcula
+ * el motor de reglas en el cliente. Eso hay que decirlo **donde se ve el
+ * resultado**, no en un tooltip ni en un comentario del seed.
+ *
+ * El aviso lo dispara el DATO —cada evaluación declara su sello en `explain`—,
+ * no la ruta ni el tenant: una fila sellada en servidor no lo pinta, y la que
+ * no lo está lo pinta aunque nadie se acuerde de configurarlo.
+ */
+function EvaluacionNoSelladaAviso({ results }: { results: RuleEvaluationResult[] }) {
+  const noSelladas = results.filter(
+    (r) => (r.explain as { sello?: unknown } | null)?.sello === "NO_SELLADO_EN_SERVIDOR",
+  );
+  if (noSelladas.length === 0) return null;
+  const motivo = String(
+    (noSelladas[0].explain as { sello_motivo?: unknown }).sello_motivo ?? "",
+  );
+
+  return (
+    <div
+      className="mb-4 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-3"
+      style={{ borderRadius: "var(--g-radius-md)" }}
+    >
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--g-text-primary)]">
+        <AlertTriangle className="h-3.5 w-3.5 text-[var(--status-warning)]" aria-hidden="true" />
+        Evaluación no sellada en servidor
+      </div>
+      <p className="mt-1 text-[11px] leading-relaxed text-[var(--g-text-secondary)]">
+        {noSelladas.length === results.length
+          ? "Esta evaluación la calculó el motor de reglas en el cliente."
+          : `${noSelladas.length} de ${results.length} evaluaciones las calculó el motor de reglas en el cliente.`}{" "}
+        Es un cálculo de apoyo a la revisión, no un resultado autoritativo: no está
+        sellado ni es oponible.
+      </p>
+      {motivo ? (
+        <p className="mt-1 text-[11px] leading-relaxed text-[var(--g-text-secondary)]">{motivo}</p>
+      ) : null}
     </div>
   );
 }

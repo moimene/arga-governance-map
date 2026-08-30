@@ -4,7 +4,7 @@
 // con clientes independientes por tenant (garrigues-rule-packs-seed.test.ts).
 import { beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { GARRIGUES_DEMO_EMAIL } from "../helpers/supabase-test-client";
+import { GARRIGUES_DEMO_EMAIL, sesionDe } from "../helpers/supabase-test-client";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
 // Fallback con la clave publicable (mismo patrón que
@@ -30,17 +30,12 @@ describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta"
   let seeded = false;
 
   beforeAll(async () => {
-    if (!SUPABASE_ANON_KEY) return;
-    const g = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
-    if (!(await g.auth.signInWithPassword({ email: GARRIGUES_DEMO_EMAIL, password: DEMO_PASSWORD })).error) {
-      garr = g; authed = true;
-      const { count } = await g.from("policies").select("id", { count: "exact", head: true });
-      seeded = (count ?? 0) >= 39;
-    }
-    const a = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
-    if (!(await a.auth.signInWithPassword({ email: ARGA_EMAIL, password: DEMO_PASSWORD })).error) {
-      arga = a; argaAuthed = true;
-    }
+    // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
+    [garr, arga] = await Promise.all([sesionDe("GARRIGUES"), sesionDe("ARGA")]);
+    authed = true;
+    argaAuthed = true;
+    const { count } = await garr.from("policies").select("id", { count: "exact", head: true });
+    seeded = (count ?? 0) >= 39;
   });
 
   it("Garrigues ve exactamente 39 documentos normativos", async () => {

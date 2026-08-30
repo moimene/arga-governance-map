@@ -359,8 +359,28 @@ export interface ExplainNode {
   hijos?: ExplainNode[];
 }
 
+/**
+ * Las etapas que los motores emiten de verdad. Era `string` pelado, y por eso
+ * `useAgreementCompliance` pudo buscar `"convocatoria"` en minuscula durante
+ * meses contra motores que emiten `'CONVOCATORIA'`: los tres `find` no encajaban
+ * nunca, caian a un `?? true` y la ficha coronaba con un ✓ verde en Convocatoria,
+ * Quorum y Mayoria sin que ninguna se hubiera comprobado. Ningun compilador
+ * podia verlo. Con la union, una cadena que no exista no compila.
+ *
+ * Las `*_skip` las emite el orquestador con `ok:true` cuando el tramite no se
+ * requiere (unipersonal, junta universal): son «no aplicable», no «ausente».
+ */
+export type EtapaEvaluacion =
+  | 'CONVOCATORIA'
+  | 'CONSTITUCION'
+  | 'VOTACION'
+  | 'agenda_item'
+  | 'convocatoria_skip'
+  | 'constitucion_skip'
+  | 'documentacion';
+
 export interface EvaluacionResult {
-  etapa: string;
+  etapa: EtapaEvaluacion;
   ok: boolean;
   severity: EvalSeverity;
   explain: ExplainNode[];

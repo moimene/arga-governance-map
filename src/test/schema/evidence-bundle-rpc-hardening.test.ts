@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { sesionDe } from "../helpers/supabase-test-client";
 
 // Hardening de seguridad (revisión adversarial Codex, [critical] + follow-ups 2026-06-06).
 // La RPC SECURITY DEFINER `fn_create_governance_evidence_bundle` (000045) confiaba en
@@ -61,17 +62,19 @@ describe("Evidence bundle RPC hardening — prueba conductual cross-tenant", () 
 
   beforeAll(async () => {
     try {
-      client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-      const { error } = await client.auth.signInWithPassword({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
-      authed = !error;
+      // Sesión COMPARTIDA: la suite entera hace 2 logins en vez de ~40, y cada
+      // cuenta lleva storageKey propio. `sesionDe` lanza si no autentica.
+      client = await sesionDe("ARGA");
+      authed = true;
     } catch {
       authed = false;
     }
   }, 30_000);
 
-  afterAll(async () => {
-    try { await client?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
-  });
+  // SIN afterAll con signOut: la sesión es COMPARTIDA. Cerrarla aquí dejaría sin
+  // autenticar a todas las sondas que corran después — y el síntoma no es un
+  // error de login, son consultas que devuelven vacío y aserciones que fallan
+  // en un fichero que no ha hecho nada mal.
 
   it("un usuario autenticado NO puede crear evidencia para otro tenant (42501)", async () => {
     if (!authed || !client) {
