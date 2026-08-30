@@ -409,7 +409,21 @@ describe("La puerta de entrada no promete lo que el producto oculta", () => {
 });
 
 describe("FRIA — ausencia acreditada, no ausencia a secas", () => {
-  const src = () => read(DETALLE);
+  /**
+   * Recorta el PANEL de ausencia, no el fichero entero. Asertar sobre las 1200
+   * líneas es la misma trampa que tumbó el test del login: una cadena que
+   * coincide en cualquier otro punto del fichero lo satisface, y el panel
+   * podría haber desaparecido.
+   */
+  function panelAusencia(): string {
+    const s = read(DETALLE);
+    const ini = s.indexOf("No consta acreditado que el artículo 27");
+    expect(ini, "el panel de ausencia acreditada no está en el fichero").toBeGreaterThan(0);
+    const fin = s.indexOf("</div>\n          ) : (", ini);
+    expect(fin, "no se encuentra el final del panel").toBeGreaterThan(ini);
+    return s.slice(ini, fin);
+  }
+  const src = () => panelAusencia();
 
   it("no dictamina: dice que NO CONSTA, no que no aplique", () => {
     // La diferencia entre «no aplica» y «no consta» es la diferencia entre un
@@ -421,12 +435,44 @@ describe("FRIA — ausencia acreditada, no ausencia a secas", () => {
     }
   });
 
-  it("enuncia las DOS condiciones del art. 27, cada una con su fuente", () => {
+  it("enuncia las DOS condiciones del art. 27, numeradas y cada una con su asunto", () => {
+    // Buscar «anexo III» suelto NO vale: aparece también dentro de la segunda
+    // condición, así que borrar el encabezado de la primera dejaba el test
+    // verde. Se exige la estructura: dos encabezados numerados, y cada uno
+    // nombrando su propio asunto.
     const s = src();
-    // Condición del sistema y condición del sujeto, y de dónde sale cada cosa.
-    expect(/anexo III/i.test(s), "no enuncia la condición del sistema").toBe(true);
-    expect(/servicios p[úu]blicos/i.test(s), "no enuncia la condición del desplegador").toBe(true);
+    const c1 = s.match(/1 · ([^<]{10,120})/);
+    const c2 = s.match(/2 · ([^<]{10,120})/);
+    expect(c1, "falta el encabezado de la condición 1").not.toBeNull();
+    expect(c2, "falta el encabezado de la condición 2").not.toBeNull();
+    expect(c1![1], `la condición 1 no nombra el alto riesgo del anexo III: ${c1![1]}`)
+      .toMatch(/alto riesgo.*anexo III/i);
+    expect(c2![1], `la condición 2 no nombra al desplegador: ${c2![1]}`)
+      .toMatch(/desplegador|categor[íi]as/i);
+    // Y las tres alternativas del sujeto, que son las que el artículo enumera.
+    expect(/organismo de Derecho p[úu]blico/i.test(s), "falta la categoría de organismo público").toBe(true);
+    expect(/servicios p[úu]blicos/i.test(s), "falta la categoría de servicios públicos").toBe(true);
+    expect(/punto 5[^<]{0,40}letras b\) y c\)/i.test(s), "falta la remisión al anexo III.5.b-c").toBe(true);
     expect(/PI-30/.test(s), "no cita la fuente interna que sostiene lo que sí consta").toBe(true);
+  });
+
+  it("CADA condición, una por una, consta como NO acreditada", () => {
+    // La invariante que importa no es que el texto esté: es que ninguna de las
+    // dos condiciones aparezca alguna vez como acreditada mientras la cabecera
+    // sigue diciendo que no consta. Se comprueba condición por condición, no
+    // sobre el panel entero.
+    // El fuente JSX parte las frases en varias líneas con sangría, así que se
+    // normaliza el espacio antes de buscar: si no, un salto de línea en mitad
+    // de la frase basta para que la invariante no se vea.
+    const s = src().replace(/\s+/g, " ");
+    const bloques = s.split(/\d · /).slice(1);
+    expect(bloques.length, "no hay dos bloques de condición").toBe(2);
+    const NO_CONSTA = /no consta|no hay[^.]{0,140}acredite|sin acreditar/i;
+    const ACREDITADA = /\bconsta acreditad|\bse acredita\b|\bqueda acreditad|\bs[íi] concurre/i;
+    for (const [i, b] of bloques.entries()) {
+      expect(NO_CONSTA.test(b), `la condición ${i + 1} no declara que NO consta`).toBe(true);
+      expect(ACREDITADA.test(b), `la condición ${i + 1} aparece como ACREDITADA`).toBe(false);
+    }
   });
 
   it("no afirma haber descartado lo que sólo no consta", () => {
