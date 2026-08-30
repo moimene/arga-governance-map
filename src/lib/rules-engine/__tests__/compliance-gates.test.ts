@@ -4,6 +4,7 @@ import {
   evaluateAgendaItemComplianceGate,
   gateFromEvaluation,
 } from '../compliance-gates';
+import type { EtapaEvaluacion } from '../types';
 
 describe('compliance-gates', () => {
   it('permite ejecutar gates completos solo en puntos decisorios', () => {
@@ -44,8 +45,13 @@ describe('compliance-gates', () => {
   });
 
   it('consolida bloqueos y próximos pasos para el panel de cumplimiento', () => {
+    // `VOTACION` en MAYUSCULA, que es lo que emite `votacion-engine.ts:118`.
+    // Este fixture decia `'votacion'`, y con el mapa de etapas en minuscula el
+    // test pasaba con el unico valor que produccion NUNCA emite: no era un
+    // typo de fixture, era un test documentando el defecto como si fuera el
+    // contrato. Con la etapa tipada, la minuscula ya ni compila.
     const votingGate = gateFromEvaluation({
-      etapa: 'votacion',
+      etapa: 'VOTACION',
       ok: false,
       severity: 'BLOCKING',
       explain: [],
@@ -57,5 +63,32 @@ describe('compliance-gates', () => {
     expect(panel.can_advance).toBe(false);
     expect(panel.blocking_issues).toEqual(['majority_not_achieved']);
     expect(panel.next_actions[0]).toMatch(/votación/i);
+    // Y en sentido contrario: el sintoma del defecto era que una votacion
+    // bloqueada proponia el paso siguiente de la FORMALIZACION, por el
+    // `?? 'formalization'` que tapaba la clave no encontrada.
+    expect(panel.next_actions[0]).not.toMatch(/formalizaci|instrumento|registral/i);
+  });
+
+  it('cada etapa que emiten los motores cae en su gate, y ninguna en el fallback', () => {
+    // El `?? 'formalization'` de `gateFromEvaluation` convierte una clave que
+    // falta en un gate PLAUSIBLE, no en un error: por eso el defecto de las
+    // tres mayusculas sobrevivio. Este test recorre las 7 etapas reales.
+    const esperado: Array<[EtapaEvaluacion, string]> = [
+      ['CONVOCATORIA', 'Convocatoria'],
+      ['convocatoria_skip', 'Convocatoria'],
+      ['CONSTITUCION', 'Constitución de la sesión'],
+      ['constitucion_skip', 'Constitución de la sesión'],
+      ['VOTACION', 'Mayoría y votación'],
+      ['documentacion', 'Documentación'],
+      ['agenda_item', 'Tipo de punto'],
+    ];
+    for (const [etapa, label] of esperado) {
+      const gate = gateFromEvaluation({
+        etapa, ok: true, severity: 'OK', explain: [], blocking_issues: [], warnings: [],
+      });
+      expect(gate.label).toBe(label);
+      // Ninguna de las siete debe caer en el fallback.
+      if (etapa !== 'documentacion') expect(gate.kind).not.toBe('formalization');
+    }
   });
 });
