@@ -381,8 +381,12 @@ export function evaluateSubcasePerimeter(params: {
   // 3. Subexpediente DORA / TIC
   const isDora = 
     params.affectsICT ||
-    text.includes("dora") || 
-    text.includes("tic") || 
+    // Mismo defecto que la sigla «ia», medido: `includes("dora")` marcaba
+    // «trabaja-dora», «administra-dora» y «provee-dora»; `includes("tic")`
+    // marcaba «prac-tic-a» y «estadis-tic-a». Cuatro de cada cinco denuncias
+    // corrientes abrian un subexpediente DORA dirigido a DGSFP/CNMV/EBA.
+    /\bdora\b/.test(text) || 
+    /\btic\b/.test(text) || 
     text.includes("ciberataque") || 
     text.includes("sistema core") || 
     text.includes("tercero tecnológico") || 
@@ -403,7 +407,11 @@ export function evaluateSubcasePerimeter(params: {
   const isAI = 
     params.affectsAI ||
     text.includes("inteligencia artificial") || 
-    text.includes("ia") || 
+    // `\bia\b` y no `includes("ia")`: la sigla es una palabra, y «ia» es una
+    // terminacion corrientisima en castellano —denunc-ia, famil-ia, mater-ia,
+    // gerenc-ia, advertenc-ia, vigilanc-ia—. Con `includes`, casi cualquier
+    // denuncia abria un subexpediente de EU AI Act dirigido a la AESIA.
+    /\bia\b/.test(text) || 
     text.includes("algoritmo") || 
     text.includes("modelo llm") || 
     text.includes("sesgo discriminatorio") || 
@@ -450,7 +458,11 @@ export function evaluateSubcasePerimeter(params: {
   }
 
   // Escalado al Consejo si involucra Alta Dirección
-  const escalationRequired = !!params.isBoardOrExecutiveTarget || text.includes("consejero") || text.includes("director general") || text.includes("ceo");
+  // «ceo» como palabra: `includes` lo encontraba dentro de «bu-ceo» y escalaba
+  // la denuncia al Consejo de Administracion por una palabra que no nombra a
+  // nadie. Escalar de mas no es conservador aqui: mete al organo de gobierno en
+  // un expediente que no le corresponde.
+  const escalationRequired = !!params.isBoardOrExecutiveTarget || text.includes("consejero") || text.includes("director general") || /\bceo\b/.test(text);
 
   return {
     subcasesToCreate: subcases,
