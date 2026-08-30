@@ -23,6 +23,24 @@ const baseInput = {
   normativeSnapshot: { snapshot_id: "snap-arga-2026" },
 };
 
+
+// `quorum_data` es un jsonb y produccion lo trata como tal a proposito: estas
+// funciones reciben y devuelven `Record<string, unknown>`, y el namespace de la
+// sala es dinamico (junta / consejo). Quien conoce la forma es el test, asi que
+// la declara UNA vez y las aserciones se comprueban contra ella, en vez de
+// silenciarlas de una en una.
+type SalaUniversal = {
+  es_universal?: string;
+  orden_del_dia_resumen?: string;
+  puntos?: Array<{ numero?: number; titulo?: string; materia?: string }>;
+};
+type RulePackJunta = { capital_concurrente_porcentaje?: number; calculo_capital_ref?: string };
+
+const sala = (d: { meetings: Record<string, unknown> }, ns: string) =>
+  d.meetings[ns] as SalaUniversal | undefined;
+const rulePackJunta = (d: Record<string, unknown>) =>
+  (d.rule_pack as { junta?: RulePackJunta } | undefined)?.junta;
+
 describe("junta-universal helpers", () => {
   it("uses the canonical meetings.status value accepted by the database", () => {
     expect(UNIVERSAL_MEETING_INITIAL_STATUS).toBe("DRAFT");
@@ -62,9 +80,9 @@ describe("junta-universal helpers", () => {
     expect(isUniversalMeetingQuorumData(quorumData)).toBe(true);
     expect(quorumData.junta_universal).toBe(false);
     expect(quorumData.organo_universal).toBe(true);
-    expect(quorumData.meetings.consejo.es_universal).toBe("SÍ");
+    expect(sala(quorumData, "consejo")?.es_universal).toBe("SÍ");
     expect(quorumData.meetings.junta).toBeUndefined();
-    expect(withAgenda.meetings.consejo.orden_del_dia_resumen).toBe("1. Formulación de cuentas");
+    expect(sala(withAgenda, "consejo")?.orden_del_dia_resumen).toBe("1. Formulación de cuentas");
     expect(withAgenda.aceptacion_unanime_orden_dia.texto_legal).toContain("órgano social");
   });
 
@@ -82,10 +100,10 @@ describe("junta-universal helpers", () => {
       "2026-06-15T10:05:00.000Z",
     );
 
-    expect(withAgenda.rule_pack.junta.capital_concurrente_porcentaje).toBe(100);
-    expect(withAgenda.rule_pack.junta.calculo_capital_ref).toBe("calc-2026-06-15");
-    expect(withAgenda.meetings.junta.orden_del_dia_resumen).toBe("1. Aprobación de cuentas");
-    expect(withAgenda.meetings.junta.puntos[0].titulo).toBe("Aprobación de cuentas");
+    expect(rulePackJunta(withAgenda)?.capital_concurrente_porcentaje).toBe(100);
+    expect(rulePackJunta(withAgenda)?.calculo_capital_ref).toBe("calc-2026-06-15");
+    expect(sala(withAgenda, "junta")?.orden_del_dia_resumen).toBe("1. Aprobación de cuentas");
+    expect(sala(withAgenda, "junta")?.puntos?.[0].titulo).toBe("Aprobación de cuentas");
     expect(withAgenda.aceptacion_unanime_orden_dia.confirmada).toBe(true);
   });
 });

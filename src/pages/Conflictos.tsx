@@ -12,6 +12,24 @@ import { KpiCard } from "@/components/KpiCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useConflictsList, useAttestationsList } from "@/hooks/useConflicts";
 import { relatedPartyTransactions, type RelatedPartyTransaction } from "@/data/conflicts";
+import { useTenantContext } from "@/context/TenantContext";
+import {
+  CATEGORIAS_PI02,
+  CONFLICTOS_AVISO,
+  CONFLICTOS_DEMO,
+  CONFLICTOS_TENANT,
+} from "../../scripts/garrigues/conflictos/catalogo-conflictos";
+
+// La categoría de PI-02 no cabe en `conflicts_of_interest.conflict_type`: su
+// CHECK admite 'Permanente' | 'Situacional', que clasifica por DURACIÓN, y
+// PI-02 clasifica por naturaleza. La columna queda NULL y la categoría se
+// resuelve aquí por código, desde el catálogo.
+const CATEGORIA_POR_CODIGO = new Map(
+  CONFLICTOS_DEMO.map((c) => [
+    c.code,
+    CATEGORIAS_PI02.find((k) => k.conflict_type === c.conflict_type)!,
+  ]),
+);
 import { Scale, ShieldAlert, CheckCircle, AlertTriangle, Bell, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTenantBranding } from "@/context/TenantBrandContext";
@@ -22,6 +40,8 @@ export default function ConflictosList() {
   const branding = useTenantBranding();
   const { data: conflicts = [], isLoading: loadingConflicts } = useConflictsList();
   const { data: attestations = [], isLoading: loadingAtts } = useAttestationsList();
+  const { tenantId } = useTenantContext();
+  const hayProcedenciaDeclarada = tenantId === CONFLICTOS_TENANT;
 
   const conflictKpis = useMemo(() => {
     const permanentes = conflicts.filter((c) => c.conflict_type === "Permanente").length;
@@ -53,6 +73,21 @@ export default function ConflictosList() {
 
         {/* === CONFLICTOS === */}
         <TabsContent value="conflictos" className="space-y-4">
+          {/* La procedencia va ARRIBA y no en un pie: es lo que define qué son
+              estas filas. Guard por DATO —el catálogo declara su tenant—, así
+              que ARGA no ve un texto que habla de una fuente que no es suya. */}
+          {hayProcedenciaDeclarada && (
+            <div className="rounded-lg border bg-muted/40 p-4">
+              <div className="text-sm font-semibold">{CONFLICTOS_AVISO.titulo}</div>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                {CONFLICTOS_AVISO.texto}
+              </p>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Fuente: {CONFLICTOS_AVISO.fuente}
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-3 gap-4">
             <KpiCard label="Conflictos permanentes declarados" value={conflictKpis.permanentes} icon={CheckCircle} tone="success" />
             <KpiCard label="Conflictos situacionales" value={conflictKpis.situacionales} icon={CheckCircle} tone="success" />
@@ -87,7 +122,22 @@ export default function ConflictosList() {
                         <div className="text-xs text-muted-foreground">{c.person_role ?? "—"}</div>
                       </TableCell>
                       <TableCell>
-                        <StatusBadge label={c.conflict_type.toUpperCase()} tone={c.conflict_type === "Permanente" ? "info" : "warning"} />
+                        {/* `conflict_type` puede ser NULL —y lo es en todas las
+                            filas cuya taxonomía de origen no es la de esta
+                            columna—. El `.toUpperCase()` de antes reventaba la
+                            pantalla entera con la primera de ellas. */}
+                        {c.conflict_type ? (
+                          <StatusBadge label={c.conflict_type.toUpperCase()} tone={c.conflict_type === "Permanente" ? "info" : "warning"} />
+                        ) : hayProcedenciaDeclarada && CATEGORIA_POR_CODIGO.has(c.code) ? (
+                          <div>
+                            <div className="text-sm">{CATEGORIA_POR_CODIGO.get(c.code)!.etiqueta}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {CATEGORIA_POR_CODIGO.get(c.code)!.apartado}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="max-w-md text-sm">{c.description}</TableCell>
                       <TableCell>

@@ -24,8 +24,9 @@ function makePackOrdinario(materia: string, inscribible = false): RulePack {
         SL: { valor: 15, fuente: 'LEY' },
         SLU: { valor: 0, fuente: 'LEY' },
         SAU: { valor: 0, fuente: 'LEY' },
+        SLP: { valor: 15, fuente: 'LEY' },
       },
-      canales: { SA: ['BORME'], SL: ['NOTIFICACION'], SLU: [], SAU: [] },
+      canales: { SA: ['BORME'], SL: ['NOTIFICACION'], SLU: [], SAU: [], SLP: ['NOTIFICACION'] },
       contenidoMinimo: [],
     },
     constitucion: {

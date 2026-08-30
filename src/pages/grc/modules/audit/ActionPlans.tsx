@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { actionPlanStatusChip } from "@/lib/grc/status-labels";
+import { useTenantContext } from "@/context/TenantContext";
+import { PLAN_ACCION_AUSENCIA } from "../../../../../scripts/garrigues/hallazgos/hallazgos-penales";
 
 type AuditActionPlanRow = {
   id: string;
@@ -12,9 +14,16 @@ type AuditActionPlanRow = {
   findings?: { code?: string | null; title?: string | null; origin?: string | null } | null;
 };
 
-function useAuditActionPlans() {
+function useAuditActionPlans(tenantId: string | null) {
   return useQuery({
-    queryKey: ["audit", "action-plans"],
+    // El tenant va en la clave Y `enabled` espera a que resuelva. RLS filtra la
+    // consulta, pero la CACHE no: con la clave anterior —["audit",
+    // "action-plans"], sin tenant— los dos tenants compartian entrada y el
+    // segundo en entrar veia lo que trajo el primero. `TenantProvider` arranca
+    // en null y resuelve por red, asi que sin `enabled` el primer render de
+    // todos los tenants comparte tambien la clave [...,null].
+    queryKey: ["audit", "action-plans", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("action_plans")
@@ -29,7 +38,14 @@ function useAuditActionPlans() {
 }
 
 export default function ActionPlans() {
-  const { data: plans = [], isLoading } = useAuditActionPlans();
+  const { tenantId } = useTenantContext();
+  const { data: plans = [], isLoading } = useAuditActionPlans(tenantId);
+  // Un vacío con procedencia declarada NO es un vacío: es una decisión, y se
+  // explica. Los demás tenants conservan su texto genérico sin cambio alguno.
+  // (El comentario va aquí y no dentro del JSX: el escáner de literales de
+  // marca de los milestone-challenger no reconoce `{/* … */}` como comentario
+  // y lo contaba como texto visible.)
+  const hayProcedenciaDeclarada = tenantId === PLAN_ACCION_AUSENCIA.tenantId;
 
   return (
     <div className="p-6 space-y-5">
@@ -44,10 +60,40 @@ export default function ActionPlans() {
         <div className="text-sm text-[var(--g-text-secondary)] animate-pulse">Cargando…</div>
       )}
 
-      {!isLoading && plans.length === 0 && (
+      {!isLoading && plans.length === 0 && !hayProcedenciaDeclarada && (
         <div className="py-16 text-center text-sm text-[var(--g-text-secondary)]">
           No hay planes de acción disponibles.
         </div>
+      )}
+
+      {!isLoading && plans.length === 0 && hayProcedenciaDeclarada && (
+        <section
+          className="border border-[var(--g-border-default)] bg-[var(--g-surface-subtle)] p-5"
+          style={{ borderRadius: "var(--g-radius-lg)" }}
+        >
+          <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
+            {PLAN_ACCION_AUSENCIA.titulo}
+          </h2>
+          <p className="mt-2 text-xs leading-relaxed text-[var(--g-text-secondary)]">
+            {PLAN_ACCION_AUSENCIA.motivo}
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-[var(--g-text-secondary)]">
+            {PLAN_ACCION_AUSENCIA.consecuencia}
+          </p>
+          <p className="mt-3 text-[11px] text-[var(--g-text-secondary)]">
+            Fuente: {PLAN_ACCION_AUSENCIA.fuente}
+          </p>
+          <p className="mt-3 text-xs text-[var(--g-text-secondary)]">
+            Lo que sí consta del mecanismo está registrado como controles de supervisión, con órgano
+            responsable:{" "}
+            <Link
+              to="/controles"
+              className="text-[var(--g-link)] underline hover:text-[var(--g-link-hover)]"
+            >
+              {PLAN_ACCION_AUSENCIA.controlesRelacionados.join(", ")}
+            </Link>
+          </p>
+        </section>
       )}
 
       <div className="space-y-3">

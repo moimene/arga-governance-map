@@ -2,6 +2,15 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
+import { useTenantContext } from "@/context/TenantContext";
+import {
+  SII_ART_25,
+  SII_CANALES_EXTERNOS,
+  SII_CANAL_EXTERNO_AVISO,
+  SII_POLITICA,
+  SII_ROLES,
+  SII_TENANT,
+} from "../../../scripts/garrigues/sii/canal-interno";
 import { Button } from "@/components/ui/button";
 import { useEntitiesList } from "@/hooks/useEntities";
 import { useCreateWhistleblowingReport } from "@/hooks/useWhistleblowing";
@@ -27,6 +36,10 @@ import {
 
 export default function SiiPortalIntake() {
   const navigate = useNavigate();
+  const { tenantId } = useTenantContext();
+  // Guard por DATO: el catálogo declara a qué tenant pertenece. Los demás
+  // conservan la pantalla tal cual, sin una política que no es suya.
+  const hayCanalDeclarado = tenantId === SII_TENANT;
   const { data: entities = [] } = useEntitiesList();
   const createMutation = useCreateWhistleblowingReport();
 
@@ -114,6 +127,7 @@ export default function SiiPortalIntake() {
     toast.success("Credencial copiada al portapapeles.");
   };
 
+
   return (
     <div className="mx-auto max-w-[1000px] p-6 animate-fade-in">
       {/* Breadcrumb */}
@@ -124,6 +138,59 @@ export default function SiiPortalIntake() {
       </nav>
 
       {/* Header Garantías Legales */}
+      {hayCanalDeclarado && (
+        <Card className="border-[var(--t-border-default)] bg-[var(--t-surface-card)] p-6 mb-6 space-y-4">
+          <div>
+            <h2 className="text-sm font-bold text-[var(--t-text-primary)]">
+              Quién gestiona este canal
+            </h2>
+            <p className="text-xs text-[var(--t-text-secondary)] mt-1">
+              Según {SII_POLITICA.codigo}, {SII_POLITICA.titulo}.
+            </p>
+            <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+              {SII_ROLES.map((r) => (
+                <div key={r.rol}>
+                  <dt className="text-xs font-semibold text-[var(--t-text-primary)]">
+                    {r.rol === "RESPONSABLE" ? "Responsable del SII" : "Instructor del Canal Interno"}
+                  </dt>
+                  <dd className="text-xs text-[var(--t-text-secondary)]">
+                    {r.cargo}{" "}
+                    <span className="text-[var(--t-text-secondary)]">({r.apartado})</span>
+                  </dd>
+                  <dd className="text-[11px] italic text-[var(--t-text-secondary)] mt-0.5">
+                    {r.sustitucion}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+
+          <div className="border-t border-[var(--t-border-default)] pt-4">
+            <h2 className="text-sm font-bold text-[var(--t-text-primary)]">
+              Canales externos ({SII_ART_25.norma}, {SII_ART_25.articulo} — {SII_ART_25.rubrica})
+            </h2>
+            {/* El matiz del art. 25, que es lo que no se puede perder: el
+                interno es el cauce preferente y aun así se puede ir al externo
+                directamente. Decir lo contrario sería un error de derecho. */}
+            <p className="text-xs text-[var(--t-text-secondary)] mt-1 leading-relaxed">
+              {SII_CANAL_EXTERNO_AVISO}
+            </p>
+            <ul className="mt-3 space-y-3">
+              {SII_CANALES_EXTERNOS.map((c) => (
+                <li key={c.nombre}>
+                  <div className="text-xs font-semibold text-[var(--t-text-primary)]">
+                    {c.nombre}{" "}
+                    <span className="font-normal text-[var(--t-text-secondary)]">({c.apartado})</span>
+                  </div>
+                  <div className="text-xs text-[var(--t-text-secondary)] leading-relaxed">{c.ambito}</div>
+                  <div className="text-[11px] italic text-[var(--t-text-secondary)]">{c.nota}</div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Card>
+      )}
+
       <Card className="border-[var(--t-border-default)] bg-[var(--t-surface-card)] p-6 mb-6">
         <div className="flex items-start justify-between gap-4">
           <div>

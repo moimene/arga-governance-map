@@ -1,0 +1,26 @@
+// tsconfig.tests.json — perímetro de TESTS y SCRIPTS.
+//
+// Existe para que el gate cubra lo que escribimos sin ensanchar el contrato de
+// producción. Antes los tests estaban excluidos y `scripts/` no lo compilaba
+// nadie: 45 ficheros y 176 errores fuera del gate, entre ellos fixtures que
+// habían dejado de corresponderse con su tipo en tres ampliaciones sucesivas.
+//
+// Diferencias deliberadas respecto de tsconfig.app.json:
+//  - `lib` ES2021: `replaceAll` la usan 4 scripts y 1 test, y CERO ficheros de
+//    producción. Ampliar el lib de la app para eso habría habilitado en `src/`
+//    una API que producción no pidió.
+//  - `paths` de `bun:test` al MISMO shim que usa vitest (vitest.config.ts →
+//    resolve.alias), no a un paquete de tipos: así los tipos SON las
+//    exportaciones del shim y no pueden divergir de él.
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "lib": ["ES2021", "DOM", "DOM.Iterable"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "bun:test": ["./src/test/bun-test-shim.ts"]
+    }
+  },
+  "include": ["src", "scripts"],
+  "exclude": []
+}
