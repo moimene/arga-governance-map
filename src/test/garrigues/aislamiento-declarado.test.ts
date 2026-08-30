@@ -81,6 +81,14 @@ describe("C3 Tarea 8 — la declaración de aislamiento cuadra con Cloud", () =>
           .select("code").eq("tenant_id", GARRIGUES).eq("code", code);
         expect(propio, `${t.tabla}: ${code} debería existir en Garrigues`).toHaveLength(1);
 
+        // Control POSITIVO del cliente de ARGA, no del de Garrigues. Si la
+        // sesión de ARGA estuviera caída o RLS le tapara la tabla entera, la
+        // ausencia de abajo pasaría **por ceguera**, no por aislamiento. Y el
+        // `propio` de arriba no sirve: comprueba el OTRO cliente.
+        const { data: veLoSuyo } = await arga.from(t.tabla)
+          .select("id").eq("tenant_id", ARGA).limit(1);
+        expect(veLoSuyo, `${t.tabla}: ARGA no ve ni lo suyo`).toHaveLength(1);
+
         const { data: ajeno, error } = await arga.from(t.tabla)
           .select("code").eq("code", code);
         expect(error).toBeNull();
