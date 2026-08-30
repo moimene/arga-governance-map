@@ -1,5 +1,4 @@
 import { describe, expect, it, beforeAll } from "bun:test";
-import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEMO_TENANT, GARRIGUES_TENANT, sesionDe } from "../helpers/supabase-test-client";
@@ -51,17 +50,26 @@ describe("C1 — el motor documental no fabrica horas, y ARGA no cambia", () => 
     expect(condicion).toBe("meetingTyped.quorum_data?.hora_no_acreditada === true");
   });
 
-  it("sin bandera, la expresión es la de origin/main carácter a carácter", () => {
-    const main = piezasDeHora(execFileSync("git", ["show", `origin/main:${RUTA}`], { encoding: "utf8" }));
+  it("sin bandera, la expresión es EXACTAMENTE la que había antes del arreglo", () => {
+    // Esta comprobación se hacía contra `git show origin/main:…`, y ESO ERA UN
+    // DEFECTO DE DISEÑO: el test se autodestruía al mergear. En cuanto el
+    // commit entra en `origin/main`, los dos lados coinciden, el control
+    // `not.toBe` deja de cumplirse y el test rompe `main` para todos.
+    // Medido: 0 fail en la rama, 1 fail en `main` recién mergeado.
+    //
+    // Un test que compara contra una referencia móvil mide la POSICIÓN del
+    // commit, no el código. Lo que quería pinar es que la rama sin bandera sea
+    // la expresión original, y eso se escribe como literal.
     const head = piezasDeHora(readFileSync(RUTA, "utf8"));
+    expect(ramaSinBandera(head.inicio))
+      .toBe("meetingTyped.start_time || formatScheduledTime(meetingTyped.scheduled_start)");
+    expect(ramaSinBandera(head.fin))
+      .toBe("meetingTyped.end_time || formatScheduledTime(meetingTyped.scheduled_end)");
 
-    expect(ramaSinBandera(head.inicio)).toBe(main.inicio);
-    expect(ramaSinBandera(head.fin)).toBe(main.fin);
-
-    // Control del método: la expresión de HEAD sí cambió respecto de main. Sin
-    // esto estaría comparando dos cosas iguales y no probaría nada.
-    expect(head.inicio).not.toBe(main.inicio);
-    expect(main.condicion).toBeNull();          // en main la condición no existía
+    // Control del método: la expresión REAL no es la rama sin bandera —lleva el
+    // condicional delante—, así que el `replace` de arriba está haciendo algo.
+    expect(head.inicio).not.toBe(ramaSinBandera(head.inicio));
+    expect(head.inicio).toContain("horaNoAcreditada");
   });
 
   describe("y el dato", () => {
