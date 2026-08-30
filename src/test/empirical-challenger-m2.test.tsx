@@ -87,7 +87,6 @@ function createChallengerMockScope(
       status: "ACTIVA",
       parentEntityId: null,
       tipoSocial: "SA",
-      tipoOrganoAdmin: "CONSEJO_ADMINISTRACION",
     },
     entities: [
       {
@@ -99,7 +98,6 @@ function createChallengerMockScope(
         status: "ACTIVA",
         parentEntityId: null,
         tipoSocial: "SA",
-        tipoOrganoAdmin: "CONSEJO_ADMINISTRACION",
       },
       {
         id: "ent-child-02",
@@ -110,7 +108,6 @@ function createChallengerMockScope(
         status: "ACTIVA",
         parentEntityId: "ent-alpha-01",
         tipoSocial: "SL",
-        tipoOrganoAdmin: "ADMINISTRADOR_UNICO",
       },
     ],
     isLoadingEntities: false,

@@ -71,7 +71,6 @@ function createMockScope(mode: "grupo" | "sociedad" = "sociedad"): SecretariaSco
       status: "ACTIVA",
       parentEntityId: null,
       tipoSocial: "SA",
-      tipoOrganoAdmin: "CONSEJO_ADMINISTRACION",
     },
     entities: [
       {
@@ -83,7 +82,6 @@ function createMockScope(mode: "grupo" | "sociedad" = "sociedad"): SecretariaSco
         status: "ACTIVA",
         parentEntityId: null,
         tipoSocial: "SA",
-        tipoOrganoAdmin: "CONSEJO_ADMINISTRACION",
       },
     ],
     isLoadingEntities: false,
