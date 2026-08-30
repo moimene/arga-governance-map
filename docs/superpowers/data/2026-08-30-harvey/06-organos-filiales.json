@@ -1,337 +1,370 @@
 {
+ "meta": {
+  "tenant": "00000000-0000-0000-0000-000000000002",
+  "fecha_generacion": "2026-08-30",
+  "correccion": "2026-08-30 — pasada de corrección sobre fuentes del repo. Los órganos de administración ya no se proponen: se toman del Registro. Se corrigen los once entidad_slug contra el catálogo canónico, se mapea body_type al CHECK de governing_bodies y se retira toda identidad inventada de cargo con facultad certificante.",
+  "fuentes_repo": [
+   "scripts/garrigues/entities-catalog.ts — única fuente de verdad del perímetro: slug canónico, NIF, legalForm, esUnipersonal, ownershipPct, parentSlug y formaAdministracion",
+   "scripts/garrigues/borme/*.json — cosecha registral 2026-08-03: cargos vigentes con fecha",
+   "scripts/garrigues/gobierno/governance-catalog.ts — Consejo de Administración de EAD Trust ya sembrado en el tenant",
+   "docs/superpowers/data/2026-08-29-garrigues-sinteticos/03-secretaria.json — campo organo_adopta de los 59 acuerdos",
+   "supabase/migrations/20260417121410_001_core_schema.sql:36 — CHECK de governing_bodies.body_type",
+   "scripts/seed-garrigues-bodies.ts — convención vigente del tenant: modalidad real en config.organo_tipo"
+  ],
+  "vocabulario_firmeza": {
+   "FIRME": "el hecho consta acreditado en fuente registral o en el catálogo del perímetro con confianza CONFIRMADO",
+   "A_CONFIRMAR": "la fuente sostiene el hecho por patrón o con salvedad expresa, no lo declara literalmente",
+   "SINTETICO": "inventado para la demo, sin correlato real"
+  },
+  "vocabulario_procedencia": {
+   "REGISTRAL_BORME": "scripts/garrigues/borme/<slug>.json, cargo vigente publicado",
+   "CATALOGO_PERIMETRO": "scripts/garrigues/entities-catalog.ts",
+   "SIMULADO": "hecho inventado para la demo"
+  },
+  "mapeo_body_type": "governing_bodies.body_type solo acepta CDA, COMISION, COMITE y JUNTA. La modalidad real viaja en config.organo_tipo (ADMIN_UNICO, SOCIO_UNICO, JUNTA_GENERAL), replicando scripts/seed-garrigues-bodies.ts, que ya siembra el administrador único de la matriz como body_type CDA. El socio único se mapea a JUNTA porque ejerce las competencias de la Junta General (artículo 15.1 LSC).",
+  "advertencia_demo_publica": "Todo cargo de persona física que aparece en este fichero es real y público, salvo que su ancla diga lo contrario. Las composiciones de Junta no nombran mesa cuando la fuente no la nombra: un nombre inventado en un cargo con facultad certificante se convierte en una certificación falsa aguas abajo."
+ },
  "organos": [
   {
-   "entidad_slug": "compania-digital-newlaw-slu",
+   "entidad_slug": "cia-digital-newlaw-slu",
    "denominacion": "Compañía Digital NewLaw, S.L.U.",
-   "slug": "garrigues-compania-digital-newlaw-admin-unico",
+   "slug": "garrigues-cia-digital-newlaw-admin-unico",
    "nombre": "Administrador Único",
-   "body_type": "ADMIN_UNICO",
-   "naturaleza": "DECISORIO",
+   "body_type": "CDA",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "ADMIN_UNICO",
+    "titular": "J&A Garrigues, S.L.P."
+   },
    "composicion": [
     {
      "cargo": "Administrador Único",
-     "nombre": "Clara Monteagudo Salcedo"
+     "nombre": "J&A Garrigues, S.L.P.",
+     "desde": "2022-12-28"
+    },
+    {
+     "cargo": "Representante persona física del Administrador Único",
+     "nombre": "Fernando Vives Ruiz",
+     "desde": "2022-12-28"
     }
    ],
-   "fundamento_legal": "Artículos 209, 210.1 y 233.1 de la Ley de Sociedades de Capital. El administrador único es un órgano unipersonal por definición.",
-   "razonamiento": "Se propone un administrador único por tratarse de una sociedad unipersonal de carácter instrumental y de tenencia empresarial. Esta forma concentra la gestión ordinaria y evita crear un consejo sin una necesidad organizativa acreditada.",
-   "firmeza": "SINTETICO",
-   "procedencia": "SIMULADO",
-   "ancla": "La forma SLU y la necesidad de modelar un órgano de administración han sido declaradas por el usuario; la elección del administrador único y su identidad son simuladas."
+   "fundamento_legal": "Artículos 209, 210.1 y 233.2.a de la Ley de Sociedades de Capital: la sociedad se administra por un administrador único, a quien corresponde la representación. Al recaer el cargo en una persona jurídica, el artículo 212 bis LSC y el artículo 143 del Reglamento del Registro Mercantil exigen la designación e inscripción de una persona física que lo represente de forma permanente en el ejercicio del cargo.",
+   "razonamiento": "No se elige forma de administración: la que consta acreditada es el administrador único. El entregable no propone modalidad alguna, se limita a modelar la inscrita.",
+   "firmeza": "FIRME",
+   "procedencia": "REGISTRAL_BORME",
+   "ancla": "scripts/garrigues/borme/cia-digital-newlaw-slu.json: cargos vigentes «Socio Unico y Adm. Unico: J & A Garrigues SLP» y «Representante persona física del Adm. Unico: Vives Ruiz, Fernando», ambos desde 2022-12-28. Concuerda con formaAdministracion ADMINISTRADOR_UNICO en scripts/garrigues/entities-catalog.ts y con organo_adopta de GARR-SEC-005/009/023/045/046/053 en docs/superpowers/data/2026-08-29-garrigues-sinteticos/03-secretaria.json."
   },
   {
-   "entidad_slug": "compania-digital-newlaw-slu",
+   "entidad_slug": "cia-digital-newlaw-slu",
    "denominacion": "Compañía Digital NewLaw, S.L.U.",
-   "slug": "garrigues-compania-digital-newlaw-socio-unico",
+   "slug": "garrigues-cia-digital-newlaw-socio-unico",
    "nombre": "Socio Único",
-   "body_type": "SOCIO_UNICO",
-   "naturaleza": "DECISORIO",
+   "body_type": "JUNTA",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "SOCIO_UNICO",
+    "titular": "J&A Garrigues, S.L.P."
+   },
    "composicion": [
     {
      "cargo": "Socio Único",
-     "nombre": "J&A Garrigues, S.L.P."
+     "nombre": "J&A Garrigues, S.L.P.",
+     "desde": "2022-12-28",
+     "es_socio_profesional": true
+    },
+    {
+     "cargo": "Representante persona física del Socio Único",
+     "nombre": "Fernando Vives Ruiz"
     }
    ],
-   "fundamento_legal": "Artículos 12 a 17 de la Ley de Sociedades de Capital y, específicamente, artículo 15: el socio único ejerce las competencias de la Junta General y consigna sus decisiones en acta bajo su firma o la de su representante.",
-   "razonamiento": "La sociedad es unipersonal, por lo que no se crea una Junta General diferenciada. Las materias reservadas a los socios se tramitarán como decisiones del socio único y no como acuerdos de una junta inexistente.",
-   "firmeza": "SINTETICO",
-   "procedencia": "INFERIDO_DE_ESTRUCTURA",
-   "ancla": "La unipersonalidad consta en la forma S.L.U.; la identificación de J&A Garrigues, S.L.P. como titular único se utiliza como hipótesis estructural del tenant y debe confirmarse documentalmente."
+   "fundamento_legal": "Artículos 12 a 16 de la Ley de Sociedades de Capital; en particular, el artículo 15.1, conforme al cual el socio único ejerce las competencias de la Junta General, y el artículo 15.2, que ordena consignar sus decisiones en acta bajo su firma o la de su representante, pudiendo ejecutarlas y formalizarlas el propio socio o los administradores. Artículo 4.1.b de la Ley 2/2007: una sociedad profesional inscrita puede ser socia profesional de otra sociedad profesional.",
+   "razonamiento": "La sociedad es unipersonal y no tiene Junta General plural. Las materias reservadas a los socios se tramitan como decisiones del socio único consignadas en acta. Socio único y administrador único son la misma persona jurídica, de modo que quien certifica esas decisiones lo hace en su condición de administrador único, no de socio.",
+   "firmeza": "FIRME",
+   "procedencia": "REGISTRAL_BORME",
+   "ancla": "scripts/garrigues/borme/cia-digital-newlaw-slu.json acredita la unipersonalidad y su titular en un mismo asiento: «Socio Unico y Adm. Unico: J & A Garrigues SLP» desde 2022-12-28. scripts/garrigues/entities-catalog.ts: esUnipersonal true, ownershipPct 100, parentSlug jya-garrigues-slp."
   },
   {
-   "entidad_slug": "g-advisory-consultoria-tecnica-economica-y-estrategica-slp",
+   "entidad_slug": "g-advisory-slp",
    "denominacion": "G-Advisory, Consultoría Técnica, Económica y Estratégica, S.L.P.",
-   "slug": "garrigues-g-advisory-consejo-administracion",
-   "nombre": "Consejo de Administración",
+   "slug": "garrigues-g-advisory-admin-unico",
+   "nombre": "Administrador Único",
    "body_type": "CDA",
-   "naturaleza": "DECISORIO",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "ADMIN_UNICO",
+    "titular": "J&A Garrigues, S.L.P."
+   },
    "composicion": [
     {
-     "cargo": "Presidente y Consejero",
-     "nombre": "Álvaro Monreal Cifuentes",
+     "cargo": "Administrador Único",
+     "nombre": "J&A Garrigues, S.L.P.",
+     "desde": "2008-07-15",
      "es_socio_profesional": true
-    },
-    {
-     "cargo": "Consejera Secretaria",
-     "nombre": "Lucía Barrenechea Soto",
-     "es_socio_profesional": true
-    },
-    {
-     "cargo": "Consejero Vocal",
-     "nombre": "Tomás Velarde Arnáiz",
-     "es_socio_profesional": true
-    },
-    {
-     "cargo": "Consejera Vocal",
-     "nombre": "Inés Prado Villalta",
-     "es_socio_profesional": false
-    },
-    {
-     "cargo": "Consejero Vocal",
-     "nombre": "Hugo Serrano Portela",
-     "es_socio_profesional": false
     }
    ],
-   "fundamento_legal": "Artículos 209, 210, 242, 245, 247 y 248 de la Ley de Sociedades de Capital; artículo 4.3 de la Ley 2/2007, de sociedades profesionales, que exige mayoría de socios profesionales entre los miembros del órgano de administración. La composición propuesta cuenta con tres miembros profesionales de un total de cinco.",
-   "razonamiento": "La amplitud técnica, económica y estratégica de la actividad aconseja un órgano colegiado que incorpore varias especialidades y control transversal. Se evita el administrador único porque concentraría excesivamente la gestión de una consultora profesional presumiblemente pluripersonal.",
-   "firmeza": "SINTETICO",
-   "procedencia": "SIMULADO",
-   "ancla": "La forma S.L.P. y la necesidad del órgano están declaradas; la modalidad colegiada, el número de miembros y las identidades son simulados."
+   "fundamento_legal": "Artículos 209, 210.1 y 233.2.a de la Ley de Sociedades de Capital: la sociedad se administra por un administrador único, a quien corresponde la representación. Al recaer el cargo en una persona jurídica, el artículo 212 bis LSC y el artículo 143 del Reglamento del Registro Mercantil exigen la designación e inscripción de una persona física que lo represente de forma permanente en el ejercicio del cargo. La administradora es una sociedad profesional inscrita, por lo que satisface por sí misma la exigencia subjetiva del artículo 4.3 de la Ley 2/2007 en un órgano unipersonal.",
+   "razonamiento": "No se elige forma de administración: la que consta acreditada es el administrador único. El entregable no propone modalidad alguna, se limita a modelar la inscrita.",
+   "firmeza": "FIRME",
+   "procedencia": "REGISTRAL_BORME",
+   "ancla": "scripts/garrigues/borme/g-advisory-slp.json: «Adm. Unico: J & A Garrigues SLP» desde 2008-07-15. Concuerda con scripts/garrigues/entities-catalog.ts (formaAdministracion ADMINISTRADOR_UNICO) y con organo_adopta de GARR-SEC-013/027/055 en docs/superpowers/data/2026-08-29-garrigues-sinteticos/03-secretaria.json. El representante persona física del administrador persona jurídica NO consta nombrado en la fuente registral consultada; no se inventa."
   },
   {
-   "entidad_slug": "g-advisory-consultoria-tecnica-economica-y-estrategica-slp",
+   "entidad_slug": "g-advisory-slp",
    "denominacion": "G-Advisory, Consultoría Técnica, Económica y Estratégica, S.L.P.",
    "slug": "garrigues-g-advisory-junta-general",
    "nombre": "Junta General de Socios",
    "body_type": "JUNTA",
-   "naturaleza": "DECISORIO",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "JUNTA_GENERAL"
+   },
    "composicion": [
     {
-     "cargo": "Presidente de la Junta",
-     "nombre": "Álvaro Monreal Cifuentes",
+     "cargo": "Mesa de la Junta",
+     "nombre": "Presidente y secretario designados por los socios concurrentes al comienzo de la reunión (artículo 191 LSC, segundo inciso: la sociedad no tiene consejo de administración)"
+    },
+    {
+     "cargo": "Socia profesional mayoritaria",
+     "nombre": "J&A Garrigues, S.L.P. — 75 % del capital y de los derechos de voto",
      "es_socio_profesional": true
     },
     {
-     "cargo": "Secretaria de la Junta",
-     "nombre": "Lucía Barrenechea Soto",
-     "es_socio_profesional": true
-    },
-    {
-     "cargo": "Colectivo de socios profesionales",
-     "nombre": "Socios profesionales titulares del 72 % del capital y de los derechos de voto",
-     "es_socio_profesional": true
-    },
-    {
-     "cargo": "Colectivo de socios no profesionales",
-     "nombre": "Socios no profesionales titulares del 28 % del capital y de los derechos de voto",
-     "es_socio_profesional": false
+     "cargo": "Resto del capital",
+     "nombre": "25 % restante sin titulares acreditados en las fuentes del perímetro; no se identifican socios sintéticos"
     }
    ],
-   "fundamento_legal": "Artículos 159, 160 y 198 a 200 de la Ley de Sociedades de Capital; artículo 4.2 de la Ley 2/2007, que exige que la mayoría del capital social y de los derechos de voto pertenezca a socios profesionales.",
-   "razonamiento": "La tabla declara pluralidad, por lo que las competencias de los socios corresponden a la Junta General y no a un socio único. La distribución sintética preserva una mayoría clara de capital y voto profesional.",
+   "fundamento_legal": "Artículos 159, 160 y 198 a 200 de la Ley de Sociedades de Capital. La mesa se determina conforme al artículo 191 LSC. La aprobación de cuentas no es inscribible: se deposita conforme al artículo 279 LSC y a los artículos 365 y siguientes del Reglamento del Registro Mercantil. Artículo 4.2 de la Ley 2/2007: la mayoría del capital y de los derechos de voto debe pertenecer a socios profesionales; J&A Garrigues, S.L.P. lo es por el artículo 4.1.b.",
+   "razonamiento": "La sociedad es pluripersonal, de modo que las competencias de los socios corresponden a la Junta General. No se reparte capital de forma sintética: se refleja la única participación acreditada y se declara desconocido el resto. La mesa de la Junta no ostenta la facultad de certificar: el artículo 109.1 RRM la atribuye al órgano de administración, que en esta sociedad es el administrador único.",
    "firmeza": "SINTETICO",
-   "procedencia": "SIMULADO",
-   "ancla": "La existencia de Junta General deriva de la pluralidad declarada; los cargos de mesa y porcentajes son simulados."
+   "procedencia": "CATALOGO_PERIMETRO",
+   "ancla": "scripts/garrigues/entities-catalog.ts da para g-advisory-slp ownershipPct 75 con parentSlug jya-garrigues-slp y confianza CONFIRMADO («75% según IDC — corrige el 100% tácito del inventario»); esUnipersonal false sostiene la Junta. El 25 % restante y la mesa no constan en ninguna fuente y no se inventan titulares. Corrige el reparto 72/28 de la versión anterior, que contradecía el catálogo."
   },
   {
    "entidad_slug": "garrigues-ip-slp",
    "denominacion": "Garrigues IP, S.L.P.",
-   "slug": "garrigues-ip-administradores-mancomunados",
-   "nombre": "Administradores Mancomunados",
-   "body_type": "ADMIN_MANCOMUNADO",
-   "naturaleza": "DECISORIO",
+   "slug": "garrigues-ip-admin-unico",
+   "nombre": "Administrador Único",
+   "body_type": "CDA",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "ADMIN_UNICO",
+    "titular": "J&A Garrigues, S.L.P."
+   },
    "composicion": [
     {
-     "cargo": "Administradora Mancomunada",
-     "nombre": "Elena Falcón Bermejo",
-     "es_socio_profesional": true
-    },
-    {
-     "cargo": "Administrador Mancomunado",
-     "nombre": "Martín Ledesma Roig",
+     "cargo": "Administrador Único",
+     "nombre": "J&A Garrigues, S.L.P.",
+     "desde": "2008-07-15",
      "es_socio_profesional": true
     }
    ],
-   "fundamento_legal": "Artículos 209, 210 y 233.2.b de la Ley de Sociedades de Capital; artículo 4.3 de la Ley 2/2007. En una estructura de dos administradores, ambos se configuran como socios profesionales para satisfacer la mayoría profesional exigida.",
-   "razonamiento": "La administración mancomunada aporta doble control sobre decisiones relativas a activos, licencias y derechos de propiedad intelectual. Resulta más proporcionada que un consejo y más segura que la actuación individual de administradores solidarios.",
-   "firmeza": "SINTETICO",
-   "procedencia": "SIMULADO",
-   "ancla": "La forma S.L.P. unipersonal y la necesidad del órgano están declaradas; la modalidad mancomunada y las personas son simuladas."
+   "fundamento_legal": "Artículos 209, 210.1 y 233.2.a de la Ley de Sociedades de Capital: la sociedad se administra por un administrador único, a quien corresponde la representación. Al recaer el cargo en una persona jurídica, el artículo 212 bis LSC y el artículo 143 del Reglamento del Registro Mercantil exigen la designación e inscripción de una persona física que lo represente de forma permanente en el ejercicio del cargo. La administradora es una sociedad profesional inscrita, por lo que satisface por sí misma la exigencia subjetiva del artículo 4.3 de la Ley 2/2007 en un órgano unipersonal.",
+   "razonamiento": "No se elige forma de administración: la que consta acreditada es el administrador único. El entregable no propone modalidad alguna, se limita a modelar la inscrita.",
+   "firmeza": "FIRME",
+   "procedencia": "REGISTRAL_BORME",
+   "ancla": "scripts/garrigues/borme/garrigues-ip-slp.json: «Adm. Unico: J & A Garrigues SLP» desde 2008-07-15. Concuerda con scripts/garrigues/entities-catalog.ts y con organo_adopta de GARR-SEC-015/029/047/048 en docs/superpowers/data/2026-08-29-garrigues-sinteticos/03-secretaria.json. Sustituye a dos administradores mancomunados inventados, que además atribuían condición de socio profesional a personas físicas en una sociedad que el propio entregable declara unipersonal. Representante persona física no nombrado en la fuente."
   },
   {
    "entidad_slug": "garrigues-ip-slp",
    "denominacion": "Garrigues IP, S.L.P.",
    "slug": "garrigues-ip-socio-unico",
    "nombre": "Socio Único",
-   "body_type": "SOCIO_UNICO",
-   "naturaleza": "DECISORIO",
+   "body_type": "JUNTA",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "SOCIO_UNICO",
+    "titular": "J&A Garrigues, S.L.P."
+   },
    "composicion": [
     {
-     "cargo": "Socio Único Profesional",
-     "nombre": "Identidad societaria pendiente de confirmación por el despacho",
+     "cargo": "Socio Único",
+     "nombre": "J&A Garrigues, S.L.P.",
      "es_socio_profesional": true
     }
    ],
-   "fundamento_legal": "Artículos 12 a 17 y 15 de la Ley de Sociedades de Capital; artículo 4.2 de la Ley 2/2007. Al existir un solo socio en una S.L.P., este debe reunir condición profesional para que la totalidad del capital y del voto satisfaga la exigencia legal.",
-   "razonamiento": "No se crea Junta General porque la entidad se ha declarado unipersonal. El socio único ejercerá sus competencias y documentará sus decisiones mediante acta de consignación.",
-   "firmeza": "SINTETICO",
-   "procedencia": "DECLARADO_USUARIO",
-   "ancla": "La unipersonalidad está declarada; la identidad concreta del socio único queda intencionadamente sin completar."
+   "fundamento_legal": "Artículos 12 a 16 de la Ley de Sociedades de Capital; en particular, el artículo 15.1, conforme al cual el socio único ejerce las competencias de la Junta General, y el artículo 15.2, que ordena consignar sus decisiones en acta bajo su firma o la de su representante, pudiendo ejecutarlas y formalizarlas el propio socio o los administradores. Artículo 4.1.b de la Ley 2/2007: una sociedad profesional inscrita puede ser socia profesional de otra sociedad profesional.",
+   "razonamiento": "Con un solo socio titular del 100 % no cabe una pluralidad de socios profesionales: la exigencia del artículo 4.2 de la Ley 2/2007 la satisface la propia socia única, que es sociedad profesional inscrita. Sus decisiones se consignan en acta y las certifica el administrador único.",
+   "firmeza": "FIRME",
+   "procedencia": "CATALOGO_PERIMETRO",
+   "ancla": "scripts/garrigues/entities-catalog.ts: garrigues-ip-slp con esUnipersonal true, ownershipPct 100 y parentSlug jya-garrigues-slp, confianza CONFIRMADO. Lo corrobora docs/superpowers/data/2026-08-29-garrigues-sinteticos/03-secretaria.json, cuyos GARR-SEC-016 y 030 sitúan a «J&A Garrigues, S.L.P.» como socio único. Sustituye a «Identidad societaria pendiente de confirmación por el despacho», que era un hueco innecesario."
   },
   {
-   "entidad_slug": "garrigues-letrados-de-soporte-slp",
+   "entidad_slug": "garrigues-letrados-soporte-slp",
    "denominacion": "Garrigues Letrados de Soporte, S.L.P.",
-   "slug": "garrigues-letrados-soporte-administradores-solidarios",
-   "nombre": "Administradores Solidarios",
-   "body_type": "ADMIN_SOLIDARIO",
-   "naturaleza": "DECISORIO",
+   "slug": "garrigues-letrados-soporte-admin-unico",
+   "nombre": "Administrador Único",
+   "body_type": "CDA",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "ADMIN_UNICO",
+    "titular": "J&A Garrigues, S.L.P."
+   },
    "composicion": [
     {
-     "cargo": "Administrador Solidario",
-     "nombre": "Jaime Novoa Beltrán",
-     "es_socio_profesional": true
-    },
-    {
-     "cargo": "Administradora Solidaria",
-     "nombre": "Paula Arístegui Mena",
+     "cargo": "Administrador Único",
+     "nombre": "J&A Garrigues, S.L.P.",
      "es_socio_profesional": true
     }
    ],
-   "fundamento_legal": "Artículos 209, 210 y 233.2.a de la Ley de Sociedades de Capital; artículo 4.3 de la Ley 2/2007. Los administradores solidarios deben ser al menos dos.",
-   "razonamiento": "La actividad de soporte jurídico requiere continuidad operativa y capacidad de actuación inmediata. Dos administradores solidarios profesionales permiten que cualquiera atienda la gestión ordinaria sin la rigidez de la firma conjunta.",
-   "firmeza": "SINTETICO",
-   "procedencia": "SIMULADO",
-   "ancla": "La modalidad solidaria, composición e identidades se simulan para reflejar una S.L.P. operativa con actuación ágil."
+   "fundamento_legal": "Artículos 209, 210.1 y 233.2.a de la Ley de Sociedades de Capital: la sociedad se administra por un administrador único, a quien corresponde la representación. Al recaer el cargo en una persona jurídica, el artículo 212 bis LSC y el artículo 143 del Reglamento del Registro Mercantil exigen la designación e inscripción de una persona física que lo represente de forma permanente en el ejercicio del cargo. La administradora es una sociedad profesional inscrita, por lo que satisface por sí misma la exigencia subjetiva del artículo 4.3 de la Ley 2/2007 en un órgano unipersonal.",
+   "razonamiento": "No se elige forma de administración: la que consta acreditada es el administrador único. El entregable no propone modalidad alguna, se limita a modelar la inscrita.",
+   "firmeza": "FIRME",
+   "procedencia": "REGISTRAL_BORME",
+   "ancla": "scripts/garrigues/borme/garrigues-letrados-soporte-slp.json: «Adm. Unico: J & A Garrigues, S.L.P.». Concuerda con scripts/garrigues/entities-catalog.ts y con organo_adopta de GARR-SEC-017/031/051/052 en docs/superpowers/data/2026-08-29-garrigues-sinteticos/03-secretaria.json. Sustituye a dos administradores solidarios inventados. Representante persona física no nombrado en la fuente."
   },
   {
-   "entidad_slug": "garrigues-letrados-de-soporte-slp",
+   "entidad_slug": "garrigues-letrados-soporte-slp",
    "denominacion": "Garrigues Letrados de Soporte, S.L.P.",
    "slug": "garrigues-letrados-soporte-socio-unico",
    "nombre": "Socio Único",
-   "body_type": "SOCIO_UNICO",
-   "naturaleza": "DECISORIO",
+   "body_type": "JUNTA",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "SOCIO_UNICO",
+    "titular": "J&A Garrigues, S.L.P."
+   },
    "composicion": [
     {
-     "cargo": "Socio Único Profesional",
-     "nombre": "Identidad societaria pendiente de confirmación por el despacho",
+     "cargo": "Socio Único",
+     "nombre": "J&A Garrigues, S.L.P.",
      "es_socio_profesional": true
     }
    ],
-   "fundamento_legal": "Artículos 12 a 17 y 15 de la Ley de Sociedades de Capital; artículo 4.2 de la Ley 2/2007.",
-   "razonamiento": "La condición unipersonal excluye una Junta General plural. Las decisiones del socio único ejercerán las competencias de la Junta y se consignarán en acta bajo su firma o la de su representante.",
-   "firmeza": "SINTETICO",
-   "procedencia": "DECLARADO_USUARIO",
-   "ancla": "La existencia del socio único está declarada; su identidad y título de adquisición requieren confirmación."
+   "fundamento_legal": "Artículos 12 a 16 de la Ley de Sociedades de Capital; en particular, el artículo 15.1, conforme al cual el socio único ejerce las competencias de la Junta General, y el artículo 15.2, que ordena consignar sus decisiones en acta bajo su firma o la de su representante, pudiendo ejecutarlas y formalizarlas el propio socio o los administradores. Artículo 4.1.b de la Ley 2/2007: una sociedad profesional inscrita puede ser socia profesional de otra sociedad profesional.",
+   "razonamiento": "La condición unipersonal excluye una Junta General plural. El socio único es sociedad profesional inscrita, de modo que la totalidad del capital y del voto es profesional a efectos del artículo 4.2 de la Ley 2/2007.",
+   "firmeza": "FIRME",
+   "procedencia": "CATALOGO_PERIMETRO",
+   "ancla": "scripts/garrigues/entities-catalog.ts: garrigues-letrados-soporte-slp con esUnipersonal true, ownershipPct 100 y parentSlug jya-garrigues-slp, confianza CONFIRMADO. Lo corrobora docs/superpowers/data/2026-08-29-garrigues-sinteticos/03-secretaria.json (GARR-SEC-018 y 032, socio único «J&A Garrigues, S.L.P.»)."
   },
   {
-   "entidad_slug": "garrigues-human-capital-services-slp",
+   "entidad_slug": "garrigues-hcs-slp",
    "denominacion": "Garrigues Human Capital Services, S.L.P.",
-   "slug": "garrigues-human-capital-admin-unico",
+   "slug": "garrigues-hcs-admin-unico",
    "nombre": "Administrador Único",
-   "body_type": "ADMIN_UNICO",
-   "naturaleza": "DECISORIO",
-   "composicion": [
-    {
-     "cargo": "Administradora Única",
-     "nombre": "Beatriz Olmeda Castrillo",
-     "es_socio_profesional": true
-    }
-   ],
-   "fundamento_legal": "Artículos 209, 210.1 y 233.1 de la Ley de Sociedades de Capital; artículo 4.3 de la Ley 2/2007. Al ser un órgano de un solo miembro, su titular se configura necesariamente como socio profesional.",
-   "razonamiento": "Se propone administración única por la especialización y dimensión presumiblemente contenida de la entidad. La condición profesional de la administradora satisface la restricción subjetiva de la Ley 2/2007.",
-   "firmeza": "SINTETICO",
-   "procedencia": "SIMULADO",
-   "ancla": "La forma S.L.P. unipersonal está declarada; la administradora, modalidad y mandato son simulados."
-  },
-  {
-   "entidad_slug": "garrigues-human-capital-services-slp",
-   "denominacion": "Garrigues Human Capital Services, S.L.P.",
-   "slug": "garrigues-human-capital-socio-unico",
-   "nombre": "Socio Único",
-   "body_type": "SOCIO_UNICO",
-   "naturaleza": "DECISORIO",
-   "composicion": [
-    {
-     "cargo": "Socio Único Profesional",
-     "nombre": "Identidad societaria pendiente de confirmación por el despacho",
-     "es_socio_profesional": true
-    }
-   ],
-   "fundamento_legal": "Artículos 12 a 17 y 15 de la Ley de Sociedades de Capital; artículo 4.2 de la Ley 2/2007.",
-   "razonamiento": "La entidad se trata como unipersonal y, por ello, no dispone de Junta General plural. El órgano decisorio de propiedad es el socio único, cuyas decisiones deben consignarse formalmente en acta.",
-   "firmeza": "SINTETICO",
-   "procedencia": "DECLARADO_USUARIO",
-   "ancla": "Unipersonalidad declarada; identidad del socio único pendiente."
-  },
-  {
-   "entidad_slug": "garrigues-consultoria-de-empresa-familiar-slp",
-   "denominacion": "Garrigues Consultoría de Empresa Familiar, S.L.P.",
-   "slug": "garrigues-consultoria-empresa-familiar-consejo-administracion",
-   "nombre": "Consejo de Administración",
    "body_type": "CDA",
-   "naturaleza": "DECISORIO",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "ADMIN_UNICO",
+    "titular": "J&A Garrigues, S.L.P."
+   },
    "composicion": [
     {
-     "cargo": "Presidente y Consejero",
-     "nombre": "Rafael Corcuera Sanz",
+     "cargo": "Administrador Único",
+     "nombre": "J&A Garrigues, S.L.P.",
      "es_socio_profesional": true
     },
     {
-     "cargo": "Consejera Secretaria",
-     "nombre": "Marta Sanromán Esteve",
-     "es_socio_profesional": true
-    },
-    {
-     "cargo": "Consejero Vocal",
-     "nombre": "Guillermo Téllez Oria",
-     "es_socio_profesional": false
+     "cargo": "Representante persona física del Administrador Único",
+     "nombre": "Fernando Vives Ruiz"
     }
    ],
-   "fundamento_legal": "Artículos 209, 210, 242, 245, 247 y 248 de la Ley de Sociedades de Capital; artículo 4.3 de la Ley 2/2007. Dos de los tres consejeros son socios profesionales.",
-   "razonamiento": "La consultoría de empresa familiar combina materias jurídicas, económicas y de gobierno, lo que justifica un órgano colegiado reducido. Un consejo de tres miembros aporta deliberación multidisciplinar sin sobredimensionar la estructura.",
-   "firmeza": "SINTETICO",
-   "procedencia": "SIMULADO",
-   "ancla": "La modalidad colegiada, las identidades y la distribución de condición profesional son simuladas."
+   "fundamento_legal": "Artículos 209, 210.1 y 233.2.a de la Ley de Sociedades de Capital: la sociedad se administra por un administrador único, a quien corresponde la representación. Al recaer el cargo en una persona jurídica, el artículo 212 bis LSC y el artículo 143 del Reglamento del Registro Mercantil exigen la designación e inscripción de una persona física que lo represente de forma permanente en el ejercicio del cargo. La administradora es una sociedad profesional inscrita, por lo que satisface por sí misma la exigencia subjetiva del artículo 4.3 de la Ley 2/2007 en un órgano unipersonal.",
+   "razonamiento": "No se elige forma de administración: la que consta acreditada es el administrador único. El entregable no propone modalidad alguna, se limita a modelar la inscrita.",
+   "firmeza": "A_CONFIRMAR",
+   "procedencia": "CATALOGO_PERIMETRO",
+   "ancla": "scripts/garrigues/entities-catalog.ts da formaAdministracion ADMINISTRADOR_UNICO y docs/superpowers/data/2026-08-29-garrigues-sinteticos/03-secretaria.json pone «J&A Garrigues, S.L.P.» en organo_adopta de GARR-SEC-019/033/049/050. Cautela expresa: scripts/garrigues/borme/garrigues-hcs-slp.json advierte de que NINGUNA fuente declara literalmente «Adm. Unico» para esta sociedad («No aparece designado explícitamente en el documento») y solo publica a Vives Ruiz, Fernando como «Representante» sin precisar de qué cargo; la identificación es inferencia por patrón de grupo, no dato inscrito verificado. Sustituye en todo caso a una administradora única persona física inventada."
   },
   {
-   "entidad_slug": "garrigues-consultoria-de-empresa-familiar-slp",
-   "denominacion": "Garrigues Consultoría de Empresa Familiar, S.L.P.",
-   "slug": "garrigues-consultoria-empresa-familiar-socio-unico",
+   "entidad_slug": "garrigues-hcs-slp",
+   "denominacion": "Garrigues Human Capital Services, S.L.P.",
+   "slug": "garrigues-hcs-socio-unico",
    "nombre": "Socio Único",
-   "body_type": "SOCIO_UNICO",
-   "naturaleza": "DECISORIO",
+   "body_type": "JUNTA",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "SOCIO_UNICO",
+    "titular": "J&A Garrigues, S.L.P."
+   },
    "composicion": [
     {
-     "cargo": "Socio Único Profesional",
-     "nombre": "Identidad societaria pendiente de confirmación por el despacho",
+     "cargo": "Socio Único",
+     "nombre": "J&A Garrigues, S.L.P.",
      "es_socio_profesional": true
     }
    ],
-   "fundamento_legal": "Artículos 12 a 17 y 15 de la Ley de Sociedades de Capital; artículo 4.2 de la Ley 2/2007.",
-   "razonamiento": "La existencia de un consejo de administración no altera la unipersonalidad. Las materias propias de los socios serán decididas por el socio único, mientras el consejo ejercerá las competencias de administración.",
-   "firmeza": "SINTETICO",
-   "procedencia": "DECLARADO_USUARIO",
-   "ancla": "La separación entre socio único y órgano de administración responde a la estructura declarada y evita confundir propiedad con administración."
+   "fundamento_legal": "Artículos 12 a 16 de la Ley de Sociedades de Capital; en particular, el artículo 15.1, conforme al cual el socio único ejerce las competencias de la Junta General, y el artículo 15.2, que ordena consignar sus decisiones en acta bajo su firma o la de su representante, pudiendo ejecutarlas y formalizarlas el propio socio o los administradores. Artículo 4.1.b de la Ley 2/2007: una sociedad profesional inscrita puede ser socia profesional de otra sociedad profesional.",
+   "razonamiento": "La entidad es unipersonal y carece de Junta General plural. El órgano decisorio de propiedad es el socio único, cuyas decisiones se consignan en acta y las certifica el administrador único.",
+   "firmeza": "FIRME",
+   "procedencia": "CATALOGO_PERIMETRO",
+   "ancla": "scripts/garrigues/entities-catalog.ts: garrigues-hcs-slp con esUnipersonal true, ownershipPct 100 y parentSlug jya-garrigues-slp, confianza CONFIRMADO; scripts/garrigues/borme/garrigues-hcs-slp.json lo corrobora en cargos vigentes («no se ha encontrado ningún socio profesional entre los cargos, solo apoderados — consistente con esUnipersonal true»). Lo mismo dicen GARR-SEC-020 y 034 de docs/superpowers/data/2026-08-29-garrigues-sinteticos/03-secretaria.json."
+  },
+  {
+   "entidad_slug": "garrigues-empresa-familiar-slp",
+   "denominacion": "Garrigues Consultoría de Empresa Familiar, S.L.P.",
+   "slug": "garrigues-empresa-familiar-admin-unico",
+   "nombre": "Administrador Único",
+   "body_type": "CDA",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "ADMIN_UNICO",
+    "titular": "J&A Garrigues, S.L.P."
+   },
+   "composicion": [
+    {
+     "cargo": "Administrador Único",
+     "nombre": "J&A Garrigues, S.L.P.",
+     "es_socio_profesional": true
+    },
+    {
+     "cargo": "Representante persona física del Administrador Único",
+     "nombre": "Fernando Vives Ruiz"
+    }
+   ],
+   "fundamento_legal": "Artículos 209, 210.1 y 233.2.a de la Ley de Sociedades de Capital: la sociedad se administra por un administrador único, a quien corresponde la representación. Al recaer el cargo en una persona jurídica, el artículo 212 bis LSC y el artículo 143 del Reglamento del Registro Mercantil exigen la designación e inscripción de una persona física que lo represente de forma permanente en el ejercicio del cargo. La administradora es una sociedad profesional inscrita, por lo que satisface por sí misma la exigencia subjetiva del artículo 4.3 de la Ley 2/2007 en un órgano unipersonal.",
+   "razonamiento": "No se elige forma de administración: la que consta acreditada es el administrador único. El entregable no propone modalidad alguna, se limita a modelar la inscrita.",
+   "firmeza": "A_CONFIRMAR",
+   "procedencia": "CATALOGO_PERIMETRO",
+   "ancla": "scripts/garrigues/entities-catalog.ts da formaAdministracion ADMINISTRADOR_UNICO y docs/superpowers/data/2026-08-29-garrigues-sinteticos/03-secretaria.json pone «J&A Garrigues, S.L.P.» en organo_adopta de GARR-SEC-021/035/056. Cautela expresa: scripts/garrigues/borme/garrigues-empresa-familiar-slp.json solo publica a Vives Ruiz, Fernando como «Representante (cargo exacto no explicitado en fetch directo)» y advierte de que ninguna fuente declaró literalmente «Adm. Unico» para esta sociedad. Sustituye a un consejo de tres miembros inventado, incompatible además con la unipersonalidad que el propio entregable declara."
+  },
+  {
+   "entidad_slug": "garrigues-empresa-familiar-slp",
+   "denominacion": "Garrigues Consultoría de Empresa Familiar, S.L.P.",
+   "slug": "garrigues-empresa-familiar-socio-unico",
+   "nombre": "Socio Único",
+   "body_type": "JUNTA",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "SOCIO_UNICO",
+    "titular": "J&A Garrigues, S.L.P."
+   },
+   "composicion": [
+    {
+     "cargo": "Socio Único",
+     "nombre": "J&A Garrigues, S.L.P.",
+     "desde": "2017",
+     "es_socio_profesional": true
+    }
+   ],
+   "fundamento_legal": "Artículos 12 a 16 de la Ley de Sociedades de Capital; en particular, el artículo 15.1, conforme al cual el socio único ejerce las competencias de la Junta General, y el artículo 15.2, que ordena consignar sus decisiones en acta bajo su firma o la de su representante, pudiendo ejecutarlas y formalizarlas el propio socio o los administradores. Artículo 4.1.b de la Ley 2/2007: una sociedad profesional inscrita puede ser socia profesional de otra sociedad profesional.",
+   "razonamiento": "Propiedad y administración quedan separadas sin duplicar titular: el mismo sujeto es socio único y administrador único, pero actúa en concepto distinto en cada uno. Las materias reservadas a los socios se deciden como socio único; la gestión, como administrador.",
+   "firmeza": "FIRME",
+   "procedencia": "REGISTRAL_BORME",
+   "ancla": "scripts/garrigues/borme/garrigues-empresa-familiar-slp.json: «un acto de 2017 registra que J & A GARRIGUES SLP adquirió la titularidad única (socio único) de la sociedad». Concuerda con scripts/garrigues/entities-catalog.ts (esUnipersonal true, ownershipPct 100) y con GARR-SEC-022 y 036 de docs/superpowers/data/2026-08-29-garrigues-sinteticos/03-secretaria.json."
   },
   {
    "entidad_slug": "garrigues-portugal-slp",
    "denominacion": "Garrigues Portugal, S.L.P.",
-   "slug": "garrigues-portugal-consejo-administracion",
-   "nombre": "Consejo de Administración",
+   "slug": "garrigues-portugal-admin-unico",
+   "nombre": "Administrador Único",
    "body_type": "CDA",
-   "naturaleza": "DECISORIO",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "ADMIN_UNICO",
+    "titular": "Fernando Vives Ruiz"
+   },
    "composicion": [
     {
-     "cargo": "Presidente y Consejero",
-     "nombre": "Rodrigo Valcárcel Mouriño",
+     "cargo": "Administrador Único",
+     "nombre": "Fernando Vives Ruiz",
+     "desde": "2026-07-06",
      "es_socio_profesional": true
-    },
-    {
-     "cargo": "Vicepresidenta y Consejera",
-     "nombre": "Helena Duarte Salgado",
-     "es_socio_profesional": true
-    },
-    {
-     "cargo": "Consejero Secretario",
-     "nombre": "Sergio Marquina Leal",
-     "es_socio_profesional": true
-    },
-    {
-     "cargo": "Consejera Vocal",
-     "nombre": "Teresa Fonseca Abreu",
-     "es_socio_profesional": false
-    },
-    {
-     "cargo": "Consejero Vocal",
-     "nombre": "Álvaro Nogueira Paz",
-     "es_socio_profesional": false
     }
    ],
-   "fundamento_legal": "Artículos 209, 210, 242, 245, 247 y 248 de la Ley de Sociedades de Capital; artículo 4.3 de la Ley 2/2007. La composición contiene tres socios profesionales de un total de cinco.",
-   "razonamiento": "La dimensión internacional sugerida por su denominación y la pluralidad declarada aconsejan un consejo que combine dirección profesional y supervisión corporativa. Se mantiene, no obstante, la forma española S.L.P. recibida como dato de entrada, sin resolver por inferencia su jurisdicción efectiva.",
-   "firmeza": "SINTETICO",
-   "procedencia": "SIMULADO",
-   "ancla": "La forma social no se modifica; la elección del consejo, su composición y las identidades son simuladas."
+   "fundamento_legal": "Artículos 209, 210.1 y 233.2.a de la Ley de Sociedades de Capital: la sociedad se administra por un administrador único, a quien corresponde la representación. Artículo 4.3, párrafo segundo, de la Ley 2/2007: cuando el órgano de administración sea unipersonal, deberá desempeñarlo un socio profesional.",
+   "razonamiento": "No se elige forma de administración: la que consta acreditada es el administrador único. El entregable no propone modalidad alguna, se limita a modelar la inscrita.",
+   "firmeza": "FIRME",
+   "procedencia": "REGISTRAL_BORME",
+   "ancla": "scripts/garrigues/borme/garrigues-portugal-slp.json: «Adm. Unico: Vives Ruiz, Fernando» desde 2026-07-06, reelección inscrita. Concuerda con scripts/garrigues/entities-catalog.ts (formaAdministracion ADMINISTRADOR_UNICO) y con organo_adopta de GARR-SEC-043 en docs/superpowers/data/2026-08-29-garrigues-sinteticos/03-secretaria.json. Sustituye a un consejo de cinco miembros inventado. La condición de socio profesional del administrador se afirma por su ejercicio como abogado y por el patrón del propio Registro, que en esta sociedad publica altas de «Soc.Prof.»; el asiento concreto de su condición de socio no se ha localizado."
   },
   {
    "entidad_slug": "garrigues-portugal-slp",
@@ -339,53 +372,58 @@
    "slug": "garrigues-portugal-junta-general",
    "nombre": "Junta General de Socios",
    "body_type": "JUNTA",
-   "naturaleza": "DECISORIO",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "JUNTA_GENERAL"
+   },
    "composicion": [
     {
-     "cargo": "Presidente de la Junta",
-     "nombre": "Rodrigo Valcárcel Mouriño",
+     "cargo": "Mesa de la Junta",
+     "nombre": "Presidente y secretario designados por los socios concurrentes al comienzo de la reunión (artículo 191 LSC, segundo inciso: la sociedad no tiene consejo de administración)"
+    },
+    {
+     "cargo": "Socios profesionales con alta inscrita",
+     "nombre": "Jaime Silva Castañón (2026-07-09), Francisco Huberto Montes Worboys (2025-04-29), Leopoldo Rubido Vidal (2026-06-04) y Rocío Belda de Mergelina (2019-07-16)",
      "es_socio_profesional": true
     },
     {
-     "cargo": "Secretaria de la Junta",
-     "nombre": "Helena Duarte Salgado",
-     "es_socio_profesional": true
-    },
-    {
-     "cargo": "Colectivo de socios profesionales",
-     "nombre": "Socios profesionales titulares del 75 % del capital y del voto",
-     "es_socio_profesional": true
-    },
-    {
-     "cargo": "Colectivo de socios no profesionales",
-     "nombre": "Socios no profesionales titulares del 25 % del capital y del voto",
-     "es_socio_profesional": false
+     "cargo": "Resto del censo",
+     "nombre": "No acreditado: el Registro solo publica las altas y bajas de socios profesionales, no el libro registro de socios, y ninguna fuente atribuye participación de capital a la matriz"
     }
    ],
-   "fundamento_legal": "Artículos 159, 160 y 198 a 200 de la Ley de Sociedades de Capital; artículo 4.2 de la Ley 2/2007.",
-   "razonamiento": "La entidad se declara pluripersonal y, por tanto, debe operar mediante Junta General, no mediante socio único. La mayoría sintética de capital y voto corresponde a socios profesionales.",
-   "firmeza": "SINTETICO",
-   "procedencia": "SIMULADO",
-   "ancla": "La pluralidad está declarada; la mesa de la Junta y la distribución de capital y voto son simuladas."
+   "fundamento_legal": "Artículos 159, 160 y 198 a 200 de la Ley de Sociedades de Capital. La mesa se determina conforme al artículo 191 LSC. La aprobación de cuentas no es inscribible: se deposita conforme al artículo 279 LSC y a los artículos 365 y siguientes del Reglamento del Registro Mercantil. Artículo 4.2 de la Ley 2/2007 para la mayoría de capital y voto profesional.",
+   "razonamiento": "La sociedad es pluripersonal y decide en Junta General. No se inventa un reparto de capital: se listan los socios profesionales cuya alta consta inscrita y se declara que el censo completo no es público. La mesa de la Junta no ostenta la facultad de certificar: el artículo 109.1 RRM la atribuye al órgano de administración, que en esta sociedad es el administrador único.",
+   "firmeza": "A_CONFIRMAR",
+   "procedencia": "REGISTRAL_BORME",
+   "ancla": "scripts/garrigues/borme/garrigues-portugal-slp.json publica cuatro altas de «Soc.Prof.» con fecha. scripts/garrigues/entities-catalog.ts marca esta sociedad con confianza A_CONFIRMAR e incidencia abierta: «BORME muestra SOCIOS PROFESIONALES PROPIOS […] posible SLP hermana con pool de socios compartido; la participación de capital de la matriz NO está acreditada». Por eso se retira el reparto 75/25 de la versión anterior, que era invención sobre una incidencia abierta."
   },
   {
    "entidad_slug": "violet-inversiones-2010-sl",
    "denominacion": "Violet Inversiones 2010, S.L.",
    "slug": "garrigues-violet-inversiones-admin-unico",
    "nombre": "Administrador Único",
-   "body_type": "ADMIN_UNICO",
-   "naturaleza": "DECISORIO",
+   "body_type": "CDA",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "ADMIN_UNICO",
+    "titular": "Garrigues Letrados de Soporte, S.L.P."
+   },
    "composicion": [
     {
      "cargo": "Administrador Único",
-     "nombre": "Diego Valmaseda Rius"
+     "nombre": "Garrigues Letrados de Soporte, S.L.P. (denominación anterior: Rino Asesores, S.L.P.)",
+     "desde": "2010-05-04"
+    },
+    {
+     "cargo": "Representante persona física del Administrador Único",
+     "nombre": "Manuel Delgado Quirós"
     }
    ],
-   "fundamento_legal": "Artículos 209, 210.1 y 233.1 de la Ley de Sociedades de Capital.",
-   "razonamiento": "Al tratarse de una sociedad de inversión instrumental, se prioriza una administración sencilla y de bajo coste. No se aprecia en los datos disponibles una complejidad que justifique un consejo ni una cogestión mancomunada.",
-   "firmeza": "SINTETICO",
-   "procedencia": "SIMULADO",
-   "ancla": "Objeto inversor inferido de la denominación; modalidad e identidad simuladas."
+   "fundamento_legal": "Artículos 209, 210.1 y 233.2.a de la Ley de Sociedades de Capital: la sociedad se administra por un administrador único, a quien corresponde la representación. Al recaer el cargo en una persona jurídica, el artículo 212 bis LSC y el artículo 143 del Reglamento del Registro Mercantil exigen la designación e inscripción de una persona física que lo represente de forma permanente en el ejercicio del cargo.",
+   "razonamiento": "No se elige forma de administración: la que consta acreditada es el administrador único. El entregable no propone modalidad alguna, se limita a modelar la inscrita.",
+   "firmeza": "FIRME",
+   "procedencia": "REGISTRAL_BORME",
+   "ancla": "scripts/garrigues/borme/violet-inversiones-2010-sl.json: «Adm. Unico: Rino Asesores SLP» desde 2010-05-04 y «Representante (de Rino Asesores SLP): Delgado Quirós, Manuel». scripts/garrigues/entities-catalog.ts registra que Rino Asesores, S.L.P. es la denominación anterior (hasta 02/01/2018) de Garrigues Letrados de Soporte, S.L.P. (B81552671). Coincide con organo_adopta de GARR-SEC-037 y 057 en docs/superpowers/data/2026-08-29-garrigues-sinteticos/03-secretaria.json. Sustituye a un administrador único persona física inventado."
   },
   {
    "entidad_slug": "violet-inversiones-2010-sl",
@@ -393,199 +431,227 @@
    "slug": "garrigues-violet-inversiones-junta-general",
    "nombre": "Junta General de Socios",
    "body_type": "JUNTA",
-   "naturaleza": "DECISORIO",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "JUNTA_GENERAL"
+   },
    "composicion": [
     {
-     "cargo": "Presidente de la Junta",
-     "nombre": "Diego Valmaseda Rius"
-    },
-    {
-     "cargo": "Secretaria de la Junta",
-     "nombre": "Marina Saavedra Echevarría"
+     "cargo": "Mesa de la Junta",
+     "nombre": "Presidente y secretario designados por los socios concurrentes al comienzo de la reunión (artículo 191 LSC, segundo inciso: la sociedad no tiene consejo de administración)"
     },
     {
      "cargo": "Socios asistentes o representados",
-     "nombre": "Pluralidad de socios conforme al censo sintético"
+     "nombre": "Censo no acreditado: el Registro no publica el libro registro de socios y el titular directo del capital no consta resuelto en el catálogo del perímetro"
     }
    ],
-   "fundamento_legal": "Artículos 159, 160 y 198 a 200 de la Ley de Sociedades de Capital.",
-   "razonamiento": "La tabla declara pluralidad de socios, por lo que se modela Junta General. No se crea socio único ni se confunde la concentración de la administración con la estructura de propiedad.",
+   "fundamento_legal": "Artículos 159, 160 y 198 a 200 de la Ley de Sociedades de Capital. La mesa se determina conforme al artículo 191 LSC. La aprobación de cuentas no es inscribible: se deposita conforme al artículo 279 LSC y a los artículos 365 y siguientes del Reglamento del Registro Mercantil.",
+   "razonamiento": "La pluralidad de socios se asume como dato de entrada y sostiene la Junta General. No se nombra mesa: hacerlo daba pie a que una persona ajena al órgano de administración apareciera certificando. La mesa de la Junta no ostenta la facultad de certificar: el artículo 109.1 RRM la atribuye al órgano de administración, que en esta sociedad es el administrador único.",
    "firmeza": "SINTETICO",
    "procedencia": "SIMULADO",
-   "ancla": "La existencia de Junta deriva de la tabla; los cargos de mesa y el censo son simulados."
+   "ancla": "scripts/garrigues/entities-catalog.ts deja Violet con parentSlug null, ownershipPct null e incidencia «100% indirecta según IDC con titular directo SIN RESOLVER». Se retiran los dos nombres de mesa de la versión anterior: uno era el administrador único inventado y el otro combinaba dos apellidos presentes en el censo real de socios de scripts/garrigues/censo/socios-acta-2026-05-06.json."
   },
   {
-   "entidad_slug": "ewoh-inversiones-2010-sl",
+   "entidad_slug": "ewch-inversiones-sl",
    "denominacion": "EWOH Inversiones 2010, S.L.",
-   "slug": "garrigues-ewoh-inversiones-administradores-mancomunados",
-   "nombre": "Administradores Mancomunados",
-   "body_type": "ADMIN_MANCOMUNADO",
-   "naturaleza": "DECISORIO",
+   "slug": "garrigues-ewoh-inversiones-admin-unico",
+   "nombre": "Administrador Único",
+   "body_type": "CDA",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "ADMIN_UNICO",
+    "titular": "Garrigues Letrados de Soporte, S.L.P."
+   },
    "composicion": [
     {
-     "cargo": "Administradora Mancomunada",
-     "nombre": "Sofía Cabanillas Ros"
+     "cargo": "Administrador Único",
+     "nombre": "Garrigues Letrados de Soporte, S.L.P. (denominación anterior: Rino Asesores, S.L.P.)"
     },
     {
-     "cargo": "Administrador Mancomunado",
-     "nombre": "Miguel Herranz Oliva"
+     "cargo": "Representante persona física del Administrador Único",
+     "nombre": "Manuel Delgado Quirós"
     }
    ],
-   "fundamento_legal": "Artículos 209, 210 y 233.2.b de la Ley de Sociedades de Capital. La administración mancomunada exige actuación conjunta en los términos estatutarios.",
-   "razonamiento": "Se propone firma mancomunada para someter inversiones, desinversiones y disposición de activos a un control dual. Esta estructura reduce el riesgo de actuación unilateral en una sociedad patrimonial sin llegar a la complejidad de un consejo.",
-   "firmeza": "SINTETICO",
-   "procedencia": "SIMULADO",
-   "ancla": "La forma de administración y las personas son simuladas como control dual de una sociedad de inversión."
+   "fundamento_legal": "Artículos 209, 210.1 y 233.2.a de la Ley de Sociedades de Capital: la sociedad se administra por un administrador único, a quien corresponde la representación. Al recaer el cargo en una persona jurídica, el artículo 212 bis LSC y el artículo 143 del Reglamento del Registro Mercantil exigen la designación e inscripción de una persona física que lo represente de forma permanente en el ejercicio del cargo.",
+   "razonamiento": "No se elige forma de administración: la que consta acreditada es el administrador único. El entregable no propone modalidad alguna, se limita a modelar la inscrita.",
+   "firmeza": "A_CONFIRMAR",
+   "procedencia": "REGISTRAL_BORME",
+   "ancla": "El representante persona física sí está acreditado: scripts/garrigues/borme/ewch-inversiones-sl.json publica «Representante: Delgado Quirós, Manuel». La razón social de la administradora persona jurídica NO lo está: el mismo fichero advierte de que «la ficha directa solo mostró a Manuel Delgado Quirós como representante, sin nombrar explícitamente a la persona jurídica administradora» y deja Rino Asesores/Letrados de Soporte como hipótesis por patrón con Violet. Se sigue esa hipótesis porque es la que ya usa organo_adopta de GARR-SEC-039 y 058 en docs/superpowers/data/2026-08-29-garrigues-sinteticos/03-secretaria.json, y se marca A_CONFIRMAR. Sustituye a dos administradores mancomunados inventados."
   },
   {
-   "entidad_slug": "ewoh-inversiones-2010-sl",
+   "entidad_slug": "ewch-inversiones-sl",
    "denominacion": "EWOH Inversiones 2010, S.L.",
    "slug": "garrigues-ewoh-inversiones-junta-general",
    "nombre": "Junta General de Socios",
    "body_type": "JUNTA",
-   "naturaleza": "DECISORIO",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "JUNTA_GENERAL"
+   },
    "composicion": [
     {
-     "cargo": "Presidenta de la Junta",
-     "nombre": "Sofía Cabanillas Ros"
-    },
-    {
-     "cargo": "Secretario de la Junta",
-     "nombre": "Miguel Herranz Oliva"
+     "cargo": "Mesa de la Junta",
+     "nombre": "Presidente y secretario designados por los socios concurrentes al comienzo de la reunión (artículo 191 LSC, segundo inciso: la sociedad no tiene consejo de administración)"
     },
     {
      "cargo": "Socios asistentes o representados",
-     "nombre": "Pluralidad de socios conforme al censo sintético"
+     "nombre": "Censo no acreditado: el Registro no publica el libro registro de socios y el titular directo del capital no consta resuelto en el catálogo del perímetro"
     }
    ],
-   "fundamento_legal": "Artículos 159, 160 y 198 a 200 de la Ley de Sociedades de Capital.",
-   "razonamiento": "La sociedad es pluripersonal según el dato de entrada y adopta las decisiones de socios en Junta General. La actuación mancomunada de los administradores no convierte a la entidad en unipersonal.",
+   "fundamento_legal": "Artículos 159, 160 y 198 a 200 de la Ley de Sociedades de Capital. La mesa se determina conforme al artículo 191 LSC. La aprobación de cuentas no es inscribible: se deposita conforme al artículo 279 LSC y a los artículos 365 y siguientes del Reglamento del Registro Mercantil.",
+   "razonamiento": "La pluralidad de socios se asume como dato de entrada y sostiene la Junta General. Sin mesa nominada: la facultad de certificar no puede acabar en manos de quien no administra. La mesa de la Junta no ostenta la facultad de certificar: el artículo 109.1 RRM la atribuye al órgano de administración, que en esta sociedad es el administrador único.",
    "firmeza": "SINTETICO",
    "procedencia": "SIMULADO",
-   "ancla": "Pluralidad declarada; composición de la Junta simulada."
+   "ancla": "scripts/garrigues/entities-catalog.ts deja ewch-inversiones-sl con parentSlug null y titular directo sin resolver. El slug del catálogo conserva la grafía «ewch» del OCR del cuadro IDC; la denominación real resuelta por el Carril B es «EWOH Inversiones 2010, S.L.» y es la que se imprime."
   },
   {
-   "entidad_slug": "garmen-inversiones-2013-sl",
+   "entidad_slug": "garben-inversiones-2013-slu",
    "denominacion": "Garmen Inversiones 2013, S.L.",
-   "slug": "garrigues-garmen-inversiones-administradores-solidarios",
-   "nombre": "Administradores Solidarios",
-   "body_type": "ADMIN_SOLIDARIO",
-   "naturaleza": "DECISORIO",
+   "slug": "garrigues-garmen-inversiones-admin-unico",
+   "nombre": "Administrador Único",
+   "body_type": "CDA",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "ADMIN_UNICO",
+    "titular": "Garrigues Letrados de Soporte, S.L.P."
+   },
    "composicion": [
     {
-     "cargo": "Administrador Solidario",
-     "nombre": "Arturo Mencía Villalba"
+     "cargo": "Administrador Único",
+     "nombre": "Garrigues Letrados de Soporte, S.L.P. (denominación anterior: Rino Asesores, S.L.P.)"
     },
     {
-     "cargo": "Administradora Solidaria",
-     "nombre": "Nuria Pardo Castejón"
+     "cargo": "Representante persona física del Administrador Único",
+     "nombre": "Manuel Delgado Quirós"
     }
    ],
-   "fundamento_legal": "Artículos 209, 210 y 233.2.a de la Ley de Sociedades de Capital. Deben coexistir al menos dos administradores solidarios.",
-   "razonamiento": "Se opta por administradores solidarios para permitir rapidez en operaciones ordinarias de inversión y tesorería. La dualidad personal mantiene continuidad operativa sin exigir firma conjunta.",
-   "firmeza": "SINTETICO",
-   "procedencia": "SIMULADO",
-   "ancla": "Modalidad solidaria e identidades simuladas para introducir heterogeneidad realista entre vehículos de inversión."
+   "fundamento_legal": "Artículos 209, 210.1 y 233.2.a de la Ley de Sociedades de Capital: la sociedad se administra por un administrador único, a quien corresponde la representación. Al recaer el cargo en una persona jurídica, el artículo 212 bis LSC y el artículo 143 del Reglamento del Registro Mercantil exigen la designación e inscripción de una persona física que lo represente de forma permanente en el ejercicio del cargo.",
+   "razonamiento": "No se elige forma de administración: la que consta acreditada es el administrador único. El entregable no propone modalidad alguna, se limita a modelar la inscrita.",
+   "firmeza": "A_CONFIRMAR",
+   "procedencia": "REGISTRAL_BORME",
+   "ancla": "Mismo estado de prueba que EWOH: scripts/garrigues/borme/garben-inversiones-2013-slu.json publica «Representante: Delgado Quirós, Manuel» y anota «administrador persona jurídica representado por Manuel Delgado Quirós (no se nombró explícitamente la razón social del administrador en la ficha de esta sociedad)». Se sigue la hipótesis de Letrados de Soporte porque es la de organo_adopta de GARR-SEC-041 y 059 en docs/superpowers/data/2026-08-29-garrigues-sinteticos/03-secretaria.json, y se marca A_CONFIRMAR. Sustituye a dos administradores solidarios inventados."
   },
   {
-   "entidad_slug": "garmen-inversiones-2013-sl",
+   "entidad_slug": "garben-inversiones-2013-slu",
    "denominacion": "Garmen Inversiones 2013, S.L.",
    "slug": "garrigues-garmen-inversiones-junta-general",
    "nombre": "Junta General de Socios",
    "body_type": "JUNTA",
-   "naturaleza": "DECISORIO",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "JUNTA_GENERAL"
+   },
    "composicion": [
     {
-     "cargo": "Presidente de la Junta",
-     "nombre": "Arturo Mencía Villalba"
-    },
-    {
-     "cargo": "Secretaria de la Junta",
-     "nombre": "Nuria Pardo Castejón"
+     "cargo": "Mesa de la Junta",
+     "nombre": "Presidente y secretario designados por los socios concurrentes al comienzo de la reunión (artículo 191 LSC, segundo inciso: la sociedad no tiene consejo de administración)"
     },
     {
      "cargo": "Socios asistentes o representados",
-     "nombre": "Pluralidad de socios conforme al censo sintético"
+     "nombre": "Censo no acreditado: el Registro no publica el libro registro de socios y el titular directo del capital no consta resuelto en el catálogo del perímetro"
     }
    ],
-   "fundamento_legal": "Artículos 159, 160 y 198 a 200 de la Ley de Sociedades de Capital.",
-   "razonamiento": "La pluralidad indicada exige Junta General y excluye el socio único. Las cuentas anuales, aplicación del resultado y demás materias reservadas a los socios deben dirigirse a este órgano.",
+   "fundamento_legal": "Artículos 159, 160 y 198 a 200 de la Ley de Sociedades de Capital. La mesa se determina conforme al artículo 191 LSC. La aprobación de cuentas no es inscribible: se deposita conforme al artículo 279 LSC y a los artículos 365 y siguientes del Reglamento del Registro Mercantil.",
+   "razonamiento": "Se mantiene la Junta General y no un socio único: ninguna fuente declara unipersonal a esta sociedad. La mesa de la Junta no ostenta la facultad de certificar: el artículo 109.1 RRM la atribuye al órgano de administración, que en esta sociedad es el administrador único.",
    "firmeza": "SINTETICO",
    "procedencia": "SIMULADO",
-   "ancla": "Pluralidad declarada; cargos de mesa y censo simulados."
+   "ancla": "scripts/garrigues/entities-catalog.ts da legalForm SL, esUnipersonal null y confianza A_CONFIRMAR pese a que su slug dice «slu»; scripts/garrigues/borme/garben-inversiones-2013-slu.json lo confirma: «el catálogo interno asume S.L.U. por inferencia aritmética del IDC. Ninguna de las fuentes consultadas confirma explícitamente el carácter unipersonal — se deja PENDIENTE, no se afirma». La Junta es la lectura coherente con el dato, no con el slug."
   },
   {
-   "entidad_slug": "ead-trust-european-agency-of-digital-trust-sl",
+   "entidad_slug": "ead-trust-sl",
    "denominacion": "EAD Trust European Agency of Digital Trust, S.L.",
    "slug": "garrigues-ead-trust-junta-general",
    "nombre": "Junta General de Socios",
    "body_type": "JUNTA",
-   "naturaleza": "DECISORIO",
+   "config": {
+    "naturaleza": "DECISORIO",
+    "organo_tipo": "JUNTA_GENERAL"
+   },
    "composicion": [
     {
-     "cargo": "Presidenta de la Junta",
-     "nombre": "Irene Montalbán Crespo"
+     "cargo": "Presidente de la Junta",
+     "nombre": "Julián Ramón Inza Aldaz — Presidente del Consejo de Administración"
     },
     {
      "cargo": "Secretario de la Junta",
-     "nombre": "Samuel Fontán Aguirre"
+     "nombre": "Roberto Delgado Gil — Secretario no consejero del Consejo de Administración"
     },
     {
      "cargo": "Socio mayoritario",
-     "nombre": "Compañía Digital NewLaw, S.L.U. — participación indirecta declarada del 51,001 %"
+     "nombre": "Compañía Digital NewLaw, S.L.U. — 51 % del capital"
     },
     {
      "cargo": "Socios minoritarios",
-     "nombre": "Titulares minoritarios sintéticos agrupados — 48,999 %"
+     "nombre": "49 % restante sin titulares acreditados en las fuentes del perímetro"
     }
    ],
-   "fundamento_legal": "Artículos 159, 160 y 198 a 200 de la Ley de Sociedades de Capital. La aprobación de cuentas corresponde a la Junta y el acuerdo no se inscribe ni se eleva a público: se presenta para depósito conforme al artículo 279 LSC y a los artículos 365 y siguientes del Reglamento del Registro Mercantil.",
-   "razonamiento": "Se añade únicamente la Junta General porque el Consejo de Administración ya existe en el tenant. Las tres aprobaciones de cuentas atribuidas a junta deberán apuntar a este órgano y continuar por el flujo de depósito, sin escritura ni intervención notarial.",
-   "firmeza": "SINTETICO",
-   "procedencia": "DEMO_PILOTO",
-   "ancla": "La participación indirecta del 51,001 % y la existencia del Consejo se reciben como datos declarados; la mesa de la Junta y la agrupación del 48,999 % minoritario son sintéticas."
+   "fundamento_legal": "Artículos 159, 160 y 198 a 200 de la Ley de Sociedades de Capital. La mesa se determina conforme al artículo 191 LSC. La aprobación de cuentas no es inscribible: se deposita conforme al artículo 279 LSC y a los artículos 365 y siguientes del Reglamento del Registro Mercantil. La mesa se rige por el primer inciso del artículo 191 LSC: al existir consejo de administración, presiden la Junta el presidente y el secretario del consejo, salvo disposición estatutaria contraria.",
+   "razonamiento": "Es el único órgano nuevo que necesita EAD Trust: su Consejo de Administración ya está sembrado en el tenant. La mesa no se inventa porque el artículo 191 LSC la remite al consejo, cuyos cargos son reales y públicos. Las tres aprobaciones de cuentas atribuidas a junta apuntan a este órgano y siguen el flujo de depósito, sin escritura ni asiento de inscripción.",
+   "firmeza": "A_CONFIRMAR",
+   "procedencia": "REGISTRAL_BORME",
+   "ancla": "Los dos cargos de mesa salen de scripts/garrigues/gobierno/governance-catalog.ts (eadBoard: PRESIDENTE Julián Ramón Inza Aldaz; SECRETARIO no consejero Roberto Delgado Gil desde 2023-04-20) y de scripts/garrigues/borme/ead-trust-sl.json. Sustituyen a una presidenta y un secretario inventados que, además, aparecían en 07-cadena-documental.json certificando y elevando a público como cargos del CONSEJO. El porcentaje queda A_CONFIRMAR: scripts/garrigues/entities-catalog.ts marca incidencia abierta «51,00 (IDC, indirecta, titular directo ilegible) vs 51,001 (contrato)». Se afirma titularidad de NewLaw porque es el parentSlug del catálogo, y se retira la palabra «indirecta», que era incompatible con sentar a NewLaw en la Junta."
   }
  ],
  "dudas": [
   {
    "entidad": "Todas las entidades",
-   "cuestion": "Debe confirmarse que los estatutos vigentes permiten la modalidad de administración propuesta y, en su caso, el número concreto o rango de administradores. El artículo 210 LSC remite a la configuración estatutaria de las formas de administración."
+   "cuestion": "Los once entidad_slug se han sustituido por los canónicos de scripts/garrigues/entities-catalog.ts, casando por denominación y NIF: compania-digital-newlaw-slu → cia-digital-newlaw-slu; g-advisory-consultoria-tecnica-economica-y-estrategica-slp → g-advisory-slp (el catálogo tiene además g-advisory-chile-spa, g-advisory-mexico-sc y g-advisory-colombia: la S.L.P. española es la de NIF B82801069); garrigues-letrados-de-soporte-slp → garrigues-letrados-soporte-slp; garrigues-human-capital-services-slp → garrigues-hcs-slp; garrigues-consultoria-de-empresa-familiar-slp → garrigues-empresa-familiar-slp; ewoh-inversiones-2010-sl → ewch-inversiones-sl; garmen-inversiones-2013-sl → garben-inversiones-2013-slu; ead-trust-european-agency-of-digital-trust-sl → ead-trust-sl. Los tres restantes (garrigues-ip-slp, garrigues-portugal-slp, violet-inversiones-2010-sl) ya eran correctos. Ninguno queda sin casar."
+  },
+  {
+   "entidad": "Garmen Inversiones 2013, S.L.",
+   "cuestion": "Defecto del catálogo, no de este entregable: el slug canónico es garben-inversiones-2013-slu (con «garben» y con «slu»), pero el propio catálogo declara legalName «Garmen Inversiones 2013, S.L.», legalForm SL, esUnipersonal null y confianza A_CONFIRMAR, e incidencia abierta de que «Garben» no aparece en ninguna búsqueda pública. Se conserva el slug tal cual para que la siembra case, se imprime la denominación real y se modela Junta General, que es lo coherente con legalForm y esUnipersonal. Corregir el slug del catálogo exige verificación registral por NIF B86825437."
   },
   {
    "entidad": "Todas las entidades",
-   "cuestion": "Las identidades personales, fechas de nombramiento, duración de mandatos, aceptaciones, NIF y datos registrales de los administradores son ficticios o están pendientes; no deben presentarse a inscripción sin acuerdo, aceptación y escritura reales."
+   "cuestion": "body_type se ha mapeado al CHECK de governing_bodies (CDA, COMISION, COMITE, JUNTA), que ninguna migración posterior levanta. Los valores ADMIN_UNICO, ADMIN_MANCOMUNADO, ADMIN_SOLIDARIO y SOCIO_UNICO de la versión anterior habrían hecho que Postgres rechazase 12 de las 21 filas. La modalidad viaja ahora en config.organo_tipo. Queda por decidir si el motor debe leer config.organo_tipo o si conviene ampliar el CHECK: hoy tres bodies distintos del tenant comparten body_type CDA sin ser colegiados."
   },
   {
-   "entidad": "Entidades unipersonales",
-   "cuestion": "Debe confirmarse documentalmente la identidad del socio único, la inscripción de la unipersonalidad y la titularidad del 100 % del capital. El régimen de los artículos 12 a 17 LSC exige tratamiento registral específico de la unipersonalidad."
+   "entidad": "Todas las entidades",
+   "cuestion": "Sembrar estos 21 órganos rompe un gate hoy verde: src/test/schema/garrigues-gobierno-seed.test.ts asserta exactamente 1 JUNTA + 2 CDA + 19 COMITE sobre governing_bodies del tenant. Con este fichero pasarían a 12 CDA y 10 JUNTA. Hay que actualizar el gate a la topología nueva con conteos por entidad, no relajar la aserción a un mayor-o-igual, que dejaría de discriminar."
   },
   {
-   "entidad": "Compañía Digital NewLaw, S.L.U.",
-   "cuestion": "La identificación de J&A Garrigues, S.L.P. como socio único se infiere de la estructura del tenant y debe verificarse contra el libro registro de socios y la hoja registral antes de tratarse como dato firme."
+   "entidad": "Órganos de administración",
+   "cuestion": "Se ha retirado la propuesta de modalidad. Las once sociedades tienen administrador único y así consta en entities-catalog.ts (formaAdministracion), en el campo organo_adopta de los 59 acuerdos de 03-secretaria.json y, en seis de ellas, en el BORME. La heterogeneidad de formas (mancomunados, solidarios, consejos) que buscaba la versión anterior no puede salir de contradecir el Registro: si la demo la necesita, hay que introducirla en entidades sin dato registral."
   },
   {
-   "entidad": "Sociedades profesionales",
-   "cuestion": "Deben confirmarse la condición profesional de cada socio y administrador, el porcentaje real de capital y voto profesional y la eventual existencia de personas jurídicas profesionales. Las composiciones propuestas cumplen formalmente la mayoría del artículo 4 de la Ley 2/2007, pero los porcentajes e identidades son sintéticos."
+   "entidad": "Garrigues Human Capital Services, S.L.P. / Garrigues Consultoría de Empresa Familiar, S.L.P.",
+   "cuestion": "Marcadas A_CONFIRMAR. Ninguna fuente pública declara literalmente «Adm. Unico» para estas dos sociedades; sus fichas BORME solo publican a Fernando Vives Ruiz como «Representante» sin precisar de qué cargo. La identificación del administrador único como J&A Garrigues, S.L.P. representada por Vives es inferencia por patrón de grupo, aunque coincide con lo que ya afirma organo_adopta en 03-secretaria.json. Verificación pendiente en el Registro Mercantil de Madrid."
+  },
+  {
+   "entidad": "EWOH Inversiones 2010, S.L. / Garmen Inversiones 2013, S.L.",
+   "cuestion": "Marcadas A_CONFIRMAR por el mismo motivo, con el matiz invertido: aquí lo acreditado es el representante persona física (Manuel Delgado Quirós) y lo no acreditado es la razón social de la administradora persona jurídica, que el Carril B deja como hipótesis por patrón con Violet. Se sigue la hipótesis porque es la que ya usa 03-secretaria.json."
+  },
+  {
+   "entidad": "G-Advisory / Garrigues IP / Garrigues Letrados de Soporte",
+   "cuestion": "El administrador único es persona jurídica y el artículo 212 bis LSC exige designar e inscribir un representante persona física, pero la fuente registral consultada no lo nombra en estas tres. No se inventa: la composición no incluye la fila de representante. Antes de otorgar cualquier escritura en nombre de estas sociedades hay que resolver quién es."
+  },
+  {
+   "entidad": "Sociedades unipersonales",
+   "cuestion": "En Garrigues IP, Letrados de Soporte, HCS y Empresa Familiar el socio único es J&A Garrigues, S.L.P., y así se ha rellenado (antes decía «Identidad societaria pendiente de confirmación»). Con un único socio titular del 100 % no puede haber dos ni tres socios profesionales: el artículo 4.1 de la Ley 2/2007 llama socio profesional a quien es socio, y aquí solo lo es la matriz, que cumple además la letra b) por ser sociedad profesional inscrita. Se ha retirado el campo es_socio_profesional de toda persona física que no sea titular de participaciones."
+  },
+  {
+   "entidad": "Todas las entidades",
+   "cuestion": "Ninguna composición de Junta nombra mesa salvo en EAD Trust, donde el artículo 191 LSC la remite al consejo y los dos cargos son reales y públicos. En las cinco Juntas de sociedades con administrador único, la mesa la designan los socios concurrentes al comienzo de la reunión. Esto es deliberado: la mesa de la Junta NO tiene facultad de certificar (artículo 109.1 RRM), y nombrarla invitaba a que aguas abajo apareciera un «Secretario de la Junta» expidiendo certificaciones, como ocurre en 07-cadena-documental.json con GARR-SEC-038, 040, 042 y 044."
+  },
+  {
+   "entidad": "EAD Trust European Agency of Digital Trust, S.L.",
+   "cuestion": "07-cadena-documental.json sigue atribuyendo la presidencia y la secretaría del CONSEJO de EAD Trust a dos personas inventadas (certificaciones de GARR-SEC-008, 012, 026 y 054 y escritura de GARR-SEC-054). El consejo real ya está sembrado en el tenant: certifica Roberto Delgado Gil como secretario no consejero, con visto bueno de Julián Ramón Inza Aldaz. Corregir 07 es imprescindible: mientras no se haga, el mismo tenant muestra a Inza como presidente y un poder firmado por otra presidenta."
+  },
+  {
+   "entidad": "EAD Trust European Agency of Digital Trust, S.L.",
+   "cuestion": "El porcentaje del socio mayoritario queda A_CONFIRMAR: entities-catalog.ts arrastra la incidencia 7 de la spec, con 51,00 % en el cuadro IDC (participación indirecta, titular directo ilegible) frente a 51,001 % en el contrato interno. Se afirma titularidad de Compañía Digital NewLaw, S.L.U. porque es el parentSlug del catálogo, y se retira la palabra «indirecta»: un titular indirecto no es socio, no asiste ni vota en la Junta."
   },
   {
    "entidad": "Garrigues Portugal, S.L.P.",
-   "cuestion": "La denominación sugiere una conexión portuguesa, mientras el dato de entrada la configura como S.L.P. española. Deben confirmarse jurisdicción de constitución, domicilio, ley personal, hoja registral y posible establecimiento o filial portuguesa; no se altera su forma social en este entregable."
-  },
-  {
-   "entidad": "EAD Trust European Agency of Digital Trust, S.L.",
-   "cuestion": "Debe confirmarse el censo completo de socios, la titularidad directa de Compañía Digital NewLaw, S.L.U., el porcentaje exacto de cada minoritario y las reglas estatutarias de presidencia y secretaría de la Junta."
-  },
-  {
-   "entidad": "EAD Trust European Agency of Digital Trust, S.L.",
-   "cuestion": "Las tres aprobaciones de cuentas deben reenrutarse a la Junta General y al flujo de depósito. Debe comprobarse que ningún expediente existente genera escritura, protocolo notarial o asiento de inscripción de las cuentas, pues la aprobación de cuentas es no inscribible y conduce a depósito."
+   "cuestion": "Se ha retirado el reparto sintético 75/25 de capital profesional. El catálogo deja esta sociedad con parentSlug null, ownershipPct null y una incidencia abierta que advierte de que tiene socios profesionales propios y de que la participación de la matriz no está acreditada. La Junta lista ahora los cuatro socios profesionales con alta inscrita en el BORME y declara que el censo completo no es público. Sigue pendiente confirmar jurisdicción de constitución, domicilio y hoja registral."
   },
   {
    "entidad": "Todas las entidades",
-   "cuestion": "Los entidad_slug se han normalizado de forma determinista a partir de las denominaciones. Deben cotejarse con los identificadores canónicos de entities antes de insertar los governing_bodies para evitar órganos huérfanos."
+   "cuestion": "Las fechas de nombramiento que se imprimen proceden del Registro. Lo que sigue pendiente es la duración de los mandatos, las aceptaciones y los datos de inscripción concretos (tomo, folio, hoja, número de inscripción), que no se han inventado. Sin ellos no puede presentarse nada a inscripción."
   },
   {
    "entidad": "Todas las entidades",
-   "cuestion": "Debe comprobarse si alguno de los 51 acuerdos huérfanos corresponde materialmente a un órgano distinto del asignado por su etiqueta actual. La conexión debe validarse por materia, tipo social y competencia, no solo por denominación del acuerdo."
+   "cuestion": "Cobertura acuerdo→órgano tras la corrección, computada por par (entidad, organo_adopta.tipo + denominación) sobre los 59 acuerdos de 03-secretaria.json: 4 de la matriz quedan fuera de alcance (su órgano ya está sembrado) y los 55 restantes casan con uno de los 21 órganos de este fichero, salvo los 4 del Consejo de EAD Trust, que apuntan al consejo ya existente en el tenant. Ningún acuerdo queda huérfano y ninguno apunta a un órgano de modalidad distinta de la que lo adopta. Conviene recomputar esta cifra en la siembra y dejarla registrada, no darla por buena desde aquí."
   }
  ]
 }
