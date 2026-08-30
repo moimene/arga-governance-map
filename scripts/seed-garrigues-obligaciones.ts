@@ -38,6 +38,8 @@ import {
   type ControlPpd,
 } from "./garrigues/normativo/obligaciones-pbcft";
 
+
+
 const SUPABASE_URL =
   process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "https://hzqwefkwsxopwrmtksbg.supabase.co";
 // SERVICE_ROLE_SECRET es el nombre que usa el .env real de este repo; los
@@ -47,6 +49,18 @@ const SERVICE_KEY_NAMES = [
   "SERVICE_ROLE_KEY", "SERVICE_ROLE_SECRET", "SUPABASE_SERVICE_ROLE", "SB_SERVICE_ROLE_KEY",
 ];
 const SERVICE_KEY = SERVICE_KEY_NAMES.map((n) => process.env[n]).find(Boolean) ?? "";
+
+// El cliente NO esta tipado contra `Database` — ese es un hallazgo abierto del
+// arbol, no algo que se arregle aqui. Lo que si se arregla: los helpers
+// anotaban `ReturnType<typeof createClient>`, que instancia los genericos con
+// sus valores POR DEFECTO (`unknown` / `never`) y no coincide con lo que
+// devuelve la llamada real. Se deriva de la fabrica de verdad, asi que el tipo
+// sigue al codigo aunque cambie la firma de createClient.
+function crearAdmin() {
+  return createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+}
+type AdminClient = ReturnType<typeof crearAdmin>;
+
 const COMMIT = process.argv.includes("--commit");
 
 const POLICY_CODE_PBCFT = "PBC-FT-10";
@@ -138,7 +152,7 @@ function validateCatalog() {
 
 type Body = { id: string; name: string };
 
-async function resolveOwnerSlugs(admin: ReturnType<typeof createClient>): Promise<Map<string, Body>> {
+async function resolveOwnerSlugs(admin: AdminClient): Promise<Map<string, Body>> {
   const slugs = Array.from(
     new Set([...OBLIGACIONES_PBCFT.map((o) => o.owner_slug), ...CONTROLES_PPD.map((c) => c.owner_slug)]),
   );
@@ -157,7 +171,7 @@ async function resolveOwnerSlugs(admin: ReturnType<typeof createClient>): Promis
   return bySlug;
 }
 
-async function resolvePolicyId(admin: ReturnType<typeof createClient>): Promise<string> {
+async function resolvePolicyId(admin: AdminClient): Promise<string> {
   const { data, error } = await admin
     .from("policies")
     .select("id")
@@ -224,7 +238,7 @@ async function main() {
   }
   if (!SERVICE_KEY) fail(`Falta la service-role key (${SERVICE_KEY_NAMES.join(", ")}).`);
 
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+  const admin = crearAdmin();
   const owners = await resolveOwnerSlugs(admin);
   const policyId = await resolvePolicyId(admin);
 

@@ -18,6 +18,9 @@
 interface ImportMeta {
   /** true cuando el módulo es el punto de entrada del proceso (Bun). */
   readonly main: boolean;
+  /** directorio del modulo, sin file:// (Bun). Lo usan los scripts para
+   *  resolver rutas relativas al propio fichero. */
+  readonly dir: string;
 }
 
 // 3) El global `Bun`. Igual que `import.meta.main`: lo usan los scripts (p. ej.
