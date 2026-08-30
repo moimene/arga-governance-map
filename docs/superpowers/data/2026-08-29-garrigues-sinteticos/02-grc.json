@@ -3843,6 +3843,9 @@
       "responsable_funcional": "Responsable de la Oficina Técnica de Seguridad (OTS)",
       "nota_responsable": "Se identifica por CARGO FUNCIONAL, no por nombre de persona. Ver `dudas`: no se han fabricado personas.",
       "organo_supervisor": "Comité de Seguridad y Privacidad",
+      "organo_supervisor_slug": "garrigues-comite-seguridad-privacidad",
+      "naturaleza_organo": "CONSULTIVO",
+      "ancla_organo_supervisor": "`governing_bodies.slug` = 'garrigues-comite-seguridad-privacidad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json por scripts/seed-garrigues-bodies.ts. Supervisión y seguimiento del plan: NUNCA adopción de un acuerdo societario (estructura CONSULTIVA, fuera de isAdoptingBody).",
       "hitos": [
         {
           "fecha": "2026-03-13",
@@ -3873,6 +3876,9 @@
       "responsable_funcional": "Responsable de la Oficina Técnica de Seguridad (OTS)",
       "nota_responsable": "Se identifica por CARGO FUNCIONAL, no por nombre de persona. Ver `dudas`: no se han fabricado personas.",
       "organo_supervisor": "Comité de Seguridad y Privacidad",
+      "organo_supervisor_slug": "garrigues-comite-seguridad-privacidad",
+      "naturaleza_organo": "CONSULTIVO",
+      "ancla_organo_supervisor": "`governing_bodies.slug` = 'garrigues-comite-seguridad-privacidad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json por scripts/seed-garrigues-bodies.ts. Supervisión y seguimiento del plan: NUNCA adopción de un acuerdo societario (estructura CONSULTIVA, fuera de isAdoptingBody).",
       "hitos": [
         {
           "fecha": "2026-05-15",
@@ -3903,6 +3909,9 @@
       "responsable_funcional": "Responsable del Departamento de Compliance",
       "nota_responsable": "Se identifica por CARGO FUNCIONAL, no por nombre de persona. Ver `dudas`: no se han fabricado personas.",
       "organo_supervisor": "Comité de Análisis y Control Interno (CACI)",
+      "organo_supervisor_slug": "garrigues-caci",
+      "naturaleza_organo": "CONSULTIVO",
+      "ancla_organo_supervisor": "`governing_bodies.slug` = 'garrigues-caci', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json por scripts/seed-garrigues-bodies.ts. Supervisión y seguimiento del plan: NUNCA adopción de un acuerdo societario (estructura CONSULTIVA, fuera de isAdoptingBody).",
       "hitos": [
         {
           "fecha": "2026-04-15",
@@ -3933,6 +3942,9 @@
       "responsable_funcional": "Secretaría del Comité de Prevención de Delitos",
       "nota_responsable": "Se identifica por CARGO FUNCIONAL, no por nombre de persona. Ver `dudas`: no se han fabricado personas.",
       "organo_supervisor": "Comité de Prevención de Delitos",
+      "organo_supervisor_slug": "garrigues-comite-prevencion-delitos",
+      "naturaleza_organo": "CONSULTIVO",
+      "ancla_organo_supervisor": "`governing_bodies.slug` = 'garrigues-comite-prevencion-delitos', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json por scripts/seed-garrigues-bodies.ts. Supervisión y seguimiento del plan: NUNCA adopción de un acuerdo societario (estructura CONSULTIVA, fuera de isAdoptingBody).",
       "hitos": [
         {
           "fecha": "2026-07-15",
@@ -3964,6 +3976,9 @@
       "responsable_funcional": "Dirección Financiera",
       "nota_responsable": "Se identifica por CARGO FUNCIONAL, no por nombre de persona. Ver `dudas`: no se han fabricado personas.",
       "organo_supervisor": "Comité de Análisis y Control Interno (CACI)",
+      "organo_supervisor_slug": "garrigues-caci",
+      "naturaleza_organo": "CONSULTIVO",
+      "ancla_organo_supervisor": "`governing_bodies.slug` = 'garrigues-caci', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json por scripts/seed-garrigues-bodies.ts. Supervisión y seguimiento del plan: NUNCA adopción de un acuerdo societario (estructura CONSULTIVA, fuera de isAdoptingBody).",
       "hitos": [
         {
           "fecha": "2026-06-30",
@@ -3994,6 +4009,9 @@
       "responsable_funcional": "Responsable de la Oficina Técnica de Seguridad (OTS)",
       "nota_responsable": "Se identifica por CARGO FUNCIONAL, no por nombre de persona. Ver `dudas`: no se han fabricado personas.",
       "organo_supervisor": "Comité de Seguridad y Privacidad",
+      "organo_supervisor_slug": "garrigues-comite-seguridad-privacidad",
+      "naturaleza_organo": "CONSULTIVO",
+      "ancla_organo_supervisor": "`governing_bodies.slug` = 'garrigues-comite-seguridad-privacidad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json por scripts/seed-garrigues-bodies.ts. Supervisión y seguimiento del plan: NUNCA adopción de un acuerdo societario (estructura CONSULTIVA, fuera de isAdoptingBody).",
       "hitos": [
         {
           "fecha": "2026-03-20",
@@ -4019,6 +4037,9 @@
       "responsable_funcional": "Secretaría del Comité de Prevención de Delitos",
       "nota_responsable": "Se identifica por CARGO FUNCIONAL, no por nombre de persona. Ver `dudas`: no se han fabricado personas.",
       "organo_supervisor": "Comité de Prevención de Delitos",
+      "organo_supervisor_slug": "garrigues-comite-prevencion-delitos",
+      "naturaleza_organo": "CONSULTIVO",
+      "ancla_organo_supervisor": "`governing_bodies.slug` = 'garrigues-comite-prevencion-delitos', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json por scripts/seed-garrigues-bodies.ts. Supervisión y seguimiento del plan: NUNCA adopción de un acuerdo societario (estructura CONSULTIVA, fuera de isAdoptingBody).",
       "hitos": [
         {
           "fecha": "2026-07-10",
@@ -4044,6 +4065,9 @@
       "responsable_funcional": "Secretaría del Comité de Gobernanza de la Inteligencia Artificial",
       "nota_responsable": "Se identifica por CARGO FUNCIONAL, no por nombre de persona. Ver `dudas`: no se han fabricado personas.",
       "organo_supervisor": "Comité de Gobernanza de la Inteligencia Artificial",
+      "organo_supervisor_slug": "garrigues-comite-gobernanza-ia",
+      "naturaleza_organo": "CONSULTIVO",
+      "ancla_organo_supervisor": "`governing_bodies.slug` = 'garrigues-comite-gobernanza-ia', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json por scripts/seed-garrigues-bodies.ts. Supervisión y seguimiento del plan: NUNCA adopción de un acuerdo societario (estructura CONSULTIVA, fuera de isAdoptingBody).",
       "hitos": [
         {
           "fecha": "2026-08-15",

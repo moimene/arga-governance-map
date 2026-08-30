@@ -3,22 +3,23 @@
   "encargo": "Prompt 4 — Consola de gobernanza, de docs/superpowers/plans/2026-08-29-prompts-datos-sinteticos-garrigues.md",
   "tenant_destino": "00000000-0000-0000-0000-000000000002",
   "fecha_generacion": "2026-08-30",
-  "version": 2,
-  "que_cambia_respecto_de_la_version_1": "La versión 1 se escribió ANTES de las correcciones de 01, 02 y 03 y no lo declaraba, de modo que cinco de sus incoherencias CONFIRMADAS quedaron falsas sin aviso. Esta versión se genera sobre el dato ya corregido: rehace el grafo entero, recalcula los indicadores, mueve a `incoherencias_subsanadas` lo que dejó de ser cierto, mantiene los tres P0 que siguen abiertos y añade tres hallazgos nuevos. Además, la referencia y la cita de cada arista se GENERAN del valor real leído del fichero en lugar de escribirse a mano: una cita entrecomillada ya no puede divergir de su fuente.",
+  "version": 3,
+  "que_cambia_respecto_de_la_version_1": "[Histórico: describe el salto v1→v2, no el estado de hoy. El estado de hoy es `que_cambia_respecto_de_la_version_2`.] La versión 1 se escribió ANTES de las correcciones de 01, 02 y 03 y no lo declaraba, de modo que cinco de sus incoherencias CONFIRMADAS quedaron falsas sin aviso. Esta versión se genera sobre el dato ya corregido: rehace el grafo entero, recalcula los indicadores, mueve a `incoherencias_subsanadas` lo que dejó de ser cierto, mantiene los tres P0 que entonces seguían abiertos y añade tres hallazgos nuevos. Además, la referencia y la cita de cada arista se GENERAN del valor real leído del fichero en lugar de escribirse a mano: una cita entrecomillada ya no puede divergir de su fuente.",
+  "que_cambia_respecto_de_la_version_2": "La versión 2 quedó medida sobre un dato que cambió el mismo día: los cuatro hashes de `entradas` de aquella versión ya no coinciden con 01, 02 y 03. Esta versión se regenera sobre el dato definitivo y cierra tres de sus hallazgos con comprobación propia — INC-CONS-01 (P0: las tres elevaciones de AIMS ya no se declaran «acuerdo»), INC-CONS-19 (los 8 planes traen `organo_supervisor_slug`) e INC-CONS-23 (la cita de esquema fabricada de 03-secretaria.json). De 20 abiertas quedan 17, y ninguna P0 ha desaparecido por reformulación: INC-CONS-02 sigue abierta y hoy es MÁS nítida que antes, porque los siete registros declaran ya exactamente qué habría que encontrar en Secretaría y no se encuentra nada. Corrige además un defecto propio de la versión 2 (INC-CONS-29: seis referencias cruzadas a un hallazgo equivocado). Y endurece la comprobación en lugar de fiarse del rótulo nuevo: `rotula_adopcion()` decide si una elevación se presenta como acuerdo mirando el campo de fecha y la prosa, no el `tipo` declarado, y se ha verificado que devuelve True sobre el dato de la versión 2 y False sobre el de hoy — de modo que el indicador no puede quedar verde por construcción.",
   "entradas": [
    {
     "fichero": "01-aims.json",
-    "sha256": "6abe042bea9a2fdeb7c6e3e902de31ce30403db5680dc3386a48fd1f0827dc50",
+    "sha256": "7bc0d2d326007fcecc5334cf99b256d3a04a33f5d668d4096d0bf4f68c9858e3",
     "modificado": "2026-08-30"
    },
    {
     "fichero": "02-grc.json",
-    "sha256": "6f716e615181697c36d2a0c67904c40d4509135bfb8daebc8b5155a0d582ed4b",
+    "sha256": "c36cef6de0bc26076478142340d4e5f1134331b99b4a77c6911de4862bf7ce58",
     "modificado": "2026-08-30"
    },
    {
     "fichero": "03-secretaria.json",
-    "sha256": "aec7554a437068227ac11bf6533374fc507d2c954defec50d96dda189810c911",
+    "sha256": "00012f852bc7f308e7ebe85c703108230af0624dfcd3eb9a56a051debd16d289",
     "modificado": "2026-08-30"
    },
    {
@@ -60,6 +61,47 @@
    "DERIVADO_DEL_DATO_GENERADO": "Valor calculado por esta consola a partir de los ficheros citados; recalculable."
   },
   "advertencia_demo_publica": "La demo es públicamente alcanzable. Cada nodo lleva su `firmeza` y su `procedencia` DENTRO, y cada arista lleva además la evidencia que la sostiene. Si la interfaz no pinta esas marcas, un dato sintético se lee como acreditado.",
+  "hallazgos_examinados_y_descartados": {
+   "por_que_esta_sección_existe": "En la versión 2 estos cinco se descartaron con motivo, pero el motivo vivía en el informe del agente y no en el fichero, así que no sobrevivió al cambio de sesión. Un hallazgo descartado con razón es información: si no se escribe, el siguiente lector lo vuelve a levantar y hay que volver a tumbarlo. Se escriben aquí.",
+   "descartados": [
+    {
+     "que": "Ocho acuerdos con fecha anterior a la primera inscripción capturada en BORME",
+     "por_que_se_descarta": "Las capturas BORME de once de las doce entidades son VENTANAS temporales, no historial completo: la de la matriz tiene 20 actos y el más antiguo es del 2026-04-24, sin ningún acto de constitución entre ellos, siendo J&A Garrigues muy anterior a esa fecha. Comparar contra la primera fecha capturada mide la cosecha, no el dato: el defecto está en la comparación. (La fecha real de constitución de la matriz no consta en ninguna fuente de este repo y esta consola no la inventa.)",
+     "afectados_si_se_hubiera_reportado": [
+      "GARR-SEC-001",
+      "GARR-SEC-002",
+      "GARR-SEC-003",
+      "GARR-SEC-004",
+      "GARR-SEC-007",
+      "GARR-SEC-008",
+      "GARR-SEC-057",
+      "GARR-SEC-059"
+     ],
+     "donde_sigue_escrito": "INC-CONS-17 y IND-12, que sí reportan el hecho real: el indicador solo es calculable sobre 9 de 59 acuerdos"
+    },
+    {
+     "que": "Atribuir propiedad de norma a los órganos que el tejido de obligaciones y controles sugiere",
+     "por_que_se_descarta": "La fuente acredita responsable en 3 de las 39 normas. Que PI-11, PI-15 y PI-24 estén cosidas a controles cuyo owner es la OTS es una inferencia de esta consola, no un dato del despacho, y G4 ya decidió que el ownership solo se atribuye donde la fuente lo dice.",
+     "donde_sigue_escrito": "`ownership_propuesto` (6 entradas) marcado PROPUESTA_NO_VALIDADA, fuera de `incoherencias`"
+    },
+    {
+     "que": "El factor P4 de la evaluación de riesgo no está prescrito por la metodología del PPD",
+     "por_que_se_descarta": "Es cierto y 02-grc.json lo declara él mismo como criterio propio: los pesos (0/0,15/0,25/0,35 y 0/0,25/0,5) sí salen del PPD, la composición no. Un dato que declara honestamente su propia laguna no es una incoherencia.",
+     "donde_sigue_escrito": "IND-11, cuya lectura dice que ser reproducible no lo hace acreditado"
+    },
+    {
+     "que": "INC-IA-006 no imputa ningún sistema del inventario",
+     "por_que_se_descarta": "Un incidente puede legítimamente no tener sistema imputado; el defecto de forma que sí importa es el de los otros 27, que nombran el sistema en prosa. Reportarlo aparte habría inflado el recuento sin añadir nada.",
+     "donde_sigue_escrito": "descarte SOBRE_SISTEMA y la nota de INC-CONS-15 (27 de 28)"
+    },
+    {
+     "que": "El modo de resolución PREFIJO_ANADIDO_POR_LA_CONSOLA quedó definido y sin usar",
+     "por_que_se_descarta": "Que un valor del contrato no aparezca en ninguna arista es la señal de que la corrección 1 funcionó: ya no hay slugs a los que la consola tenga que añadir el prefijo. Se conserva el valor definido a propósito, para que reaparecer sea visible.",
+     "donde_sigue_escrito": "`grafo.contrato`, donde el modo se documenta como «hoy sin usar»"
+    }
+   ],
+   "advertencia": "Esta lista se ha reconstruido a partir de lo que el propio fichero conserva, no de una copia del informe de la versión 2. Si aquel informe descartó algún hallazgo más que no dejó rastro aquí, está perdido: esa es exactamente la razón de que esta sección exista."
+  },
   "lo_que_no_se_ha_hecho": [
    "No se ha consultado Supabase. Todas las comprobaciones son contra ficheros del repo y contra los cuatro ficheros hermanos.",
    "No se ha corregido ni un solo campo de 01, 02, 03 ni 05.",
@@ -74,10 +116,10 @@
    "aristas_descartadas": 190,
    "politicas": 39,
    "ownership_propuesto": 6,
-   "incoherencias_abiertas": 20,
-   "incoherencias_subsanadas": 8,
+   "incoherencias_abiertas": 17,
+   "incoherencias_subsanadas": 12,
    "indicadores": 12,
-   "verificaciones_que_pasan": 6,
+   "verificaciones_que_pasan": 7,
    "dudas": 12
   },
   "como_detectar_que_este_fichero_se_ha_quedado_obsoleto": "shasum -a 256 01-aims.json 02-grc.json 03-secretaria.json 05-canal.json y comparar con `_meta.entradas`. Si alguno difiere, este fichero está medido sobre otro dato y hay que regenerarlo antes de creerse un solo número."
@@ -86,7 +128,7 @@
   "contrato": {
    "regla": "Una arista sin evidencia es una arista que no debe existir. Cada arista lleva `evidencia` con la clase, la referencia exacta (fichero y campo), la cita y su propia firmeza y procedencia. La referencia y la cita se generan del valor real leído del fichero: no se transcriben a mano.",
    "alcance_de_los_nodos": "El grafo no reproduce el tenant entero. Contiene: las 12 entidades con acuerdo, los 22 órganos reales, las 39 normas, las 28 obligaciones y los 30 controles reales, los 12 sistemas de IA, los 18 riesgos tecnológicos y los 24 riesgos penales que los catálogos departamentales y el canal referencian, y todos los registros de los cuatro ficheros hermanos. Los otros 58 riesgos penales del mapa y las 21 entidades sin acuerdo existen en el tenant y no aparecen aquí porque ninguna arista los toca.",
-   "resolucion_de_slug": "Cuatro resultados posibles y todos quedan escritos en la arista: LITERAL (el slug existe tal cual), ALIAS_DEL_REPO (el slug es un alias que solo vive en obligaciones-ciber.ts y que el seed resuelve por nombre — INC-CONS-04), RESUELTO_POR_ROTULO (el campo trae el nombre del órgano y no un slug — INC-CONS-19) y PREFIJO_ANADIDO_POR_LA_CONSOLA (hoy sin usar: los slugs de los ficheros hermanos ya vienen prefijados). El `slug_declarado` se conserva siempre.",
+   "resolucion_de_slug": "Cuatro resultados posibles y todos quedan escritos en la arista: LITERAL (el slug existe tal cual), ALIAS_DEL_REPO (el slug es un alias que solo vive en obligaciones-ciber.ts y que el seed resuelve por nombre — INC-CONS-04), RESUELTO_POR_ROTULO (el campo trae el nombre del órgano y no un slug; desde la corrección 2 ya no lo usa ninguna arista — INC-CONS-19, cerrada) y PREFIJO_ANADIDO_POR_LA_CONSOLA (hoy sin usar: los slugs de los ficheros hermanos ya vienen prefijados). El `slug_declarado` se conserva siempre.",
    "clases_de_evidencia": {
     "CATALOGO_DEL_REPO": "Un fichero versionado del repo que es fuente de verdad del seed.",
     "DOCUMENTO_FUENTE_DEL_DESPACHO": "Cita literal de un documento del despacho, transcrita en el seed.",
@@ -1836,7 +1878,7 @@
     "etiqueta": "Copilot",
     "firmeza": "FIRME",
     "procedencia": "PI-30_ART_3_1_1",
-    "fuente": "scripts/garrigues/ia/catalogo-ia.ts (rama main; no está en el árbol de esta rama — ver INC-CONS-23)",
+    "fuente": "scripts/garrigues/ia/catalogo-ia.ts (rama main; no está en el árbol de esta rama — ver INC-CONS-24)",
     "origen": "CATALOGO_C2",
     "estado": "ACTIVO",
     "risk_level_ai_act": null,
@@ -1848,7 +1890,7 @@
     "etiqueta": "Harvey",
     "firmeza": "FIRME",
     "procedencia": "PI-30_ART_3_1_1",
-    "fuente": "scripts/garrigues/ia/catalogo-ia.ts (rama main; no está en el árbol de esta rama — ver INC-CONS-23)",
+    "fuente": "scripts/garrigues/ia/catalogo-ia.ts (rama main; no está en el árbol de esta rama — ver INC-CONS-24)",
     "origen": "CATALOGO_C2",
     "estado": "ACTIVO",
     "risk_level_ai_act": null,
@@ -1860,7 +1902,7 @@
     "etiqueta": "Garrigues GA_IA",
     "firmeza": "FIRME",
     "procedencia": "PI-30_ART_3_1_1",
-    "fuente": "scripts/garrigues/ia/catalogo-ia.ts (rama main; no está en el árbol de esta rama — ver INC-CONS-23)",
+    "fuente": "scripts/garrigues/ia/catalogo-ia.ts (rama main; no está en el árbol de esta rama — ver INC-CONS-24)",
     "origen": "CATALOGO_C2",
     "estado": "ACTIVO",
     "risk_level_ai_act": null,
@@ -1872,7 +1914,7 @@
     "etiqueta": "Acuerdo enterprise OpenAI",
     "firmeza": "FIRME",
     "procedencia": "DECLARADO_USUARIO",
-    "fuente": "scripts/garrigues/ia/catalogo-ia.ts (rama main; no está en el árbol de esta rama — ver INC-CONS-23)",
+    "fuente": "scripts/garrigues/ia/catalogo-ia.ts (rama main; no está en el árbol de esta rama — ver INC-CONS-24)",
     "origen": "CATALOGO_C2",
     "estado": "ACTIVO",
     "risk_level_ai_act": null,
@@ -1884,7 +1926,7 @@
     "etiqueta": "Acuerdo enterprise Anthropic",
     "firmeza": "FIRME",
     "procedencia": "DECLARADO_USUARIO",
-    "fuente": "scripts/garrigues/ia/catalogo-ia.ts (rama main; no está en el árbol de esta rama — ver INC-CONS-23)",
+    "fuente": "scripts/garrigues/ia/catalogo-ia.ts (rama main; no está en el árbol de esta rama — ver INC-CONS-24)",
     "origen": "CATALOGO_C2",
     "estado": "ACTIVO",
     "risk_level_ai_act": null,
@@ -1896,7 +1938,7 @@
     "etiqueta": "Soluciones agénticas de proceso",
     "firmeza": "FIRME",
     "procedencia": "PLAN_NO_DESPLEGADO",
-    "fuente": "scripts/garrigues/ia/catalogo-ia.ts (rama main; no está en el árbol de esta rama — ver INC-CONS-23)",
+    "fuente": "scripts/garrigues/ia/catalogo-ia.ts (rama main; no está en el árbol de esta rama — ver INC-CONS-24)",
     "origen": "CATALOGO_C2",
     "estado": "PLANIFICADO",
     "risk_level_ai_act": null,
@@ -8346,16 +8388,18 @@
     "evidencia": {
      "clase": "REGISTRO_SINTETICO_DE_ESTA_ENTREGA",
      "referencia": "01-aims.json :: incidentes[].consecuencia_societaria",
-     "cita": "Elevado al Comité de Seguridad y Privacidad y al Comité de Gobernanza de la Inteligencia Artificial, con acuerdo de condicionar el escalado del corpus de 100k a 10M paginas a que el control de fuga de datos este operativo.",
+     "cita": "Elevado al Comité de Seguridad y Privacidad y al Comité de Gobernanza de la Inteligencia Artificial, que informan favorablemente no escalar el corpus de 100k a 10M paginas hasta que el control de fuga de datos este operativo, y lo recomiendan a quien tiene competencia para decidirlo.",
      "firmeza": "SINTETICO",
      "procedencia": "SIMULADO"
     },
     "fecha_declarada": "2026-04-30",
+    "campo_de_fecha": "fecha_informe",
+    "tipo_declarado": "Informe de comité",
     "slug_declarado": "garrigues-comite-seguridad-privacidad",
     "resolucion_slug": "LITERAL",
     "naturaleza_organo": "CONSULTIVO",
-    "tipo_declarado_en_origen": "acuerdo (el campo se llama `fecha_acuerdo` y la descripción dice «con acuerdo de» / «que acuerda»)",
-    "ADVERTENCIA_DE_LA_CONSOLA": "El órgano de destino es CONSULTIVO y isAdoptingBody() lo excluye de la adopción (src/lib/secretaria/operational-bodies.ts:34-38). Esta arista se dibuja como ELEVACIÓN, no como adopción, y el rótulo de origen sigue siendo defectuoso: ver INC-CONS-01."
+    "advertencia_en_origen": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). Por tanto este registro NO debe materializarse como acuerdo societario ni como acto inscribible: su rastro correcto en Secretaría es un informe o un acta de órgano consultivo, NUNCA un acuerdo adoptado. Si la consola encuentra un acuerdo adoptado por el Comité de Seguridad y Privacidad o por el Comité de Gobernanza de la Inteligencia Artificial, es un defecto de siembra, no un dato.",
+    "verificable_como": "Existe rastro documental en Secretaria fechado el 2026-04-30 asociado a garrigues-comite-seguridad-privacidad y a garrigues-comite-gobernanza-ia, y su tipo NO es acuerdo adoptado."
    },
    {
     "id": "ARI-0300",
@@ -8365,16 +8409,18 @@
     "evidencia": {
      "clase": "REGISTRO_SINTETICO_DE_ESTA_ENTREGA",
      "referencia": "01-aims.json :: incidentes[].consecuencia_societaria",
-     "cita": "Elevado al Comité de Seguridad y Privacidad y al Comité de Gobernanza de la Inteligencia Artificial, con acuerdo de condicionar el escalado del corpus de 100k a 10M paginas a que el control de fuga de datos este operativo.",
+     "cita": "Elevado al Comité de Seguridad y Privacidad y al Comité de Gobernanza de la Inteligencia Artificial, que informan favorablemente no escalar el corpus de 100k a 10M paginas hasta que el control de fuga de datos este operativo, y lo recomiendan a quien tiene competencia para decidirlo.",
      "firmeza": "SINTETICO",
      "procedencia": "SIMULADO"
     },
     "fecha_declarada": "2026-04-30",
+    "campo_de_fecha": "fecha_informe",
+    "tipo_declarado": "Informe de comité",
     "slug_declarado": "garrigues-comite-gobernanza-ia",
     "resolucion_slug": "LITERAL",
     "naturaleza_organo": "CONSULTIVO",
-    "tipo_declarado_en_origen": "acuerdo (el campo se llama `fecha_acuerdo` y la descripción dice «con acuerdo de» / «que acuerda»)",
-    "ADVERTENCIA_DE_LA_CONSOLA": "El órgano de destino es CONSULTIVO y isAdoptingBody() lo excluye de la adopción (src/lib/secretaria/operational-bodies.ts:34-38). Esta arista se dibuja como ELEVACIÓN, no como adopción, y el rótulo de origen sigue siendo defectuoso: ver INC-CONS-01."
+    "advertencia_en_origen": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). Por tanto este registro NO debe materializarse como acuerdo societario ni como acto inscribible: su rastro correcto en Secretaría es un informe o un acta de órgano consultivo, NUNCA un acuerdo adoptado. Si la consola encuentra un acuerdo adoptado por el Comité de Seguridad y Privacidad o por el Comité de Gobernanza de la Inteligencia Artificial, es un defecto de siembra, no un dato.",
+    "verificable_como": "Existe rastro documental en Secretaria fechado el 2026-04-30 asociado a garrigues-comite-seguridad-privacidad y a garrigues-comite-gobernanza-ia, y su tipo NO es acuerdo adoptado."
    },
    {
     "id": "ARI-0301",
@@ -8436,16 +8482,18 @@
     "evidencia": {
      "clase": "REGISTRO_SINTETICO_DE_ESTA_ENTREGA",
      "referencia": "01-aims.json :: incidentes[].consecuencia_societaria",
-     "cita": "Elevado al Comité de Práctica Profesional, que acuerda una revision periodica de coherencia entre las barreras de informacion declaradas y los permisos efectivos en los repositorios.",
+     "cita": "Elevado al Comité de Práctica Profesional, que recomienda una revision periodica de coherencia entre las barreras de informacion declaradas y los permisos efectivos en los repositorios.",
      "firmeza": "SINTETICO",
      "procedencia": "SIMULADO"
     },
     "fecha_declarada": "2026-06-18",
+    "campo_de_fecha": "fecha_informe",
+    "tipo_declarado": "Acta de órgano consultivo",
     "slug_declarado": "garrigues-comite-practica-profesional",
     "resolucion_slug": "LITERAL",
     "naturaleza_organo": "CONSULTIVO",
-    "tipo_declarado_en_origen": "acuerdo (el campo se llama `fecha_acuerdo` y la descripción dice «con acuerdo de» / «que acuerda»)",
-    "ADVERTENCIA_DE_LA_CONSOLA": "El órgano de destino es CONSULTIVO y isAdoptingBody() lo excluye de la adopción (src/lib/secretaria/operational-bodies.ts:34-38). Esta arista se dibuja como ELEVACIÓN, no como adopción, y el rótulo de origen sigue siendo defectuoso: ver INC-CONS-01."
+    "advertencia_en_origen": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). Por tanto este registro NO debe materializarse como acuerdo societario ni como acto inscribible: su rastro correcto en Secretaría es un informe o un acta de órgano consultivo, NUNCA un acuerdo adoptado. Si la consola encuentra un acuerdo adoptado por Comité de Práctica Profesional, es un defecto de siembra, no un dato.",
+    "verificable_como": "Existe rastro documental en Secretaria fechado el 2026-06-18 asociado a garrigues-comite-practica-profesional, y su tipo NO es acuerdo adoptado."
    },
    {
     "id": "ARI-0306",
@@ -9071,14 +9119,17 @@
     "hasta": "ORG:garrigues-comite-seguridad-privacidad",
     "evidencia": {
      "clase": "REGISTRO_SINTETICO_DE_ESTA_ENTREGA",
-     "referencia": "02-grc.json :: planes_accion[].organo_supervisor",
-     "cita": "PA-GARR-SINT-01 declara organo_supervisor = \"Comité de Seguridad y Privacidad\".",
+     "referencia": "02-grc.json :: planes_accion[].organo_supervisor_slug",
+     "cita": "PA-GARR-SINT-01 declara organo_supervisor_slug = \"garrigues-comite-seguridad-privacidad\" y organo_supervisor = \"Comité de Seguridad y Privacidad\".",
      "firmeza": "SINTETICO",
      "procedencia": "SIMULADO"
     },
-    "slug_declarado": "Comité de Seguridad y Privacidad",
-    "resolucion_slug": "RESUELTO_POR_ROTULO",
-    "fragilidad": "El campo es un RÓTULO, no un slug: la arista se sostiene en la coincidencia literal del nombre y se rompe si alguien renombra el comité. Ver INC-CONS-19."
+    "slug_declarado": "garrigues-comite-seguridad-privacidad",
+    "resolucion_slug": "LITERAL",
+    "naturaleza_organo": "CONSULTIVO",
+    "rotulo_corrobora_el_slug": true,
+    "ancla_en_origen": "`governing_bodies.slug` = 'garrigues-comite-seguridad-privacidad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json por scripts/seed-garrigues-bodies.ts. Supervisión y seguimiento del plan: NUNCA adopción de un acuerdo societario (estructura CONSULTIVA, fuera de isAdoptingBody).",
+    "supervision_no_es_adopcion": "El órgano supervisor de un plan de acción es CONSULTIVO: supervisa la ejecución, no adopta ningún acuerdo. La arista no autoriza a sembrar uno."
    },
    {
     "id": "ARI-0351",
@@ -9087,14 +9138,17 @@
     "hasta": "ORG:garrigues-comite-seguridad-privacidad",
     "evidencia": {
      "clase": "REGISTRO_SINTETICO_DE_ESTA_ENTREGA",
-     "referencia": "02-grc.json :: planes_accion[].organo_supervisor",
-     "cita": "PA-GARR-SINT-02 declara organo_supervisor = \"Comité de Seguridad y Privacidad\".",
+     "referencia": "02-grc.json :: planes_accion[].organo_supervisor_slug",
+     "cita": "PA-GARR-SINT-02 declara organo_supervisor_slug = \"garrigues-comite-seguridad-privacidad\" y organo_supervisor = \"Comité de Seguridad y Privacidad\".",
      "firmeza": "SINTETICO",
      "procedencia": "SIMULADO"
     },
-    "slug_declarado": "Comité de Seguridad y Privacidad",
-    "resolucion_slug": "RESUELTO_POR_ROTULO",
-    "fragilidad": "El campo es un RÓTULO, no un slug: la arista se sostiene en la coincidencia literal del nombre y se rompe si alguien renombra el comité. Ver INC-CONS-19."
+    "slug_declarado": "garrigues-comite-seguridad-privacidad",
+    "resolucion_slug": "LITERAL",
+    "naturaleza_organo": "CONSULTIVO",
+    "rotulo_corrobora_el_slug": true,
+    "ancla_en_origen": "`governing_bodies.slug` = 'garrigues-comite-seguridad-privacidad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json por scripts/seed-garrigues-bodies.ts. Supervisión y seguimiento del plan: NUNCA adopción de un acuerdo societario (estructura CONSULTIVA, fuera de isAdoptingBody).",
+    "supervision_no_es_adopcion": "El órgano supervisor de un plan de acción es CONSULTIVO: supervisa la ejecución, no adopta ningún acuerdo. La arista no autoriza a sembrar uno."
    },
    {
     "id": "ARI-0352",
@@ -9103,14 +9157,17 @@
     "hasta": "ORG:garrigues-caci",
     "evidencia": {
      "clase": "REGISTRO_SINTETICO_DE_ESTA_ENTREGA",
-     "referencia": "02-grc.json :: planes_accion[].organo_supervisor",
-     "cita": "PA-GARR-SINT-03 declara organo_supervisor = \"Comité de Análisis y Control Interno (CACI)\".",
+     "referencia": "02-grc.json :: planes_accion[].organo_supervisor_slug",
+     "cita": "PA-GARR-SINT-03 declara organo_supervisor_slug = \"garrigues-caci\" y organo_supervisor = \"Comité de Análisis y Control Interno (CACI)\".",
      "firmeza": "SINTETICO",
      "procedencia": "SIMULADO"
     },
-    "slug_declarado": "Comité de Análisis y Control Interno (CACI)",
-    "resolucion_slug": "RESUELTO_POR_ROTULO",
-    "fragilidad": "El campo es un RÓTULO, no un slug: la arista se sostiene en la coincidencia literal del nombre y se rompe si alguien renombra el comité. Ver INC-CONS-19."
+    "slug_declarado": "garrigues-caci",
+    "resolucion_slug": "LITERAL",
+    "naturaleza_organo": "CONSULTIVO",
+    "rotulo_corrobora_el_slug": true,
+    "ancla_en_origen": "`governing_bodies.slug` = 'garrigues-caci', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json por scripts/seed-garrigues-bodies.ts. Supervisión y seguimiento del plan: NUNCA adopción de un acuerdo societario (estructura CONSULTIVA, fuera de isAdoptingBody).",
+    "supervision_no_es_adopcion": "El órgano supervisor de un plan de acción es CONSULTIVO: supervisa la ejecución, no adopta ningún acuerdo. La arista no autoriza a sembrar uno."
    },
    {
     "id": "ARI-0353",
@@ -9119,14 +9176,17 @@
     "hasta": "ORG:garrigues-comite-prevencion-delitos",
     "evidencia": {
      "clase": "REGISTRO_SINTETICO_DE_ESTA_ENTREGA",
-     "referencia": "02-grc.json :: planes_accion[].organo_supervisor",
-     "cita": "PA-GARR-SINT-04 declara organo_supervisor = \"Comité de Prevención de Delitos\".",
+     "referencia": "02-grc.json :: planes_accion[].organo_supervisor_slug",
+     "cita": "PA-GARR-SINT-04 declara organo_supervisor_slug = \"garrigues-comite-prevencion-delitos\" y organo_supervisor = \"Comité de Prevención de Delitos\".",
      "firmeza": "SINTETICO",
      "procedencia": "SIMULADO"
     },
-    "slug_declarado": "Comité de Prevención de Delitos",
-    "resolucion_slug": "RESUELTO_POR_ROTULO",
-    "fragilidad": "El campo es un RÓTULO, no un slug: la arista se sostiene en la coincidencia literal del nombre y se rompe si alguien renombra el comité. Ver INC-CONS-19."
+    "slug_declarado": "garrigues-comite-prevencion-delitos",
+    "resolucion_slug": "LITERAL",
+    "naturaleza_organo": "CONSULTIVO",
+    "rotulo_corrobora_el_slug": true,
+    "ancla_en_origen": "`governing_bodies.slug` = 'garrigues-comite-prevencion-delitos', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json por scripts/seed-garrigues-bodies.ts. Supervisión y seguimiento del plan: NUNCA adopción de un acuerdo societario (estructura CONSULTIVA, fuera de isAdoptingBody).",
+    "supervision_no_es_adopcion": "El órgano supervisor de un plan de acción es CONSULTIVO: supervisa la ejecución, no adopta ningún acuerdo. La arista no autoriza a sembrar uno."
    },
    {
     "id": "ARI-0354",
@@ -9135,14 +9195,17 @@
     "hasta": "ORG:garrigues-caci",
     "evidencia": {
      "clase": "REGISTRO_SINTETICO_DE_ESTA_ENTREGA",
-     "referencia": "02-grc.json :: planes_accion[].organo_supervisor",
-     "cita": "PA-GARR-SINT-05 declara organo_supervisor = \"Comité de Análisis y Control Interno (CACI)\".",
+     "referencia": "02-grc.json :: planes_accion[].organo_supervisor_slug",
+     "cita": "PA-GARR-SINT-05 declara organo_supervisor_slug = \"garrigues-caci\" y organo_supervisor = \"Comité de Análisis y Control Interno (CACI)\".",
      "firmeza": "SINTETICO",
      "procedencia": "SIMULADO"
     },
-    "slug_declarado": "Comité de Análisis y Control Interno (CACI)",
-    "resolucion_slug": "RESUELTO_POR_ROTULO",
-    "fragilidad": "El campo es un RÓTULO, no un slug: la arista se sostiene en la coincidencia literal del nombre y se rompe si alguien renombra el comité. Ver INC-CONS-19."
+    "slug_declarado": "garrigues-caci",
+    "resolucion_slug": "LITERAL",
+    "naturaleza_organo": "CONSULTIVO",
+    "rotulo_corrobora_el_slug": true,
+    "ancla_en_origen": "`governing_bodies.slug` = 'garrigues-caci', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json por scripts/seed-garrigues-bodies.ts. Supervisión y seguimiento del plan: NUNCA adopción de un acuerdo societario (estructura CONSULTIVA, fuera de isAdoptingBody).",
+    "supervision_no_es_adopcion": "El órgano supervisor de un plan de acción es CONSULTIVO: supervisa la ejecución, no adopta ningún acuerdo. La arista no autoriza a sembrar uno."
    },
    {
     "id": "ARI-0355",
@@ -9151,14 +9214,17 @@
     "hasta": "ORG:garrigues-comite-seguridad-privacidad",
     "evidencia": {
      "clase": "REGISTRO_SINTETICO_DE_ESTA_ENTREGA",
-     "referencia": "02-grc.json :: planes_accion[].organo_supervisor",
-     "cita": "PA-GARR-SINT-06 declara organo_supervisor = \"Comité de Seguridad y Privacidad\".",
+     "referencia": "02-grc.json :: planes_accion[].organo_supervisor_slug",
+     "cita": "PA-GARR-SINT-06 declara organo_supervisor_slug = \"garrigues-comite-seguridad-privacidad\" y organo_supervisor = \"Comité de Seguridad y Privacidad\".",
      "firmeza": "SINTETICO",
      "procedencia": "SIMULADO"
     },
-    "slug_declarado": "Comité de Seguridad y Privacidad",
-    "resolucion_slug": "RESUELTO_POR_ROTULO",
-    "fragilidad": "El campo es un RÓTULO, no un slug: la arista se sostiene en la coincidencia literal del nombre y se rompe si alguien renombra el comité. Ver INC-CONS-19."
+    "slug_declarado": "garrigues-comite-seguridad-privacidad",
+    "resolucion_slug": "LITERAL",
+    "naturaleza_organo": "CONSULTIVO",
+    "rotulo_corrobora_el_slug": true,
+    "ancla_en_origen": "`governing_bodies.slug` = 'garrigues-comite-seguridad-privacidad', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json por scripts/seed-garrigues-bodies.ts. Supervisión y seguimiento del plan: NUNCA adopción de un acuerdo societario (estructura CONSULTIVA, fuera de isAdoptingBody).",
+    "supervision_no_es_adopcion": "El órgano supervisor de un plan de acción es CONSULTIVO: supervisa la ejecución, no adopta ningún acuerdo. La arista no autoriza a sembrar uno."
    },
    {
     "id": "ARI-0356",
@@ -9167,14 +9233,17 @@
     "hasta": "ORG:garrigues-comite-prevencion-delitos",
     "evidencia": {
      "clase": "REGISTRO_SINTETICO_DE_ESTA_ENTREGA",
-     "referencia": "02-grc.json :: planes_accion[].organo_supervisor",
-     "cita": "PA-GARR-SINT-07 declara organo_supervisor = \"Comité de Prevención de Delitos\".",
+     "referencia": "02-grc.json :: planes_accion[].organo_supervisor_slug",
+     "cita": "PA-GARR-SINT-07 declara organo_supervisor_slug = \"garrigues-comite-prevencion-delitos\" y organo_supervisor = \"Comité de Prevención de Delitos\".",
      "firmeza": "SINTETICO",
      "procedencia": "SIMULADO"
     },
-    "slug_declarado": "Comité de Prevención de Delitos",
-    "resolucion_slug": "RESUELTO_POR_ROTULO",
-    "fragilidad": "El campo es un RÓTULO, no un slug: la arista se sostiene en la coincidencia literal del nombre y se rompe si alguien renombra el comité. Ver INC-CONS-19."
+    "slug_declarado": "garrigues-comite-prevencion-delitos",
+    "resolucion_slug": "LITERAL",
+    "naturaleza_organo": "CONSULTIVO",
+    "rotulo_corrobora_el_slug": true,
+    "ancla_en_origen": "`governing_bodies.slug` = 'garrigues-comite-prevencion-delitos', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json por scripts/seed-garrigues-bodies.ts. Supervisión y seguimiento del plan: NUNCA adopción de un acuerdo societario (estructura CONSULTIVA, fuera de isAdoptingBody).",
+    "supervision_no_es_adopcion": "El órgano supervisor de un plan de acción es CONSULTIVO: supervisa la ejecución, no adopta ningún acuerdo. La arista no autoriza a sembrar uno."
    },
    {
     "id": "ARI-0357",
@@ -9183,14 +9252,17 @@
     "hasta": "ORG:garrigues-comite-gobernanza-ia",
     "evidencia": {
      "clase": "REGISTRO_SINTETICO_DE_ESTA_ENTREGA",
-     "referencia": "02-grc.json :: planes_accion[].organo_supervisor",
-     "cita": "PA-GARR-SINT-08 declara organo_supervisor = \"Comité de Gobernanza de la Inteligencia Artificial\".",
+     "referencia": "02-grc.json :: planes_accion[].organo_supervisor_slug",
+     "cita": "PA-GARR-SINT-08 declara organo_supervisor_slug = \"garrigues-comite-gobernanza-ia\" y organo_supervisor = \"Comité de Gobernanza de la Inteligencia Artificial\".",
      "firmeza": "SINTETICO",
      "procedencia": "SIMULADO"
     },
-    "slug_declarado": "Comité de Gobernanza de la Inteligencia Artificial",
-    "resolucion_slug": "RESUELTO_POR_ROTULO",
-    "fragilidad": "El campo es un RÓTULO, no un slug: la arista se sostiene en la coincidencia literal del nombre y se rompe si alguien renombra el comité. Ver INC-CONS-19."
+    "slug_declarado": "garrigues-comite-gobernanza-ia",
+    "resolucion_slug": "LITERAL",
+    "naturaleza_organo": "CONSULTIVO",
+    "rotulo_corrobora_el_slug": true,
+    "ancla_en_origen": "`governing_bodies.slug` = 'garrigues-comite-gobernanza-ia', construido con el prefijo del tenant sobre el catálogo scripts/garrigues/gobierno/comites-2026.json por scripts/seed-garrigues-bodies.ts. Supervisión y seguimiento del plan: NUNCA adopción de un acuerdo societario (estructura CONSULTIVA, fuera de isAdoptingBody).",
+    "supervision_no_es_adopcion": "El órgano supervisor de un plan de acción es CONSULTIVO: supervisa la ejecución, no adopta ningún acuerdo. La arista no autoriza a sembrar uno."
    },
    {
     "id": "ARI-0358",
@@ -13724,83 +13796,42 @@
  ],
  "incoherencias": [
   {
-   "id": "INC-CONS-01",
-   "severidad": "P0",
-   "veredicto": "CONFIRMADA_Y_ABIERTA",
-   "titulo": "Tres elevaciones de AIMS siguen declarándose «acuerdo» de un órgano que el motor excluye de la adopción",
-   "donde": "01-aims.json :: incidentes[].consecuencia_societaria (INC-IA-003, INC-IA-005)",
-   "hecho": "Los tres órganos a los que AIMS eleva algo son CONSULTIVOS: scripts/seed-garrigues-bodies.ts aplica config.naturaleza='CONSULTIVO' a las 19 estructuras de comites-2026.json, y src/lib/secretaria/operational-bodies.ts :: isAdoptingBody (líneas 34-38) excluye exactamente ese valor. INC-IA-003 dice «Elevado al Comité de Seguridad y Privacidad y al Comité de Gobernanza de la Inteligencia Artificial, con acuerdo de condicionar el escalado del corpus…» e INC-IA-005 «Elevado al Comité de Práctica Profesional, que acuerda una revisión periódica…». Los dos conservan el campo `consecuencia_societaria.fecha_acuerdo`, y su `aviso_de_coherencia` instruye a la consola a reportar como incoherencia que Secretaría no contenga «un acuerdo de esos órganos» en esa fecha — que es precisamente lo que el gate de G3 prohíbe que exista. El fichero no contiene ninguna ocurrencia de CONSULTIVO, isAdoptingBody ni operational-bodies.",
-   "por_que_importa": "«Acuerdo del Comité de Gobernanza de la IA» es el primer error que ve un abogado en una demo pública, y la instrucción de crear el correlato induce a sembrar un acuerdo adoptado por un órgano que el propio producto excluye del selector de adopción.",
-   "asimetria_dentro_de_la_entrega": "Los otros dos módulos SÍ se corrigieron: 02-grc.json rotula ahora «Informe de comité» y «Acta de órgano consultivo» con naturaleza_organo=CONSULTIVO y una ADVERTENCIA_DE_MODELADO que cita operational-bodies.ts, y 05-canal.json dice expresamente «NUNCA un acuerdo adoptado». El mismo hecho se declara hoy de dos maneras incompatibles dentro de la misma entrega, lo que es peor que declararlo mal de forma uniforme: quien lea 02 y 05 concluirá que el criterio está aplicado.",
-   "hallazgo_de": "consola (P0, mantenido de la versión anterior de este fichero)",
-   "afectados": [
-    {
-     "origen": "INC-IA-003",
-     "modulo": "AIMS",
-     "organo": "garrigues-comite-seguridad-privacidad",
-     "fecha": "2026-04-30",
-     "tipo_declarado": "Acuerdo (campo `fecha_acuerdo` + «con acuerdo de» / «que acuerda»)",
-     "naturaleza": "CONSULTIVO",
-     "rotula_adopcion": true
-    },
-    {
-     "origen": "INC-IA-003",
-     "modulo": "AIMS",
-     "organo": "garrigues-comite-gobernanza-ia",
-     "fecha": "2026-04-30",
-     "tipo_declarado": "Acuerdo (campo `fecha_acuerdo` + «con acuerdo de» / «que acuerda»)",
-     "naturaleza": "CONSULTIVO",
-     "rotula_adopcion": true
-    },
-    {
-     "origen": "INC-IA-005",
-     "modulo": "AIMS",
-     "organo": "garrigues-comite-practica-profesional",
-     "fecha": "2026-06-18",
-     "tipo_declarado": "Acuerdo (campo `fecha_acuerdo` + «con acuerdo de» / «que acuerda»)",
-     "naturaleza": "CONSULTIVO",
-     "rotula_adopcion": true
-    }
-   ],
-   "lo_que_NO_hace_la_consola": "No se ha corregido ni un campo de 01-aims.json. Se reporta.",
-   "que_haria_falta": "Reescribir los dos `consecuencia_societaria` de 01-aims.json con el patrón ya aplicado en 02 y 05: tipo «Informe de comité» / «Acta de órgano consultivo», renombrar `fecha_acuerdo` a `fecha`, añadir naturaleza_organo y la ADVERTENCIA_DE_MODELADO, y reformular el aviso_de_coherencia para que pida rastro documental y no «un acuerdo»."
-  },
-  {
    "id": "INC-CONS-02",
    "severidad": "P0",
    "veredicto": "CONFIRMADA_Y_ABIERTA",
    "titulo": "Las siete consecuencias societarias declaradas siguen sin ningún rastro correlativo en Secretaría",
    "donde": "01-aims.json, 02-grc.json y 05-canal.json (elevaciones) frente a 03-secretaria.json :: acuerdos",
    "hecho": "Siete registros de tres módulos declaran que algo se elevó a un órgano en una fecha concreta. 03-secretaria.json contiene 59 acuerdos y ninguno es de un comité: sus `organo_adopta.tipo` son ORGANO_ADMIN (35), SOCIO_UNICO (11), JUNTA_GENERAL (9) y CONSEJO_ADMIN (4), y la palabra «Comité» no aparece ni una vez en todo el fichero. Ninguna de las siete fechas tiene contrapartida.",
+   "que_ha_cambiado_en_esta_version": "Las siete están ya correctamente rotuladas en origen como informe o acta de órgano consultivo — ninguna dice «acuerdo» (INC-CONS-01 cerrada). Lo que sigue abierto es lo otro: el rastro no existe. La incoherencia ya no es de redacción, es de dato ausente, y por eso sube de nitidez en vez de bajar: los siete registros declaran hoy exactamente qué habría que encontrar y no se encuentra nada.",
    "por_que_importa": "Es el hueco que el encargo pedía llenar: el prompt de Secretaría no generó informes ni actas de órgano consultivo, y los otros tres módulos sí generaron las elevaciones que los invocan.",
-   "hallazgo_de": "consola (P0, mantenido de la versión anterior de este fichero)",
+   "hallazgo_de": "consola (P0, mantenido de las dos versiones anteriores de este fichero)",
    "afectados": [
     {
      "origen": "INC-IA-003",
      "modulo": "AIMS",
      "organo": "garrigues-comite-seguridad-privacidad",
      "fecha": "2026-04-30",
-     "tipo_declarado": "Acuerdo (campo `fecha_acuerdo` + «con acuerdo de» / «que acuerda»)",
+     "tipo_declarado": "Informe de comité",
      "naturaleza": "CONSULTIVO",
-     "rotula_adopcion": true
+     "rotula_adopcion": false
     },
     {
      "origen": "INC-IA-003",
      "modulo": "AIMS",
      "organo": "garrigues-comite-gobernanza-ia",
      "fecha": "2026-04-30",
-     "tipo_declarado": "Acuerdo (campo `fecha_acuerdo` + «con acuerdo de» / «que acuerda»)",
+     "tipo_declarado": "Informe de comité",
      "naturaleza": "CONSULTIVO",
-     "rotula_adopcion": true
+     "rotula_adopcion": false
     },
     {
      "origen": "INC-IA-005",
      "modulo": "AIMS",
      "organo": "garrigues-comite-practica-profesional",
      "fecha": "2026-06-18",
-     "tipo_declarado": "Acuerdo (campo `fecha_acuerdo` + «con acuerdo de» / «que acuerda»)",
+     "tipo_declarado": "Acta de órgano consultivo",
      "naturaleza": "CONSULTIVO",
-     "rotula_adopcion": true
+     "rotula_adopcion": false
     },
     {
      "origen": "INC-GARR-SINT-01",
@@ -13839,7 +13870,8 @@
      "rotula_adopcion": false
     }
    ],
-   "lo_que_NO_hace_la_consola": "No propone crear ninguno de los siete. Crear un «acuerdo» sería reproducir INC-CONS-01; crear un «informe» exige decidir antes cómo se modela un informe de órgano consultivo en Secretaría, que es la duda D-01."
+   "verificable_como": "Los siete `verificable_como` de origen dicen lo mismo con distinta fecha y órgano: «existe rastro documental en Secretaría fechado el X asociado a Y, y su tipo NO es acuerdo adoptado». Hoy los siete fallan por la primera mitad, no por la segunda.",
+   "lo_que_NO_hace_la_consola": "No propone crear ninguno de los siete. Crear un «acuerdo» reintroduciría el defecto que 01, 02 y 05 acaban de cerrar; crear un «informe» exige decidir antes cómo se modela un informe de órgano consultivo en Secretaría, que es la duda D-01."
   },
   {
    "id": "INC-CONS-04",
@@ -14053,58 +14085,6 @@
    "hallazgo_de": "consola"
   },
   {
-   "id": "INC-CONS-19",
-   "severidad": "P2",
-   "veredicto": "CONFIRMADA_Y_ABIERTA",
-   "titulo": "Ocho planes de acción declaran su órgano supervisor por rótulo y no por slug",
-   "donde": "02-grc.json :: planes_accion[].organo_supervisor",
-   "hecho": "El campo es una cadena con el nombre del comité («Comité de Seguridad y Privacidad», «Comité de Análisis y Control Interno (CACI)»). Los 28 slugs de órgano del resto de 02-grc.json se prefijaron correctamente en la corrección; estos ocho no se tocaron. La consola dibuja las ocho aristas SUPERVISADO_POR resolviendo por coincidencia literal del nombre y lo marca `resolucion_slug: RESUELTO_POR_ROTULO`.",
-   "por_que_importa": "La arista se rompe el día que alguien renombre un comité, y ningún test lo detectaría.",
-   "hallazgo_de": "reverificador (mantenido) + consola",
-   "afectados": [
-    {
-     "plan": "PA-GARR-SINT-01",
-     "rotulo": "Comité de Seguridad y Privacidad",
-     "slug_real": "garrigues-comite-seguridad-privacidad"
-    },
-    {
-     "plan": "PA-GARR-SINT-02",
-     "rotulo": "Comité de Seguridad y Privacidad",
-     "slug_real": "garrigues-comite-seguridad-privacidad"
-    },
-    {
-     "plan": "PA-GARR-SINT-03",
-     "rotulo": "Comité de Análisis y Control Interno (CACI)",
-     "slug_real": "garrigues-caci"
-    },
-    {
-     "plan": "PA-GARR-SINT-04",
-     "rotulo": "Comité de Prevención de Delitos",
-     "slug_real": "garrigues-comite-prevencion-delitos"
-    },
-    {
-     "plan": "PA-GARR-SINT-05",
-     "rotulo": "Comité de Análisis y Control Interno (CACI)",
-     "slug_real": "garrigues-caci"
-    },
-    {
-     "plan": "PA-GARR-SINT-06",
-     "rotulo": "Comité de Seguridad y Privacidad",
-     "slug_real": "garrigues-comite-seguridad-privacidad"
-    },
-    {
-     "plan": "PA-GARR-SINT-07",
-     "rotulo": "Comité de Prevención de Delitos",
-     "slug_real": "garrigues-comite-prevencion-delitos"
-    },
-    {
-     "plan": "PA-GARR-SINT-08",
-     "rotulo": "Comité de Gobernanza de la Inteligencia Artificial",
-     "slug_real": "garrigues-comite-gobernanza-ia"
-    }
-   ]
-  },
-  {
    "id": "INC-CONS-20",
    "severidad": "P2",
    "veredicto": "CONFIRMADA",
@@ -14199,17 +14179,6 @@
    }
   },
   {
-   "id": "INC-CONS-23",
-   "severidad": "P1",
-   "veredicto": "CONFIRMADA_NUEVA",
-   "titulo": "Cita de esquema fabricada dentro del bloque que se añadió para dar seguridad a quien siembre",
-   "donde": "03-secretaria.json :: prerrequisitos_de_siembra.efecto_si_se_siembra_igualmente",
-   "hecho": "El texto afirma: «secretaria_book_entries.body_id sí es NOT NULL (20260719140000)». Verificado contra supabase/migrations/20260719140000_secretaria_book_entries_foundation.sql: NO existe ninguna tabla `secretaria_book_entries` — ese nombre solo aparece como clave de set_config ('app.secretaria_book_entries_rpc'). La tabla se llama `societary_book_entries` (línea 41) y NO tiene columna body_id: enruta por `section_id`. `societary_book_sections.body_id` (línea 17) es NULLABLE, y el único body_id NOT NULL de esa migración (línea 101) pertenece a `societary_book_routing_incidents`, que es la tabla de incidencias de enrutado.",
-   "matiz_importante": "La CONSECUENCIA afirmada sí se sostiene, por otra vía: la RPC de enrutado lanza excepción cuando `resolved_body_id IS NULL` (misma migración, ~línea 846), así que un acta sin órgano resuelto no abre asiento. Y la otra mitad de la frase es correcta: `agreements.body_id` es nullable (20260418053633_secretaria_t1b_agreements.sql:7). Es la cita, no la conclusión, lo que está mal.",
-   "por_que_importa": "Una tabla y una columna inventadas con un número de migración real detrás son más peligrosas que una afirmación vaga: quien las lea las dará por comprobadas y no irá a la migración.",
-   "hallazgo_de": "reverificador (verificado de nuevo por esta consola contra la migración)"
-  },
-  {
    "id": "INC-CONS-24",
    "severidad": "P2",
    "veredicto": "CONFIRMADA_NUEVA_DE_RAMA",
@@ -14244,10 +14213,46 @@
  ],
  "incoherencias_subsanadas_desde_la_version_1": [
   {
+   "id": "INC-CONS-01",
+   "titulo": "Tres elevaciones de AIMS se declaraban «acuerdo» de un órgano que el motor excluye de la adopción",
+   "estado": "SUBSANADA_EN_ORIGEN",
+   "era": "P0",
+   "subsanada_en": "corrección 2 (posterior a la versión 2 de este fichero)",
+   "comprobacion_de_esta_consola": "La consola no se fía del rótulo nuevo: mide. `rotula_adopcion()` marca una elevación como adopción si el registro conserva el campo `fecha_acuerdo`, si no declara `tipo`, o si su prosa contiene una forma de «acuerda/acuerdo». Sobre el dato de la versión 2 devolvía True en INC-IA-003 e INC-IA-005; sobre el dato de hoy devuelve False en las 7 elevaciones de los tres módulos. Los dos registros llevan además `tipo` («Informe de comité» / «Acta de órgano consultivo»), `fecha_informe` en lugar de `fecha_acuerdo`, `naturaleza_organo: CONSULTIVO`, la ADVERTENCIA_DE_MODELADO que cita operational-bodies.ts y un `verificable_como` que exige que el tipo NO sea acuerdo adoptado. La asimetría entre módulos que era el nervio del hallazgo ha desaparecido: 01, 02 y 05 dicen ahora lo mismo.",
+   "lo_que_NO_cierra": "Que el rótulo sea correcto no crea el rastro: las siete elevaciones siguen sin correlato en Secretaría. Eso es INC-CONS-02 y sigue abierta."
+  },
+  {
+   "id": "INC-CONS-19",
+   "titulo": "Ocho planes de acción declaraban su órgano supervisor por rótulo y no por slug",
+   "estado": "SUBSANADA_EN_ORIGEN",
+   "era": "P2",
+   "subsanada_en": "corrección 2 (posterior a la versión 2 de este fichero)",
+   "comprobacion_de_esta_consola": "Los 8 planes traen hoy `organo_supervisor_slug`, y la consola resuelve por ese campo: las 8 aristas SUPERVISADO_POR pasan de RESUELTO_POR_ROTULO a LITERAL. Se conserva el rótulo y se comprueba que corrobora al slug (`rotulo_corrobora_el_slug`), de modo que un renombrado del comité rompería la corroboración pero no la arista. Los 4 slugs (garrigues-comite-seguridad-privacidad, garrigues-caci, garrigues-comite-prevencion-delitos, garrigues-comite-gobernanza-ia) existen en el universo real de órganos construido de comites-2026.json.",
+   "efecto_lateral_util": "Los 8 traen también `naturaleza_organo: CONSULTIVO`, que es dato del seed y no interpretación: los 19 comités se siembran con config.naturaleza='CONSULTIVO'. La consola puede ahora comprobar sin leer prosa que el supervisor de un plan no adopta."
+  },
+  {
+   "id": "INC-CONS-23",
+   "titulo": "Cita de esquema fabricada dentro del bloque de prerrequisitos de siembra",
+   "estado": "SUBSANADA_EN_ORIGEN",
+   "era": "P1",
+   "subsanada_en": "corrección 2 (posterior a la versión 2 de este fichero)",
+   "comprobacion_de_esta_consola": "La frase «secretaria_book_entries.body_id sí es NOT NULL (20260719140000)» ya no está en 03-secretaria.json. La única ocurrencia que queda de esa cadena en todo el fichero es la mención expresa de que esa tabla NO existe, dentro del propio texto corregido: no es un residuo, es la corrección nombrando lo que corrige. El texto nuevo se ha releído contra supabase/migrations/20260719140000_secretaria_book_entries_foundation.sql y sus cinco extremos se sostienen: la migración crea societary_book_sections (13), societary_book_entries (41), societary_book_closures (68) y societary_book_routing_incidents (97); societary_book_entries no tiene columna body_id; societary_book_sections.body_id (17) es nullable; fn_secretaria_resolve_minute_book_destination resuelve el órgano como COALESCE(m.body_id, mt.body_id) (817) y lanza «acta % sin contexto coherente de tenant, entidad y órgano» (847) con la guarda `resolved_body_id IS NULL` en 845, exigiendo además sección MINUTES ACTIVE sobre libro OPEN del ejercicio (867-873 en la rama ya resuelta, 904-910 en la búsqueda de candidato); y fn_secretaria_register_minute_book_entry lanza «acta % sin destino de libro resuelto» (1068). La otra mitad, `agreements.body_id` nullable, sigue siendo cierta (20260418053633_secretaria_t1b_agreements.sql:7).",
+   "coste": "La consecuencia jurídica que el bloque quería transmitir se mantiene íntegra; lo que ha cambiado es que ahora la sostiene la migración y no una tabla inexistente."
+  },
+  {
+   "id": "INC-CONS-29",
+   "titulo": "Defecto propio de la versión anterior de este fichero: referencia cruzada equivocada",
+   "estado": "SUBSANADA_EN_ESTE_FICHERO",
+   "era": "P2",
+   "subsanada_en": "versión 3 (este fichero)",
+   "que_pasaba": "Las 6 apariciones del nodo del catálogo de IA remitían «ver INC-CONS-23» cuando el hallazgo que documenta que catalogo-ia.ts no está en el árbol de esta rama es INC-CONS-24. INC-CONS-23 era la cita de esquema fabricada de 03-secretaria.json, que no tiene nada que ver. `_meta.entradas_del_repo` sí remitía bien, así que el propio fichero se contradecía.",
+   "comprobacion_de_esta_consola": "Corregido a INC-CONS-24 en las 6 apariciones. Cero referencias a un hallazgo cerrado dentro del grafo."
+  },
+  {
    "id": "INC-CONS-03",
    "titulo": "Veintiocho referencias a órgano del módulo GRC no resolvían por slug literal",
    "estado": "SUBSANADA_EN_ORIGEN",
-   "comprobacion_de_esta_consola": "Las 122 referencias efectivas a órgano del grafo se resuelven hoy así: 108 LITERAL, 6 por alias del propio repo (INC-CONS-04) y 8 por rótulo (INC-CONS-19). Cero resueltas añadiendo el prefijo, cero sin resolver. Las 28 de 02-grc.json entran todas en el grupo LITERAL."
+   "comprobacion_de_esta_consola": "Las 122 referencias efectivas a órgano del grafo se resuelven hoy así: 6 ALIAS_DEL_REPO, 116 LITERAL. Cero resueltas añadiendo el prefijo, cero sin resolver. Las 28 de 02-grc.json entran todas en el grupo LITERAL, y desde la corrección 2 también los 8 supervisores de plan (INC-CONS-19). El resto de no-literales son los 6 alias del propio repo (INC-CONS-04), que no dependen de esta entrega."
   },
   {
    "id": "INC-CONS-06",
@@ -14419,34 +14424,34 @@
    "nombre": "Consecuencias societarias sin correlato en Secretaría",
    "valor": "7 / 7 (100,0 %)",
    "formula": "elevaciones a órgano declaradas en AIMS, GRC y canal sin acuerdo, informe ni acta del mismo órgano en la misma fecha en 03-secretaria.json ÷ total de elevaciones declaradas",
-   "lectura": "Ninguna de las siete tiene rastro: los 59 acuerdos de Secretaría son de órganos de administración, socio único, junta y consejo, y ninguno de comité. Tres de las siete se rotulan además «acuerdo» de un órgano consultivo (INC-CONS-01); las otras cuatro ya se corrigieron a informe o acta.",
+   "lectura": "Ninguna de las siete tiene rastro: los 59 acuerdos de Secretaría son de órganos de administración, socio único, junta y consejo, y ninguno de comité. El indicador no se mueve respecto de la medición anterior, pero su naturaleza sí: en la versión 2, tres de las siete estaban además mal rotuladas como «acuerdo» de un órgano consultivo; hoy las siete están bien rotuladas como informe o acta y lo que falta es el dato. `rotula_adopcion` da False en las 7.",
    "elevaciones": [
     {
      "origen": "INC-IA-003",
      "modulo": "AIMS",
      "organo": "garrigues-comite-seguridad-privacidad",
      "fecha": "2026-04-30",
-     "tipo_declarado": "Acuerdo (campo `fecha_acuerdo` + «con acuerdo de» / «que acuerda»)",
+     "tipo_declarado": "Informe de comité",
      "naturaleza": "CONSULTIVO",
-     "rotula_adopcion": true
+     "rotula_adopcion": false
     },
     {
      "origen": "INC-IA-003",
      "modulo": "AIMS",
      "organo": "garrigues-comite-gobernanza-ia",
      "fecha": "2026-04-30",
-     "tipo_declarado": "Acuerdo (campo `fecha_acuerdo` + «con acuerdo de» / «que acuerda»)",
+     "tipo_declarado": "Informe de comité",
      "naturaleza": "CONSULTIVO",
-     "rotula_adopcion": true
+     "rotula_adopcion": false
     },
     {
      "origen": "INC-IA-005",
      "modulo": "AIMS",
      "organo": "garrigues-comite-practica-profesional",
      "fecha": "2026-06-18",
-     "tipo_declarado": "Acuerdo (campo `fecha_acuerdo` + «con acuerdo de» / «que acuerda»)",
+     "tipo_declarado": "Acta de órgano consultivo",
      "naturaleza": "CONSULTIVO",
-     "rotula_adopcion": true
+     "rotula_adopcion": false
     },
     {
      "origen": "INC-GARR-SINT-01",
@@ -14527,13 +14532,12 @@
   {
    "id": "IND-10",
    "nombre": "Referencias a órgano que no resuelven por slug literal",
-   "valor": "14 / 122 (11,5 %)",
+   "valor": "6 / 122 (4,9 %)",
    "formula": "aristas con `resolucion_slug` distinto de LITERAL ÷ total de aristas que resuelven un órgano",
-   "lectura": "Baja de 42/115 a 14/122 respecto de la medición anterior: los 28 slugs de GRC ya llevan prefijo. Las 14 que quedan son 6 alias del propio repo (INC-CONS-04) y 8 rótulos de planes de acción (INC-CONS-19). Cero requieren añadir el prefijo y cero quedan sin resolver.",
+   "lectura": "Baja de 42/115 (versión 1) a 14/122 (versión 2) y a 6/122 ahora: primero los 28 slugs de GRC y después los 8 supervisores de plan (INC-CONS-19). Las que quedan son los 6 alias del propio repo (INC-CONS-04), que son deuda del repo y no de esta entrega. Cero requieren añadir el prefijo y cero quedan sin resolver.",
    "desglose": {
-    "LITERAL": 108,
-    "ALIAS_DEL_REPO": 6,
-    "RESUELTO_POR_ROTULO": 8
+    "LITERAL": 116,
+    "ALIAS_DEL_REPO": 6
    },
    "fuente": "grafo de este fichero",
    "firmeza": "FIRME",
@@ -14601,14 +14605,19 @@
    "como": "Recorrido de los nodos PERSONA_CARGO y de su campo `persona_de_ficcion`."
   },
   {
+   "que": "Ninguna elevación a órgano consultivo se presenta ya como acuerdo adoptado",
+   "resultado": "Las 7 elevaciones de los tres módulos (AIMS 3, GRC 2, canal 2) dan rotula_adopcion = False; 0 lo dan True. Las tres que lo daban en la versión 2 (INC-IA-003 ×2 e INC-IA-005) se corrigieron en origen.",
+   "como": "`rotula_adopcion()` no lee el `tipo` declarado, que es justo lo que una corrección cosmética arreglaría: marca adopción si el registro conserva el campo `fecha_acuerdo`, si no declara `tipo` en absoluto, o si su prosa contiene una forma de «acuerda/acuerdo». Contrastada contra el dato de la versión 2, donde devuelve True en los dos registros de AIMS: la comprobación puede fallar, y falló hasta hoy."
+  },
+  {
    "que": "Los órganos consultivos no adoptan en el grafo",
    "resultado": "Las 8 aristas ADOPTADO_POR apuntan solo a garrigues-admin-unico y garrigues-ead-cda, ambos DECISORIO. Ninguna arista de adopción toca un comité.",
    "como": "Filtro por tipo de arista y lectura de `naturaleza` en el nodo de destino."
   }
  ],
  "dudas": [
-  "D-01 — ¿Cómo se modela en Secretaría el rastro de una elevación a órgano consultivo? Los Estatutos y el gate de G3 dicen informe o acta, no acuerdo. Mientras no haya una respuesta, esta consola no propone crear ninguna de las siete: solo señala que faltan (INC-CONS-02).",
-  "D-02 — ¿Se corrige 01-aims.json para alinearlo con 02 y 05, o se decide que el criterio del consultivo no aplica a AIMS? Hoy la misma entrega declara el mismo hecho de dos maneras incompatibles (INC-CONS-01).",
+  "D-01 — ¿Cómo se modela en Secretaría el rastro de una elevación a órgano consultivo? Los cuatro módulos dicen ya lo mismo —informe o acta de órgano consultivo, nunca acuerdo adoptado— pero ninguno dice en qué tabla vive eso. `minutes` cuelga de `meetings` y el enrutado a libro exige órgano y sección MINUTES; un informe de comité consultivo no es un acta de reunión de órgano de administración. Mientras no haya respuesta, esta consola no propone crear ninguna de las siete: solo señala que faltan (INC-CONS-02). Es hoy la duda que más bloquea, porque es la única que queda entre el dato y el cierre de un P0.",
+  "D-02 — Cerrada por la corrección 2: 01-aims.json quedó alineado con 02 y 05. Se conserva la entrada porque el criterio sigue vivo para todo dato futuro: cualquier elevación nueva a un comité debe nacer como informe o acta, con `naturaleza_organo` y `verificable_como`, y nunca con un campo `fecha_acuerdo`.",
   "D-03 — ¿Quién crea los órganos de las 10 sociedades sin ninguno, y con qué fuente? Sin ellos, 51 de los 59 acuerdos se siembran con body_id NULL y nada falla (INC-CONS-05).",
   "D-04 — ¿EAD Trust necesita su Junta General modelada? Se le atribuyen tres aprobaciones de cuentas por junta y solo tiene Consejo.",
   "D-05 — ¿Se sanean `garrigues-ots` y `garrigues-consejo-administracion-ead-trust` en obligaciones-ciber.ts, o se acepta que el seed resuelva por nombre? Es repo, no dato sintético (INC-CONS-04).",

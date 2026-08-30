@@ -761,7 +761,7 @@
       "medidas_existentes": ["CTR-IA-06"],
       "residuo": { "nivel": null, "color": "#D9D9D9" },
       "conclusion": null,
-      "por_que_sigue_abierta": "Porque el punto que la bloquea es normativo interno y no tecnico: PI-30 §3.1.1 excluye expresamente las funcionalidades de Gemini-Google del paraguas de aprobacion de GA_IA y las remite al §3.2 en su totalidad. Hasta que el Comité de Gobernanza de la IA se pronuncie sobre si un chatbot corporativo construido sobre Gemini queda dentro o fuera de esa exclusion, cerrar la evaluacion seria decidir por el Comité. Se deja abierta a proposito.",
+      "por_que_sigue_abierta": "Porque el punto que la bloquea es normativo interno y no tecnico: PI-30 §3.1.1 excluye expresamente las funcionalidades de Gemini-Google del paraguas de aprobacion de GA_IA y las remite al §3.2 en su totalidad. Hasta que el Comité de Gobernanza de la IA se pronuncie sobre si un chatbot corporativo construido sobre Gemini queda dentro o fuera de esa exclusion, cerrar la evaluacion seria anticipar el criterio del Comité. Se deja abierta a proposito.",
       "firmeza": "SINTETICO",
       "ancla": "PI-30 §3.1.1 (exclusion real) + metodologia P1/P2 del PPD. Valores SIMULADOS.",
       "procedencia": "SIMULADO"
@@ -1019,7 +1019,7 @@
         { "fecha": "2026-04-16", "actuacion": "Se confirma que el fragmento procedia de un asunto sujeto a barrera de informacion y que la recuperacion no aplicaba el filtro de alcance por asunto." },
         { "fecha": "2026-04-17", "actuacion": "Se corrige el filtro de alcance y se restablece el servicio." },
         { "fecha": "2026-04-23", "actuacion": "Se eleva al Comité de Seguridad y Privacidad y al Comité de Gobernanza de la Inteligencia Artificial." },
-        { "fecha": "2026-04-30", "actuacion": "Ambos comites acuerdan condicionar el escalado del corpus a la implantacion del control de fuga de datos." }
+        { "fecha": "2026-04-30", "actuacion": "Ambos comites emiten informe recomendando que el escalado del corpus no se acometa hasta que el control de fuga de datos este operativo." }
       ],
       "deteccion": "Observacion del propio equipo usuario al revisar las fuentes citadas. Es deteccion humana y tardia: el sistema no la senalo.",
       "contencion": "Suspension del uso del corpus afectado el mismo dia. Se verifico que el fragmento no llego a incorporarse a ningun entregable.",
@@ -1028,10 +1028,14 @@
       "control_reforzado": "CTR-IA-03, CTR-IA-05",
       "consecuencia_societaria": {
         "hay": true,
-        "descripcion": "Elevado al Comité de Seguridad y Privacidad y al Comité de Gobernanza de la Inteligencia Artificial, con acuerdo de condicionar el escalado del corpus de 100k a 10M paginas a que el control de fuga de datos este operativo.",
+        "tipo": "Informe de comité",
+        "descripcion": "Elevado al Comité de Seguridad y Privacidad y al Comité de Gobernanza de la Inteligencia Artificial, que informan favorablemente no escalar el corpus de 100k a 10M paginas hasta que el control de fuga de datos este operativo, y lo recomiendan a quien tiene competencia para decidirlo.",
         "organos": ["garrigues-comite-seguridad-privacidad", "garrigues-comite-gobernanza-ia"],
-        "fecha_acuerdo": "2026-04-30",
-        "aviso_de_coherencia": "Este acuerdo NO se ha generado en el modulo de Secretaria por este encargo. Si Secretaria no contiene un acuerdo de esos organos en esa fecha, es una incoherencia REAL que la consola debe reportar, no un error a tapar."
+        "fecha_informe": "2026-04-30",
+        "naturaleza_organo": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). Por tanto este registro NO debe materializarse como acuerdo societario ni como acto inscribible: su rastro correcto en Secretaría es un informe o un acta de órgano consultivo, NUNCA un acuerdo adoptado. Si la consola encuentra un acuerdo adoptado por el Comité de Seguridad y Privacidad o por el Comité de Gobernanza de la Inteligencia Artificial, es un defecto de siembra, no un dato.",
+        "aviso_de_coherencia": "Este informe NO se ha generado en el modulo de Secretaria por este encargo. Debe existir rastro documental en Secretaria fechado el 2026-04-30 y asociado a esos dos organos, de tipo informe o acta de organo consultivo. Lo que se pide NO es un acuerdo adoptado: si no hay rastro, es una incoherencia REAL que la consola debe reportar, no un error a tapar; y si lo que aparece es un acuerdo adoptado por esos comites, es un defecto de siembra a reportar igualmente.",
+        "verificable_como": "Existe rastro documental en Secretaria fechado el 2026-04-30 asociado a garrigues-comite-seguridad-privacidad y a garrigues-comite-gobernanza-ia, y su tipo NO es acuerdo adoptado."
       },
       "por_que_no_esta_cerrado": "Porque el control que lo cierra (CTR-IA-05) sigue en implantacion. Marcarlo RESUELTO con la medida pendiente seria cerrar el expediente antes que el riesgo.",
       "firmeza": "SINTETICO",
@@ -1073,7 +1077,7 @@
         { "fecha": "2026-06-03", "actuacion": "Se verifica que la barrera estaba correctamente declarada en el expediente pero no se habia trasladado a los permisos del repositorio subyacente." },
         { "fecha": "2026-06-04", "actuacion": "Se corrigen los permisos y se revisa el resto de asuntos con barrera vigente." },
         { "fecha": "2026-06-11", "actuacion": "Se eleva al Comité de Práctica Profesional por afectar al regimen de barreras de informacion." },
-        { "fecha": "2026-06-18", "actuacion": "El Comité acuerda una revision periodica de coherencia entre barreras declaradas y permisos efectivos." }
+        { "fecha": "2026-06-18", "actuacion": "El Comité emite informe recomendando una revision periodica de coherencia entre barreras declaradas y permisos efectivos." }
       ],
       "deteccion": "Comunicacion voluntaria e inmediata del propio usuario.",
       "contencion": "Cese del acceso el mismo dia. No hubo descarga, reenvio ni uso de la informacion.",
@@ -1082,10 +1086,14 @@
       "control_reforzado": "CTR-IA-09",
       "consecuencia_societaria": {
         "hay": true,
-        "descripcion": "Elevado al Comité de Práctica Profesional, que acuerda una revision periodica de coherencia entre las barreras de informacion declaradas y los permisos efectivos en los repositorios.",
+        "tipo": "Acta de órgano consultivo",
+        "descripcion": "Elevado al Comité de Práctica Profesional, que recomienda una revision periodica de coherencia entre las barreras de informacion declaradas y los permisos efectivos en los repositorios.",
         "organos": ["garrigues-comite-practica-profesional"],
-        "fecha_acuerdo": "2026-06-18",
-        "aviso_de_coherencia": "Este acuerdo NO se ha generado en Secretaria por este encargo. Su ausencia alli es una incoherencia REAL que la consola debe reportar."
+        "fecha_informe": "2026-06-18",
+        "naturaleza_organo": "CONSULTIVO",
+        "ADVERTENCIA_DE_MODELADO": "El órgano está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO', scripts/seed-garrigues-bodies.ts) y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos (isAdoptingBody, src/lib/secretaria/operational-bodies.ts). Por tanto este registro NO debe materializarse como acuerdo societario ni como acto inscribible: su rastro correcto en Secretaría es un informe o un acta de órgano consultivo, NUNCA un acuerdo adoptado. Si la consola encuentra un acuerdo adoptado por Comité de Práctica Profesional, es un defecto de siembra, no un dato.",
+        "aviso_de_coherencia": "Este informe NO se ha generado en Secretaria por este encargo. Debe existir rastro documental en Secretaria fechado el 2026-06-18 y asociado a garrigues-comite-practica-profesional, de tipo informe o acta de organo consultivo. Lo que se pide NO es un acuerdo adoptado: su ausencia es una incoherencia REAL que la consola debe reportar; y si lo que aparece es un acuerdo adoptado por este comite, es un defecto de siembra a reportar igualmente.",
+        "verificable_como": "Existe rastro documental en Secretaria fechado el 2026-06-18 asociado a garrigues-comite-practica-profesional, y su tipo NO es acuerdo adoptado."
       },
       "firmeza": "SINTETICO",
       "ancla": "PI-30 §3.1.1 (Copilot como herramienta corporativa) para el sistema. El incidente es inventado.",
@@ -1277,7 +1285,7 @@
     {
       "id": "D-03",
       "pregunta": "¿Quedan los chatbots construidos sobre Gemini dentro o fuera de la exclusión de PI-30 §3.1.1?",
-      "por_que_importa": "Es la única contradicción de fondo que este encargo ha encontrado entre el dato declarado y la política vigente. PI-30 aprueba GA_IA con una excepción expresa que saca las funcionalidades de Gemini-Google del paraguas y las remite al §3.2 en su totalidad; el usuario declara que se han construido chatbots corporativos precisamente sobre Gemini. EV-IA-05 se ha dejado abierta a propósito porque cerrarla sería decidir por el Comité de Gobernanza de la IA.",
+      "por_que_importa": "Es la única contradicción de fondo que este encargo ha encontrado entre el dato declarado y la política vigente. PI-30 aprueba GA_IA con una excepción expresa que saca las funcionalidades de Gemini-Google del paraguas y las remite al §3.2 en su totalidad; el usuario declara que se han construido chatbots corporativos precisamente sobre Gemini. EV-IA-05 se ha dejado abierta a propósito porque cerrarla sería anticipar el criterio del Comité de Gobernanza de la IA.",
       "bloquea": "EV-IA-05 y el estado real de GARR-IA-005."
     },
     {
@@ -1318,8 +1326,8 @@
     },
     {
       "id": "D-10",
-      "pregunta": "¿Los acuerdos de comité que aparecen como consecuencia societaria de INC-IA-003 e INC-IA-005 existen en Secretaría?",
-      "por_que_importa": "Este encargo NO ha generado esos acuerdos: genera el incidente que dice haberlos motivado. Si Secretaría no tiene un acuerdo del Comité de Seguridad y Privacidad y del Comité de Gobernanza de la IA con fecha 2026-04-30, ni uno del Comité de Práctica Profesional con fecha 2026-06-18, la consola debe reportarlo como incoherencia. Está declarado a propósito y dentro de cada incidente, no escondido aquí.",
+      "pregunta": "¿Los informes de comité que aparecen como consecuencia societaria de INC-IA-003 e INC-IA-005 existen en Secretaría?",
+      "por_que_importa": "Este encargo NO ha generado esos informes: genera el incidente que dice haberlos motivado. Los tres comités implicados son estructuras CONSULTIVAS (config.naturaleza='CONSULTIVO') y quedan fuera de los selectores de adopción, así que lo que hay que buscar en Secretaría es un informe o un acta de órgano consultivo, NUNCA un acuerdo adoptado. Si Secretaría no tiene rastro documental del Comité de Seguridad y Privacidad y del Comité de Gobernanza de la IA con fecha 2026-04-30, ni del Comité de Práctica Profesional con fecha 2026-06-18, la consola debe reportarlo como incoherencia; y si lo que encuentra es un acuerdo adoptado por cualquiera de ellos, debe reportarlo como defecto de siembra. Está declarado a propósito y dentro de cada incidente, no escondido aquí.",
       "bloquea": "Nada. Es un enganche deliberado para el Prompt 4."
     },
     {
