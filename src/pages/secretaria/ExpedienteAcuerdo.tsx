@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useAgreement, useAgreementCompliance, type ComplianceResult } from "@/hooks/useAgreementCompliance";
 import { ActaAcreditadaNotice } from "@/components/secretaria/ActaAcreditadaNotice";
+import { lecturaDeSelloMotivo } from "@/lib/secretaria/sello-motivo-lectura";
 import { useAgreementSignedDocumentUrl } from "@/hooks/useEvidenceBundleSignedUrl";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { useQTSPVerification } from "@/hooks/useQTSPVerification";
@@ -1440,7 +1441,35 @@ function EvaluacionNoSelladaAviso({ results }: { results: RuleEvaluationResult[]
         sellado ni es oponible.
       </p>
       {motivo ? (
-        <p className="mt-1 text-[11px] leading-relaxed text-[var(--g-text-secondary)]">{motivo}</p>
+        (() => {
+          // Se enseñan LAS DOS: la lectura jurídica arriba y, desplegable y
+          // rotulado como tal, el literal del registro WORM. Si no hay lectura
+          // registrada —porque alguien re-acuñó el WORM con otro texto— se pinta
+          // el literal tal cual: nunca se oculta, como mucho no se traduce.
+          const { lectura, literal } = lecturaDeSelloMotivo(motivo);
+          if (!lectura) {
+            return (
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--g-text-secondary)]">
+                {literal}
+              </p>
+            );
+          }
+          return (
+            <>
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--g-text-secondary)]">
+                {lectura}
+              </p>
+              <details className="mt-1">
+                <summary className="cursor-pointer text-[11px] font-medium text-[var(--g-text-secondary)]">
+                  Ver el literal del registro de evaluación
+                </summary>
+                <p className="mt-1 text-[11px] leading-relaxed text-[var(--g-text-secondary)]">
+                  {literal}
+                </p>
+              </details>
+            </>
+          );
+        })()
       ) : null}
     </div>
   );
