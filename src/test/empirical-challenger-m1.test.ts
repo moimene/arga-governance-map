@@ -114,6 +114,10 @@ describe("Milestone 1 — Empirical Challenger Verification Suite", () => {
         parentEntityId: "ent-root-1",
         taxId: "B12345678",
         countryCode: "ES",
+        jurisdiction: "ES",
+        legalForm: "SLU",
+        status: "ACTIVA",
+        materiality: "Pendiente",
       },
       {
         id: "ent-root-1",
@@ -122,6 +126,10 @@ describe("Milestone 1 — Empirical Challenger Verification Suite", () => {
         parentEntityId: null,
         taxId: "A12345678",
         countryCode: "ES",
+        jurisdiction: "ES",
+        legalForm: "SA",
+        status: "ACTIVA",
+        materiality: "Pendiente",
       },
     ];
 
