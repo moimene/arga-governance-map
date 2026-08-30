@@ -845,11 +845,6 @@ export default function SistemaDetalle() {
                         clasificación del art. 6 sobre este inventario, así que no consta ni que lo
                         sea ni que no lo sea.
                       </span>
-                      <span className="block text-[var(--g-text-secondary)]">
-                        Lo que sí consta: la política interna PI-30 (§3.2.c) obliga a revisar,
-                        ajustar y validar todo resultado antes de usarlo, y declara que la IA
-                        generativa «no es un sustituto» del trabajo profesional.
-                      </span>
                     </div>
                     <div
                       className="p-3 bg-[var(--g-surface-subtle)]/40 border border-[var(--g-border-subtle)] text-xs space-y-1"

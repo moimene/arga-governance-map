@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS aims_fria_assessments (
     REFERENCES ai_systems(tenant_id, id) ON DELETE CASCADE,
   version_id uuid,
   FOREIGN KEY (tenant_id, version_id)
-    REFERENCES aims_system_versions(tenant_id, id) ON DELETE SET NULL,
+    REFERENCES aims_system_versions(tenant_id, id) ON DELETE SET NULL (version_id),
   title text NOT NULL,
   status text NOT NULL DEFAULT 'DRAFT', -- 'DRAFT', 'IN_REVIEW', 'APPROVED', 'SUPERSEDED'
   version_number int NOT NULL DEFAULT 1,

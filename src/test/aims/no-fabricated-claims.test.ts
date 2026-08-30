@@ -36,6 +36,31 @@ const DECLARACION = "src/components/ai-governance/DeclaracionConformidadModal.ts
 const HOOK = "src/hooks/useAimsTechnicalFile.ts";
 const RPC = "supabase/migrations/20260829130000_aims_close_technical_file_sin_atribucion.sql";
 
+/**
+ * Control positivo del instrumento (forma nº7).
+ *
+ * Cinco bucles de este fichero recorren `superficieAims()` y TODAS sus
+ * aserciones son de ausencia (`.toBe(false)`). Una lista encogida las pone
+ * verdes a las cinco a la vez, y "no hay sellos fabricados" pasaría a
+ * significar "no he mirado". Una aserción de ausencia sin control positivo no
+ * distingue "correctamente ausente" de "ciego".
+ */
+describe("A3 — el barrido ve la superficie que dice barrer", () => {
+  it("encuentra la superficie AIMS completa, no un subconjunto mudo", () => {
+    const ficheros = superficieAims();
+    expect(ficheros.length, "el barrido de la superficie AIMS se ha quedado corto")
+      .toBeGreaterThanOrEqual(19);
+    for (const esperado of [
+      "src/pages/ai-governance/SistemaDetalle.tsx",
+      "src/pages/ai-governance/IncidenteDetalle.tsx",
+      "src/lib/aims/incident-clocks.ts",
+      "src/hooks/useAimsTechnicalFile.ts",
+    ]) {
+      expect(ficheros, `${esperado} no entra en el barrido`).toContain(esperado);
+    }
+  });
+});
+
 describe("A3 — sin sellos fabricados", () => {
   it("el cliente no fabrica tokens de sello", () => {
     const src = read(DETALLE);
@@ -430,7 +455,12 @@ describe("FRIA — ausencia acreditada, no ausencia a secas", () => {
     // dictamen y un estado de conocimiento. Esta consola no tiene el dictamen.
     const s = src();
     expect(/no consta acreditad/i.test(s), "falta la fórmula de ausencia acreditada").toBe(true);
-    for (const re of [/\bno (le )?aplica\b/i, /no es exigible/i, /queda excluid/i]) {
+    // Las tres primeras no bastaban: una mutación que dictaminaba con «no
+    // alcanza» y «no procede» pasaba el gate entero. Sigue siendo lista negra
+    // —vigila formulaciones, no el sentido—; la garantía estructural es que la
+    // cabecera diga «no consta», comprobada aparte.
+    for (const re of [/\bno (le )?aplica\b/i, /no es exigible/i, /queda excluid/i,
+                      /no alcanza/i, /no procede/i, /no resulta de aplicaci/i, /est[áa] exent/i]) {
       expect(re.test(s), `la pestaña dictamina en vez de constatar: ${re}`).toBe(false);
     }
   });
@@ -453,7 +483,11 @@ describe("FRIA — ausencia acreditada, no ausencia a secas", () => {
     expect(/organismo de Derecho p[úu]blico/i.test(s), "falta la categoría de organismo público").toBe(true);
     expect(/servicios p[úu]blicos/i.test(s), "falta la categoría de servicios públicos").toBe(true);
     expect(/punto 5[^<]{0,40}letras b\) y c\)/i.test(s), "falta la remisión al anexo III.5.b-c").toBe(true);
-    expect(/PI-30/.test(s), "no cita la fuente interna que sostiene lo que sí consta").toBe(true);
+    // La cita a PI-30 se retiró: el panel se renderiza para cualquier tenant y
+    // hoy los únicos `ai_systems` de Cloud son de ARGA, así que afirmaba a una
+    // aseguradora la política interna de un despacho. Su sitio es una arista
+    // leída de la política real del tenant, no un rótulo en el copy.
+    expect(/PI-30/.test(s), "el panel vuelve a citar PI-30 sin puerta de tenant").toBe(false);
   });
 
   it("CADA condición, una por una, consta como NO acreditada", () => {
@@ -465,10 +499,14 @@ describe("FRIA — ausencia acreditada, no ausencia a secas", () => {
     // normaliza el espacio antes de buscar: si no, un salto de línea en mitad
     // de la frase basta para que la invariante no se vea.
     const s = src().replace(/\s+/g, " ");
-    const bloques = s.split(/\d · /).slice(1);
+    // Cada bloque se corta en el cierre de SU div: sin esto el segundo abarca
+    // hasta el final del panel y su "no consta" se satisface con cualquier frase
+    // del cierre — el gate pasaba con la condición 2 afirmando lo contrario de
+    // lo que dice la cabecera.
+    const bloques = s.split(/\d · /).slice(1).map((b) => b.split("</div>")[0]);
     expect(bloques.length, "no hay dos bloques de condición").toBe(2);
     const NO_CONSTA = /no consta|no hay[^.]{0,140}acredite|sin acreditar/i;
-    const ACREDITADA = /\bconsta acreditad|\bse acredita\b|\bqueda acreditad|\bs[íi] concurre/i;
+    const ACREDITADA = /\bconsta acreditad|\bse acredita\b|\bqueda acreditad|\bconcurre/i;
     for (const [i, b] of bloques.entries()) {
       expect(NO_CONSTA.test(b), `la condición ${i + 1} no declara que NO consta`).toBe(true);
       expect(ACREDITADA.test(b), `la condición ${i + 1} aparece como ACREDITADA`).toBe(false);

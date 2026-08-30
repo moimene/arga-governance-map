@@ -21,7 +21,7 @@ const sqlEjecutable = () => readFileSync(RUTA, "utf8").replace(/^\s*--.*$/gm, ""
  * precisamente la tabla del art. 27.1(e).
  */
 function tablasDelSql(): string[] {
-  return [...sqlEjecutable().matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]);
+  return [...sqlEjecutable().matchAll(/CREATE TABLE (?:IF NOT EXISTS )?(\w+)/g)].map((m) => m[1]);
 }
 
 describe("B1 — la migración aísla por el tenant de la sesión", () => {
@@ -47,8 +47,12 @@ describe("B1 — la migración aísla por el tenant de la sesión", () => {
   });
 
   it("ninguna política hardcodea un tenant", () => {
-    expect(/tenant_id\s*=\s*'00000000-/.test(sqlEjecutable()),
-      "hay una política con el tenant en duro").toBe(false);
+    // Buscar `tenant_id = '0000…'` dejaba pasar `IN ('0000…'::uuid)`, que es la
+    // forma natural de escribirlo si alguien "arregla" el aislamiento a mano.
+    for (const pol of sqlEjecutable().match(/CREATE POLICY[\s\S]*?;/g) ?? []) {
+      expect(/'[0-9a-f]{8}-[0-9a-f]{4}-/i.test(pol),
+        `política con un tenant en duro: ${pol.slice(0, 90)}`).toBe(false);
+    }
   });
 
   it("toda tabla creada tiene política con fn_current_tenant_id y TO authenticated", () => {
@@ -67,7 +71,11 @@ describe("B1 — la migración aísla por el tenant de la sesión", () => {
 
   it("RLS habilitada en toda tabla creada", () => {
     const sql = sqlEjecutable();
-    for (const t of tablasDelSql()) {
+    const tablas = tablasDelSql();
+    // Sin ancla, un cambio que vaciara `tablasDelSql()` dejaría este bucle
+    // asertando sobre cero tablas y pasando por verde.
+    expect(tablas.length, "la migración no crea ninguna tabla").toBeGreaterThanOrEqual(10);
+    for (const t of tablas) {
       expect(sql, `${t} sin RLS`).toContain(`ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY`);
     }
   });
@@ -100,7 +108,7 @@ describe("B1 — las FK llevan coherencia de tenant", () => {
     // aislamiento, eso no se mergea con una nota.
     const sql = sqlEjecutable();
     const simples = sql.match(
-      /\b(fria_id|incident_regime_id|incident_id|system_id|version_id)\s+uuid[^,\n]*REFERENCES\s+(aims_|ai_)/g,
+      /\b(fria_id|incident_regime_id|incident_id|system_id|version_id)\s+uuid[^,]*REFERENCES\s+(aims_|ai_)/g,
     ) ?? [];
     expect(simples, `FK sin coherencia de tenant: ${simples.join(" | ")}`).toEqual([]);
   });
@@ -113,8 +121,11 @@ describe("B1 — las FK llevan coherencia de tenant", () => {
         `${padre} no expone (tenant_id, id)`).toBe(true);
     }
     for (const previo of ["ai_incidents", "ai_systems", "aims_system_versions"]) {
-      expect(sql, `${previo} no recibe la clave compuesta`)
-        .toContain(`ALTER TABLE ${previo}`);
+      // `toContain("ALTER TABLE x")` lo satisface CUALQUIER ALTER: sustituir la
+      // clave compuesta por un ADD COLUMN dejaba el gate verde y a las hijas sin
+      // padre al que colgarse por (tenant_id, id).
+      expect(new RegExp(`ALTER TABLE ${previo}[\\s\\S]{0,200}?UNIQUE \\(tenant_id, id\\)`).test(sql),
+        `${previo} no expone UNIQUE (tenant_id, id)`).toBe(true);
     }
   });
 

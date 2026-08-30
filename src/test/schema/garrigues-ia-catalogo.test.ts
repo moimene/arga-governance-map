@@ -20,7 +20,21 @@ describe("Catálogo de IA — la procedencia no se mezcla", () => {
     // públicas de esos proveedores como NO corporativas (§3.1.2).
     const declarados = SISTEMAS_IA.filter((s) => s.provenance === "DECLARADO_USUARIO");
     expect(declarados.length, "no consta lo declarado por el usuario").toBeGreaterThan(0);
-    expect(declarados.every((s) => s.provenance !== "PI-30_ART_3_1_1")).toBe(true);
+    // La aserción anterior era `declarados.every(s => s.provenance !== "PI-30…")`
+    // sobre un array YA filtrado a `=== "DECLARADO_USUARIO"`: no podía fallar
+    // nunca, y era justo la que da nombre al test.
+    //
+    // El campo que RECLAMA fuente es `sourceRef`. Se vigila sobre TODO lo que no
+    // sale de la política —no sólo lo declarado—: una mutación que apuntaba el
+    // `sourceRef` del roadmap a PI-30 se escapaba del filtro anterior.
+    // `description` sí puede nombrarla —el texto honesto la cita para NEGAR que
+    // respalde nada—, así que ahí sólo se vigila que no afirme aprobación.
+    for (const s of SISTEMAS_IA.filter((x) => x.provenance !== "PI-30_ART_3_1_1")) {
+      expect(s.sourceRef, `${s.name} invoca PI-30 como fuente de lo que la política no dice`)
+        .not.toMatch(/PI-30/);
+      expect(s.description, `${s.name} presenta como aprobado lo que sólo está declarado`)
+        .not.toMatch(/\b(aprobad|autorizad|homologad|validad)[oa]s? por (la )?PI-30/i);
+    }
   });
 
   it("el roadmap se marca como plan y no como desplegado", () => {
