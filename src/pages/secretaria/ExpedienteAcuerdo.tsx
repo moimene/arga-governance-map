@@ -23,6 +23,7 @@ import {
   Lock,
 } from "lucide-react";
 import { useAgreement, useAgreementCompliance, type ComplianceResult } from "@/hooks/useAgreementCompliance";
+import { ActaAcreditadaNotice } from "@/components/secretaria/ActaAcreditadaNotice";
 import { useAgreementSignedDocumentUrl } from "@/hooks/useEvidenceBundleSignedUrl";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { useQTSPVerification } from "@/hooks/useQTSPVerification";
@@ -859,6 +860,15 @@ export default function ExpedienteAcuerdo() {
                   <CheckRow ok={compliance.majority_compliant} label="Mayoría" />
                   <CheckRow ok={compliance.conflict_handled} label="Conflictos de interés" />
                   <NotaDeExpediente explain={agreement.compliance_explain} />
+                  <ActaAcreditadaNotice
+                    contexto="ficha"
+                    acreditacion={
+                      (
+                        (agreement.compliance_explain as Record<string, Record<string, unknown>> | null)
+                          ?.c1_junta_socios_2026 as Record<string, unknown> | undefined
+                      )?.acta_certificacion
+                    }
+                  />
                   {compliance.blocking_issues.length > 0 ? (
                     <div
                       className="mt-3 bg-[var(--g-sec-100)]/60 p-3 text-xs text-[var(--g-text-primary)]"

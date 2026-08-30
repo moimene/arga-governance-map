@@ -136,6 +136,7 @@ import {
   buildDecisionAgendaSnapshots,
   votingMatterFromSnapshot,
 } from "@/lib/secretaria/meeting-voting";
+import { ActaAcreditadaNotice } from "@/components/secretaria/ActaAcreditadaNotice";
 import { BookDestinationNotice } from "@/components/secretaria/BookDestinationNotice";
 import { StepperShell, StepDef } from "./_shared/StepperShell";
 
@@ -754,6 +755,15 @@ function ConstitutionStep({ meetingId }: { meetingId?: string }) {
         pasa a <span className="font-medium text-[var(--g-text-primary)]">EN&nbsp;CURSO</span> y se activan
         los pasos de asistentes y quórum. Al cerrar (generación del acta) pasa a CELEBRADA.
       </p>
+
+      {/* Tambien aqui, y no solo en el paso 6: mientras la reunion siga en DRAFT
+          el paso de cierre esta DESHABILITADO, asi que un aviso puesto solo alli
+          es inalcanzable justo para quien viene a buscar el acta. Verificado en
+          vivo: los pasos 2, 3, 5 y 6 vuelven `disabled` en DRAFT. */}
+      <ActaAcreditadaNotice
+        contexto="cierre"
+        acreditacion={(m.quorum_data as Record<string, unknown> | null)?.["acta_certificacion"]}
+      />
 
       <div
         className="divide-y divide-[var(--g-border-subtle)] border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
@@ -4086,6 +4096,11 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
         Revisa las resoluciones y sus expedientes Acuerdo 360 vinculados antes de confirmar el cierre. Al confirmar, se generará el
         acta en borrador mediante el proceso interno de Secretaría.
       </p>
+
+      <ActaAcreditadaNotice
+        contexto="cierre"
+        acreditacion={recordAt(meetingQuorumData, "acta_certificacion")}
+      />
 
       <BookDestinationNotice
         body={meetingBodyForUniversal}

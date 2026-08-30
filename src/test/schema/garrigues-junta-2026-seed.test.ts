@@ -9,7 +9,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { GARRIGUES_DEMO_EMAIL, GARRIGUES_TENANT, sesionDe } from "../helpers/supabase-test-client";
+import { DEMO_TENANT, GARRIGUES_DEMO_EMAIL, GARRIGUES_TENANT, sesionDe } from "../helpers/supabase-test-client";
 import {
   ANTELACION_DIAS,
   CANAL_ESTATUTARIO,
@@ -1082,6 +1082,68 @@ describe("C1 — los 10 acuerdos de la Junta en Cloud", () => {
     // Control discriminante: ARGA no adquiere la clave.
     const { data: enArga } = await arga.from("agreements")
       .select("id").not("compliance_explain->c1_junta_socios_2026", "is", null).limit(5);
+    expect(enArga ?? []).toHaveLength(0);
+  });
+
+  it("la plataforma NO ha emitido acta ni certificación de la Junta, y el día que lo haga este test cae", async () => {
+    // Condición nº2 y nº3 del diseño de la Task 8.
+    //
+    // `fn_secretaria_build_minute_legal_manifest` cierra a propósito la emisión
+    // de acta autoritativa para TODA Junta —`IF v_is_junta THEN RAISE EXCEPTION
+    // '… economic Junta quorum requires the dedicated capital evaluator before
+    // legal finalization'`— porque su modelo exige censo POLITICO y que la
+    // asistencia cubra cada asiento: el de un colegiado de asiento único. Una
+    // Junta de Socios vota por participaciones. Y sin acta no hay certificación:
+    // `fn_generar_certificacion` exige un acta y la variante sin sesión es un
+    // rechazo puro.
+    //
+    // Hoy estos ceros son consecuencia de una imposibilidad técnica. Este test
+    // existe para que el día que alguien abra esa puerta —escribiendo el
+    // evaluador de capital, o saltándose el guard con
+    // `set_config('app.secretaria_authoritative_rpc','1')` antes de un INSERT,
+    // que está nombrado y RECHAZADO en el diseño— sea una DECISIÓN y no un
+    // efecto colateral que nadie mire. El test no prohíbe: obliga a mirar.
+    const { data: actas, error: eActas } = await garr.from("minutes")
+      .select("id, meeting_id").eq("tenant_id", GARRIGUES_TENANT);
+    expect(eActas).toBeNull();
+    expect(actas ?? []).toHaveLength(0);
+
+    const { data: certs, error: eCerts } = await garr.from("certifications")
+      .select("id").eq("tenant_id", GARRIGUES_TENANT);
+    expect(eCerts).toBeNull();
+    expect(certs ?? []).toHaveLength(0);
+
+    // CONTROL: sin esto, los dos ceros de arriba serían indistinguibles de una
+    // consulta que no ve nada —RLS mal, tabla equivocada, cliente sin sesión—.
+    // ARGA sí tiene actas, y el mismo camino de lectura las encuentra.
+    const { data: enArga, error: eArga } = await arga.from("minutes")
+      .select("id").eq("tenant_id", DEMO_TENANT).limit(5);
+    expect(eArga).toBeNull();
+    expect((enArga ?? []).length).toBeGreaterThan(0);
+  });
+
+  it("el acta se acredita por su huella registral, y el asiento sale del filing, no de una constante", async () => {
+    const { data: filing } = await garr.from("registry_filings")
+      .select("inscription_number, borme_ref")
+      .eq("tenant_id", GARRIGUES_TENANT).eq("status", "INSCRITA")
+      .not("inscription_number", "is", null)
+      .order("borme_ref").order("inscription_number").limit(1).maybeSingle();
+    expect(filing?.inscription_number).toBeTruthy();
+
+    const { data: m } = await garr.from("meetings")
+      .select("quorum_data").eq("id", meetingId).maybeSingle();
+    const nota = (m!.quorum_data as Record<string, Record<string, string>>).acta_certificacion;
+    // El asiento que pinta la pantalla es EL DEL FILING, no uno tecleado aparte.
+    expect(nota.asiento).toBe(String(filing!.inscription_number));
+    expect(nota.borme).toBe(filing!.borme_ref);
+    // Y el texto dice que es acreditación y no emisión: sin esta frase la
+    // pantalla se leería como que la plataforma emitió el acta.
+    expect(nota.alcance).toContain("ACREDITACION, no emision");
+    expect(nota.alcance).toContain("como expediente, no como capacidad");
+    expect(nota.motivo_no_emision).toContain("no emite acta autoritativa");
+
+    const { data: enArga } = await arga.from("meetings")
+      .select("id").not("quorum_data->acta_certificacion", "is", null).limit(5);
     expect(enArga ?? []).toHaveLength(0);
   });
 
