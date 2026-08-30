@@ -282,3 +282,52 @@ export function formatRemainingTime(targetDateIso: string): {
     badgeClass,
   };
 }
+
+/**
+ * Zona horaria en la que se PINTAN los plazos.
+ *
+ * El cálculo de esta librería es absoluto: aritmética sobre `getTime()` y
+ * `Date.UTC`, salida en `toISOString()`. No depende de la zona del proceso.
+ * El renderizado sí dependía: `toLocaleString("es-ES")` sin `timeZone` usa la
+ * zona de quien mira, y `toLocaleDateString` —solo fecha— desplaza el DÍA
+ * cuando el vencimiento cae cerca de medianoche UTC. Un plazo del art. 33 RGPD
+ * mostrado un día tarde no es un detalle cosmético.
+ *
+ * Se fija a Europe/Madrid porque los plazos que cuenta esta pantalla son de
+ * norma española y europea, y su hora civil de referencia es ésa. Fijarla tiene
+ * un segundo efecto: elimina la dimensión del entorno, así que el resultado ya
+ * se puede asertar en un test — `bun test` corre en UTC y la aplicación en
+ * Europe/Madrid, y sin `timeZone` explícito ninguna aserción sobre la salida
+ * podría cubrir ese eje.
+ */
+export const DEADLINE_TIME_ZONE = "Europe/Madrid";
+
+/** Vencimiento con fecha y hora, siempre en la misma zona y rotulada. */
+export function formatDeadline(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return `${d.toLocaleString("es-ES", {
+    timeZone: DEADLINE_TIME_ZONE,
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  })} (hora peninsular)`;
+}
+
+/**
+ * Fecha (sin hora) en la misma zona que los vencimientos.
+ *
+ * `reported_at` es la fecha de conocimiento DE LA QUE se calculan los plazos:
+ * pintarla en la zona del navegador mientras el vencimiento va en hora
+ * peninsular dejaría las dos fechas en marcos distintos, y la incoherencia
+ * saltaría justo en los casos de medianoche, que son los que importan.
+ */
+export function formatIncidentDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("es-ES", {
+    timeZone: DEADLINE_TIME_ZONE,
+    day: "2-digit", month: "2-digit", year: "numeric",
+  });
+}
