@@ -34,7 +34,6 @@ function makePackOrdinario(materia: string, inscribible = false): RulePack {
         SA_1a: { valor: 0.25, fuente: 'LEY', referencia: 'art. 189 LSC' },
         SA_2a: { valor: 0, fuente: 'LEY', referencia: 'art. 189 LSC' },
         SL: { valor: 0, fuente: 'LEY', referencia: 'art. 201 LSC' },
-        SLP: { valor: 0, fuente: 'LEY', referencia: 'art. 201 LSC' },
         CONSEJO: { valor: 'mayoria_miembros', fuente: 'LEY' },
       },
     },

@@ -24,7 +24,6 @@ const pack: RulePack = {
       SA_1a: { valor: 0.5, fuente: 'LEY', referencia: 'art. 194 LSC' },
       SA_2a: { valor: 0.25, fuente: 'LEY' },
       SL: { valor: 0, fuente: 'LEY' },
-      SLP: { valor: 0, fuente: 'LEY' },
       CONSEJO: { valor: 'mayoria_miembros', fuente: 'LEY' },
     },
   },

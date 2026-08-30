@@ -1,29 +1,23 @@
-// tsconfig.app.json — alcance del gate de tipos.
+// tsconfig.app.json — perímetro de PRODUCCIÓN. Solo `src` sin sus tests.
 //
 // EL GATE REAL ES `bun run typecheck`, que ejecuta `tsc -b` (modo build con
-// referencias de proyecto). NO uses `bunx tsc --noEmit` ni `tsc -p <config>`
-// como señal verde: el tsconfig.json raíz referencia proyectos y un proyecto
-// suelto no es equivalente. Esto estaba escrito solo en CLAUDE.md:253, a 250
-// líneas del fichero que protege, y por eso era invisible para cualquiera que
-// abriera este.
+// referencias). NO uses `bunx tsc --noEmit` ni `tsc -p <config>` como señal
+// verde: el tsconfig.json raíz referencia proyectos y uno suelto no equivale.
+// Esto vivía solo en CLAUDE.md:253, a 250 líneas del fichero que protege.
 //
-// `include` cubre `src` (CON sus tests) y `scripts`. Antes excluía
-// **/__tests__/** y **/*.test.ts, y eso dejaba 45 ficheros y 176 errores fuera
-// del gate — entre ellos fixtures que habían dejado de corresponderse con su
-// tipo en tres ampliaciones sucesivas de TipoSocial. Si alguien vuelve a
-// excluirlos para acelerar `tsc`, el hueco vuelve y vuelve en silencio:
-// src/test/typecheck-cobertura.test.ts existe para impedirlo.
-//
-// El mapeo de `bun:test` apunta al MISMO shim que usa vitest
-// (vitest.config.ts → resolve.alias), no a un paquete de tipos: así los tipos
-// SON las exportaciones del shim y no pueden divergir de él.
+// Los tests y `scripts/` NO entran aquí a propósito: tienen su propio proyecto
+// en tsconfig.tests.json, referenciado desde la raíz, para que `tsc -b` los
+// cubra SIN ensanchar el contrato de producción. Si un test necesita una API
+// más moderna, se amplía el `lib` de AQUEL, no el de este: de lo contrario
+// mañana alguien usa esa API en `src/` y compila porque se la habilitó un
+// script.
 {
   "compilerOptions": {
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
     "lib": [
-      "ES2021",
+      "ES2020",
       "DOM",
       "DOM.Iterable"
     ],
@@ -38,9 +32,6 @@
     "paths": {
       "@/*": [
         "./src/*"
-      ],
-      "bun:test": [
-        "./src/test/bun-test-shim.ts"
       ]
     },
     "skipLibCheck": true,
@@ -52,8 +43,11 @@
     "useDefineForClassFields": true
   },
   "include": [
-    "src",
-    "scripts"
+    "src"
   ],
-  "exclude": []
+  "exclude": [
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ]
 }
