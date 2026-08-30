@@ -59,7 +59,7 @@ Reportado al orquestador y elevado al usuario, que decidió la base de clase A *
 | 6-bis | El décimo acuerdo (`MODIFICACION_ESTATUTOS`, art. 36) | **COMPLETA** ([informe](task-6bis-report.md)). 2/3 por el art. 30.2.a, etiquetado `INFERIDO` con la lectura alternativa nombrada. **10/10 acuerdos** | — | 46 pass / 0 fail · lint 0 · tsc 0 |
 | 6 | Los acuerdos con resolución por materia | **COMPLETA con 9 de 10** ([informe](task-6-report.md)). El décimo (`MODIFICACION_ESTATUTOS`) bloqueado: el art. 36 no existe en los Estatutos entregados | sin ronda separada, por instrucción de cierre — declarado en el informe | 42 pass / 0 fail en su sonda · lint 0 · tsc 0 |
 | 7 | Resoluciones y evaluación del motor | **COMPLETA** ([informe](task-7-report.md)). Cuarta vía: `meeting_votes` vacía, el motor evalúa umbral y alcanzabilidad. **P0 destapado: el motor nunca supo evaluar una SLP** | control discriminante ARGA antes/después + positivo SLP | 62 pass / 0 fail · lint 0 · tsc 0 |
-| 8 | Acta por RPC + certificación sin VºBº | pendiente | — | — |
+| 8 | Acta y certificación | **COMPLETA POR LA CUARTA VÍA** ([diseño](../../../docs/superpowers/specs/2026-08-30-c1-task8-acta-certificacion-diseno.md)). La plataforma **no puede** emitir el acta de una Junta y esto no lo cambia: se acredita por su huella registral (asiento I/A 960) y se dice que no se ha generado | diseño llevado a orquestación antes de escribir; 3 opciones rechazadas por escrito, incluida la de saltarse el guard | 3732 pass / 0 fail · lint 0 · tsc 0 · build OK · verificación viva con control de tenant |
 | 9 | Ciclo registral | **COMPLETA** ([informe](task-9-report.md)). 3 acuerdos INSCRITA en 2 anuncios reales, 4 en PREPARADA sin fecha ni anuncio ni protocolo. Cero invención | controles de no-invención medidos en Cloud | 74 pass / 0 fail · lint 0 · tsc 0 |
 | 10 | Verificación viva, control ARGA y cierre | pendiente | — | — |
 
@@ -109,3 +109,48 @@ E canario SA .............. BLOCKING                          OK           ← p
 | — | Seis packs con las mayorías estatutarias literales del art. 30 llevan `fuente: 'SISTEMA'` en sus ramas de relleno, y el explain imprime la fuente | Procedencia mal etiquetada en el registro jurídico. Anotado, no tocado |
 
 **Gates tras la ronda:** 76 pass / 0 fail en la sonda de la Junta · 819 pass / 144 skip / 0 fail en `src/test/schema/` · 729 pass / 0 fail en motor + sonda · lint 0 · typecheck 0. Medidos en worktree propio. `origin/main` ha avanzado con trabajo de C3: **hay que rebasar antes de la medición final de cierre**.
+
+
+## Task 8 — el límite, con las palabras exactas
+
+**Esto NO es la Task 8 «hecha» en el sentido de capacidad. La cadena del GOAL
+queda completa como EXPEDIENTE, no como CAPACIDAD.** El sistema sigue sin poder
+emitir el acta de una Junta de Socios, ni su certificación.
+
+`fn_secretaria_build_minute_legal_manifest` lo cierra **a propósito**, con su
+comentario delante, para **toda Junta de cualquier tenant**: su modelo exige
+censo `POLITICO` y que la asistencia cubra **cada asiento**, que es el modelo de
+un órgano colegiado de asiento único. Una Junta de Socios vota por
+participaciones, no por asientos. Y sin acta no hay certificación:
+`fn_generar_certificacion` exige un acta y la variante sin sesión es un rechazo
+puro —su cuerpo entero es un `RAISE EXCEPTION`—.
+
+Corrección de partida que hubo que hacer: **no son «los tres muros de
+`fn_generar_acta`»** que este carril citó dos días. `fn_generar_acta` no tiene
+ninguno; son **33 `RAISE EXCEPTION`** y viven en el manifiesto. Segunda vez que
+este carril inventa un hecho técnico por acumulación (la primera fue
+`fn_secretaria_evaluate_meeting_vote`, que no existe). Norma: **al citar una
+función, un muro o un contrato, abrirlo.**
+
+### La brecha de capacidad, nombrada y no enterrada
+
+Abrirla de verdad exige escribir *the dedicated capital evaluator* que el propio
+mensaje de error nombra: quórum y mayoría **sobre censo** para una Junta. Eso
+**subsume el P0-2 que el usuario acotó hoy a SLP dejando ARGA intacta**, y lo
+reabre en lo ancho. No es tarea de un carril. Escalada al usuario como brecha de
+capacidad, no como pregunta bloqueante.
+
+### Lo que se rechazó, escrito para que nadie lo reproponga
+
+| Rechazada | Por qué |
+|---|---|
+| Censo `POLITICO` y pasar la Junta por colegiada | Afirmaría un voto por cabeza, 346 asientos de peso 1, en un órgano que vota por capital. **Falso en Derecho** |
+| Declararla universal | Cerrada además, y **falsa**: hubo convocatoria con 15 días (arts. 27.3/27.4) |
+| `set_config('app.secretaria_authoritative_rpc','1')` y luego INSERT | Es la única puerta que queda abierta técnicamente para un `service_role`, y es **fabricar evidencia jurídica autoritativa saltándose su guardia** |
+
+### Estado que sostiene la cuarta vía
+
+`minutes` = **0** y `certifications` = **0** en Garrigues (ARGA: 12 actas por el
+camino que sí le corresponde). Hay un test que **cae si aparece una fila**, con
+control discriminante para que los dos ceros no sean indistinguibles de una
+consulta ciega. Hoy el 0 es imposibilidad técnica; mañana será una decisión.

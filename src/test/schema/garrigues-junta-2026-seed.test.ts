@@ -9,7 +9,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { GARRIGUES_DEMO_EMAIL, GARRIGUES_TENANT, sesionDe } from "../helpers/supabase-test-client";
+import { DEMO_TENANT, GARRIGUES_DEMO_EMAIL, GARRIGUES_TENANT, sesionDe } from "../helpers/supabase-test-client";
 import {
   ANTELACION_DIAS,
   CANAL_ESTATUTARIO,
@@ -1082,6 +1082,91 @@ describe("C1 — los 10 acuerdos de la Junta en Cloud", () => {
     // Control discriminante: ARGA no adquiere la clave.
     const { data: enArga } = await arga.from("agreements")
       .select("id").not("compliance_explain->c1_junta_socios_2026", "is", null).limit(5);
+    expect(enArga ?? []).toHaveLength(0);
+  });
+
+  it("la plataforma NO ha emitido acta ni certificación de la Junta, y el día que lo haga este test cae", async () => {
+    // Condición nº2 y nº3 del diseño de la Task 8.
+    //
+    // `fn_secretaria_build_minute_legal_manifest` cierra a propósito la emisión
+    // de acta autoritativa para TODA Junta —`IF v_is_junta THEN RAISE EXCEPTION
+    // '… economic Junta quorum requires the dedicated capital evaluator before
+    // legal finalization'`— porque su modelo exige censo POLITICO y que la
+    // asistencia cubra cada asiento: el de un colegiado de asiento único. Una
+    // Junta de Socios vota por participaciones. Y sin acta no hay certificación:
+    // `fn_generar_certificacion` exige un acta y la variante sin sesión es un
+    // rechazo puro.
+    //
+    // Hoy estos ceros son consecuencia de una imposibilidad técnica. Este test
+    // existe para que el día que alguien abra esa puerta —escribiendo el
+    // evaluador de capital, o saltándose el guard con
+    // `set_config('app.secretaria_authoritative_rpc','1')` antes de un INSERT,
+    // que está nombrado y RECHAZADO en el diseño— sea una DECISIÓN y no un
+    // efecto colateral que nadie mire. El test no prohíbe: obliga a mirar.
+    const { data: actas, error: eActas } = await garr.from("minutes")
+      .select("id, meeting_id").eq("tenant_id", GARRIGUES_TENANT);
+    expect(eActas).toBeNull();
+    expect(actas ?? []).toHaveLength(0);
+
+    const { data: certs, error: eCerts } = await garr.from("certifications")
+      .select("id").eq("tenant_id", GARRIGUES_TENANT);
+    expect(eCerts).toBeNull();
+    expect(certs ?? []).toHaveLength(0);
+
+    // CONTROL: sin esto, los dos ceros de arriba serían indistinguibles de una
+    // consulta que no ve nada —RLS mal, tabla equivocada, cliente sin sesión—.
+    // ARGA sí tiene actas, y el mismo camino de lectura las encuentra.
+    const { data: enArga, error: eArga } = await arga.from("minutes")
+      .select("id").eq("tenant_id", DEMO_TENANT).limit(5);
+    expect(eArga).toBeNull();
+    expect((enArga ?? []).length).toBeGreaterThan(0);
+  });
+
+  it("la nota NO atribuye un asiento a ningún acuerdo, y cita TODOS los anuncios", async () => {
+    // El P0 que se le escapó a todos los gates: la primera versión copiaba UN
+    // asiento —elegido con un `order by … limit 1` arbitrario— al JSON de los
+    // DIEZ acuerdos. Hay DOS anuncios (960/338618 y 961/338619), solo TRES
+    // acuerdos están inscritos, y a la admisión de socio, inscrita bajo el 961,
+    // la ficha le pintaba el 960. Siete de diez citaban un asiento que no era
+    // suyo. Ningún test miraba `agreements.compliance_explain`: por eso pasó.
+    const { data: filings } = await garr.from("registry_filings")
+      .select("agreement_id, status, inscription_number, borme_ref")
+      .eq("tenant_id", GARRIGUES_TENANT);
+    const inscritos = (filings ?? []).filter((f) => f.status === "INSCRITA" && f.inscription_number);
+    // Precondición: si esto fuera 1, el test no distinguiría nada.
+    expect(new Set(inscritos.map((f) => f.inscription_number)).size).toBeGreaterThan(1);
+
+    const { data, error } = await garr.from("agreements")
+      .select("id, compliance_explain").in("id", acuerdos.map((a) => a.id));
+    expect(error).toBeNull();
+    expect(data).toHaveLength(acuerdos.length);
+
+    for (const fila of data!) {
+      const nota = (fila.compliance_explain as Record<string, Record<string, Record<string, string>>>)
+        ?.c1_junta_socios_2026?.acta_certificacion;
+      expect(nota).toBeTruthy();
+      // 1. No se atribuye asiento en el dato. El de CADA acuerdo lo lee la ficha
+      //    de SU expediente registral (`ExpedienteAcuerdo` → registryFiling).
+      expect(Object.keys(nota)).not.toContain("asiento");
+      // 2. La huella del ACTA son TODOS los anuncios, porque el acta es una y
+      //    los asientos varios. Si mañana aparece un tercero, esto cae.
+      for (const f of inscritos) {
+        expect(nota.anuncios).toContain(String(f.inscription_number));
+        expect(nota.anuncios).toContain(String(f.borme_ref));
+      }
+      expect(nota.alcance).toContain("ACREDITACIÓN, no emisión");
+      expect(nota.alcance).toContain("como expediente, no como capacidad");
+      expect(nota.motivo_no_emision).toContain("no emite acta autoritativa");
+    }
+
+    // Y la reunión dice lo mismo: el acta es la misma para los diez.
+    const { data: m } = await garr.from("meetings")
+      .select("quorum_data").eq("id", meetingId).maybeSingle();
+    const notaReunion = (m!.quorum_data as Record<string, Record<string, string>>).acta_certificacion;
+    for (const f of inscritos) expect(notaReunion.anuncios).toContain(String(f.inscription_number));
+
+    const { data: enArga } = await arga.from("meetings")
+      .select("id").not("quorum_data->acta_certificacion", "is", null).limit(5);
     expect(enArga ?? []).toHaveLength(0);
   });
 

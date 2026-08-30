@@ -23,6 +23,7 @@ import {
   Lock,
 } from "lucide-react";
 import { useAgreement, useAgreementCompliance, type ComplianceResult } from "@/hooks/useAgreementCompliance";
+import { ActaAcreditadaNotice } from "@/components/secretaria/ActaAcreditadaNotice";
 import { useAgreementSignedDocumentUrl } from "@/hooks/useEvidenceBundleSignedUrl";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { useQTSPVerification } from "@/hooks/useQTSPVerification";
@@ -86,6 +87,7 @@ interface AgreementRegistryFilingRow {
   filing_number: string | null;
   presentation_date: string | null;
   inscription_number: string | null;
+  borme_ref: string | null;
   created_at: string;
 }
 
@@ -364,7 +366,7 @@ export default function ExpedienteAcuerdo() {
       const { data, error } = await supabase
         .from("registry_filings")
         .select(
-          "id, status, filing_via, filing_number, presentation_date, inscription_number, created_at",
+          "id, status, filing_via, filing_number, presentation_date, inscription_number, borme_ref, created_at",
         )
         .eq("agreement_id", id)
         .order("created_at", { ascending: false })
@@ -859,6 +861,22 @@ export default function ExpedienteAcuerdo() {
                   <CheckRow ok={compliance.majority_compliant} label="Mayoría" />
                   <CheckRow ok={compliance.conflict_handled} label="Conflictos de interés" />
                   <NotaDeExpediente explain={agreement.compliance_explain} />
+                  <ActaAcreditadaNotice
+                    contexto="ficha"
+                    acreditacion={
+                      (
+                        (agreement.compliance_explain as Record<string, Record<string, unknown>> | null)
+                          ?.c1_junta_socios_2026 as Record<string, unknown> | undefined
+                      )?.acta_certificacion
+                    }
+                    // El asiento se toma del expediente registral DE ESTE
+                    // acuerdo, no de la copia del JSON. La copia llevaba el
+                    // mismo numero en los diez —incluidos los cuatro sin
+                    // inscribir y los tres no inscribibles— y a la admision de
+                    // socio, inscrita bajo el 961, le pintaba el 960.
+                    asientoDelAcuerdo={registryFiling?.inscription_number ?? null}
+                    bormeDelAcuerdo={registryFiling?.borme_ref ?? null}
+                  />
                   {compliance.blocking_issues.length > 0 ? (
                     <div
                       className="mt-3 bg-[var(--g-sec-100)]/60 p-3 text-xs text-[var(--g-text-primary)]"

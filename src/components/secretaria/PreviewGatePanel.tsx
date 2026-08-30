@@ -1,18 +1,22 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, CheckCircle2, XCircle, AlertTriangle, Loader2, Zap } from "lucide-react";
 import { usePreviewAcuerdo, type PreviewParams } from "@/hooks/usePreviewAcuerdo";
-import type { EvalSeverity } from "@/lib/rules-engine";
+import type { EtapaEvaluacion, EvalSeverity } from "@/lib/rules-engine";
 
-const GATE_LABELS: Record<string, string> = {
+/**
+ * Este mapa llevaba CADA etapa en sus dos grafias —`votacion` y `VOTACION`,
+ * `documentacion` y `DOCUMENTACION`— porque alguien choco antes con esto y, al
+ * no saber cual emitia el motor de verdad, escribio las dos. El rotulo salia
+ * bien y la duda quedaba fosilizada en el mapa. Tipado como
+ * `Record<EtapaEvaluacion, string>` es TOTAL: solo entran las etapas que los
+ * motores emiten, y el compilador exige que esten todas.
+ */
+const GATE_LABELS: Record<EtapaEvaluacion, string> = {
   agenda_item:       "Tipo de punto",
-  convocatoria:      "Convocatoria",
   CONVOCATORIA:      "Convocatoria",
-  constitucion:      "Constitución / Quórum",
   CONSTITUCION:      "Constitución / Quórum",
-  votacion:          "Votación",
   VOTACION:          "Votación",
   documentacion:     "Documentación",
-  DOCUMENTACION:     "Documentación",
   convocatoria_skip: "Convocatoria (no requerida)",
   constitucion_skip: "Constitución (no requerida)",
 };
