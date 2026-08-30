@@ -14,8 +14,9 @@ const pack: RulePack = {
       SL: { valor: 15, fuente: 'LEY', referencia: 'art. 176 LSC' },
       SAU: { valor: 30, fuente: 'LEY', referencia: 'art. 176 LSC' },
       SLU: { valor: 15, fuente: 'LEY', referencia: 'art. 176 LSC' },
+      SLP: { valor: 15, fuente: 'LEY', referencia: 'art. 176 LSC' },
     },
-    canales: { SA: [], SL: [], SAU: [], SLU: [] },
+    canales: { SA: [], SL: [], SAU: [], SLU: [], SLP: [] },
     contenidoMinimo: [],
   },
   constitucion: {

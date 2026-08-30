@@ -1113,13 +1113,42 @@ describe("C1 — los 10 acuerdos de la Junta en Cloud", () => {
     expect(eCerts).toBeNull();
     expect(certs ?? []).toHaveLength(0);
 
-    // CONTROL: sin esto, los dos ceros de arriba serían indistinguibles de una
+    // TERCERA PUERTA, y es la única que la UI ofrece de verdad. El CTA
+    // «Preparar certificación» de la ficha lleva a las certificaciones
+    // autónomas, y ese camino NO escribe en `certifications`: escribe en
+    // `secretaria_document_artifacts`. Vigilar solo las dos tablas de arriba
+    // era vigilar las puertas ya cerradas y dejar abierta la que se usa: si
+    // mañana alguien siembra `standalone_certification_kinds` para este tenant
+    // —un seed de una línea— la UI podrá emitir una certificación de esta Junta
+    // y las dos aserciones anteriores seguirían verdes.
+    const { data: artefactos, error: eArt } = await garr.from("secretaria_document_artifacts")
+      .select("id, artifact_kind, source_domain, source_id").eq("tenant_id", GARRIGUES_TENANT);
+    expect(eArt).toBeNull();
+    // Ninguna certificación del tenant…
+    expect((artefactos ?? []).filter((a) =>
+      String(a.artifact_kind ?? "").toUpperCase().includes("CERTIFICAC"))).toHaveLength(0);
+    // …y, más afilado, ningún artefacto colgado de un acuerdo de ESTA Junta,
+    // sea del tipo que sea.
+    const idsJunta = new Set(acuerdos.map((a) => a.id));
+    expect((artefactos ?? []).filter((a) => a.source_id && idsJunta.has(a.source_id))).toHaveLength(0);
+
+    // Y la razón por la que hoy ese camino no es alcanzable: el catálogo de
+    // tipos está vacío para este tenant. Si deja de estarlo, es una decisión.
+    const { data: tipos } = await garr.from("standalone_certification_kinds")
+      .select("kind_code").eq("tenant_id", GARRIGUES_TENANT);
+    expect(tipos ?? []).toHaveLength(0);
+
+    // CONTROL: sin esto, los ceros de arriba serían indistinguibles de una
     // consulta que no ve nada —RLS mal, tabla equivocada, cliente sin sesión—.
-    // ARGA sí tiene actas, y el mismo camino de lectura las encuentra.
+    // ARGA sí tiene actas Y tipos de certificación, y el mismo camino de
+    // lectura los encuentra.
     const { data: enArga, error: eArga } = await arga.from("minutes")
       .select("id").eq("tenant_id", DEMO_TENANT).limit(5);
     expect(eArga).toBeNull();
     expect((enArga ?? []).length).toBeGreaterThan(0);
+    const { data: tiposArga } = await arga.from("standalone_certification_kinds")
+      .select("kind_code").eq("tenant_id", DEMO_TENANT).limit(5);
+    expect((tiposArga ?? []).length).toBeGreaterThan(0);
   });
 
   it("la nota NO atribuye un asiento a ningún acuerdo, y cita TODOS los anuncios", async () => {
@@ -1155,6 +1184,13 @@ describe("C1 — los 10 acuerdos de la Junta en Cloud", () => {
         expect(nota.anuncios).toContain(String(f.borme_ref));
       }
       expect(nota.alcance).toContain("ACREDITACIÓN, no emisión");
+      // Lo que se PINTA va en lenguaje jurídico: el nombre de la función SQL
+      // vive en el ledger y en el doc de diseño, que es donde están sus
+      // verificadores. Un abogado no verifica nombres de función; el que
+      // audita, sí — y un nombre en pantalla es un nombre que alguien copiará
+      // sin abrir la función.
+      expect(nota.motivo_no_emision).not.toContain("fn_");
+      expect(nota.motivo_no_emision).toContain("se vota por participaciones");
       expect(nota.alcance).toContain("como expediente, no como capacidad");
       expect(nota.motivo_no_emision).toContain("no emite acta autoritativa");
     }

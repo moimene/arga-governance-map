@@ -1,3 +1,4 @@
+import { useStandaloneCertificationKinds } from "@/hooks/useStandaloneCertifications";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -130,6 +131,11 @@ export function AgreementDocumentRequirementsPanel({ agreement }: { agreement: A
   }
 
   const certificationKind = certificationKindForAgreement(agreement);
+  // El destino de estos CTA es el alta de certificaciones autonomas, que no
+  // puede crear nada si el tenant no tiene tipos configurados.
+  const { data: certificationKinds = [] } = useStandaloneCertificationKinds();
+  const certificacionDisponible = certificationKinds.length > 0;
+
   const certificationTo = scope.createScopedTo(
     `/secretaria/certificaciones?entity=${encodeURIComponent(agreement.entity_id ?? "")}`
       + `&body=${encodeURIComponent(agreement.body_id ?? "")}`
@@ -240,6 +246,7 @@ export function AgreementDocumentRequirementsPanel({ agreement }: { agreement: A
                   isPending={createArtifact.isPending || plantillas.isLoading}
                   onCreateInforme={handleCreateInforme}
                   certificationTo={certificationTo}
+                  certificacionDisponible={certificacionDisponible}
                   informesTo={informesTo}
                   tramitadorTo={tramitadorTo}
                 />
@@ -272,14 +279,16 @@ export function AgreementDocumentRequirementsPanel({ agreement }: { agreement: A
             <FileText className="h-4 w-4" />
             Bandeja de informes
           </Link>
-          <Link
-            to={certificationTo}
-            className="inline-flex items-center gap-2 border border-[var(--g-border-subtle)] px-3 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            <FileCheck2 className="h-4 w-4" />
-            Certificación autónoma
-          </Link>
+          {certificacionDisponible ? (
+            <Link
+              to={certificationTo}
+              className="inline-flex items-center gap-2 border border-[var(--g-border-subtle)] px-3 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <FileCheck2 className="h-4 w-4" />
+              Certificación autónoma
+            </Link>
+          ) : null}
         </div>
       </div>
     </section>
@@ -308,6 +317,7 @@ function RequirementAction({
   isPending,
   onCreateInforme,
   certificationTo,
+  certificacionDisponible,
   informesTo,
   tramitadorTo,
 }: {
@@ -315,6 +325,7 @@ function RequirementAction({
   isPending: boolean;
   onCreateInforme: (requirement: AgreementDocumentRequirementRow) => void;
   certificationTo: string;
+  certificacionDisponible: boolean;
   informesTo: string;
   tramitadorTo: string;
 }) {
@@ -353,6 +364,21 @@ function RequirementAction({
   }
 
   if (requirement.document_kind === "CERTIFICACION_SOPORTE") {
+    // Un CTA que no puede cumplir su promesa no se pinta. Este era una llamada
+    // primaria, marcada OBLIGATORIO y BLOCKING, que llevaba a un formulario
+    // muerto y mudo cuando el tenant no tiene tipos de certificacion: los dos
+    // selectores vacios y los dos botones deshabilitados, sin decir por que.
+    // El lector concluia un fallo tecnico, no que la plataforma no pueda
+    // certificar ese acto — o sea que la contradiccion se resolvia en la
+    // direccion equivocada POR OMISION. No se siembra el catalogo: eso abriria
+    // un camino de certificacion que no debe abrirse sin decidirlo.
+    if (!certificacionDisponible) {
+      return (
+        <p className="shrink-0 text-xs text-[var(--g-text-secondary)]">
+          Sin tipos de certificación configurados para esta organización.
+        </p>
+      );
+    }
     return (
       <Link
         to={certificationTo}

@@ -107,7 +107,15 @@ export function mergeMeetingSourceLinks(existing: unknown, next: MeetingSourceLi
   } satisfies MeetingSourceLinks;
 }
 
-export function patchQuorumDataSourceLinks(quorumData: Record<string, unknown> | null | undefined, next: MeetingSourceLinks) {
+// El retorno se DECLARA porque TypeScript no propaga la firma de indice a
+// traves del spread: `{...unRecord}` produce un tipo sin claves conocidas, asi
+// que el tipo inferido perdia todo lo que `quorum_data` ya traia. Es un jsonb
+// con claves que este modulo no conoce y no debe borrar. Cambio de TIPO: el
+// spread en ejecucion es exactamente el mismo.
+export function patchQuorumDataSourceLinks(
+  quorumData: Record<string, unknown> | null | undefined,
+  next: MeetingSourceLinks,
+): Record<string, unknown> & { source_links: ReturnType<typeof mergeMeetingSourceLinks> } {
   return {
     ...(quorumData ?? {}),
     source_links: mergeMeetingSourceLinks(quorumData, next),

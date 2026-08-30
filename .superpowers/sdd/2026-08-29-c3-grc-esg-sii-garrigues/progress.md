@@ -232,3 +232,212 @@ MEDICIÓN EN VENTANA SERIALIZADA concedida por la orquestación, tras integrar e
   DELTA SIN RESIDUO: +23 pass y +23 tests = 9 (sii-tenant-scope) + 14 (sii-afirmaciones).
   Expects +34 = 16 + 17 de los dos ficheros nuevos + 1 de la aserción añadida al test del engine.
   Con la varianza aislada en ~29, este delta cuadra al dígito y es señal, no ruido.
+
+---
+
+## Gate de tipos — CERRADO (2026-08-30)
+
+`bun run typecheck` = **0**, con `scripts/` y los tests dentro del perímetro.
+Punto de partida: 176.
+
+### Contabilidad contra el baseline
+
+`6c61a27` es el commit inmediatamente anterior a abrir el gate. Medido HOY, en
+el mismo árbol, con el mismo runner:
+
+| | baseline `6c61a27` | HEAD `ee0862c` | Δ |
+|---|---|---|---|
+| tests | 3841 | 3842 | **+1** |
+| pass | 3684 | 3685 | **+1** |
+| skip | 152 | 152 | **0** |
+| fail | 5 | 5 | **0** |
+| aserciones | 20 695 | 20 697 | **+2** |
+
+El +1/+2 es identificable: el test que protege la cita legal del organoTipo por
+defecto (`b1532a0`), que tiene exactamente dos aserciones. **Ninguna aserción
+perdida en 21 commits.**
+
+Los **5 fallos están también en el baseline**, así que no son de esta serie.
+Son dato en Cloud: la reunión `e0beed92…` tiene 10 acuerdos y el test espera 9.
+El décimo es `MODIFICACION_ESTATUTOS`, creado el **2026-08-30 a las 04:52 en
+solitario**, nueve horas después de los otros nueve (que entran en 0,7 s el
+29 a las 19:16). El test que cae se llama *"…y ninguno es la modificación
+bloqueada"*. Es de C1 y está reportado: o es residuo de su verificación viva, o
+el bloqueo no bloqueó — eso lo dice C1, no yo.
+
+Nota sobre la cifra que dio ORQUESTACION (3689 pass / 20 820 expects): es la
+misma suite antes de que apareciera el décimo acuerdo. 3689 − 3684 = los 5 que
+ahora caen, y 20 820 − 20 695 = 125 aserciones que esos 5 tests ya no llegan a
+ejecutar al abortar. También cuadra.
+
+### Criterio aplicado
+
+Neutralidad medida contra copia de seguridad en **cada** familia, ejecutando
+antes y después: 45/99, 18/52, 656/1660, 6/16, 54/152, 29/86, 14/41, 41/407,
+9/42, 66/150, 19/332, 5/22, 14/126, 10/26, 4/22, 28/486, 1226/3381.
+
+Lo que NO se hizo, que importa tanto como lo hecho:
+- **No** se completó el fixture del "rule pack legacy" a los cinco tipos
+  sociales: habría borrado el escenario que el test existe para cubrir. El
+  desajuste estaba en el contrato de producción y ahí se corrigió.
+- **No** se tocó `types.ts:114-115`. Convertir `Record<TipoSocial, …>` en
+  parcial es contrato del motor de reglas, ripplea a todos sus consumidores y
+  podría ocultar tipos que faltan en otro sitio.
+- **No** se tocó `SUPABASE_SERVICE_ROLE_KEY` ni `TipoSocialConvocatoria`
+  (dominio cerrado por decisión legal ITEM-119/DL-4), ni `votacion-engine.ts` /
+  `majority-evaluator.ts` (reservados a C1), ni `package.json`.
+
+### Hallazgos reales que destapó el gate
+
+1. `buildReport` declaraba `mode: "report" | "apply"` mientras el llamante le
+   pasa también `"plan"` — el script TIENE modo plan y lo imprime.
+2. `patchQuorumDataSourceLinks` afirmaba por tipo que BORRA todo lo que
+   `quorum_data` ya traía, cuando en ejecución lo conserva.
+3. `ReturnType<typeof createClient>` instancia los genéricos con sus valores
+   por defecto (`unknown`/`never`), que no es lo que devuelve la llamada real.
+4. Los embeds to-one de PostgREST venían tipados como array en cinco sitios.
+5. Dos `@ts-expect-error` que ya no suprimían nada.
+6. El fixture de snapshot llevaba tres campos requeridos sin poner desde v2.
+
+### Deuda anotada, no cerrada
+
+- 39 clientes Supabase sin `Database`; el fichero de tipos generado (340 KB)
+  tiene **0 importadores**. Tiparlos haría innecesarios varios `.returns<T>()`.
+- `TenantBranding` no declara `modules`.
+- El `organoTipo` por defecto: el motor dice Junta y `normalizeBodyTypeForRpc`
+  dice Consejo. Alcanzable desde dato; es criterio legal, no de tipos.
+
+---
+
+## Tarea 5 — CERRADA (2026-08-30)
+
+Commits `22d0579` (dato + arista) y `49c26bc` (UI + fuga de caché).
+
+**Criterio de aceptación, punto por punto:**
+- Desde un riesgo de banda alta se llega a su hallazgo y vuelta: **sí**, 8 de 8
+  por FK, verificado renderizando.
+- El KPI «Con hallazgo» deja de marcar 0 sobre 82: **8 de 82**. ARGA sigue en
+  1 de 167, sin tocar.
+- Todo plan sembrado con `tenant_id` y etiqueta de simulado: **no se siembra
+  ninguno** — ver abajo.
+
+**Desviación del plan, deliberada y con fuente.** El paso 4 decía «planes de
+acción simulados y etiquetados». Al ir a la fuente resultó que la extracción de
+G5 ya lo había decidido con el documento delante, y lo dejó escrito en
+`penal/seguimiento-ppd.ts`: *«El Plan de acción del §246 no se siembra porque
+la fuente describe el mecanismo y no publica la lista.»* Sembrar ocho planes
+verosímiles los haría indistinguibles de los reales. Se sigue la fuente y el
+criterio del carril, no el paso del plan.
+
+**Lo que el gate de esta tarea sí muerde, demostrado:**
+- Mutando `{risk.findings && null}`: el grep del gate 6 de G5 encuentra 2
+  coincidencias y sigue verde; el render test cae (1 pass / 1 fail).
+- Mutando el guard del estado vacío a `true`: 2 de 4 caen (ARGA vería la fuente
+  ajena).
+- Quitando el tenant de la queryKey: 0 pass / 2 fail.
+- Quitando `enabled`: 1 pass / 1 fail.
+
+**Hallazgo no buscado:** `ActionPlans.tsx` tenía la queryKey sin tenant. RLS
+filtra la consulta pero no la caché — gotcha nº10, vivo en mi superficie.
+
+**Corrección de premisa propia:** `enabled: false` no impide que TanStack
+registre la entrada en caché; la registra y no la busca. La primera versión del
+test asertaba que no había entrada y era falso.
+
+**Fragilidad eliminada, no error corregido:** el código del hallazgo salía de
+`i + 1`. La asignación de hoy coincidía con el orden del array, así que no
+había daño observable; lo que desaparece es que reordenar el catálogo pudiera
+reasignarlos en silencio.
+
+**No ejecutado a propósito:** `seed-garrigues-penal.ts --apply`, porque también
+escribe en `controls`, congelada en este carril. El enlace va por script propio
+que solo toca `findings` y `risks`. Idempotente: 2ª pasada 0/0/8.
+
+---
+
+## Tarea 6 — CERRADA (2026-08-30)
+
+Commit `23c43b7`. `/conflictos` de Garrigues tiene 5 situaciones y ninguna se
+atribuye a una persona.
+
+- **Ningún nombre del censo**, comprobado contra las 406 personas traídas de
+  Cloud, por nombre completo y por apellido. `person_id` NULL en todas, forzado
+  por el seed y verificado a la salida.
+- **Fallo propio, corregido:** la primera versión del test leía solo las
+  descripciones de **Cloud**, así que meter «Fernando Vives Ruiz» en el
+  catálogo NO la hacía caer — el nombre entra por el catálogo y el guard no lo
+  veía hasta que alguien sembrara. Ahora comprueba las dos fuentes; las dos
+  mutaciones caen.
+- **Acotado a personas físicas**, y no es debilitarlo: los nombres de personas
+  jurídicas contienen palabras comunes («Sociedad») que salen en cualquier
+  descripción societaria.
+- **Dos CHECK que hablan otro idioma.** `conflict_type` clasifica por DURACIÓN
+  ('Permanente'|'Situacional') y PI-02 por naturaleza: queda NULL. `status`
+  solo admite tres valores, así que «en chequeo» vive aparte en `estadoTexto`.
+- **Crash real:** `c.conflict_type.toUpperCase()` sin guarda sobre columna
+  nullable reventaba la pantalla entera.
+
+## Tarea 7 — CERRADA (2026-08-30)
+
+Commits `c20824d` (clasificador), `43a501c` (catálogo PI-31), `+` (portal).
+
+**Hecho:**
+- **Paso 6, y eran TRES siglas y no una.** `ia`, `dora`/`tic` y `ceo`, todas
+  con `includes()` sobre terminaciones corrientes del castellano. Medido: 4 de
+  cada 5 frases de prueba abrían un subexpediente DORA hacia DGSFP/CNMV/EBA, y
+  «buceo» escalaba al Consejo de Administración.
+- **Roles reales de PI-31**, cotejados literal contra el PDF con
+  `pdftotext -layout`. El cotejo cazó una cita mía truncada con punto final que
+  la fuente no tiene.
+- **Pasos 3 y 4 (parte visible):** bloque de canales externos en el portal, con
+  el matiz del art. 25 —el interno es preferente pero no obligatorio ni previo—
+  y los dos roles con su sustitución por conflicto.
+
+**Paso 4 (resto), cerrado.** Los tres literales de órgano del motor
+COMPARTIDO pasan a `OrganosSii`, con el valor por defecto **byte a byte** el de
+antes. La aserción que hace segura la refactorización no es «Garrigues ve lo
+suyo», sino que el defecto no se desvíe: si se desviara, ARGA cambiaría sin que
+nadie lo hubiera pedido. Probado mutando una tilde del defecto.
+
+`actionRequired: "ESCALADO_COMITE_AUDITORIA"` NO se toca: es contrato de la
+interfaz. Cambia lo que lee una persona, no el código que enruta.
+
+**Paso 5, cerrado.** Tres casos de las tres vías reales (PBC/FT, conflicto con
+cliente, acoso), **simulados y dicho en pantalla con el motivo**: ni PI-31 ni
+el Manual de PBC/FT publican un registro de comunicaciones, porque la Ley
+2/2023 impone confidencialidad reforzada. El instructor es el CARGO, no una
+persona. Y los relojes del fixture cumplen la ley que la pantalla invoca —7
+días de acuse (9.2.c), 3 meses de resolución (9.2.d)—, porque un fixture fuera
+de plazo enseñaría un incumplimiento que nadie ha querido enseñar.
+
+**Defecto propio, repetido:** mi guard contra el error del art. 25 vetaba la
+palabra «agotar» y tropezaba con el texto correcto («no requiere agotar»). Una
+lista negra de palabras no distingue afirmar de negar — **el mismo
+`includes("ia")` que acababa de corregir, quince minutos después**. Ahora
+prohíbe la construcción afirmativa.
+
+## Estado de la rama
+
+```
+bun test ....... 3777 pass · 152 skip · 0 fail · 21.338 expects · 3929 tests
+lint ........... limpio
+typecheck ...... 1  ← de C1 (`compliance-gates.test.ts`), intacto y reportado
+```
+
+Delta contra `11fcf51` (3730 / 152 / 0 · 21.185 · 3882): **+47 pass, +153
+aserciones, +47 tests, 0 fail, skip sin mover.**
+
+---
+
+## Estado tras la Tarea 7 (2026-08-30)
+
+```
+bun test ....... 3787 pass · 152 skip · 0 fail · 21.379 expects · 3939 tests
+lint ........... limpio
+typecheck ...... 1  ← de C1 (`compliance-gates.test.ts`), intacto y reportado
+```
+
+Delta contra `11fcf51` (3730 / 152 / 0 · 21.185 · 3882): **+57 pass, +194
+aserciones, +57 tests, 0 fail, skip sin mover.**
+
+**Queda solo la Tarea 8**, que espera al merge de C2 por el paso 1.

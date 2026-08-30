@@ -105,7 +105,35 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
-import { createDraftFromImport, transitionTemplateState } from "../template-admin-service";
+import { createDraftFromImport, transitionTemplateState, type TransitionResult } from "../template-admin-service";
+
+/**
+ * Estrecha `TransitionResult` al caso WARNINGS_NEED_ACK.
+ *
+ * El test ya estrechaba con `if (first.ok || first.reason !== …) throw`, que es
+ * lo correcto en TypeScript estricto. Pero este proyecto corre con
+ * `strict: false` y `strictNullChecks: false` —decisión registrada en CLAUDE.md
+ * y que no se toca—, y con esa configuración el estrechamiento por
+ * discriminante booleano no se aplica. El código estaba bien; lo que faltaba
+ * era que el gate lo viera.
+ *
+ * Este guard hace explícito lo que el `if` ya comprobaba, y LANZA en vez de
+ * castear a ciegas: si el resultado no es el esperado, el test falla ahí y no
+ * tres líneas más abajo con un `undefined`.
+ */
+function contextoDeAviso(
+  r: TransitionResult,
+): Extract<TransitionResult, { reason: "WARNINGS_NEED_ACK" }> {
+  // El propio guard sufre la misma limitación que viene a resolver: sin
+  // `strictNullChecks` tampoco aquí estrecha el discriminante. Así que la
+  // comprobación es en EJECUCIÓN —que es donde importa— y el cast solo
+  // traslada al tipo lo que el `throw` de abajo ya garantiza.
+  const fallo = r as Extract<TransitionResult, { ok: false }>;
+  if (r.ok || fallo.reason !== "WARNINGS_NEED_ACK") {
+    throw new Error(`Se esperaba WARNINGS_NEED_ACK y llegó ${r.ok ? "ok:true" : fallo.reason}`);
+  }
+  return fallo as Extract<TransitionResult, { reason: "WARNINGS_NEED_ACK" }>;
+}
 
 const baseTemplate = (overrides: Partial<PlantillaCandidate> = {}): PlantillaCandidate => ({
   id: "tpl-1",
@@ -232,9 +260,7 @@ describe("template-admin-service — atomicidad servidor", () => {
       expectedPredecessorId: "active-v1",
     });
     expect(mockState.rpcCalls).toEqual([]);
-    if (first.ok || first.reason !== "WARNINGS_NEED_ACK") {
-      throw new Error("Expected warning context");
-    }
+    const aviso = contextoDeAviso(first);
 
     const confirmed = await transitionTemplateState(
       {
@@ -243,9 +269,9 @@ describe("template-admin-service — atomicidad servidor", () => {
         motivo: "sustitución controlada",
         actor: "legal@arga-seguros.com",
         ackWarnings: true,
-        operationId: first.operationId,
-        expectedFrom: first.expectedFrom,
-        expectedPredecessorId: first.expectedPredecessorId,
+        operationId: aviso.operationId,
+        expectedFrom: aviso.expectedFrom,
+        expectedPredecessorId: aviso.expectedPredecessorId,
       },
       { tenantId: "tenant-1" },
     );
@@ -281,9 +307,7 @@ describe("template-admin-service — atomicidad servidor", () => {
       },
       { tenantId: "tenant-1" },
     );
-    if (first.ok || first.reason !== "WARNINGS_NEED_ACK") {
-      throw new Error("Expected warning context");
-    }
+    const aviso = contextoDeAviso(first);
 
     mockState.activeTemplates = [
       baseTemplate({ id: "active-v2", estado: "ACTIVA", version: "1.0.1" }),
@@ -295,9 +319,9 @@ describe("template-admin-service — atomicidad servidor", () => {
         motivo: "sustitución controlada",
         actor: "legal@arga-seguros.com",
         ackWarnings: true,
-        operationId: first.operationId,
-        expectedFrom: first.expectedFrom,
-        expectedPredecessorId: first.expectedPredecessorId,
+        operationId: aviso.operationId,
+        expectedFrom: aviso.expectedFrom,
+        expectedPredecessorId: aviso.expectedPredecessorId,
       },
       { tenantId: "tenant-1" },
     );

@@ -35,7 +35,6 @@ describe("shouldIncludeTestData", () => {
     };
   });
   afterEach(() => {
-    // @ts-expect-error restore
     globalThis.localStorage = orig;
   });
   it("por defecto es false (sin VITE_E2E en vitest)", () => {

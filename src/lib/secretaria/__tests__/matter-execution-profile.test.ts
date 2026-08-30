@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { EntityNormativeProfile } from "@/lib/secretaria/normative-framework";
 import type { NormalizedCapa3Field } from "@/lib/secretaria/capa3-fields";
 import type { RulePack } from "@/lib/rules-engine";
+import type { RulePackPayloadEntrante } from "../matter-execution-profile";
 import {
   buildMatterExecutionProfile,
   computePrerequisiteGaps,
@@ -38,7 +39,11 @@ const normativeProfile: EntityNormativeProfile = {
   effective_at: "2026-05-17T00:00:00.000Z",
 };
 
-function rulePack(overrides: Partial<RulePack> & Record<string, unknown> = {}): Partial<RulePack> & Record<string, unknown> {
+// Los fixtures usan el tipo de ENTRADA del modulo, no `Partial<RulePack>`: uno
+// de los casos declara SOLO SA a proposito —es el "rule pack legacy" cuyo plazo
+// se corrige al minimo del art. 176 LSC— y completarlo a los cinco tipos
+// sociales borraria el escenario que el test existe para cubrir.
+function rulePack(overrides: RulePackPayloadEntrante = {}): RulePackPayloadEntrante {
   return {
     id: "rp-base",
     materia: "APROBACION_CUENTAS",
@@ -48,12 +53,14 @@ function rulePack(overrides: Partial<RulePack> & Record<string, unknown> = {}): 
         SL: { valor: 15, fuente: "LEY", referencia: "Art. 176 LSC" },
         SAU: { valor: 30, fuente: "LEY", referencia: "Art. 176 LSC" },
         SLU: { valor: 15, fuente: "LEY", referencia: "Art. 176 LSC" },
+        SLP: { valor: 15, fuente: "LEY", referencia: "Art. 176 LSC" },
       },
       canales: {
         SA: ["BORME", "WEB"],
         SL: ["NOTIFICACION_INDIVIDUAL"],
         SAU: ["BORME", "WEB"],
         SLU: ["NOTIFICACION_INDIVIDUAL"],
+        SLP: ["NOTIFICACION_INDIVIDUAL"],
       },
       contenidoMinimo: ["orden_dia"],
       documentosObligatorios: [{ id: "cuentas_formuladas", nombre: "Cuentas formuladas" }],

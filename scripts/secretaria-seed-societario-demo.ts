@@ -609,7 +609,14 @@ function attendeeRows(): Row[] {
   return rows;
 }
 
-function agreementRows(templateIds: Record<string, string | null>): Row[] {
+// Dos llamantes distintos y ninguno encajaba en `Record<string, string | null>`:
+// `main` pasa el retorno ENTERO de `fetchTemplateIds` —que ademas de las claves
+// por materia trae `activeCount` y `byMatter`— y `verify` pasa `{}` para
+// derivar solo los ids esperados sin resolver plantillas. Parcial cubre a los
+// dos y es lo que el cuerpo ya asumia al leer claves que pueden faltar.
+type TemplateIds = Partial<Awaited<ReturnType<typeof fetchTemplateIds>>>;
+
+function agreementRows(templateIds: TemplateIds): Row[] {
   const rows: Row[] = [];
   const persistedAdoptionMode = (mode: string) => (["CO_APROBACION", "SOLIDARIO"].includes(mode) ? "NO_SESSION" : mode);
   const majorityCodeFor = (agreementKind: string, matterClass: string) => {
@@ -739,7 +746,7 @@ function unipersonalRows(): Row[] {
   ];
 }
 
-function noSessionRows(templateIds: Record<string, string | null>) {
+function noSessionRows(templateIds: TemplateIds) {
   return {
     resolutions: [
       {

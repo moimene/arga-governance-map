@@ -6,7 +6,10 @@ import {
   generarVerificadorOffline,
   sha256,
 } from '../evidence-bundle';
-import type { EvidenceArtifact, QTSPSealResponse } from '../types';
+// `EvidenceArtifact` se declara en ../evidence-bundle —el mismo módulo que este
+// fichero prueba y del que ya importa las funciones—, no en ../types.
+import type { EvidenceArtifact } from '../evidence-bundle';
+import type { QTSPSealResponse } from '../types';
 
 // ============================================================
 // Test Helpers

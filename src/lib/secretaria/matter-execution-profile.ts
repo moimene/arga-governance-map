@@ -5,7 +5,7 @@ import {
   WORKFLOW_STEPS_VERSION,
   type AdoptionWorkflowStep,
 } from "@/lib/secretaria/workflow-steps";
-import type { PactoParasocial, RulePack, RuleParamOverride } from "@/lib/rules-engine";
+import type { PactoParasocial, ReglaConvocatoria, RulePack, RuleParamOverride } from "@/lib/rules-engine";
 
 export type FormalGate =
   | "CONVOCATORIA"
@@ -145,6 +145,26 @@ export interface MatterExecutionProfile {
   gaps: ProfileGap[];
 }
 
+/**
+ * Lo que de verdad llega aqui. `Partial<RulePack>` afirmaba que si viene
+ * `convocatoria`, sus mapas cubren los CINCO tipos sociales — y este modulo ya
+ * asume lo contrario: la linea que lee `antelacionDias` la castea a
+ * `Record<string, unknown>` y la que lee `canales` indexa con un union de
+ * CUATRO tipos y cae en `?? []`. El unico llamante de produccion
+ * (MatterExecutionProfilePanel) pasa `payload as Record<string, unknown>`: un
+ * blob de la BD, nunca un RulePack bien formado.
+ *
+ * Solo AMPLIA — un pack completo sigue encajando — y no cambia nada en
+ * ejecucion. Lo que se gana es que el tipo deja de afirmar una completitud que
+ * el codigo de debajo no da por supuesta.
+ */
+export type RulePackPayloadEntrante = Partial<Omit<RulePack, "convocatoria">> & {
+  convocatoria?: Partial<Omit<ReglaConvocatoria, "antelacionDias" | "canales">> & {
+    antelacionDias?: Partial<ReglaConvocatoria["antelacionDias"]>;
+    canales?: Partial<ReglaConvocatoria["canales"]>;
+  };
+} & Record<string, unknown>;
+
 export interface BuildMatterExecutionProfileContext {
   materia: string;
   organo_tipo: string;
@@ -154,7 +174,7 @@ export interface BuildMatterExecutionProfileContext {
   subtipo_materia?: string;
   is_listed?: boolean;
   is_supervised_entity?: boolean;
-  rulePackPayload: Partial<RulePack> & Record<string, unknown>;
+  rulePackPayload: RulePackPayloadEntrante;
   normativeProfile: EntityNormativeProfile;
   paramOverrides?: RuleParamOverride[];
   pactosParasociales?: PactoParasocial[];
@@ -692,7 +712,7 @@ function isUnipersonalMode(context: BuildMatterExecutionProfileContext) {
   );
 }
 
-function sourceRulePackId(rulePackPayload: Partial<RulePack> & Record<string, unknown>) {
+function sourceRulePackId(rulePackPayload: RulePackPayloadEntrante) {
   return typeof rulePackPayload.id === "string" ? rulePackPayload.id : undefined;
 }
 

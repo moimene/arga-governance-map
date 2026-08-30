@@ -31,6 +31,15 @@ import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { auditTemplateInventory, type TemplateInventoryRow } from "../src/lib/secretaria/template-inventory-audit";
 
+// `SupabaseClient` a secas resuelve `Database = unknown`, y con schema
+// desconocido `.select()` devuelve `GenericStringError[]`: de ahi salia el
+// `as TemplateInventoryRow[]` imposible. El tipo se deriva de la fabrica real.
+function crearCliente(url: string, key: string) {
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+type Cliente = ReturnType<typeof crearCliente>;
+
+
 const EXPECTED_PROJECT_REF = "hzqwefkwsxopwrmtksbg";
 const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 const ZERO_UUID = "00000000-0000-0000-0000-000000000000";
@@ -111,7 +120,7 @@ function isMissingRpcError(message: string): boolean {
   return /function .* does not exist|could not find the function|schema cache|unknown function/i.test(message);
 }
 
-async function expectSelect(client: SupabaseClient, table: string, columns: string) {
+async function expectSelect(client: Cliente, table: string, columns: string) {
   const { error } = await client.from(table).select(columns).limit(0);
   if (error) {
     throw new Error(`${table}: ${error.message}`);
@@ -119,7 +128,7 @@ async function expectSelect(client: SupabaseClient, table: string, columns: stri
 }
 
 async function expectRpcBusinessError(
-  client: SupabaseClient,
+  client: Cliente,
   name: string,
   params: Record<string, unknown>,
   expected: RegExp,
@@ -137,7 +146,7 @@ async function expectRpcBusinessError(
   }
 }
 
-async function runTemplateInventorySmoke(client: SupabaseClient): Promise<Check[]> {
+async function runTemplateInventorySmoke(client: Cliente): Promise<Check[]> {
   const { data, error } = await client
     .from("plantillas_protegidas")
     .select(
@@ -157,13 +166,18 @@ async function runTemplateInventorySmoke(client: SupabaseClient): Promise<Check[
         "capa2_variables",
         "capa3_editables",
       ].join(", "),
-    );
+    )
+    // El select se construye uniendo un array, asi que es DINAMICO: PostgREST
+    // no puede resolverlo contra el schema y tipa `data` como
+    // `GenericStringError[]`. Se declara por el canal de la libreria, que
+    // sustituye al `as TemplateInventoryRow[]` que no se solapaba.
+    .returns<TemplateInventoryRow[]>();
 
   if (error) {
     throw new Error(`plantillas_protegidas inventory probe: ${error.message}`);
   }
 
-  const rows = (data ?? []) as TemplateInventoryRow[];
+  const rows = data ?? [];
   const audit = auditTemplateInventory(rows);
   const blocking = audit.issues.filter((issue) => issue.severity === "BLOCKING");
 
@@ -215,9 +229,7 @@ async function runReadonlySmoke(): Promise<Check[]> {
     );
   }
 
-  const client = createClient(url, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const client = crearCliente(url, serviceKey);
 
   const checks: Check[] = [];
 
@@ -485,9 +497,7 @@ async function runAuthUserIsolationSmoke(): Promise<Check[]> {
     );
   }
 
-  const admin = createClient(url, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const admin = crearCliente(url, serviceKey);
   const userClient = createClient(url, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });

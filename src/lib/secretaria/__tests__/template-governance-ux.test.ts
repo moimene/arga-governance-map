@@ -65,7 +65,10 @@ function review(
     canClaimLegalApproval: true,
     isOperationalActive: true,
     reasons: [],
-    flags: emptyFlags,
+    // `flags` se declaraba DOS veces en este literal: aquí y otra vez debajo,
+    // después del `...patch`. La segunda gana siempre, así que esta era código
+    // muerto. Lo destapó el gate al cubrir los tests; retirarla no cambia
+    // ningún valor resultante.
     duplicateKey: null,
     approvalPlan: null,
     approvalDecision: null,

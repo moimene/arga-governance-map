@@ -28,6 +28,18 @@ import {
   DEFAULT_SHELL_LABEL,
 } from "@/lib/tenant-brand-labels";
 import type { TenantBranding } from "@/context/TenantBrandContext";
+
+/**
+ * `TenantBranding` NO declara `modules`, pero el dato en Cloud SÍ lo lleva —es
+ * la lista blanca de módulos por tenant que lee `isModuleEnabled`— y
+ * `tenant-modules.ts` lo resuelve con un tipo local no exportado. De ahí venía
+ * el `as unknown as Record<string, string>` que había aquí: castear un array a
+ * un mapa para colarlo. Se declara el shape real en vez de disfrazarlo.
+ * (El hueco de tipo en `TenantBranding` es hallazgo aparte: modelarlo toca
+ * `src/context/`, fuera del alcance del gate.)
+ */
+type BrandingConModulos = TenantBranding & { modules?: string[] };
+
 import type { SecretariaScopeController } from "@/components/secretaria/shell/types";
 
 // Mock Auth, Tenant, and Notifications
@@ -39,7 +51,7 @@ let mockAuthUser = {
 
 const mockTenantRole = "COMPLIANCE";
 
-let mockTenantBranding: TenantBranding | null = {
+let mockTenantBranding: BrandingConModulos | null = {
   nombre: "Corp Nexus Legal",
   shell_label: "CORP NEXUS SUITE",
   scope_label: "Grupo Nexus Internacional",
@@ -80,7 +92,6 @@ vi.mock("@/hooks/useNotifications", () => ({
 function createMockScope(mode: "grupo" | "sociedad" = "sociedad"): SecretariaScopeController {
   return {
     mode,
-    selectedEntityId: "ent-nexus-1",
     selectedEntity: {
       id: "ent-nexus-1",
       name: "Nexus Seguros S.A.",
@@ -88,9 +99,9 @@ function createMockScope(mode: "grupo" | "sociedad" = "sociedad"): SecretariaSco
       legalForm: "SA",
       jurisdiction: "ES",
       status: "ACTIVA",
+      materiality: "Pendiente",
       parentEntityId: null,
       tipoSocial: "SA",
-      tipoOrganoAdmin: "CONSEJO_ADMINISTRACION",
     },
     entities: [
       {
@@ -100,9 +111,9 @@ function createMockScope(mode: "grupo" | "sociedad" = "sociedad"): SecretariaSco
         legalForm: "SA",
         jurisdiction: "ES",
         status: "ACTIVA",
+        materiality: "Pendiente",
         parentEntityId: null,
         tipoSocial: "SA",
-        tipoOrganoAdmin: "CONSEJO_ADMINISTRACION",
       },
     ],
     isLoadingEntities: false,
@@ -372,7 +383,7 @@ describe("Milestone 2 — Empirical Challenger Verification & Stress Harness", (
       // Whitelist only secretaria and grc
       mockTenantBranding = {
         nombre: "Auditoría & Risk S.L.",
-        modules: ["secretaria", "grc"] as unknown as Record<string, string>,
+        modules: ["secretaria", "grc"],
       };
 
       const enabled = getEnabledGarriguesModules(mockTenantBranding);
@@ -383,7 +394,7 @@ describe("Milestone 2 — Empirical Challenger Verification & Stress Harness", (
     it("evaluates single-module whitelisting: tenant with only AI Governance", () => {
       mockTenantBranding = {
         nombre: "AI Ethics Lab",
-        modules: ["ai-governance"] as unknown as Record<string, string>,
+        modules: ["ai-governance"],
       };
 
       const enabled = getEnabledGarriguesModules(mockTenantBranding);

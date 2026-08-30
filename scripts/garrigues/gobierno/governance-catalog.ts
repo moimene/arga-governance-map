@@ -104,9 +104,9 @@ export function loadGovernanceCatalog() {
   const representados = censoJson.representados as string[];
   const todos = [...presenciales, ...representados];
 
-  const estructuras: EstructuraResuelta[] = (comitesJson.estructuras as EstructuraResuelta[]).map((e) => ({
+  const estructuras: EstructuraResuelta[] = comitesJson.estructuras.map((e) => ({
     ...e,
-    miembros: (e.miembros as { nombre: string; categoria: string; rol?: string }[]).map((m) => {
+    miembros: e.miembros.map((m) => {
       if (m.categoria !== "SOCIO") {
         return { nombreComite: m.nombre, nombreCanonico: m.nombre, categoria: m.categoria, rol: m.rol, esSocioCenso: false };
       }
