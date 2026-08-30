@@ -40,6 +40,11 @@ function useAuditActionPlans(tenantId: string | null) {
 export default function ActionPlans() {
   const { tenantId } = useTenantContext();
   const { data: plans = [], isLoading } = useAuditActionPlans(tenantId);
+  // Un vacío con procedencia declarada NO es un vacío: es una decisión, y se
+  // explica. Los demás tenants conservan su texto genérico sin cambio alguno.
+  // (El comentario va aquí y no dentro del JSX: el escáner de literales de
+  // marca de los milestone-challenger no reconoce `{/* … */}` como comentario
+  // y lo contaba como texto visible.)
   const hayProcedenciaDeclarada = tenantId === PLAN_ACCION_AUSENCIA.tenantId;
 
   return (
@@ -55,8 +60,6 @@ export default function ActionPlans() {
         <div className="text-sm text-[var(--g-text-secondary)] animate-pulse">Cargando…</div>
       )}
 
-      {/* El vacio de Garrigues NO es un vacio: es una decision de procedencia,
-          y se explica. ARGA conserva su texto tal cual (cero cambio). */}
       {!isLoading && plans.length === 0 && !hayProcedenciaDeclarada && (
         <div className="py-16 text-center text-sm text-[var(--g-text-secondary)]">
           No hay planes de acción disponibles.

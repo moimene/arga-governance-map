@@ -46,6 +46,13 @@
     "src"
   ],
   "exclude": [
+    // "src/test/**" es material de test COMPLETO, no solo los `*.test.*`:
+    // helpers, el preload de JSDOM, el shim de `bun:test` y las declaraciones
+    // ambiente. Sin esta linea entraban 5 ficheros en el proyecto de
+    // PRODUCCION, y uno de ellos —que importa `bun:test`— no compilaba porque
+    // ese alias solo existe en el proyecto de tests. Verificado antes de
+    // excluir: ningun fichero de produccion importa de `src/test/`.
+    "src/test/**",
     "**/__tests__/**",
     "**/*.test.ts",
     "**/*.test.tsx"

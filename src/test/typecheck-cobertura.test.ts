@@ -57,5 +57,10 @@ describe("el perímetro del gate de tipos no encoge sin que se note", () => {
     // bundle, y ese ensanche deja de proteger el código que sí llega.
     expect(enApp.filter((f) => f.includes(".test."))).toEqual([]);
     expect(enApp.filter((f) => f.startsWith("scripts/") || f.includes("/scripts/"))).toEqual([]);
+    // Y tampoco los ficheros de APOYO de los tests, que no llevan `.test.` en
+    // el nombre y por eso se colaban: helpers, el preload de JSDOM, el shim de
+    // `bun:test` y las declaraciones ambiente. Eran 5, y uno de ellos ni
+    // compilaba en producción porque importa un alias que allí no existe.
+    expect(enApp.filter((f) => f.includes("src/test/"))).toEqual([]);
   });
 });

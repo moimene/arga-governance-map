@@ -12,9 +12,29 @@
 //
 // Se mockea SOLO el hook de datos. El router se monta de verdad, con la ruta
 // que declara `App.tsx`, para que `useParams` resuelva como en producción.
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { render, screen, cleanup } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { mockearModulos } from "./_mock-restaurable";
+
+// `mock.module` es GLOBAL a la corrida: sin restaurar, estos stubs siguen vivos
+// en todos los ficheros que se carguen después. Ver _mock-restaurable.ts.
+const restaurarMocks = await mockearModulos([
+  ["@/hooks/useRisks", () => ({
+    useRiskById: () => ({ data: riesgoActual, isLoading: false, error: null }),
+    useRisks: () => ({ data: [], isLoading: false, error: null }),
+    useCreateRisk: () => ({ mutate: () => {}, isPending: false }),
+    useUpdateRisk: () => ({ mutate: () => {}, isPending: false }),
+  })],
+  ["@/components/secretaria/shell", () => ({
+    useSecretariaScope: () => ({
+      mode: "grupo", selectedEntity: null, entities: [],
+      createScopedTo: (ruta: string) => ruta,
+    }),
+  })],
+]);
+afterAll(restaurarMocks);
+
 
 const RIESGO_ID = "11111111-1111-1111-1111-111111111111";
 const HALLAZGO_ID = "22222222-2222-2222-2222-222222222222";
@@ -45,21 +65,7 @@ const RIESGO = {
 
 let riesgoActual: Record<string, unknown> | null = RIESGO;
 
-mock.module("@/hooks/useRisks", () => ({
-  useRiskById: () => ({ data: riesgoActual, isLoading: false, error: null }),
-  useRisks: () => ({ data: [], isLoading: false, error: null }),
-  useCreateRisk: () => ({ mutate: () => {}, isPending: false }),
-  useUpdateRisk: () => ({ mutate: () => {}, isPending: false }),
-}));
 
-mock.module("@/components/secretaria/shell", () => ({
-  useSecretariaScope: () => ({
-    mode: "grupo",
-    selectedEntity: null,
-    entities: [],
-    createScopedTo: (ruta: string) => ruta,
-  }),
-}));
 
 beforeEach(() => { riesgoActual = RIESGO; });
 afterEach(() => cleanup());

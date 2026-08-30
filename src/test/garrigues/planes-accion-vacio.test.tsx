@@ -5,23 +5,27 @@
 // el componente se lo mostrara a TODO el mundo, ARGA incluida — y eso sería
 // contarle a ARGA una procedencia que no es la suya. Así que se monta dos
 // veces, una por tenant, y se exige que ARGA vea exactamente lo que veía.
-import { afterEach, describe, expect, it, mock } from "bun:test";
+import { afterAll, afterEach, describe, expect, it } from "bun:test";
 import { render, screen, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { PLAN_ACCION_AUSENCIA } from "../../../scripts/garrigues/hallazgos/hallazgos-penales";
+import { mockearModulos } from "./_mock-restaurable";
+
+// `mock.module` es GLOBAL a la corrida; sin restaurar, estos stubs siguen vivos
+// en los ficheros posteriores. Ver _mock-restaurable.ts.
+const restaurarMocks = await mockearModulos([
+  ["@/context/TenantContext", () => ({ useTenantContext: () => ({ tenantId: tenantActual }) })],
+  ["@tanstack/react-query", () => ({ useQuery: () => ({ data: [], isLoading: false, error: null }) })],
+]);
+afterAll(restaurarMocks);
+
 
 const ARGA = "00000000-0000-0000-0000-000000000001";
 const TEXTO_GENERICO = "No hay planes de acción disponibles.";
 
 let tenantActual: string | null = PLAN_ACCION_AUSENCIA.tenantId;
 
-mock.module("@/context/TenantContext", () => ({
-  useTenantContext: () => ({ tenantId: tenantActual }),
-}));
 
-mock.module("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: [], isLoading: false, error: null }),
-}));
 
 afterEach(() => cleanup());
 

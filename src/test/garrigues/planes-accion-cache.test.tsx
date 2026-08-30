@@ -6,26 +6,28 @@
 // La fuga que cubre es el gotcha nº10 del proyecto: RLS filtra la CONSULTA,
 // pero no la CACHÉ. Con la clave sin tenant los dos comparten entrada y el
 // segundo en entrar ve lo que trajo el primero.
-import { afterEach, describe, expect, it, mock } from "bun:test";
+import { afterAll, afterEach, describe, expect, it } from "bun:test";
 import { render, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PLAN_ACCION_AUSENCIA } from "../../../scripts/garrigues/hallazgos/hallazgos-penales";
+import { mockearModulos } from "./_mock-restaurable";
+
+// El caso que motivó el helper: este stub de `supabase` tumbaba 11 tests de
+// motor-plantillas, que pasa 13/13 aislado. Ver _mock-restaurable.ts.
+const restaurarMocks = await mockearModulos([
+  ["@/context/TenantContext", () => ({ useTenantContext: () => ({ tenantId: tenantActual }) })],
+  ["@/integrations/supabase/client", () => ({
+    supabase: { from: () => ({ select: () => ({ order: () => Promise.resolve({ data: [], error: null }) }) }) },
+  })],
+]);
+afterAll(restaurarMocks);
+
 
 const ARGA = "00000000-0000-0000-0000-000000000001";
 let tenantActual: string | null = null;
 
-mock.module("@/context/TenantContext", () => ({
-  useTenantContext: () => ({ tenantId: tenantActual }),
-}));
 
-mock.module("@/integrations/supabase/client", () => ({
-  supabase: {
-    from: () => ({
-      select: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
-    }),
-  },
-}));
 
 afterEach(() => cleanup());
 

@@ -8,13 +8,26 @@
 //
 // La segunda es el control discriminante de la procedencia: que ARGA no vea un
 // aviso que habla de una política que no es suya.
-import { afterEach, describe, expect, it, mock } from "bun:test";
+import { afterAll, afterEach, describe, expect, it } from "bun:test";
 import { render, screen, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import {
   CONFLICTOS_AVISO,
   CONFLICTOS_TENANT,
 } from "../../../scripts/garrigues/conflictos/catalogo-conflictos";
+import { mockearModulos } from "./_mock-restaurable";
+
+// `mock.module` es GLOBAL a la corrida. Ver _mock-restaurable.ts.
+const restaurarMocks = await mockearModulos([
+  ["@/context/TenantContext", () => ({ useTenantContext: () => ({ tenantId: tenantActual }) })],
+  ["@/context/TenantBrandContext", () => ({ useTenantBranding: () => null })],
+  ["@/hooks/useConflicts", () => ({
+    useConflictsList: () => ({ data: [FILA_SIN_TIPO], isLoading: false }),
+    useAttestationsList: () => ({ data: [], isLoading: false }),
+  })],
+]);
+afterAll(restaurarMocks);
+
 
 // El preload monta JSDOM pero no expone `getComputedStyle` como global, y los
 // primitivos de Radix que usa esta pantalla lo llaman. Se puentea AQUÍ y no en
@@ -38,17 +51,6 @@ const FILA_SIN_TIPO = {
 };
 
 let tenantActual: string | null = CONFLICTOS_TENANT;
-
-mock.module("@/context/TenantContext", () => ({
-  useTenantContext: () => ({ tenantId: tenantActual }),
-}));
-mock.module("@/context/TenantBrandContext", () => ({
-  useTenantBranding: () => null,
-}));
-mock.module("@/hooks/useConflicts", () => ({
-  useConflictsList: () => ({ data: [FILA_SIN_TIPO], isLoading: false }),
-  useAttestationsList: () => ({ data: [], isLoading: false }),
-}));
 
 afterEach(() => cleanup());
 
