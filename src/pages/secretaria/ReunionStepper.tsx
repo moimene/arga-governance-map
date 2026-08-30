@@ -691,6 +691,7 @@ function ConstitutionStep({ meetingId }: { meetingId?: string }) {
     scheduled_end: string | null;
     location: string | null;
     confidentiality_level: string | null;
+    quorum_data?: unknown;
     governing_bodies?: {
       name?: string | null;
       entities?: { common_name?: string | null; legal_name?: string | null } | null;
@@ -722,22 +723,26 @@ function ConstitutionStep({ meetingId }: { meetingId?: string }) {
     m.governing_bodies?.entities?.common_name ??
     "—";
 
+  // Un expediente puede declarar que la HORA de la sesión no está acreditada y
+  // que su timestamp solo fija el día. Sin esta bandera la pantalla pintaba la
+  // hora de renderizado —00:00Z sale «2:00» en Madrid— como si fuera dato del
+  // expediente. Las reuniones que no la traen (ARGA, y toda reunión creada por
+  // la vía normal) no cambian: se sigue pintando fecha y hora.
+  const horaNoAcreditada =
+    (m.quorum_data as { hora_no_acreditada?: boolean } | null)?.hora_no_acreditada === true;
+  const fechaSesion = (iso: string | null) =>
+    !iso
+      ? "—"
+      : horaNoAcreditada
+        ? `${new Date(iso).toLocaleDateString("es-ES", { dateStyle: "medium" })} · hora no acreditada`
+        : new Date(iso).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" });
+
   const fields: [string, string][] = [
     ["Entidad", entityName],
     ["Órgano", bodyName],
     ["Tipo de sesión", m.meeting_type ?? "—"],
-    [
-      "Inicio previsto",
-      m.scheduled_start
-        ? new Date(m.scheduled_start).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" })
-        : "—",
-    ],
-    [
-      "Fin previsto",
-      m.scheduled_end
-        ? new Date(m.scheduled_end).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" })
-        : "—",
-    ],
+    ["Inicio previsto", fechaSesion(m.scheduled_start)],
+    ["Fin previsto", fechaSesion(m.scheduled_end)],
     ["Lugar / Modalidad", m.location ?? "—"],
     ["Confidencialidad", m.confidentiality_level ?? "NORMAL"],
   ];

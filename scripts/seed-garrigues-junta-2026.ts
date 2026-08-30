@@ -100,14 +100,23 @@ import {
   convocatoriaText,
   puntosQueMaterializan,
   puntosSinMateriaAcreditada,
-  NOTA_PUNTO_BLOQUEADO,
-  PUNTO_BLOQUEADO,
+  SUBSUNCION_ART36,
   ordinalEnOrdenDelDia,
   puntosConAcuerdo,
+  subsuncionDe,
   textoAcuerdo,
+  ELEVACION_NO_ACREDITADA,
+  MOTIVO_SIN_INSCRIPCION,
+  candidatoDescartadoDePunto,
+  inscripcionDePunto,
+  inscripcionesDeLaJunta,
+  notaAnuncioCompartido,
   type PuntoOrdenDia,
 } from "./garrigues/junta-2026/orden-del-dia";
 import { votingRightsFromCapitalHolding } from "../src/lib/secretaria/meeting-census";
+import { evaluarVotacion } from "../src/lib/rules-engine/votacion-engine";
+import { esFormulaEvaluable } from "../src/lib/rules-engine/majority-evaluator";
+import type { EvalSeverity, RulePack, VotosInput } from "../src/lib/rules-engine/types";
 
 const SUPABASE_URL =
   process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "https://hzqwefkwsxopwrmtksbg.supabase.co";
@@ -354,6 +363,12 @@ export function buildQuorumData(votosPresenciales: number, votosSumaCenso: numbe
     // Declararlo activaría `v_is_universal` en el manifiesto autoritativo del
     // acta, que exige aceptaciones WORM individuales del orden del día.
     junta_universal: false,
+    // Bandera legible por MAQUINA. Las `notas` de abajo dicen lo mismo en prosa
+    // y no las renderiza ninguna superficie: la hora se pintaba como «2:00»
+    // —00:00Z en horario de Madrid— sin una sola advertencia, en cuatro sitios.
+    // Una Junta de S.L.P. a las dos de la madrugada es lo primero que ve un
+    // abogado. ARGA no lleva esta clave: sin ella el render no cambia.
+    hora_no_acreditada: true,
     notas: [
       "Reconstrucción demo sin efecto jurídico. El expediente real de la Junta de 06/05/2026 consta en el Registro Mercantil de Madrid; la plataforma lo reproduce, no lo sustituye.",
       "La hora de la sesión NO consta en la fuente disponible. `scheduled_start` se guarda a las 00:00Z para que la fecha sea correcta en UTC y en hora local de Madrid; la hora que pinte cualquier pantalla es un artefacto de renderizado, no un dato del expediente.",
@@ -411,12 +426,34 @@ export function censoPrecondicion(socios: SocioCenso[]): {
     (code === "A" ? TITULOS_POR_SOCIO_CUOTA : 1) * (claseArt7(code)?.votosPorTitulo ?? 0);
   const votos = (h: HoldingCenso) => votingRightsFromCapitalHolding(h) ?? 0;
 
-  // Dos titulares de clases distintas: la comparación es de proporciones, así que
-  // no depende de qué socio concreto se tome ni de ningún literal.
   const clases = [...new Set(socios.map((s) => s.holding.share_class?.class_code ?? "?"))].sort();
   if (clases.length < 2) {
     return { ok: false, ratioRpc: null, ratioVotos: null, detalle: `censo con una sola clase (${clases.join(", ")}): la proporción no es comprobable` };
   }
+
+  // Se recorren TODOS los socios, no una muestra por clase. La versión anterior
+  // tomaba el primero de cada clase con `find`, así que un censo con 344 de 345
+  // socios de clase A mal sembrados pasaba el gate diciendo «reproduce la
+  // proporción del art. 7». El gate existe para no congelar un peso equivocado
+  // en un registro INMUTABLE: muestrear no sirve para eso.
+  const desviados: string[] = [];
+  for (const s of socios) {
+    const code = s.holding.share_class?.class_code ?? "?";
+    const esperado = pesoArt7(code);
+    if (esperado === 0) {
+      return { ok: false, ratioRpc: null, ratioVotos: null, detalle: `clase ${code} sin peso en el art. 7: la proporción no es comprobable` };
+    }
+    if (votos(s.holding) !== esperado) {
+      desviados.push(`${s.full_name} (clase ${code}: ${votos(s.holding)} votos, art. 7 impone ${esperado})`);
+    }
+  }
+  if (desviados.length) {
+    return {
+      ok: false, ratioRpc: pesoArt7(clases[0]) / pesoArt7(clases[1]), ratioVotos: null,
+      detalle: `${desviados.length} de ${socios.length} socios no guardan el peso del art. 7: ${desviados.slice(0, 3).join("; ")}${desviados.length > 3 ? ` …y ${desviados.length - 3} más` : ""}`,
+    };
+  }
+
   const a = socios.find((s) => s.holding.share_class?.class_code === clases[0])!;
   const b = socios.find((s) => s.holding.share_class?.class_code === clases[1])!;
   if (pesoArt7(clases[1]) === 0 || votos(b.holding) === 0) {
@@ -437,7 +474,7 @@ export function censoPrecondicion(socios: SocioCenso[]): {
 }
 
 
-// ────────────────────────────── Task 6: los 9 acuerdos, con su regla y su punto ──
+// ───────────────────────────── Task 6: los 10 acuerdos, con su regla y su punto ──
 
 /**
  * La regla que sirve un acuerdo: el pack POR MATERIA del tenant Garrigues.
@@ -452,6 +489,14 @@ export type PackResuelto = {
   version: string;
   materia: string;
   mayoriaSL: Record<string, unknown>;
+  /**
+   * Payload completo de la versión activa e id de esa fila. Opcionales porque
+   * Task 6 no los necesitaba y las fixturas de su sonda no los traen; Task 7 sí
+   * los exige —el motor evalúa el pack entero, no solo su rama de mayoría— y
+   * `main()` falla cerrado si faltan.
+   */
+  payload?: RulePack;
+  versionId?: string;
 };
 
 export type AgendaRow = {
@@ -550,6 +595,11 @@ export function buildAgreementRow(args: {
   const texto = textoAcuerdo(punto.numero);
   const referencia = String(pack.mayoriaSL.referencia ?? "");
   if (!referencia) throw new Error(`acuerdo: el pack ${pack.packId} no trae referencia de mayoría`);
+  // La subsunción viaja con el acuerdo cuando la hay, y solo cuando la hay: los
+  // otros 9 resuelven su mayoría por cita directa y una clave vacía sugeriría lo
+  // contrario. Es el mismo objeto que el pack lleva en
+  // `reglaEspecifica.subsuncionArt36`, así que la sonda puede contrastarlos.
+  const subsuncion = subsuncionDe(punto.numero);
 
   return {
     tenant_id: GARRIGUES_TENANT,
@@ -584,10 +634,32 @@ export function buildAgreementRow(args: {
           tenant: "GARRIGUES",
         },
         mayoria: pack.mayoriaSL,
+        // Sin esto, la ficha ensenaba `base_votos 16900` y
+        // `concurrencia_todas_las_clases 16908` juntos, con un `concurrencia_pct
+        // 100` al lado: mas votos concurriendo que la base, y un 100 % que no
+        // sale de dividir ninguno de los dos. Son DOS bases y hay que decirlo.
+        base_computo: {
+          declarada: baseComputoJunta(),
+          criterio: "Votos de la clase A no autocartera",
+          ambas_clases: baseComputoTodasLasClases(),
+          diferencia: baseComputoTodasLasClases() - baseComputoJunta(),
+          nota:
+            `El porcentaje se calcula sobre la base DECLARADA de ${baseComputoJunta()} votos ` +
+            `(clase A no autocartera, criterio del usuario de 2026-08-29). Los ` +
+            `${baseComputoTodasLasClases()} votos computables de AMBAS clases del art. 7 de los ` +
+            `Estatutos son otra base: la diferencia son los ` +
+            `${baseComputoTodasLasClases() - baseComputoJunta()} votos de la clase B, que SI votan. ` +
+            `Sobre la base declarada los presenciales dan el 0,8875 % que imprime el acta.`,
+          registro: "docs/legal/2026-08-29-base-computo-junta-socios-garrigues.md",
+        },
+        ...(subsuncion ? { subsuncion } : {}),
         required_majority_code: {
           valor: null,
-          motivo:
-            "El vocabulario de required_majority_code (SIMPLE < REFORZADA_2_3 < UNANIMIDAD, fn_majority_level) no expresa la base de cómputo del art. 30.1 de los Estatutos, que es la mayoría de los votos del capital social y no la de los votos emitidos. Escribir un código de esa escalera afirmaría otra regla; la aplicable es la del rule pack y está copiada aquí al lado.",
+          motivo: subsuncion
+            // Aquí la escalera SÍ tiene una palabra para «dos tercios», así que
+            // el motivo del NULL no puede ser el mismo que en los otros nueve.
+            ? "REFORZADA_2_3 (fn_majority_level) sí nombra los dos tercios, pero se deja NULL por dos razones: no expresa la base de cómputo —votos de las participaciones en que se divide el capital social, no votos emitidos ni capital presente— y, sobre todo, escribir la mayoría en una columna estructurada la presentaría como FIRME cuando se aplica por SUBSUNCIÓN etiquetada INFERIDO. La mayoría aplicable vive en el rule pack y la subsunción, con su lectura alternativa, está aquí al lado."
+            : "El vocabulario de required_majority_code (SIMPLE < REFORZADA_2_3 < UNANIMIDAD, fn_majority_level) no expresa la base de cómputo del art. 30.1 de los Estatutos, que es la mayoría de los votos del capital social y no la de los votos emitidos. Escribir un código de esa escalera afirmaría otra regla; la aplicable es la del rule pack y está copiada aquí al lado.",
         },
         texto_del_acuerdo:
           texto.contenido === "ACREDITADO"
@@ -595,6 +667,513 @@ export function buildAgreementRow(args: {
             : "INFERIDO: el certificado recoge el punto pero no lo que se decidió. El texto no identifica a ninguna persona.",
         alcance:
           "Reconstrucción demo sin efecto jurídico. El expediente real consta en el Registro Mercantil de Madrid; la plataforma lo reproduce, no lo sustituye.",
+      },
+    },
+  };
+}
+
+// ────────────────── Task 7: resoluciones y evaluación real de la mayoría ──
+
+/**
+ * ## Por qué `meeting_votes` queda VACÍA, y por qué eso NO es un hueco
+ *
+ * El certificado del acta acredita **dos** hechos y ninguno es un escrutinio:
+ * que los acuerdos se adoptaron, y que concurrió el censo entero (3 socios
+ * presentes y 343 representados por una sola persona). **No transcribe quién
+ * votó qué.**
+ *
+ * `meeting_votes` es, columna por columna (verificado en Cloud), una tabla
+ * NOMINAL y SIN PESO: `(resolution_id, attendee_id, vote_value, conflict_flag,
+ * reason)`. No tiene ni `votes` ni `direction` ni `meeting_id` —las tres que
+ * proponía el plan— así que no sabe expresar un agregado ponderado. De ahí que
+ * las tres salidas posibles fueran:
+ *
+ *  1. **3.460 filas nominales** (346 socios × 10 acuerdos): fabricar la
+ *     atribución del sentido del voto a 346 personas identificadas. Descartada.
+ *  2. **4 filas** —el representante único y los 3 presenciales—: descartada por
+ *     tres razones independientes. (a) El acta dice que Roberto Delgado exhibió
+ *     343 cartas de delegación, **no** que votara a favor de los 10 puntos: una
+ *     delegación puede llevar instrucción de voto por punto y el certificado no
+ *     la transcribe; y a Vives y a Zarza les pondría en la boca un voto que
+ *     nadie ha escrito. (b) Sin columna de peso, esas 4 filas cuentan **4
+ *     votos**, no 16.900: el agregado saldría además aritméticamente falso.
+ *     (c) `meeting_votes` es justo la tabla que la vía sellada del servidor lee
+ *     como «el sentido individual del voto»; rellenarla a mano fabrica el
+ *     artefacto que esa vía existe para proteger.
+ *  3. **Ninguna fila, y el motor evaluando lo que sí está acreditado.** Elegida.
+ *
+ * Lo que el motor evalúa entonces no es «¿se alcanzó la mayoría?» —eso ya lo
+ * certifica el acta— sino **«¿qué mayoría exigía la regla y era alcanzable con
+ * la concurrencia certificada?»**. La pregunta tiene respuesta no trivial
+ * precisamente porque estas mayorías estatutarias se miden sobre los **votos
+ * totales** y no sobre los emitidos: con concurrencia baja, un 80 % del total es
+ * inalcanzable y la adopción certificada sería incompatible con la regla. El
+ * motor detecta esa incompatibilidad, y por eso su veredicto **cambia** con la
+ * entrada en vez de ser un rótulo.
+ */
+export const MEETING_VOTES_VACIA =
+  "El certificado del acta no transcribe el desglose nominal de votos. meeting_votes queda VACÍA a propósito: es una tabla por asistente y sin columna de peso, así que escribirla atribuiría un sentido de voto a personas identificadas que la fuente no nombra votando.";
+
+/** El acta decide la adopción; este motor no. */
+export const ADOPCION_LA_CERTIFICA_EL_ACTA =
+  "La adopción está certificada por el acta y vive en meeting_resolutions.status = ADOPTED. Esta evaluación NO la decide.";
+
+/** Marca que la ficha lee para avisar de que el resultado no está sellado. */
+export const SELLO_CLIENTE = "NO_SELLADO_EN_SERVIDOR";
+
+export const SELLO_MOTIVO =
+  "La vía sellada en servidor (fn_secretaria_server_resolution_evaluation) no admite este órgano: evalúa CDA, COMISION y COMITE, exige un censo POLITICO WORM y que cada asiento pese exactamente 1. Esta Junta son 346 socios ponderados por títulos × votos por título sobre un censo ECONOMICO, y no cabe ahí ni añadiendo JUNTA a la lista. La evaluación la ejecutó el motor de reglas TS en el cliente.";
+
+export const ESCENARIO_EVALUADO =
+  "MAXIMO_ALCANZABLE — el voto a favor se fija en los votos concurrentes que certifica el acta, que es el TECHO que la concurrencia permite, no el escrutinio. El motor responde si la mayoría exigida era alcanzable con esa concurrencia; no afirma cómo votó nadie.";
+
+/**
+ * La clase que compone la base de cómputo declarada del expediente: clase A no
+ * autocartera = 16.900 votos (decisión del usuario de 2026-08-29, §4 de
+ * `docs/legal/2026-08-29-base-computo-junta-socios-garrigues.md`). Los 8 votos
+ * de clase B concurrieron y se cuentan aparte: **las dos bases no se mezclan.**
+ */
+const CLASE_BASE_DECLARADA = "A";
+
+/**
+ * Concurrencia certificada, medida sobre la base declarada y sobre la íntegra.
+ *
+ * Devuelve las dos porque la diferencia (8 votos de clase B) es real y está
+ * decidida; devolver una sola invitaría a usarla como si fuera la otra.
+ */
+export function concurrenciaCertificada(socios: SocioCenso[], attendees: AttendeeRow[]) {
+  const claseDe = new Map(socios.map((s) => [s.person_id, s.holding.share_class?.class_code ?? "?"]));
+  let enBaseDeclarada = 0;
+  let todasLasClases = 0;
+  let sociosEnBase = 0;
+  for (const a of attendees) {
+    // Presencial o representado: ambas formas concurren. Un ausente no sumaría.
+    if (a.attendance_type !== "PRESENCIAL" && a.attendance_type !== "REPRESENTADO") continue;
+    todasLasClases += a.voting_rights;
+    if (claseDe.get(a.person_id) === CLASE_BASE_DECLARADA) {
+      enBaseDeclarada += a.voting_rights;
+      sociosEnBase += 1;
+    }
+  }
+  return { votos: enBaseDeclarada, socios: sociosEnBase, votosTodasLasClases: todasLasClases };
+}
+
+export type EvaluacionMayoria = {
+  punto: string;
+  materia: string;
+  packId: string;
+  version: string;
+  /** Veredicto del motor sobre la ALCANZABILIDAD, no sobre la adopción. */
+  ok: boolean;
+  severity: EvalSeverity;
+  /** false cuando el motor no sabe evaluar la fórmula del pack. */
+  evaluable: boolean;
+  formula: string;
+  referencia: string;
+  /** Votos exigidos por la regla. Sale del motor, no se recalcula aquí. */
+  umbralVotos: number | null;
+  blockingIssues: string[];
+  warnings: string[];
+  /** Plano a propósito: la ficha renderiza cada valor con `String(value)`. */
+  explain: Record<string, string | number | boolean>;
+};
+
+/**
+ * Corre el motor de reglas sobre un punto. **Ejecuta `evaluarVotacion` de
+ * verdad**: el umbral y el veredicto salen de su salida, no de una constante.
+ *
+ * Si la fórmula del pack no la sabe evaluar el motor, no se persiste su
+ * veredicto: `evaluateFormula` devuelve `false` con umbral 0 ante una fórmula
+ * desconocida, y ese `false` es indistinguible de una mayoría realmente no
+ * alcanzada. Se declara `evaluable: false` y se dice por qué. Es el caso de la
+ * DOBLE MAYORÍA de la exclusión (art. 30.2.g Estatutos + art. 15 Ley 2/2007):
+ * su segunda condición es una mayoría de SOCIOS, no de votos, y sin el desglose
+ * nominal —que el acta no transcribe— no hay forma de computarla.
+ */
+export function evaluarMayoriaPunto(args: {
+  punto: PuntoOrdenDia;
+  pack: RulePack;
+  packId: string;
+  version: string;
+  baseVotos: number;
+  concurrenciaVotos: number;
+  concurrenciaTodasLasClases: number;
+}): EvaluacionMayoria {
+  const { punto, pack, packId, version, baseVotos, concurrenciaVotos } = args;
+  if (!punto.materia) throw new Error(`evaluación: el punto ${punto.numero} no tiene materia`);
+  const mayoria = pack.votacion?.mayoria?.SL;
+  if (!mayoria?.formula) {
+    throw new Error(`evaluación: el pack ${packId} no trae fórmula en la rama SL de votacion.mayoria`);
+  }
+  const evaluable = esFormulaEvaluable(mayoria.formula);
+
+  const votos: VotosInput = {
+    // TECHO, no escrutinio: ver ESCENARIO_EVALUADO.
+    favor: concurrenciaVotos,
+    contra: 0,
+    abstenciones: 0,
+    en_blanco: 0,
+    capital_presente: concurrenciaVotos,
+    // Base DECLARADA del expediente (16.900). Nunca la íntegra de 16.908.
+    capital_total: baseVotos,
+  };
+
+  const salida = evaluarVotacion(
+    {
+      tipoSocial: "SLP",
+      organoTipo: "JUNTA_GENERAL",
+      adoptionMode: "MEETING",
+      materiaClase: pack.clase,
+      materias: [punto.materia],
+      votos,
+    },
+    [pack],
+  );
+
+  const nodoMayoria = salida.explain.find((n) => String(n.regla).startsWith("Mayoría:"));
+  const umbralVotos =
+    evaluable && typeof nodoMayoria?.umbral === "number" ? nodoMayoria.umbral : null;
+  const pct = (n: number) => Math.round((n / baseVotos) * 1_000_000) / 10_000;
+
+  const motivoNoEvaluable =
+    `El motor de reglas no sabe evaluar la fórmula "${mayoria.formula}". No se persiste su veredicto: ante una fórmula desconocida devuelve «no alcanzada» con umbral 0, indistinguible de una mayoría realmente no alcanzada. La segunda condición es una mayoría de SOCIOS, no de votos, y el acta no transcribe el desglose nominal que permitiría computarla.`;
+
+  const explain: Record<string, string | number | boolean> = {
+    schema_version: "c1-junta-2026.mayoria.v1",
+    sello: SELLO_CLIENTE,
+    sello_motivo: SELLO_MOTIVO,
+    punto: punto.numero,
+    materia: punto.materia,
+    rule_pack: `${packId} v${version}`,
+    formula: String(mayoria.formula),
+    referencia: String(mayoria.referencia ?? ""),
+    base_computo: "VOTOS_CLASE_A_NO_AUTOCARTERA",
+    base_votos: baseVotos,
+    concurrencia_votos: concurrenciaVotos,
+    concurrencia_pct: pct(concurrenciaVotos),
+    concurrencia_todas_las_clases: args.concurrenciaTodasLasClases,
+    escenario: ESCENARIO_EVALUADO,
+    umbral_votos: umbralVotos ?? "NO EVALUABLE",
+    umbral_pct: umbralVotos === null ? "NO EVALUABLE" : pct(umbralVotos),
+    veredicto: !evaluable
+      ? "NO EVALUADO por el motor"
+      : salida.mayoriaAlcanzada
+        ? `La mayoría exigida (${umbralVotos} votos) es alcanzable con la concurrencia certificada (${concurrenciaVotos} votos)`
+        : `La mayoría exigida (${umbralVotos} votos) NO es alcanzable con la concurrencia certificada (${concurrenciaVotos} votos)`,
+    desglose_nominal: MEETING_VOTES_VACIA,
+    adopcion: ADOPCION_LA_CERTIFICA_EL_ACTA,
+    alcance:
+      "Reconstrucción demo sin efecto jurídico. El expediente real consta en el Registro Mercantil de Madrid; la plataforma lo reproduce, no lo sustituye.",
+  };
+  if (!evaluable) explain.motivo_no_evaluable = motivoNoEvaluable;
+  return {
+    punto: punto.numero,
+    materia: punto.materia,
+    packId,
+    version,
+    ok: evaluable ? salida.ok : false,
+    // No evaluable NO es BLOCKING: el motor no dice que el acuerdo falle, dice
+    // que no puede pronunciarse. Pintarlo en rojo afirmaría lo primero.
+    severity: evaluable ? salida.severity : "WARNING",
+    evaluable,
+    formula: String(mayoria.formula),
+    referencia: String(mayoria.referencia ?? ""),
+    umbralVotos,
+    blockingIssues: evaluable ? salida.blocking_issues : [],
+    warnings: evaluable ? salida.warnings : [motivoNoEvaluable, ...salida.warnings],
+    explain,
+  };
+}
+
+export type ResolutionRow = {
+  tenant_id: string;
+  meeting_id: string;
+  agenda_item_index: number;
+  resolution_text: string;
+  resolution_type: string;
+  required_majority_code: null;
+  status: "ADOPTED";
+  agreement_id: string;
+  kind_resolution: "DECISION";
+};
+
+/**
+ * La resolución del punto: el hecho que el acta SÍ certifica.
+ *
+ * - `agenda_item_index` es el ordinal de la convocatoria, el mismo que
+ *   `agenda_items.order_number`. `tr_resolution_kind_matches_agenda` lo exige:
+ *   si no encuentra el punto por (meeting_id, order_number), lanza.
+ * - `required_majority_code` va a **NULL explícito**. La columna tiene DEFAULT
+ *   `'SIMPLE'`, así que omitirla escribiría una mayoría que no es la aplicable:
+ *   el mismo motivo que en `agreements` (la escalera SIMPLE/REFORZADA_2_3/
+ *   UNANIMIDAD no expresa la base del art. 30.1), agravado porque aquí el
+ *   silencio no deja NULL, deja SIMPLE.
+ * - `kind_resolution` DECISION exige `agenda_items.kind = 'DECISORIO'`, que es
+ *   lo que Task 6 escribió en los 10 puntos.
+ */
+export function buildResolutionRow(meetingId: string, punto: PuntoOrdenDia, agreementId: string): ResolutionRow {
+  if (!punto.materia) throw new Error(`resolución: el punto ${punto.numero} no tiene materia`);
+  return {
+    tenant_id: GARRIGUES_TENANT,
+    meeting_id: meetingId,
+    agenda_item_index: ordinalEnOrdenDelDia(punto.numero),
+    resolution_text: textoAcuerdo(punto.numero).decision,
+    resolution_type: punto.materia,
+    required_majority_code: null,
+    status: "ADOPTED",
+    agreement_id: agreementId,
+    kind_resolution: "DECISION",
+  };
+}
+
+export type RuleEvaluationRow = {
+  tenant_id: string;
+  agreement_id: string;
+  etapa: string;
+  ok: boolean;
+  explain: Record<string, string | number | boolean>;
+  blocking_issues: string[];
+  warnings: string[];
+  rule_pack_id: string;
+  rule_pack_version: string;
+  rule_pack_version_id: string | null;
+  payload_hash: string;
+  severity: EvalSeverity;
+  evaluation_hash: string;
+};
+
+async function sha256Hex(texto: string) {
+  const buf = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(texto));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Etapa del registro. Una por punto: agrupa la fila en la ficha del acuerdo. */
+export function etapaEvaluacion(punto: string) {
+  return `MAYORIA_JUNTA_2026_PUNTO_${punto}`;
+}
+
+/**
+ * La fila que se persiste. `rule_evaluation_results` es **WORM**: `worm_guard()`
+ * bloquea UPDATE y DELETE para todo el mundo, service_role incluido. Por eso el
+ * seed compara `evaluation_hash` antes de insertar y, si difiere del que ya hay,
+ * **para y lo dice** en vez de apilar una segunda evaluación del mismo punto.
+ */
+export async function buildRuleEvaluationRow(args: {
+  agreementId: string;
+  evaluacion: EvaluacionMayoria;
+  packVersionId: string | null;
+  packPayload: unknown;
+}): Promise<RuleEvaluationRow> {
+  const { agreementId, evaluacion } = args;
+  const sinHash = {
+    tenant_id: GARRIGUES_TENANT,
+    agreement_id: agreementId,
+    etapa: etapaEvaluacion(evaluacion.punto),
+    ok: evaluacion.ok,
+    explain: evaluacion.explain,
+    blocking_issues: evaluacion.blockingIssues,
+    warnings: evaluacion.warnings,
+    rule_pack_id: evaluacion.packId,
+    rule_pack_version: evaluacion.version,
+    rule_pack_version_id: args.packVersionId,
+    payload_hash: await sha256Hex(canonical(args.packPayload)),
+    severity: evaluacion.severity,
+  };
+  return { ...sinHash, evaluation_hash: await sha256Hex(canonical(sinHash)) };
+}
+
+// ──────────────── Task 9: el ciclo registral, la inscripción del 13/07 y el BORME ──
+
+/**
+ * Estado del expediente cuando la fuente acredita la inscripción.
+ *
+ * Vocabulario medido contra Cloud: el CHECK `registry_filings_v2_status_check`
+ * **solo aplica a `workflow_version = 2`** (`PREPARADA · ELEVADA · PRESENTADA ·
+ * SUBSANACION · DENEGADA · INSCRITA · PUBLICADA`); en v1 la columna es texto
+ * libre con DEFAULT `'PREPARACION'` y no hay ningún trigger sobre la tabla. Se
+ * escribe igualmente dentro de ese vocabulario porque es el que `statusLabel()`
+ * sabe traducir: `'PREPARACION'` —el default de la tabla— no tiene entrada y la
+ * ficha lo pintaría en crudo.
+ *
+ * `REGISTERED`, que proponía el plan, **no existe en ninguna de las dos escaleras**.
+ */
+const FILING_ESTADO_INSCRITA = "INSCRITA";
+
+/**
+ * Estado del expediente cuando la fuente NO acredita inscripción. Es el peldaño
+ * MÁS BAJO del ciclo: no afirma elevación, ni presentación, ni calificación.
+ *
+ * Y aun así afirma algo, así que la fila lo acota: `PREPARADA` describe el
+ * estado de ESTE registro —la plataforma ha reconstruido el expediente del
+ * acuerdo— y no un acto del mundo real. Lo que la fuente no dice va escrito en
+ * `procedure_snapshot.c1_junta_socios_2026.sin_inscripcion`.
+ *
+ * La alternativa era no crear la fila. Se descarta: `ExpedienteAcuerdo` solo
+ * pinta el bloque registral `{registryFiling ? … : null}`, así que sin fila los
+ * cuatro acuerdos sin inscripción quedarían **indistinguibles de un acuerdo no
+ * inscribible** — el expediente incompleto se vería completo.
+ */
+const FILING_ESTADO_SIN_INSCRIPCION = "PREPARADA";
+
+/**
+ * La vía. Columna NOT NULL con DEFAULT `'NOTARIAL'`: omitirla **no deja NULL,
+ * afirma que se presentó por vía notarial** — la misma mina que
+ * `meeting_resolutions.required_majority_code` en Task 7.
+ *
+ * `REGISTRO_MERCANTIL` (el valor que usan las filas v2 de ARGA) nombra el
+ * destino, que sí consta —RM de Madrid, hoja M-190538, en los datos registrales
+ * de la propia fuente—, y no dice nada sobre el camino (notarial o telemático),
+ * que no consta.
+ */
+const FILING_VIA = "REGISTRO_MERCANTIL";
+
+export type RegistryFilingRow = {
+  tenant_id: string;
+  entity_id: string;
+  agreement_id: string;
+  workflow_version: 1;
+  filing_via: string;
+  status: string;
+  filing_number: null;
+  presentation_date: null;
+  estimated_resolution: null;
+  inscription_number: string | null;
+  borme_ref: string | null;
+  registered_at: string | null;
+  publication_reference: null;
+  published_at: null;
+  qualification_outcome: null;
+  qualified_at: null;
+  deed_id: null;
+  deed_reference: null;
+  deed_date: null;
+  notary_id: null;
+  notary_name: null;
+  protocol_number: null;
+  elevated_at: null;
+  procedure_snapshot: Record<string, unknown>;
+};
+
+/**
+ * El expediente registral de un acuerdo inscribible.
+ *
+ * ## Por qué `workflow_version = 1` y no el ciclo gobernado v2
+ *
+ * Medido contra Cloud antes de escribir una línea. El ciclo v2
+ * (`fn_registry_prepare_filing` → `record_presentation` → `record_qualification`
+ * → `record_inscription`) es la vía gobernada, con su `registry_filing_events`
+ * append-only, y **aquí no se puede recorrer sin inventar**:
+ *
+ *  1. `fn_registry_record_inscription` exige `status = 'PRESENTADA'` **y**
+ *     `qualification_outcome = 'POSITIVA'` antes de inscribir. Llegar ahí obliga
+ *     a dar `p_presentation_date` y `p_filing_number` a `record_presentation` y
+ *     una fecha de calificación a `record_qualification`: **tres datos que la
+ *     fuente no acredita**. El ciclo gobernado no es opcional en su orden.
+ *  2. Las cuatro RPC exigen `p_evidence_artifact_id` NOT NULL y lo verifican
+ *     contra `secretaria_document_artifacts` (`fn_registry_assert_artifact` con
+ *     `p_require_verified = true`). No hay artefacto de este expediente: la
+ *     certificación es Task 8 y el artefacto documental no existe.
+ *  3. El CHECK `registry_filings_v2_projection_check` obliga en v2 a
+ *     `base_document_artifact_id` NOT NULL, y si el documento base fuera
+ *     `'ESCRITURA'`, `registry_filings_escritura_metadata_check` exige
+ *     `deed_date`, `notary_name` y `protocol_number` — **exactamente los tres
+ *     datos que esta tarea tiene prohibido inventar**.
+ *
+ * Escribir eventos a mano tampoco vale: `registry_filing_events` es append-only
+ * con guard, y fabricar un rastro de auditoría gobernado es peor que no tenerlo.
+ * Queda elevado como brecha de producto: **hoy la plataforma no sabe registrar
+ * un expediente ya inscrito cuya presentación no consta.**
+ *
+ * ## Qué se escribe y qué no
+ *
+ * Todo lo acreditado sale de `inscripcionDePunto()`, que lo DERIVA de la captura
+ * BORME. Todo lo demás va a NULL **explícito** —no omitido— para que un `update`
+ * de una ejecución posterior limpie cualquier valor que alguien hubiera puesto a
+ * mano, y para que la fila enseñe su propio silencio.
+ */
+export function buildRegistryFilingRow(args: {
+  agreementId: string;
+  punto: PuntoOrdenDia;
+  clase: ClaseMateria;
+}): RegistryFilingRow {
+  const { agreementId, punto, clase } = args;
+  if (!punto.materia) throw new Error(`expediente registral: el punto ${punto.numero} no tiene materia`);
+  if (clase.materia !== punto.materia) {
+    throw new Error(`expediente registral: clase de ${clase.materia} aplicada al punto ${punto.numero} (${punto.materia})`);
+  }
+  // Un expediente registral de un acuerdo NO inscribible afirmaría que hay algo
+  // que inscribir. La inscribibilidad la dice `materia_catalog`, no este seed.
+  if (!clase.inscribable) {
+    throw new Error(`expediente registral: el punto ${punto.numero} (${punto.materia}) no es inscribible según materia_catalog`);
+  }
+
+  const insc = inscripcionDePunto(punto.numero);
+  const descartado = candidatoDescartadoDePunto(punto.numero);
+
+  return {
+    tenant_id: GARRIGUES_TENANT,
+    entity_id: GARRIGUES_MATRIZ_UUID,
+    agreement_id: agreementId,
+    workflow_version: 1,
+    filing_via: FILING_VIA,
+    status: insc ? FILING_ESTADO_INSCRITA : FILING_ESTADO_SIN_INSCRIPCION,
+    // Asiento de presentación: no consta ni en los inscritos.
+    filing_number: null,
+    presentation_date: null,
+    estimated_resolution: null,
+    inscription_number: insc ? insc.numeroInscripcion : null,
+    borme_ref: insc ? insc.anuncio : null,
+    // `date` no hay: la columna del asiento es `registered_at` (timestamptz).
+    // 00:00Z conserva el DÍA en UTC —`slice(0,10)` da 2026-07-13—, que es el
+    // dato que no puede fallar; ver la historia de `FECHA_1_ISO`. Hoy ninguna
+    // superficie del Tramitador pinta esta columna: brecha de producto anotada,
+    // que NO se compensa metiendo la fecha en una columna que sí se pinte.
+    registered_at: insc ? `${insc.fecha}T00:00:00.000Z` : null,
+    // La publicación en el boletín es otro acto: la fuente da el número de
+    // anuncio pero NO identifica el boletín (no hay CVE de 13/07/2026 en su
+    // lista) ni su fecha de publicación.
+    publication_reference: null,
+    published_at: null,
+    // La inscripción implica que hubo calificación positiva, pero la
+    // calificación es un acto con fecha y la fuente no la da. Además esas dos
+    // columnas pertenecen al ciclo v2 gobernado, que aquí no se recorre.
+    qualification_outcome: null,
+    qualified_at: null,
+    deed_id: null,
+    deed_reference: null,
+    deed_date: null,
+    notary_id: null,
+    notary_name: null,
+    protocol_number: null,
+    elevated_at: null,
+    procedure_snapshot: {
+      c1_junta_socios_2026: {
+        punto: punto.numero,
+        materia: punto.materia,
+        junta: FECHA_JUNTA,
+        inscripcion: insc
+          ? {
+              anuncio: insc.anuncio,
+              fecha: insc.fecha,
+              registral: insc.registral,
+              numero_inscripcion: insc.numeroInscripcion,
+              actos_del_anuncio: insc.actos,
+              puntos_del_mismo_anuncio: insc.puntos,
+              anuncio_compartido: notaAnuncioCompartido(insc),
+              vinculo_con_la_junta: insc.vinculo,
+              fuente: "scripts/garrigues/borme/jya-garrigues-slp.json (captura Carril B de la matriz, 2026-08-03)",
+            }
+          : null,
+        ...(insc ? {} : { sin_inscripcion: MOTIVO_SIN_INSCRIPCION }),
+        ...(descartado ? { candidato_descartado: descartado } : {}),
+        elevacion: ELEVACION_NO_ACREDITADA,
+        estado: insc
+          ? `${FILING_ESTADO_INSCRITA}: la fuente acredita el asiento (anuncio ${insc.anuncio}, ${insc.registral}, ${insc.fecha}). No acredita ni la presentación ni la calificación como actos con fecha, y esas columnas quedan a NULL.`
+          : `${FILING_ESTADO_SIN_INSCRIPCION}: es el peldaño más bajo del ciclo y describe el estado de ESTE registro —la plataforma ha reconstruido el expediente del acuerdo—, no un acto del mundo real. No afirma elevación, ni presentación, ni calificación, ni inscripción.`,
+        workflow:
+          "workflow_version 1. El ciclo gobernado v2 exige recorrer PRESENTADA + calificación POSITIVA antes de inscribir y un artefacto documental verificado; los tres datos que eso pide (fecha de presentación, asiento y fecha de calificación) no constan, y el artefacto no existe. Ver la cabecera de buildRegistryFilingRow().",
+        alcance:
+          "Reconstrucción demo sin efecto jurídico. El expediente real consta en el Registro Mercantil de Madrid (hoja M-190538); la plataforma lo reproduce, no lo sustituye. No se afirma presentación, envío, entrega ni interacción real con ningún registro ni con EAD Trust.",
       },
     },
   };
@@ -613,11 +1192,21 @@ async function main() {
     fail("preflight: hay números de punto repetidos; Task 6 no podría enlazar el acuerdo con su punto.");
   }
 
-  // Task 6: 9 acuerdos, no 10. El punto 1.1 está bloqueado (ver PUNTO_BLOQUEADO).
+  // Task 6-bis: 10 acuerdos. Ya no hay punto bloqueado — el 1.1 se desbloqueó
+  // con la decisión del usuario de 2026-08-30 (ver SUBSUNCION_ART36).
   const conAcuerdo = puntosConAcuerdo();
-  if (conAcuerdo.length !== 9) fail(`preflight: ${conAcuerdo.length} puntos con acuerdo, esperados 9.`);
-  if (conAcuerdo.some((p) => p.numero === PUNTO_BLOQUEADO)) {
-    fail(`preflight: el punto ${PUNTO_BLOQUEADO} está bloqueado y no puede materializar acuerdo.`);
+  if (conAcuerdo.length !== 10) fail(`preflight: ${conAcuerdo.length} puntos con acuerdo, esperados 10.`);
+  if (conAcuerdo.length !== materializan.length) {
+    fail("preflight: hay puntos que materializan sin acuerdo; si vuelve a haber un bloqueo, decláralo aquí.");
+  }
+  // La etiqueta no es decorativa: si alguien la degrada a FIRME o le quita la
+  // lectura alternativa, el seed no escribe. Es el único sitio del pipeline por
+  // el que pasan los 10 acuerdos antes de tocar Cloud.
+  if (SUBSUNCION_ART36.procedencia !== "INFERIDO") {
+    fail("preflight: la subsunción del art. 36 debe seguir etiquetada INFERIDO.");
+  }
+  if (!SUBSUNCION_ART36.lecturaAlternativa.includes("30.2.f") || !SUBSUNCION_ART36.lecturaAlternativa.includes("30.1")) {
+    fail("preflight: la lectura alternativa del art. 36 (30.2.f tasado → 30.1) no puede perderse.");
   }
   for (const p of conAcuerdo) textoAcuerdo(p.numero);   // lanza si falta un texto
   // Los ordinales son los de la convocatoria: si dos coincidieran, dos acuerdos
@@ -653,7 +1242,7 @@ async function main() {
   const materiasAcuerdo = conAcuerdo.map((p) => p.materia!);
   const { data: packsGarr, error: ePacks } = await admin
     .from("rule_packs")
-    .select("id, materia, organo_tipo, tenant_id, rule_pack_versions!inner(version, is_active, status, payload)")
+    .select("id, materia, organo_tipo, tenant_id, rule_pack_versions!inner(id, version, is_active, status, payload)")
     .eq("tenant_id", GARRIGUES_TENANT)
     .in("materia", materiasAcuerdo)
     .eq("rule_pack_versions.is_active", true);
@@ -665,7 +1254,7 @@ async function main() {
   };
   const packPorMateria = new Map<string, PackResuelto>();
   for (const rp of packsGarr ?? []) {
-    const versiones = (rp.rule_pack_versions ?? []) as Array<{ version: string; payload: PackPayload }>;
+    const versiones = (rp.rule_pack_versions ?? []) as Array<{ id: string; version: string; payload: PackPayload }>;
     if (versiones.length !== 1) {
       fail(`rule_packs ${rp.id}: ${versiones.length} versiones activas, esperada 1.`);
     }
@@ -687,6 +1276,10 @@ async function main() {
       version: String(versiones[0].version),
       materia: rp.materia,
       mayoriaSL,
+      // Task 7: el motor evalúa el pack ENTERO (materia, clase, órgano, modos y
+      // votación), no solo su rama de mayoría.
+      payload: payload as unknown as RulePack,
+      versionId: versiones[0].id,
     });
   }
   const sinPack = materiasAcuerdo.filter((m) => !packPorMateria.has(m));
@@ -695,7 +1288,9 @@ async function main() {
     // no se muere: un ensayo que revienta sin enseñar qué falta no sirve de nada.
     const msg =
       `materias sin rule pack del tenant Garrigues: ${sinPack.join(", ")}. ` +
-      `Aplica antes supabase/migrations/20260829170000_c1_packs_materias_junta.sql.`;
+      `Aplica antes supabase/migrations/20260829170000_c1_packs_materias_junta.sql ` +
+      `(APROBACION_CUENTAS, NOMBRAMIENTO_AUDITOR, DELEGACION_FACULTADES) y ` +
+      `supabase/migrations/20260830120000_c1_pack_modificacion_estatutos_junta.sql (MODIFICACION_ESTATUTOS).`;
     if (COMMIT) fail(msg);
     console.log(`\n⚠ ${msg}\n  El dry-run continúa para enseñar el resto; con --commit para aquí.`);
   }
@@ -924,7 +1519,7 @@ async function main() {
 
   const claseporMateria = new Map((cat ?? []).map((c) => [c.materia, c as ClaseMateria]));
 
-  console.log("\n── Task 6 · los 9 acuerdos, su punto y su regla ──");
+  console.log(`\n── Task 6 · los ${conAcuerdo.length} acuerdos, su punto y su regla ──`);
   console.table(conAcuerdo.map((p) => {
     const pack = packPorMateria.get(p.materia!);
     const clase = claseporMateria.get(p.materia!)!;
@@ -937,16 +1532,119 @@ async function main() {
       mayoria: pack ? `${pack.mayoriaSL.fuente} · ${pack.mayoriaSL.formula}` : "—",
       referencia: pack ? String(pack.mayoriaSL.referencia).slice(0, 52) : "—",
       texto: textoAcuerdo(p.numero).contenido,
+      regla: subsuncionDe(p.numero) ? "SUBSUNCIÓN · INFERIDO" : "cita directa",
       gate: materiasConGate.has(p.materia!) ? "INFORME_PRECEPTIVO_ORGANO" : "—",
     };
   }));
   console.log(
     [
-      `Punto ${PUNTO_BLOQUEADO} SIN acuerdo — ${NOTA_PUNTO_BLOQUEADO}`,
-      `Gate del informe preceptivo previsto en ${conAcuerdo.filter((p) => materiasConGate.has(p.materia!)).length} de ${conAcuerdo.length} acuerdos.`,
+      `Punto 1.1 (art. 36) — mayoría de 2/3 por SUBSUNCIÓN en el art. 30.2.a), etiquetada ${SUBSUNCION_ART36.procedencia} y decidida por ${SUBSUNCION_ART36.decididoPor}.`,
+      `  Lectura aplicada: ${SUBSUNCION_ART36.lecturaAplicada}`,
+      `  Lectura ALTERNATIVA (viaja con el acuerdo): ${SUBSUNCION_ART36.lecturaAlternativa}.`,
+      `  Registro canónico: ${SUBSUNCION_ART36.registroCanonico}`,
+      `Gate del informe preceptivo previsto en ${conAcuerdo.filter((p) => materiasConGate.has(p.materia!)).length} de ${conAcuerdo.length} acuerdos. MODIFICACION_ESTATUTOS NO entra: ${SUBSUNCION_ART36.consecuenciaNoAplicada}`,
       `Arista punto ↔ acuerdo: agenda_items.order_number (ordinal de la convocatoria) → agreements.agenda_item_id (uuid, FK).`,
       `source_convocatoria_id queda a NULL: el guard exige convocatoria EMITIDA e inmutable y ésta está en ${ESTADO}.`,
-      `required_majority_code queda a NULL a propósito: la escalera SIMPLE/REFORZADA_2_3/UNANIMIDAD no expresa la base del art. 30.1.`,
+      `required_majority_code queda a NULL en los ${conAcuerdo.length}: la escalera SIMPLE/REFORZADA_2_3/UNANIMIDAD no expresa la base del art. 30.1, y en el 1.1 escribir REFORZADA_2_3 presentaría como FIRME una mayoría aplicada por subsunción INFERIDA.`,
+    ].join("\n"),
+  );
+
+  // ────────────── Task 7 · las resoluciones y la evaluación de la mayoría ──
+
+  // La concurrencia sale de la asistencia ya construida, no de un literal, y se
+  // mide sobre las DOS bases: la declarada (16.900, clase A no autocartera) y la
+  // íntegra (16.908, ambas clases). El motor recibe SOLO la declarada.
+  const concurrencia = concurrenciaCertificada(socios, attendees);
+  if (concurrencia.votosTodasLasClases !== votosSumaCenso) {
+    fail(`preflight: la concurrencia total (${concurrencia.votosTodasLasClases}) no coincide con la suma del censo (${votosSumaCenso}).`);
+  }
+  if (concurrencia.votos !== baseComputoJunta()) {
+    // El acta certifica que concurrió el censo entero: 346 de 346. Si la base
+    // declarada dejara de estar íntegramente concurrida, la evaluación de la
+    // mayoría hablaría de otra sesión.
+    fail(`preflight: la concurrencia sobre la base declarada es ${concurrencia.votos} y la base es ${baseComputoJunta()}: el acta certifica concurrencia íntegra.`);
+  }
+
+  const evaluaciones = conAcuerdo
+    .filter((p) => packPorMateria.get(p.materia!)?.payload)
+    .map((p) => {
+      const pack = packPorMateria.get(p.materia!)!;
+      return evaluarMayoriaPunto({
+        punto: p,
+        pack: pack.payload!,
+        packId: pack.packId,
+        version: pack.version,
+        baseVotos: baseComputoJunta(),
+        concurrenciaVotos: concurrencia.votos,
+        concurrenciaTodasLasClases: concurrencia.votosTodasLasClases,
+      });
+    });
+
+  console.log(`\n── Task 7 · resoluciones y evaluación de la mayoría (motor de reglas, en cliente) ──`);
+  console.table(evaluaciones.map((e) => ({
+    punto: e.punto,
+    materia: e.materia,
+    formula: e.formula,
+    umbral: e.umbralVotos === null ? "NO EVALUABLE" : `${e.umbralVotos} / ${baseComputoJunta()}`,
+    concurrencia: `${concurrencia.votos} votos (${concurrencia.socios} socios de clase ${CLASE_BASE_DECLARADA})`,
+    veredicto: e.evaluable ? (e.ok ? "ALCANZABLE" : "NO ALCANZABLE") : "NO EVALUADO",
+    severity: e.severity,
+  })));
+  const noEvaluables = evaluaciones.filter((e) => !e.evaluable);
+  console.log(
+    [
+      `Sello: ${SELLO_CLIENTE}. ${SELLO_MOTIVO}`,
+      `Escenario: ${ESCENARIO_EVALUADO}`,
+      `meeting_votes: 0 filas. ${MEETING_VOTES_VACIA}`,
+      `${ADOPCION_LA_CERTIFICA_EL_ACTA}`,
+      `Bases NO mezcladas: el motor recibe ${baseComputoJunta()} (declarada); la concurrencia íntegra de ambas clases es ${concurrencia.votosTodasLasClases} y solo se guarda como conciliación.`,
+      `Fórmulas que el motor NO sabe evaluar: ${noEvaluables.length} de ${evaluaciones.length}${noEvaluables.length ? ` — ${noEvaluables.map((e) => `${e.materia} ("${e.formula}")`).join(", ")}` : ""}.`,
+    ].join("\n"),
+  );
+
+  // ────────────── Task 9 · el ciclo registral: elevación, inscripción y BORME ──
+
+  // Quién tiene expediente registral lo dice `materia_catalog.inscribable`, no
+  // este seed: el conjunto se DERIVA y no se pina. Si mañana el catálogo cambia
+  // la inscribibilidad de una materia, este número cambia con él.
+  const inscribibles = conAcuerdo.filter((p) => claseporMateria.get(p.materia!)!.inscribable);
+  const noInscribibles = conAcuerdo.filter((p) => !claseporMateria.get(p.materia!)!.inscribable);
+  const conInscripcion = inscribibles.filter((p) => inscripcionDePunto(p.numero));
+  const sinInscripcion = inscribibles.filter((p) => !inscripcionDePunto(p.numero));
+
+  console.log(`\n── Task 9 · el ciclo registral de los ${inscribibles.length} acuerdos inscribibles ──`);
+  console.table(inscribibles.map((p) => {
+    const insc = inscripcionDePunto(p.numero);
+    return {
+      punto: p.numero,
+      materia: p.materia,
+      estado: insc ? FILING_ESTADO_INSCRITA : FILING_ESTADO_SIN_INSCRIPCION,
+      anuncio: insc?.anuncio ?? "—",
+      inscripcion: insc ? `I/A ${insc.numeroInscripcion}` : "—",
+      fecha: insc?.fecha ?? "—",
+      comparte_anuncio: insc && insc.puntos.length > 1
+        ? `sí · con el punto ${insc.puntos.filter((x) => x !== p.numero).join(", ")}`
+        : "—",
+      instrumento: "no acreditado",
+      candidato_descartado: candidatoDescartadoDePunto(p.numero)?.anuncio ?? "—",
+    };
+  }));
+  console.log(
+    [
+      `${conInscripcion.length} de ${inscribibles.length} acuerdos inscribibles con inscripción ACREDITADA; ${sinInscripcion.length} sin anuncio en la fuente: ${sinInscripcion.map((p) => p.materia).join(", ")}.`,
+      ...inscripcionesDeLaJunta().map((i) =>
+        `Anuncio ${i.anuncio} · ${i.registral} · ${i.fecha} · puntos ${i.puntos.join(", ")} · actos ${i.actos.join(", ")}\n  Vínculo: ${i.vinculo}`,
+      ),
+      // 2 anuncios y 3 acuerdos inscritos: el aviso viaja también en cada fila.
+      ...inscripcionesDeLaJunta().map(notaAnuncioCompartido).filter(Boolean) as string[],
+      `Los ${sinInscripcion.length} sin inscripción NO se omiten: se escriben en ${FILING_ESTADO_SIN_INSCRIPCION} con anuncio, fecha, asiento y protocolo a NULL. ${MOTIVO_SIN_INSCRIPCION}`,
+      ...inscribibles
+        .map((p) => [p, candidatoDescartadoDePunto(p.numero)] as const)
+        .filter(([, c]) => c)
+        .map(([p, c]) => `Punto ${p.numero}: candidato DESCARTADO ${c!.anuncio} (${c!.fecha}, ${c!.registral}) — ${c!.motivo}`),
+      ELEVACION_NO_ACREDITADA,
+      `Los ${noInscribibles.length} acuerdos no inscribibles (${noInscribibles.map((p) => p.materia).join(", ")}) no generan expediente registral: lo dice materia_catalog. El depósito de las cuentas de 2025 es otro procedimiento y la fuente no acredita ni su presentación ni su fecha.`,
+      `Fuente ÚNICA de todo lo anterior: scripts/garrigues/borme/jya-garrigues-slp.json. Ni una fecha, ni un número de anuncio, ni un protocolo se escriben a mano en este seed.`,
     ].join("\n"),
   );
 
@@ -1045,7 +1743,7 @@ async function main() {
     console.log(`✓ payload verificado: ${creado.total_partes} partes · Σ voting_weight=${suma.toFixed(6)} · ratio ${ratio.toFixed(2)} (art. 7)`);
   }
 
-  // ── Task 6 · los 9 acuerdos ──────────────────────────────────────────────
+  // ── Task 6 · los 10 acuerdos ─────────────────────────────────────────────
 
   // 1) El punto celebrado. Índice único (meeting_id, order_number): la clave de
   //    idempotencia es el ordinal, y NO se borra y reinserta — un agenda_item
@@ -1144,6 +1842,187 @@ async function main() {
     fail("el gate del informe preceptivo se escribió sin BLOCKING/PRE_CONVOCATORIA.");
   }
   console.log(`✓ ${idsAcuerdo.length} acuerdos con requisitos refrescados · gate INFORME_PRECEPTIVO_ORGANO en ${conGate.size}: ${[...conGate].join(", ")}`);
+
+  // ── Task 7 · resoluciones y evaluación persistida ────────────────────────
+
+  // 4) La resolución del punto. Idempotente por el índice único
+  //    (tenant_id, meeting_id, agenda_item_index).
+  //
+  //    Por qué NO por `fn_save_meeting_resolutions`, que es la vía gobernada que
+  //    usa el ReunionStepper (leída en Cloud antes de decidir):
+  //      a) Borra TODAS las resoluciones y votos de la reunión y los reinserta.
+  //         Los ids cambiarían en cada ejecución del seed, que es justo lo que
+  //         este script evita en agenda_items y en la asistencia.
+  //      b) Solo persiste la evaluación del motor si el `adoption_snapshot` trae
+  //         `rule_trace.source = 'V2_CLOUD'` con `ruleset_snapshot_id`. Aquí no
+  //         hay ningún ruleset snapshot y fabricar uno sería un rótulo.
+  //      c) Ese `adoption_snapshot` lleva `vote_summary`: el escrutinio que el
+  //         acta NO transcribe. Rellenarlo es exactamente lo que esta tarea se
+  //         niega a hacer.
+  //    El gate de producto que exige la RPC es específico del hook
+  //    `useSaveMeetingResolutions` (ver `secretaria-p0-meeting-resolutions-rpc`),
+  //    no de los seeds, que ya escriben agenda_items, agreements y asistencia
+  //    por PostgREST.
+  const { data: prevRes, error: ePrevRes } = await admin.from("meeting_resolutions")
+    .select("id, tenant_id, meeting_id, agenda_item_index, resolution_text, resolution_type, required_majority_code, status, agreement_id, kind_resolution")
+    .eq("meeting_id", meetingId).eq("tenant_id", GARRIGUES_TENANT);
+  if (ePrevRes) fail(`meeting_resolutions lookup: ${ePrevRes.message}`);
+  const resPorOrdinal = new Map((prevRes ?? []).map((r) => [r.agenda_item_index, r]));
+
+  for (const punto of conAcuerdo) {
+    const acuerdo = idsAcuerdo.find((a) => a.punto === punto.numero);
+    if (!acuerdo) fail(`resolución: el punto ${punto.numero} no tiene acuerdo en Cloud.`);
+    const fila = buildResolutionRow(meetingId, punto, acuerdo!.id);
+    const previo = resPorOrdinal.get(fila.agenda_item_index);
+    if (!previo) {
+      const { error } = await admin.from("meeting_resolutions").insert(fila);
+      if (error) fail(`meeting_resolutions insert punto ${punto.numero}: ${error.message}`);
+      console.log(`✓ resolución del punto ${punto.numero} creada (ordinal ${fila.agenda_item_index})`);
+      continue;
+    }
+    const sinCambios = Object.entries(fila).every(([k, v]) => canonical((previo as Record<string, unknown>)[k]) === canonical(v));
+    if (sinCambios) { console.log(`= resolución del punto ${punto.numero} sin cambios`); continue; }
+    const { error } = await admin.from("meeting_resolutions").update(fila).eq("id", previo.id);
+    if (error) fail(`meeting_resolutions update punto ${punto.numero}: ${error.message}`);
+    console.log(`✓ resolución del punto ${punto.numero} actualizada`);
+  }
+
+  // 5) `meeting_votes` NO se escribe. Se comprueba que sigue vacía: si alguien
+  //    la rellenara después, el seed lo dice en vez de convivir con ello.
+  const { data: resIds, error: eResIds } = await admin.from("meeting_resolutions")
+    .select("id").eq("meeting_id", meetingId).eq("tenant_id", GARRIGUES_TENANT);
+  if (eResIds) fail(`meeting_resolutions relectura: ${eResIds.message}`);
+  const { data: votosEnCloud, error: eVotosCloud } = await admin.from("meeting_votes")
+    .select("id").in("resolution_id", (resIds ?? []).map((r) => r.id));
+  if (eVotosCloud) fail(`meeting_votes lookup: ${eVotosCloud.message}`);
+  if ((votosEnCloud ?? []).length) {
+    fail(`hay ${votosEnCloud.length} fila(s) en meeting_votes para esta Junta y no debería haber ninguna. ${MEETING_VOTES_VACIA}`);
+  }
+  console.log(`✓ meeting_votes: 0 filas (${(resIds ?? []).length} resoluciones). ${MEETING_VOTES_VACIA}`);
+
+  // 6) La evaluación del motor. `rule_evaluation_results` es WORM: worm_guard()
+  //    bloquea UPDATE y DELETE incluso para service_role. Si ya hay una
+  //    evaluación del mismo punto con OTRO hash, el seed para: apilar una
+  //    segunda dejaría dos veredictos del mismo punto sin poder retirar ninguno.
+  const { data: prevEval, error: ePrevEval } = await admin.from("rule_evaluation_results")
+    .select("id, agreement_id, etapa, evaluation_hash")
+    .in("agreement_id", idsAcuerdo.map((a) => a.id));
+  if (ePrevEval) fail(`rule_evaluation_results lookup: ${ePrevEval.message}`);
+  const evalPrevia = new Map((prevEval ?? []).map((r) => [`${r.agreement_id}|${r.etapa}`, r]));
+
+  let escritas = 0;
+  for (const evaluacion of evaluaciones) {
+    const acuerdo = idsAcuerdo.find((a) => a.punto === evaluacion.punto);
+    if (!acuerdo) fail(`evaluación: el punto ${evaluacion.punto} no tiene acuerdo en Cloud.`);
+    const pack = packPorMateria.get(evaluacion.materia)!;
+    const fila = await buildRuleEvaluationRow({
+      agreementId: acuerdo!.id,
+      evaluacion,
+      packVersionId: pack.versionId ?? null,
+      packPayload: pack.payload,
+    });
+    const previa = evalPrevia.get(`${fila.agreement_id}|${fila.etapa}`);
+    if (previa) {
+      if (previa.evaluation_hash === fila.evaluation_hash) {
+        console.log(`= evaluación del punto ${evaluacion.punto} ya persistida e idéntica`);
+        continue;
+      }
+      fail(
+        `la evaluación del punto ${evaluacion.punto} ya existe (${previa.id}) con otro hash: la regla, la base o la concurrencia han cambiado. ` +
+        `rule_evaluation_results es WORM y la anterior no se puede retirar: decidir a mano.`,
+      );
+    }
+    const { error } = await admin.from("rule_evaluation_results").insert(fila);
+    if (error) fail(`rule_evaluation_results insert punto ${evaluacion.punto}: ${error.message}`);
+    escritas += 1;
+  }
+  console.log(
+    `✓ ${escritas} evaluación(es) del motor persistidas · ${evaluaciones.filter((e) => e.evaluable).length}/${evaluaciones.length} evaluables · sello ${SELLO_CLIENTE}`,
+  );
+
+  // ── Task 9 · el expediente registral de cada acuerdo inscribible ─────────
+
+  // `registry_filings` NO tiene índice único ninguno —solo la PK— ni un solo
+  // trigger (medido en Cloud). La clave de idempotencia es (tenant_id,
+  // agreement_id), que aquí es 1:1 porque cada acuerdo tiene un expediente. Si
+  // apareciera más de uno, el seed PARA: elegir cuál actualizar sería adivinar,
+  // y `ExpedienteAcuerdo` pinta el más reciente por `created_at`.
+  const { data: prevFilings, error: ePrevFilings } = await admin.from("registry_filings")
+    .select("id, tenant_id, entity_id, agreement_id, workflow_version, filing_via, status, filing_number, presentation_date, estimated_resolution, inscription_number, borme_ref, registered_at, publication_reference, published_at, qualification_outcome, qualified_at, deed_id, deed_reference, deed_date, notary_id, notary_name, protocol_number, elevated_at, procedure_snapshot")
+    .eq("tenant_id", GARRIGUES_TENANT);
+  if (ePrevFilings) fail(`registry_filings lookup: ${ePrevFilings.message}`);
+  const filingsPorAcuerdo = new Map<string, Record<string, unknown>>();
+  for (const f of prevFilings ?? []) {
+    const clave = String(f.agreement_id);
+    if (filingsPorAcuerdo.has(clave)) {
+      fail(`hay más de un registry_filings para el acuerdo ${clave}: parar y decidir a mano cuál es el del expediente.`);
+    }
+    filingsPorAcuerdo.set(clave, f as Record<string, unknown>);
+  }
+
+  const idsFiling: string[] = [];
+  for (const punto of inscribibles) {
+    const acuerdo = idsAcuerdo.find((a) => a.punto === punto.numero);
+    if (!acuerdo) fail(`expediente registral: el punto ${punto.numero} no tiene acuerdo en Cloud.`);
+    const fila = buildRegistryFilingRow({
+      agreementId: acuerdo!.id,
+      punto,
+      clase: claseporMateria.get(punto.materia!)!,
+    });
+    const previo = filingsPorAcuerdo.get(acuerdo!.id);
+    if (!previo) {
+      const { data, error } = await admin.from("registry_filings").insert(fila).select("id").single();
+      if (error) fail(`registry_filings insert punto ${punto.numero}: ${error.message}`);
+      idsFiling.push(data.id);
+      console.log(`✓ expediente registral del punto ${punto.numero} creado en ${fila.status}${fila.borme_ref ? ` · anuncio ${fila.borme_ref} · inscripción ${fila.inscription_number}` : " · sin inscripción acreditada"}`);
+      continue;
+    }
+    idsFiling.push(String(previo.id));
+    // `registered_at` es timestamptz: se escribe `2026-07-13T00:00:00.000Z` y
+    // vuelve `2026-07-13 00:00:00+00`. Comparadas como texto NUNCA son iguales y
+    // el seed reescribiría en cada ejecución diciendo «actualizado» sin que nada
+    // haya cambiado — una señal falsa. Se comparan como instante.
+    const sinCambios = Object.entries(fila).every(([k, v]) =>
+      k === "registered_at"
+        ? (v === null ? previo[k] === null : previo[k] !== null && Date.parse(String(previo[k])) === Date.parse(String(v)))
+        : canonical(previo[k]) === canonical(v));
+    if (sinCambios) { console.log(`= expediente registral del punto ${punto.numero} sin cambios`); continue; }
+    const { error } = await admin.from("registry_filings").update(fila).eq("id", previo.id);
+    if (error) fail(`registry_filings update punto ${punto.numero}: ${error.message}`);
+    console.log(`✓ expediente registral del punto ${punto.numero} actualizado`);
+  }
+
+  // Un expediente del tenant que no corresponda a un acuerdo inscribible de esta
+  // Junta es un residuo: no se borra en silencio, se dice.
+  const filingsHuerfanos = (prevFilings ?? []).filter((f) => !idsFiling.includes(String(f.id)));
+  if (filingsHuerfanos.length) {
+    console.log(`⚠ ${filingsHuerfanos.length} registry_filings del tenant fuera de este expediente (acuerdos ${filingsHuerfanos.map((f) => f.agreement_id).join(", ")}). No se tocan: decidir a mano.`);
+  }
+
+  // Verificación posterior: lo que quedó escrito de verdad, contra lo acreditado.
+  const { data: escritos, error: eEscritos } = await admin.from("registry_filings")
+    .select("agreement_id, status, inscription_number, borme_ref, registered_at, presentation_date, notary_name, protocol_number, deed_date")
+    .in("id", idsFiling);
+  if (eEscritos) fail(`registry_filings relectura: ${eEscritos.message}`);
+  const inscritos = (escritos ?? []).filter((f) => f.status === FILING_ESTADO_INSCRITA);
+  if (inscritos.length !== conInscripcion.length) {
+    fail(`registry_filings: ${inscritos.length} expediente(s) en ${FILING_ESTADO_INSCRITA} y la fuente acredita ${conInscripcion.length}.`);
+  }
+  // Ni una fecha, ni un asiento, ni un protocolo fuera de lo acreditado.
+  const anuncios = new Set(inscritos.map((f) => `${f.borme_ref}|${f.inscription_number}`));
+  if (anuncios.size !== inscripcionesDeLaJunta().length) {
+    fail(`registry_filings: ${anuncios.size} anuncio(s) distintos entre los inscritos y la fuente acredita ${inscripcionesDeLaJunta().length}.`);
+  }
+  const inventado = (escritos ?? []).find((f) =>
+    f.presentation_date !== null || f.notary_name !== null || f.protocol_number !== null || f.deed_date !== null
+    || (f.status !== FILING_ESTADO_INSCRITA && (f.registered_at !== null || f.inscription_number !== null || f.borme_ref !== null)),
+  );
+  if (inventado) {
+    fail(`registry_filings: el expediente del acuerdo ${inventado.agreement_id} tiene un dato que la fuente no acredita.`);
+  }
+  console.log(
+    `✓ ${idsFiling.length} expediente(s) registral(es) · ${inscritos.length} ${FILING_ESTADO_INSCRITA} en ${anuncios.size} anuncio(s) del BORME · ${idsFiling.length - inscritos.length} en ${FILING_ESTADO_SIN_INSCRIPCION} sin fecha, sin anuncio y sin protocolo`,
+  );
 }
 
 if (import.meta.main) main();

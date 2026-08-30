@@ -7,6 +7,7 @@
 //      login falla, `beforeAll` lanza y los tests revientan. Una sonda que se salta
 //      a sí misma es un gate verde que no asierta nada.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { GARRIGUES_DEMO_EMAIL, GARRIGUES_TENANT, sesionDe } from "../helpers/supabase-test-client";
 import {
@@ -26,27 +27,45 @@ import {
   MESA_SECRETARIO,
   REPRESENTANTE_UNICO,
   SOCIOS_PRESENCIALES,
-  PUNTO_BLOQUEADO,
-  NOTA_PUNTO_BLOQUEADO,
+  SUBSUNCION_ART36,
   ordinalEnOrdenDelDia,
   puntosConAcuerdo,
+  subsuncionDe,
   textoAcuerdo,
   TEXTOS_ACUERDO,
+  MOTIVO_SIN_INSCRIPCION,
+  candidatoDescartadoDePunto,
+  inscripcionDePunto,
+  inscripcionesDeLaJunta,
+  notaAnuncioCompartido,
 } from "../../../scripts/garrigues/junta-2026/orden-del-dia";
+// La captura BORME como FUENTE del bloque registral: la sonda contrasta contra
+// ella lo que el módulo deriva, no contra otra copia del propio módulo.
+import bormeMatriz from "../../../scripts/garrigues/borme/jya-garrigues-slp.json";
 import {
   baseComputoJunta,
   baseComputoTodasLasClases,
   CENSO_TOTAL,
 } from "../../../scripts/garrigues/capital/estructura-art7";
 import {
+  ADOPCION_LA_CERTIFICA_EL_ACTA,
   buildAgendaRow,
   buildAgreementRow,
   buildAttendeeRows,
   buildQuorumData,
+  buildRegistryFilingRow,
+  buildResolutionRow,
   censoPrecondicion,
+  concurrenciaCertificada,
+  etapaEvaluacion,
+  evaluarMayoriaPunto,
+  MEETING_VOTES_VACIA,
+  SELLO_CLIENTE,
   type PackResuelto,
   type SocioCenso,
 } from "../../../scripts/seed-garrigues-junta-2026";
+import { esFormulaEvaluable } from "../../../src/lib/rules-engine/majority-evaluator";
+import type { RulePack } from "../../../src/lib/rules-engine/types";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -93,6 +112,10 @@ describe("C1 — orden del día de la Junta de Socios 2026 (módulo puro)", () =
     }
     // Los 3 son exactamente esos: Centro de Estudios, sostenibilidad e informe de gestión.
     expect(puntosSinMateriaAcreditada().map((p) => p.numero)).toEqual(["5", "8", "9"]);
+    // Sin esta guarda, `every` sobre una lista vacia da true y la asercion no
+    // mide nada: probado mutando `puntosQueMaterializan()` a [] — 20 tests caen
+    // y esta seguia verde.
+    expect(puntosQueMaterializan().length).toBeGreaterThan(0);
     expect(puntosQueMaterializan().every((p) => p.nota === undefined)).toBe(true);
   });
 
@@ -343,6 +366,28 @@ describe("C1 — asistencia, base de cómputo y gate del censo (módulo puro)", 
     );
     expect(censoPrecondicion(malSembrado).ok).toBe(false);
   });
+
+  it("el gate mira a TODOS los socios, no a una muestra por clase", () => {
+    // La primera versión tomaba el primero de cada clase con `find`. Un censo con
+    // 344 de 345 socios de clase A mal sembrados pasaba el gate diciendo que
+    // reproduce la proporción del art. 7, porque el único que miraba era el bueno.
+    // Muestrear no sirve para un gate cuyo trabajo es no congelar un peso
+    // equivocado en un registro INMUTABLE.
+    const censo = [
+      socio("A-01", "A"),
+      ...Array.from({ length: 20 }, (_, i) => socio(`A-${i + 2}`, "A")),
+      socio("B-01", "B"),
+    ];
+    expect(censoPrecondicion(censo).ok).toBe(true);
+
+    // Uno solo, y en mitad de la lista: el gate tiene que cerrar igual.
+    const unoMalEnMedio = censo.map((s, i) =>
+      i === 12 ? { ...s, holding: { ...s.holding, numero_titulos: 7 } } : s,
+    );
+    const r = censoPrecondicion(unoMalEnMedio);
+    expect(r.ok).toBe(false);
+    expect(r.detalle).toContain("1 de 22 socios");
+  });
 });
 
 describe("C1 — la reunión, la asistencia del acta y el censo WORM en Cloud", () => {
@@ -518,40 +563,99 @@ const MATERIAS_SLP = [
 /** Las 3 que hasta C1 solo existían en ARGA: su pack lleva prefijo GARR_. */
 const MATERIAS_NUEVAS = ["APROBACION_CUENTAS", "NOMBRAMIENTO_AUDITOR", "DELEGACION_FACULTADES"];
 
+/**
+ * La 4ª que solo existía en ARGA, y va aparte de `MATERIAS_NUEVAS` **porque su
+ * mayoría es otra**: las tres de arriba se adoptan por la cláusula general del
+ * art. 30.1 y ésta por los 2/3 del art. 30.2.a) — y encima por subsunción
+ * etiquetada. Meterla en la misma lista habría convertido las aserciones del
+ * art. 30.1 en un filtro que ya no distingue nada.
+ */
+const MATERIA_ESTATUTOS = "MODIFICACION_ESTATUTOS";
+
 type MayoriaSL = { fuente?: string; formula?: string; referencia?: string; baseComputo?: string };
 type PackPayload = { materia?: string; votacion?: { mayoria?: { SL?: MayoriaSL } } };
 
 describe("C1 — los acuerdos de la Junta (módulo puro)", () => {
-  it("son 9, no 10: el punto bloqueado sigue en el orden del día pero no produce acuerdo", () => {
-    expect(puntosConAcuerdo()).toHaveLength(9);
+  it("son 10: el punto 1.1 se desbloqueó y ya no queda ningún punto decisorio sin acuerdo", () => {
+    // Task 6 lo dejaba en 9. Este 10 NO es «actualizar un número»: el punto 1.1
+    // pasó a tener regla el 2026-08-30, y lo que este caso fija es que ya no
+    // existe la categoría «punto que se delibera y no produce acuerdo».
+    expect(puntosConAcuerdo()).toHaveLength(10);
     expect(puntosQueMaterializan()).toHaveLength(10);   // el contrato de Task 4 no se toca
-    const bloqueado = ORDEN_DEL_DIA.find((p) => p.numero === PUNTO_BLOQUEADO)!;
-    expect(bloqueado.materia).toBe("MODIFICACION_ESTATUTOS");
-    expect(bloqueado.materializa).toBe(true);           // se deliberó
-    expect(puntosConAcuerdo().map((p) => p.materia)).not.toContain("MODIFICACION_ESTATUTOS");
-    // La razón se escribe: el art. 36 no consta y la mayoría del 30.2.f está tasada.
-    expect(NOTA_PUNTO_BLOQUEADO).toContain("art. 36");
-    expect(NOTA_PUNTO_BLOQUEADO).toContain("30.2.f");
-    expect(NOTA_PUNTO_BLOQUEADO).toContain("Comité Legal");
+    expect(ORDEN_DEL_DIA).toHaveLength(14);             // ni el de las 14 entradas
+    expect(puntosConAcuerdo().map((p) => p.numero)).toEqual(puntosQueMaterializan().map((p) => p.numero));
+    const uno = ORDEN_DEL_DIA.find((p) => p.numero === "1.1")!;
+    expect(uno.materia).toBe(MATERIA_ESTATUTOS);
+    expect(uno.materializa).toBe(true);
+    expect(puntosConAcuerdo().map((p) => p.materia)).toContain(MATERIA_ESTATUTOS);
   });
 
-  it("los 9 son exactamente las 6 materias SLP más las 3 que solo existían en ARGA", () => {
+  it("la mayoría del 1.1 va etiquetada INFERIDO y arrastra su lectura alternativa", () => {
+    // La aserción que impide que la subsunción se presente mañana como cita.
+    const sub = subsuncionDe("1.1")!;
+    expect(sub).toBe(SUBSUNCION_ART36);
+    expect(sub.procedencia).toBe("INFERIDO");
+    expect(sub.decididoPor).toContain("2026-08-30");
+    // Qué regula el art. 36, y de dónde se sabe: BORME 338618/2026 (I/A 960).
+    expect(sub.objeto).toContain("plazo de duración de los administradores");
+    expect(sub.objeto).toContain("338618");
+    // La lectura aplicada y la ALTERNATIVA, las dos, dentro del registro.
+    expect(sub.lecturaAplicada).toContain("30.2.a");
+    expect(sub.lecturaAlternativa).toContain("30.2.f");
+    expect(sub.lecturaAlternativa).toContain("30.1");
+    expect(sub.registroCanonico).toBe("docs/legal/2026-08-30-modificacion-art-36-mayoria-aplicada.md");
+    // Y la consecuencia que NO se aplicó queda nombrada: bajo la lectura
+    // aplicada, el art. 39.5.b.i arrastraría el informe preceptivo. El gate demo
+    // no se amplía sobre algo inferido, y eso se dice en vez de callarse.
+    expect(sub.consecuenciaNoAplicada).toContain("39.5.b.i");
+    // Los otros nueve resuelven por cita directa: una subsunción vacía en todos
+    // haría que esta etiqueta no distinguiera nada.
+    const otros = puntosConAcuerdo().filter((x) => x.numero !== "1.1");
+    expect(otros.length).toBeGreaterThan(0);   // un `for` sobre [] no asierta nada
+    for (const p of otros) {
+      expect(subsuncionDe(p.numero)).toBeNull();
+    }
+  });
+
+  it("los 10 son las 6 materias SLP, las 3 del art. 30.1 y la modificación de estatutos", () => {
     expect(puntosConAcuerdo().map((p) => p.materia).sort())
-      .toEqual([...MATERIAS_SLP, ...MATERIAS_NUEVAS].sort());
+      .toEqual([...MATERIAS_SLP, ...MATERIAS_NUEVAS, MATERIA_ESTATUTOS].sort());
   });
 
   it("el ordinal es la posición en la convocatoria, con huecos donde no hay acuerdo", () => {
-    // 1 (bloqueado), 6, 9, 10 (sin materia) y 14 (acta) NO aparecen: no se
-    // renumera, porque el ordinal apunta al elemento del array de la convocatoria.
+    // 6, 9, 10 (sin materia) y 14 (acta) NO aparecen: no se renumera, porque el
+    // ordinal apunta al elemento del array de la convocatoria. El 1 ya SÍ está:
+    // es el punto 1.1, primer elemento del orden del día.
     expect(puntosConAcuerdo().map((p) => ordinalEnOrdenDelDia(p.numero)))
-      .toEqual([2, 3, 4, 5, 7, 8, 11, 12, 13]);
+      .toEqual([1, 2, 3, 4, 5, 7, 8, 11, 12, 13]);
     expect(ordinalEnOrdenDelDia("1.1")).toBe(1);
     expect(ordinalEnOrdenDelDia("acta")).toBe(ORDEN_DEL_DIA.length);
     expect(() => ordinalEnOrdenDelDia("99")).toThrow(/no está en el orden del día/);
   });
 
-  it("los 9 tienen texto, y el INFERIDO no identifica a ninguna persona del acta", () => {
+  it("el texto del 1.1 dice lo acreditado y NO reconstruye la disposición transitoria", () => {
+    const t = textoAcuerdo("1.1");
+    // ACREDITADO por dos vías: el BORME y el cotejo del Comité Legal de 2026-08-05.
+    expect(t.contenido).toBe("ACREDITADO");
+    expect(t.decision).toContain("artículo 36");
+    expect(t.decision).toContain("338618/2026");
+    expect(t.decision).toContain("seis años");
+    // El título del punto enuncia una transitoria de conversión a Consejo que la
+    // fuente no acredita: el texto la nombra como no acreditada en vez de
+    // inventarle contenido.
+    expect(t.decision).toContain("no acredita");
+    expect(t.decision).toContain("no la reconstruye");
+    // Y la etiqueta de la mayoría viaja también en el texto que lee el abogado.
+    expect(t.decision).toContain("INFERIDO");
+    expect(t.decision).toContain("30.2.a");
+  });
+
+  it("los 10 tienen texto, y el INFERIDO no identifica a ninguna persona del acta", () => {
     const personas = [...SOCIOS_PRESENCIALES, MESA_PRESIDENTA, MESA_SECRETARIO, REPRESENTANTE_UNICO];
+    // Esta es la asercion que sostiene la afirmacion de riesgo legal («el texto
+    // INFERIDO no nombra a nadie»). Con la lista vacia pasaria sin mirar nada.
+    expect(puntosConAcuerdo().length).toBe(10);
+    expect(personas.length).toBeGreaterThan(0);
     for (const p of puntosConAcuerdo()) {
       const t = textoAcuerdo(p.numero);
       expect(t.propuesta.length).toBeGreaterThan(40);
@@ -626,6 +730,55 @@ describe("C1 — los acuerdos de la Junta (módulo puro)", () => {
     expect(ce.contenido_acuerdo).toBe("INFERIDO");
   });
 
+  it("el acuerdo del 1.1 lleva la subsunción dentro, y los demás no la llevan", () => {
+    const punto = puntosConAcuerdo().find((p) => p.numero === "1.1")!;
+    const packEstatutos: PackResuelto = {
+      packId: "GARR_MODIFICACION_ESTATUTOS",
+      version: "1.0.0",
+      materia: MATERIA_ESTATUTOS,
+      mayoriaSL: {
+        fuente: "ESTATUTOS",
+        formula: "favor >= 2/3_votos_totales",
+        referencia: "art. 30.2.a) Estatutos",
+      },
+    };
+    const fila = buildAgreementRow({
+      meetingId: "m-1", bodyId: "b-1", agendaItemId: "ai-1", punto,
+      clase: { materia: MATERIA_ESTATUTOS, matter_class: "ESTATUTARIA", inscribable: true },
+      pack: packEstatutos,
+    });
+    expect(fila.matter_class).toBe("ESTATUTARIA");
+    expect(fila.inscribable).toBe(true);
+    // La cita de la mayoría se copia del pack: si el pack cambiara a la lectura
+    // alternativa (art. 30.1), el acuerdo la seguiría sin tocar el seed.
+    expect(fila.statutory_basis).toBe("art. 30.2.a) Estatutos");
+    expect(fila.statutory_basis).not.toMatch(/LSC/);
+    const ce = fila.compliance_explain.c1_junta_socios_2026 as {
+      subsuncion?: { procedencia?: string; lecturaAlternativa?: string };
+      mayoria: { fuente: string };
+      required_majority_code: { valor: null; motivo: string };
+    };
+    expect(ce.subsuncion?.procedencia).toBe("INFERIDO");
+    expect(ce.subsuncion?.lecturaAlternativa).toContain("30.2.f");
+    expect(ce.mayoria.fuente).toBe("ESTATUTOS");
+    // NULL también aquí, y por un motivo distinto al de los otros nueve: la
+    // escalera sí sabe decir «dos tercios», pero escribirlo presentaría como
+    // firme una mayoría que se aplica por subsunción etiquetada.
+    expect(ce.required_majority_code.valor).toBeNull();
+    expect(ce.required_majority_code.motivo).toContain("REFORZADA_2_3");
+    expect(ce.required_majority_code.motivo).toContain("SUBSUNCIÓN");
+
+    // Control: un acuerdo cuya regla sale de una cita directa NO lleva la clave.
+    // Sin esto, «la subsunción está» no distinguiría de «se pinta siempre».
+    const otro = puntosConAcuerdo().find((p) => p.materia === "APROBACION_CUENTAS")!;
+    const filaOtro = buildAgreementRow({
+      meetingId: "m-1", bodyId: "b-1", agendaItemId: "ai-2", punto: otro,
+      clase: { materia: "APROBACION_CUENTAS", matter_class: "ORDINARIA", inscribable: false },
+      pack: packDe("APROBACION_CUENTAS"),
+    });
+    expect("subsuncion" in (filaOtro.compliance_explain.c1_junta_socios_2026 as object)).toBe(false);
+  });
+
   it("el acuerdo se niega a que le crucen la clase o el pack de otra materia", () => {
     const punto = puntosConAcuerdo().find((p) => p.materia === "APROBACION_CUENTAS")!;
     const base = {
@@ -642,7 +795,7 @@ describe("C1 — los acuerdos de la Junta (módulo puro)", () => {
   });
 });
 
-describe("C1 — los 9 acuerdos de la Junta en Cloud", () => {
+describe("C1 — los 10 acuerdos de la Junta en Cloud", () => {
   let garr: SupabaseClient;
   let arga: SupabaseClient;
   let meetingId: string | null = null;
@@ -686,12 +839,13 @@ describe("C1 — los 9 acuerdos de la Junta en Cloud", () => {
   // error de login, son consultas que devuelven vacío y aserciones que fallan
   // en un fichero que no ha hecho nada mal.
 
-  it("hay 9 acuerdos, son los 9 puntos con materia y ninguno es la modificación bloqueada", () => {
-    expect(acuerdos).toHaveLength(9);
+  it("hay 10 acuerdos, son los 10 puntos con materia e incluyen la modificación del art. 36", () => {
+    expect(acuerdos).toHaveLength(10);
     expect(acuerdos.map((a) => a.agreement_kind).sort())
       .toEqual(puntosConAcuerdo().map((p) => p.materia).sort());
-    // El control que importa: el punto 1.1 NO produjo acuerdo.
-    expect(acuerdos.map((a) => a.agreement_kind)).not.toContain("MODIFICACION_ESTATUTOS");
+    // El punto 1.1 SÍ produce acuerdo desde Task 6-bis. Lo que sigue sin poder
+    // pasar es que aparezca sin regla del tenant: eso lo cierra el caso del pack.
+    expect(acuerdos.map((a) => a.agreement_kind)).toContain(MATERIA_ESTATUTOS);
     expect(acuerdos.every((a) => a.adoption_mode === "MEETING")).toBe(true);
     expect(acuerdos.every((a) => a.status === "ADOPTED")).toBe(true);
     expect(acuerdos.every((a) => String(a.decision_date).slice(0, 10) === FECHA_JUNTA)).toBe(true);
@@ -705,7 +859,7 @@ describe("C1 — los 9 acuerdos de la Junta en Cloud", () => {
       .select("materia, matter_class, inscribable")
       .in("materia", acuerdos.map((a) => a.agreement_kind));
     expect(error).toBeNull();
-    expect(data).toHaveLength(9);
+    expect(data).toHaveLength(10);
     for (const c of data!) {
       const a = acuerdos.find((x) => x.agreement_kind === c.materia)!;
       expect([a.agreement_kind, a.matter_class, a.inscribable])
@@ -719,7 +873,7 @@ describe("C1 — los 9 acuerdos de la Junta en Cloud", () => {
       .select("id, order_number, title, kind, matter_code, tenant_id, source_convocatoria_id")
       .eq("meeting_id", meetingId);
     expect(error).toBeNull();
-    expect(items).toHaveLength(9);
+    expect(items).toHaveLength(10);
     expect(items!.every((i) => i.tenant_id === GARRIGUES_TENANT)).toBe(true);
     expect(items!.every((i) => i.kind === "DECISORIO")).toBe(true);
     // El vínculo por FK a la convocatoria no se escribe: está en BORRADOR y el
@@ -738,12 +892,12 @@ describe("C1 — los 9 acuerdos de la Junta en Cloud", () => {
       expect(item!.matter_code).toBe(a.agreement_kind);
     }
     // Y es 1:1 — dos acuerdos sobre el mismo punto serían el mismo acuerdo.
-    expect(new Set(acuerdos.map((a) => a.agenda_item_id)).size).toBe(9);
+    expect(new Set(acuerdos.map((a) => a.agenda_item_id)).size).toBe(10);
   });
 
   it("cada acuerdo resuelve al pack POR MATERIA del tenant Garrigues, no al de órgano", async () => {
     // Sin esto el bucle de abajo no itera y el caso pasa en vacío.
-    expect(acuerdos).toHaveLength(9);
+    expect(acuerdos).toHaveLength(10);
     const { data: packs, error } = await garr.from("rule_packs")
       .select("id, materia, organo_tipo, tenant_id, rule_pack_versions!inner(version, is_active)")
       .eq("rule_pack_versions.is_active", true);
@@ -815,7 +969,63 @@ describe("C1 — los 9 acuerdos de la Junta en Cloud", () => {
     expect(garrVe ?? []).toHaveLength(0);
   });
 
-  it("el gate del informe preceptivo dispara en 4 acuerdos y solo en esos 4", async () => {
+  it("la modificación de estatutos va por los 2/3 del art. 30.2.a), no por el 199.a LSC de ARGA", async () => {
+    // La arista, no el rótulo: la mayoría que enseña el acuerdo tiene que venir
+    // del pack del tenant. Si dejara de leerse y resolviera al homónimo de ARGA,
+    // la referencia sería «art. 199.a LSC» (mayoría simple del capital) y este
+    // caso caería por los dos lados.
+    const { data, error } = await garr.from("rule_packs")
+      .select("id, materia, tenant_id, rule_pack_versions!inner(payload, is_active)")
+      .eq("materia", MATERIA_ESTATUTOS)
+      .eq("rule_pack_versions.is_active", true);
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1);
+    expect(data![0].id).toBe("GARR_MODIFICACION_ESTATUTOS");
+    expect(data![0].tenant_id).toBe(GARRIGUES_TENANT);
+    const payload = data![0].rule_pack_versions[0].payload as PackPayload & {
+      reglaEspecifica?: { subsuncionArt36?: Record<string, string> };
+    };
+    const sl = payload?.votacion?.mayoria?.SL ?? {};
+    expect(sl.fuente).toBe("ESTATUTOS");
+    expect(sl.referencia).toContain("30.2.a");
+    expect(sl.referencia).not.toMatch(/LSC/);
+    expect(String(sl.formula)).toContain("2/3");
+
+    // La etiqueta INFERIDO y la lectura alternativa viajan DENTRO del pack: es
+    // el segundo de los tres sitios (módulo, pack y docs/legal).
+    const sub = payload?.reglaEspecifica?.subsuncionArt36 ?? {};
+    expect(sub.procedencia).toBe("INFERIDO");
+    expect(sub.lecturaAplicada).toBe(SUBSUNCION_ART36.lecturaAplicada);
+    expect(sub.lecturaAlternativa).toBe(SUBSUNCION_ART36.lecturaAlternativa);
+    expect(sub.objeto).toContain("338618");
+
+    // Y el acuerdo copia esa cita, que es lo que hace de esto una arista.
+    const a = acuerdos.find((x) => x.agreement_kind === MATERIA_ESTATUTOS)!;
+    expect(a.rule_pack_id).toBe("GARR_MODIFICACION_ESTATUTOS");
+    expect(a.statutory_basis).toBe(sl.referencia);
+    expect(a.matter_class).toBe("ESTATUTARIA");
+    expect(a.inscribable).toBe(true);
+    const ce = (a.compliance_explain?.c1_junta_socios_2026 ?? {}) as {
+      subsuncion?: Record<string, string>;
+    };
+    expect(ce.subsuncion?.procedencia).toBe("INFERIDO");
+    expect(ce.subsuncion?.lecturaAlternativa).toContain("30.2.f");
+
+    // Control discriminante: el homónimo de ARGA existe, dice otra cosa y
+    // Garrigues no lo ve.
+    const { data: deArga } = await arga.from("rule_packs")
+      .select("id, tenant_id, rule_pack_versions!inner(payload, is_active)")
+      .eq("id", MATERIA_ESTATUTOS)
+      .eq("rule_pack_versions.is_active", true);
+    expect(deArga).toHaveLength(1);
+    const slArga = (deArga![0].rule_pack_versions[0].payload as PackPayload)?.votacion?.mayoria?.SL ?? {};
+    expect(slArga.referencia).toContain("199");
+    expect(String(slArga.referencia)).not.toContain("30.2.a");
+    const { data: garrVeArga } = await garr.from("rule_packs").select("id").eq("id", MATERIA_ESTATUTOS);
+    expect(garrVeArga ?? []).toHaveLength(0);
+  });
+
+  it("el gate de informe preceptivo POR ORGANO dispara en 4 acuerdos y solo en esos 4", async () => {
     const { data: reqs, error } = await garr.from("agreement_document_requirements")
       .select("agreement_id, requirement_code, blocking_policy, fase, title, legal_basis")
       .in("agreement_id", acuerdos.map((a) => a.id))
@@ -823,15 +1033,105 @@ describe("C1 — los 9 acuerdos de la Junta en Cloud", () => {
     expect(error).toBeNull();
     const conGate = new Set(reqs!.map((r) => acuerdos.find((a) => a.id === r.agreement_id)!.agreement_kind));
     expect(conGate).toEqual(CON_GATE);
-    // Y NO dispara en los otros 5: sin esta línea, «el gate funciona» solo
-    // significaría «el panel se pinta siempre».
-    expect(reqs).toHaveLength(4);
-    expect(acuerdos.filter((a) => !CON_GATE.has(a.agreement_kind))).toHaveLength(5);
+    // Y NO dispara en los demás: sin esta línea, «el gate funciona» solo
+    // significaría «el panel se pinta siempre». El número de acuerdos sin gate
+    // se DERIVA (era 5 con 9 acuerdos, es 6 con 10): pinarlo a mano lo habría
+    // convertido en inventario, y volvería a romperse al siguiente acuerdo.
+    expect(reqs).toHaveLength(CON_GATE.size);
+    const sinGate = acuerdos.filter((a) => !CON_GATE.has(a.agreement_kind));
+    expect(sinGate).toHaveLength(acuerdos.length - CON_GATE.size);
+    expect(sinGate.length).toBeGreaterThan(0);
+    // El décimo acuerdo entra por aquí: bajo la lectura aplicada del art. 30.2.a)
+    // el art. 39.5.b.i lo llevaría al informe preceptivo del Consejo de Socios,
+    // pero ESTE gate —el de órgano— no se amplía sobre una subsunción etiquetada
+    // INFERIDO. Ojo al alcance de la frase: el acuerdo SÍ adquiere el otro gate,
+    // el de materia (test siguiente). «Sin gate» aquí significa sin el de órgano.
+    // Si alguien lo añade al config del órgano, esta línea cae y hay que ir al
+    // Comité Legal, no al test.
+    expect(sinGate.map((a) => a.agreement_kind)).toContain(MATERIA_ESTATUTOS);
     // Las columnas reales son `blocking_policy` y `fase`, no `blocking`/`phase`.
     expect(reqs!.every((r) => r.blocking_policy === "BLOCKING" && r.fase === "PRE_CONVOCATORIA")).toBe(true);
     // El copy nombra al órgano informante y su artículo.
     expect(reqs!.every((r) => String(r.title).includes("Consejo de Socios"))).toBe(true);
     expect(reqs!.every((r) => String(r.legal_basis).includes("39.5.b"))).toBe(true);
+  });
+
+  it("el expediente explica sus DOS bases de cómputo, y ARGA no adquiere la clave", async () => {
+    // La fila de evaluación enseñaba `base_votos 16900` y
+    // `concurrencia_todas_las_clases 16908` juntas, sin decir que son bases
+    // distintas y con un porcentaje al lado que no sale de dividir ninguna.
+    // `rule_evaluation_results` es WORM y su explain entra en el hash, así que
+    // la nota vive en `agreements.compliance_explain`, que sí es mutable, y la
+    // pinta `NotaDeExpediente`.
+    const { data, error } = await garr.from("agreements")
+      .select("id, compliance_explain")
+      .in("id", acuerdos.map((a) => a.id));
+    expect(error).toBeNull();
+    expect(data).toHaveLength(acuerdos.length);
+    for (const fila of data!) {
+      const base = (fila.compliance_explain as Record<string, Record<string, Record<string, unknown>>>)
+        ?.c1_junta_socios_2026?.base_computo;
+      expect(base?.declarada).toBe(baseComputoJunta());
+      expect(base?.ambas_clases).toBe(baseComputoTodasLasClases());
+      expect(base?.diferencia).toBe(baseComputoTodasLasClases() - baseComputoJunta());
+      // La nota tiene que NOMBRAR las dos y decir de dónde sale la diferencia.
+      expect(String(base?.nota)).toContain(String(baseComputoJunta()));
+      expect(String(base?.nota)).toContain(String(baseComputoTodasLasClases()));
+      expect(String(base?.nota)).toContain("clase B");
+    }
+    // Control discriminante: ARGA no adquiere la clave.
+    const { data: enArga } = await arga.from("agreements")
+      .select("id").not("compliance_explain->c1_junta_socios_2026", "is", null).limit(5);
+    expect(enArga ?? []).toHaveLength(0);
+  });
+
+  it("la reunión declara que su HORA no está acreditada, y ARGA no", async () => {
+    // Sin esta bandera la pantalla pintaba las 00:00Z como «2:00» de Madrid en
+    // cuatro sitios. Las notas en prosa que lo explicaban no las lee nadie.
+    const { data, error } = await garr.from("meetings")
+      .select("id, quorum_data").eq("id", meetingId).maybeSingle();
+    expect(error).toBeNull();
+    expect((data!.quorum_data as Record<string, unknown>).hora_no_acreditada).toBe(true);
+
+    const { data: enArga } = await arga.from("meetings")
+      .select("id").not("quorum_data->hora_no_acreditada", "is", null).limit(5);
+    expect(enArga ?? []).toHaveLength(0);
+  });
+
+  it("hay un SEGUNDO gate, por materia, y alcanza a 6 de los 10 acuerdos", async () => {
+    // El test de arriba filtra `INFORME_PRECEPTIVO_ORGANO`, y su rotulo se leia
+    // como «a los demas no les cae ningun preceptivo». Falso por partida doble:
+    // existe un segundo gate POR MATERIA, alcanza a SEIS acuerdos, y TRES llevan
+    // los dos a la vez. Ninguno de los dos gates se mide solo. (El assert 5 de la
+    // migracion 20260830120000 tiene el mismo rotulo estrecho: cierto del
+    // _ORGANO unicamente. La migracion esta aplicada y no se reescribe.)
+    const { data, error } = await garr.from("agreement_document_requirements")
+      .select("agreement_id, blocking_policy, fase")
+      .in("agreement_id", acuerdos.map((a) => a.id))
+      .eq("requirement_code", "INFORME_PRECEPTIVO_MATERIA");
+    expect(error).toBeNull();
+    const porMateria = new Set((data ?? []).map(
+      (r) => acuerdos.find((a) => a.id === r.agreement_id)!.agreement_kind));
+    expect(porMateria).toEqual(new Set([
+      "ADMISION_SOCIO_CUOTA",
+      "CONTINUIDAD_SOCIO_POST_60",
+      "EXCLUSION_SOCIO_ESTATUTARIA",
+      "INTEGRACION_DESPACHO_AUMENTO_SIN_PREFERENCIA",
+      MATERIA_ESTATUTOS,
+      "RETRIBUCION_PRESTACIONES_ACCESORIAS",
+    ]));
+    // Los dos gates son distintos en fuerza y en fase: el de organo BLOQUEA antes
+    // de convocar; el de materia admite override y actua con la convocatoria.
+    for (const r of data!) {
+      expect(r.blocking_policy).toBe("OVERRIDE_REQUIRED");
+      expect(r.fase).toBe("CONVOCATORIA");
+    }
+    // Y se solapan: tres acuerdos llevan los dos. La modificacion de estatutos
+    // lleva solo el de materia — por eso no esta en CON_GATE.
+    expect([...CON_GATE].filter((k) => porMateria.has(k))).toHaveLength(3);
+    expect(CON_GATE.has(MATERIA_ESTATUTOS)).toBe(false);
+    expect(porMateria.has(MATERIA_ESTATUTOS)).toBe(true);
+
   });
 
   it("los acuerdos sin contenido acreditado van marcados y no nombran a ningún socio", async () => {
@@ -864,6 +1164,597 @@ describe("C1 — los 9 acuerdos de la Junta en Cloud", () => {
     expect((propias ?? []).length).toBeGreaterThan(0);
     // Y al revés: Garrigues tampoco ve los de ARGA.
     const { data: alReves } = await garr.from("agreements").select("id").neq("tenant_id", GARRIGUES_TENANT);
+    expect(alReves ?? []).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────── Task 7 ──
+
+/** Las 4 fórmulas reales que los packs del tenant traen para esta Junta. */
+const F_80 = "favor >= 4/5_votos_totales";              // art. 30.3.b) Estatutos
+const F_2_3 = "favor >= 2/3_votos_totales";             // art. 30.2 Estatutos
+const F_30_1 = "favor > 1/2_votos_capital";             // art. 30.1 Estatutos
+const F_DOBLE = "favor >= 2/3_votos_totales + mayoria_socios_profesionales"; // art. 30.2.g + art. 15 Ley 2/2007
+
+describe("C1 — el motor evalúa la mayoría de la Junta (módulo puro)", () => {
+  /**
+   * Pack sintético: lo único que cambia entre casos es la FÓRMULA, que es
+   * exactamente la variable cuyo efecto hay que demostrar. Las cadenas son las
+   * reales de los packs del tenant, y la sonda de Cloud comprueba después que
+   * los packs sembrados siguen trayendo esas mismas cadenas.
+   */
+  const packDe = (materia: string, formula: string): RulePack =>
+    ({
+      id: `TEST_${materia}`,
+      materia,
+      clase: "ESTATUTARIA",
+      organoTipo: "JUNTA_GENERAL",
+      modosAdopcionPermitidos: ["MEETING"],
+      votacion: {
+        mayoria: { SL: { formula, fuente: "ESTATUTOS", referencia: "art. 30 de los Estatutos" } },
+        abstenciones: "no_cuentan",
+      },
+    }) as unknown as RulePack;
+
+  const corre = (materia: string, formula: string, concurrenciaVotos: number) =>
+    evaluarMayoriaPunto({
+      punto: puntosConAcuerdo().find((p) => p.materia === materia)!,
+      pack: packDe(materia, formula),
+      packId: `TEST_${materia}`,
+      version: "1.0.0",
+      baseVotos: baseComputoJunta(),
+      concurrenciaVotos,
+      concurrenciaTodasLasClases: baseComputoTodasLasClases(),
+    });
+
+  it("el umbral lo calcula el motor y sale distinto para cada fórmula", () => {
+    // 80 % de 16.900 = 13.520. Si esto fuera un rótulo, las tres darían igual.
+    expect(corre("ADMISION_SOCIO_CUOTA", F_80, baseComputoJunta()).umbralVotos).toBe(13_520);
+    expect(corre("MODIFICACION_ESTATUTOS", F_2_3, baseComputoJunta()).umbralVotos)
+      .toBeCloseTo((2 * baseComputoJunta()) / 3, 6);
+    expect(corre("APROBACION_CUENTAS", F_30_1, baseComputoJunta()).umbralVotos).toBe(8_450);
+  });
+
+  it("MUTACIÓN — bajar la concurrencia por debajo del 80 % vuelca el veredicto de la admisión", () => {
+    // Con el censo íntegro concurrido, el 80 % del art. 30.3.b) es alcanzable.
+    expect(corre("ADMISION_SOCIO_CUOTA", F_80, baseComputoJunta()).ok).toBe(true);
+    // Un solo voto por debajo del umbral y deja de serlo. El motor CORRE: el
+    // resultado depende de la entrada, no de la etiqueta del acuerdo.
+    expect(corre("ADMISION_SOCIO_CUOTA", F_80, 13_519).ok).toBe(false);
+    // Y el umbral es `>=`, no `>`: justo en 13.520 se alcanza.
+    expect(corre("ADMISION_SOCIO_CUOTA", F_80, 13_520).ok).toBe(true);
+  });
+
+  it("MUTACIÓN — con la MISMA concurrencia, la fórmula decide el veredicto", () => {
+    // 12.000 votos: pasan los 2/3 (11.266,67) y no pasan los 4/5 (13.520).
+    expect(corre("MODIFICACION_ESTATUTOS", F_2_3, 12_000).ok).toBe(true);
+    expect(corre("ADMISION_SOCIO_CUOTA", F_80, 12_000).ok).toBe(false);
+    // Y la del art. 30.1 (mayoría de los votos del capital) pasa de sobra.
+    expect(corre("APROBACION_CUENTAS", F_30_1, 12_000).ok).toBe(true);
+  });
+
+  it("la doble mayoría de la exclusión NO se evalúa, y se dice por qué", () => {
+    // El motor no sabe computar «mayoría de socios profesionales» —es una
+    // mayoría de SOCIOS, no de votos— y el acta no transcribe el desglose
+    // nominal que haría falta. Ante una fórmula desconocida `evaluateFormula`
+    // devuelve «no alcanzada» con umbral 0: persistir ese false diría que la
+    // mayoría falló cuando lo que pasa es que no se evaluó.
+    expect(esFormulaEvaluable(F_DOBLE)).toBe(false);
+    const e = corre("EXCLUSION_SOCIO_ESTATUTARIA", F_DOBLE, baseComputoJunta());
+    expect(e.evaluable).toBe(false);
+    expect(e.umbralVotos).toBeNull();
+    expect(e.ok).toBe(false);
+    // WARNING, no BLOCKING: el motor no dice que el acuerdo falle, dice que no
+    // puede pronunciarse. Pintarlo en rojo afirmaría lo primero.
+    expect(e.severity).toBe("WARNING");
+    expect(e.warnings.join(" ")).toContain("mayoría de SOCIOS");
+    expect(String(e.explain.veredicto)).toContain("NO EVALUADO");
+    // Y las tres que sí evalúa siguen evaluándose: si el motor hubiera dejado de
+    // reconocer las fórmulas, este caso pasaría solo y sería indistinguible.
+    expect(esFormulaEvaluable(F_80)).toBe(true);
+    expect(esFormulaEvaluable(F_2_3)).toBe(true);
+    expect(esFormulaEvaluable(F_30_1)).toBe(true);
+  });
+
+  it("la evaluación declara que NO está sellada en servidor y qué escenario evaluó", () => {
+    const e = corre("ADMISION_SOCIO_CUOTA", F_80, baseComputoJunta());
+    expect(e.explain.sello).toBe(SELLO_CLIENTE);
+    expect(e.explain.sello).toBe("NO_SELLADO_EN_SERVIDOR");
+    expect(String(e.explain.sello_motivo)).toContain("fn_secretaria_server_resolution_evaluation");
+    expect(String(e.explain.escenario)).toContain("no el escrutinio");
+    // La adopción la certifica el acta; esta evaluación no la decide.
+    expect(e.explain.adopcion).toBe(ADOPCION_LA_CERTIFICA_EL_ACTA);
+    expect(e.explain.desglose_nominal).toBe(MEETING_VOTES_VACIA);
+    expect(String(e.explain.desglose_nominal)).toContain("meeting_votes queda VACÍA");
+    // `explain` es PLANO: la ficha renderiza cada valor con String(value) y un
+    // objeto anidado saldría como "[object Object]".
+    expect(Object.values(e.explain).every((v) => typeof v !== "object")).toBe(true);
+  });
+
+  it("las dos bases NO se mezclan: el motor recibe 16.900 y 16.908 viaja como conciliación", () => {
+    const e = corre("ADMISION_SOCIO_CUOTA", F_80, baseComputoJunta());
+    expect(e.explain.base_votos).toBe(16_900);
+    expect(e.explain.base_votos).toBe(baseComputoJunta());
+    expect(e.explain.concurrencia_todas_las_clases).toBe(16_908);
+    expect(e.explain.concurrencia_todas_las_clases).toBe(baseComputoTodasLasClases());
+    expect(e.explain.base_computo).toBe("VOTOS_CLASE_A_NO_AUTOCARTERA");
+    // El umbral se mide sobre la declarada: 4/5 de 16.908 daría 13.526,4.
+    expect(e.umbralVotos).toBe(13_520);
+    expect(e.umbralVotos).not.toBe((4 * baseComputoTodasLasClases()) / 5);
+  });
+
+  it("la concurrencia se mide sobre la base declarada y sobre la íntegra, por separado", () => {
+    const socios = [...SOCIOS_PRESENCIALES.map((n) => socio(n)), socio("Socia Representada", "A"), socio("Socio Clase B", "B")];
+    const filas = buildAttendeeRows("m", socios, `id-${REPRESENTANTE_UNICO}`);
+    const c = concurrenciaCertificada(socios, filas);
+    // 4 socios de cuota × 50 votos = 200 en la base declarada; +1 de clase B.
+    expect(c.socios).toBe(4);
+    expect(c.votos).toBe(200);
+    expect(c.votosTodasLasClases).toBe(201);
+    expect(c.votosTodasLasClases - c.votos).toBe(1);   // el voto de clase B, fuera de la base
+  });
+
+  it("la resolución enlaza por agreement_id y NO deja que el DEFAULT escriba SIMPLE", () => {
+    const punto = puntosConAcuerdo().find((p) => p.materia === "APROBACION_CUENTAS")!;
+    const fila = buildResolutionRow("m-1", punto, "ag-1");
+    expect(fila.agreement_id).toBe("ag-1");
+    expect(fila.agenda_item_index).toBe(ordinalEnOrdenDelDia(punto.numero));
+    expect(fila.status).toBe("ADOPTED");
+    // DECISION exige agenda_items.kind = DECISORIO, que es lo que Task 6 escribió.
+    expect(fila.kind_resolution).toBe("DECISION");
+    // La columna tiene DEFAULT 'SIMPLE': omitirla escribiría una mayoría que no
+    // es la aplicable. Va a NULL explícito, igual que en `agreements`.
+    expect(fila.required_majority_code).toBeNull();
+    expect("required_majority_code" in fila).toBe(true);
+    expect(fila.resolution_text).toBe(textoAcuerdo(punto.numero).decision);
+    expect(fila.tenant_id).toBe(GARRIGUES_TENANT);   // la tabla NO tiene default
+  });
+
+  it("la ficha del acuerdo lee ESTA clave: el aviso y el dato no pueden divergir", () => {
+    // Verificar un RÓTULO no prueba la ARISTA. El aviso «no sellada en servidor»
+    // de `ExpedienteAcuerdo` se dispara leyendo `explain.sello`; si alguien
+    // renombrara la clave en el seed o en la página, el aviso dejaría de
+    // pintarse EN SILENCIO y todas las demás aserciones seguirían verdes.
+    const ficha = readFileSync("src/pages/secretaria/ExpedienteAcuerdo.tsx", "utf8");
+    expect(ficha).toContain(`sello === "${SELLO_CLIENTE}"`);
+    expect(ficha).toContain("sello_motivo");
+    // Y el aviso cuelga de la tarjeta donde se ve el resultado, no de un tooltip.
+    expect(ficha).toMatch(/title="Validación normativa">\s*\n\s*<EvaluacionNoSelladaAviso/);
+  });
+
+  it("cada punto tiene su propia etapa: dos acuerdos no comparten registro", () => {
+    const etapas = puntosConAcuerdo().map((p) => etapaEvaluacion(p.numero));
+    expect(new Set(etapas).size).toBe(etapas.length);
+    expect(etapas).toContain("MAYORIA_JUNTA_2026_PUNTO_1.1");
+  });
+});
+
+describe("C1 — resoluciones, votos y evaluación de la Junta en Cloud", () => {
+  // ⚠ Este bloque queda ROJO hasta que se ejecute el seed con permiso de
+  // escritura: `bun run scripts/seed-garrigues-junta-2026.ts --commit`.
+  // La tarea que lo escribió tenía prohibido escribir en Cloud. No se le pone
+  // graceful-skip: una sonda que se salta a sí misma es un gate verde que no
+  // asierta nada, y este bloque es justo el que prueba que la evaluación llegó.
+  let garr: SupabaseClient;
+  let arga: SupabaseClient;
+  let meetingId: string;
+  type Resolucion = {
+    id: string;
+    agenda_item_index: number;
+    agreement_id: string | null;
+    status: string;
+    required_majority_code: string | null;
+    kind_resolution: string;
+    resolution_type: string;
+  };
+  type Evaluacion = {
+    id: string;
+    agreement_id: string;
+    etapa: string;
+    ok: boolean;
+    severity: string;
+    explain: Record<string, unknown> | null;
+    warnings: unknown;
+    rule_pack_id: string | null;
+    rule_pack_version: string | null;
+    evaluation_hash: string | null;
+  };
+  let resoluciones: Resolucion[] = [];
+  let evaluaciones: Evaluacion[] = [];
+  let acuerdoPorId = new Map<string, string>();
+
+  beforeAll(async () => {
+    // Sesión COMPARTIDA y memoizada (patrón de C3): 2 logins en toda la suite.
+    [garr, arga] = await Promise.all([sesionDe("GARRIGUES"), sesionDe("ARGA")]);
+
+    const { data: m, error: eM } = await garr.from("meetings").select("id").eq("slug", MEETING_SLUG).maybeSingle();
+    if (eM) throw new Error(`meetings ${MEETING_SLUG}: ${eM.message}`);
+    if (!m) throw new Error(`No existe la reunión ${MEETING_SLUG}: ejecuta antes el seed.`);
+    meetingId = m.id;
+
+    const { data: res, error: eRes } = await garr.from("meeting_resolutions")
+      .select("id, agenda_item_index, agreement_id, status, required_majority_code, kind_resolution, resolution_type")
+      .eq("meeting_id", meetingId);
+    if (eRes) throw new Error(`meeting_resolutions: ${eRes.message}`);
+    resoluciones = res ?? [];
+
+    const { data: ags, error: eAgs } = await garr.from("agreements")
+      .select("id, agreement_kind").eq("tenant_id", GARRIGUES_TENANT).eq("parent_meeting_id", meetingId);
+    if (eAgs) throw new Error(`agreements: ${eAgs.message}`);
+    acuerdoPorId = new Map((ags ?? []).map((a) => [a.id, a.agreement_kind]));
+
+    const { data: evs, error: eEvs } = await garr.from("rule_evaluation_results")
+      .select("id, agreement_id, etapa, ok, severity, explain, warnings, rule_pack_id, rule_pack_version, evaluation_hash")
+      .in("agreement_id", [...acuerdoPorId.keys()]);
+    if (eEvs) throw new Error(`rule_evaluation_results: ${eEvs.message}`);
+    evaluaciones = evs ?? [];
+  }, 30_000);
+
+  // SIN afterAll con signOut: la sesión es COMPARTIDA.
+
+  it("cada acuerdo tiene su resolución enlazada por agreement_id, no por texto", () => {
+    expect(resoluciones).toHaveLength(10);
+    expect(resoluciones.every((r) => r.agreement_id !== null)).toBe(true);
+    expect(new Set(resoluciones.map((r) => r.agreement_id)).size).toBe(10);
+    expect(resoluciones.every((r) => r.status === "ADOPTED")).toBe(true);
+    expect(resoluciones.every((r) => r.kind_resolution === "DECISION")).toBe(true);
+    // El enlace es real: cada agreement_id es uno de los 10 acuerdos de la Junta.
+    expect(resoluciones.every((r) => acuerdoPorId.has(r.agreement_id!))).toBe(true);
+    // El ordinal es el del orden del día, con sus huecos y sin renumerar.
+    expect(resoluciones.map((r) => r.agenda_item_index).sort((a, b) => a - b))
+      .toEqual(puntosConAcuerdo().map((p) => ordinalEnOrdenDelDia(p.numero)).sort((a, b) => a - b));
+    // Nadie escribió SIMPLE por el DEFAULT de la columna.
+    expect(resoluciones.every((r) => r.required_majority_code === null)).toBe(true);
+  });
+
+  it("meeting_votes está VACÍA para esta Junta, y el expediente dice por qué", async () => {
+    const { data, error } = await garr.from("meeting_votes").select("id")
+      .in("resolution_id", resoluciones.map((r) => r.id));
+    expect(error).toBeNull();
+    // El acta no transcribe el desglose nominal: escribirlo atribuiría un voto a
+    // 346 personas identificadas. La ausencia es la decisión, no un olvido...
+    expect(data ?? []).toHaveLength(0);
+    // ...y por eso el motivo VIAJA en el expediente. Sin esto, «no hay filas»
+    // sería indistinguible de «se olvidaron».
+    expect(evaluaciones.length).toBeGreaterThan(0);
+    expect(evaluaciones.every((e) => e.explain?.desglose_nominal === MEETING_VOTES_VACIA)).toBe(true);
+    // Control discriminante: la aserción de arriba sería vacua si no hubiera
+    // resoluciones sobre las que buscar votos.
+    expect(resoluciones.length).toBe(10);
+  });
+
+  it("los 10 acuerdos llevan la evaluación del motor, con su umbral sobre la base declarada", () => {
+    expect(evaluaciones).toHaveLength(10);
+    expect(new Set(evaluaciones.map((e) => e.agreement_id)).size).toBe(10);
+    expect(new Set(evaluaciones.map((e) => e.etapa)).size).toBe(10);
+    expect(evaluaciones.every((e) => e.evaluation_hash !== null)).toBe(true);
+    // La base es la declarada (16.900). NUNCA la íntegra de 16.908.
+    expect(evaluaciones.every((e) => e.explain?.base_votos === baseComputoJunta())).toBe(true);
+    expect(evaluaciones.every((e) => e.explain?.concurrencia_todas_las_clases === baseComputoTodasLasClases())).toBe(true);
+    // El umbral del 80 % del art. 30.3.b) son 13.520 votos, calculados por el motor.
+    const admision = evaluaciones.find((e) => acuerdoPorId.get(e.agreement_id) === "ADMISION_SOCIO_CUOTA");
+    expect(admision).toBeDefined();
+    expect(admision!.explain?.umbral_votos).toBe(13_520);
+    expect(String(admision!.explain?.formula)).toBe(F_80);
+    expect(admision!.ok).toBe(true);
+  });
+
+  it("la evaluación declara NO SELLADA EN SERVIDOR — que es lo que la ficha pinta", () => {
+    // Sin esto, los tres `every` de abajo pasarían sobre un array VACÍO: verde
+    // mudo. La sonda tiene que ponerse roja mientras no haya evaluaciones.
+    expect(evaluaciones).toHaveLength(10);
+    expect(evaluaciones.every((e) => e.explain?.sello === SELLO_CLIENTE)).toBe(true);
+    expect(evaluaciones.every((e) => String(e.explain?.sello_motivo ?? "").includes("fn_secretaria_server_resolution_evaluation"))).toBe(true);
+    // El aviso de la ficha se dispara por ESTE dato (`explain.sello`), no por la
+    // ruta ni por el tenant: si la clave cambiara de nombre, el aviso caería en
+    // silencio y este caso es lo único que lo impide.
+    expect(evaluaciones.every((e) => e.explain?.sello === "NO_SELLADO_EN_SERVIDOR")).toBe(true);
+  });
+
+  it("la que el motor NO sabe evaluar va marcada, y es exactamente la doble mayoría", () => {
+    const noEvaluadas = evaluaciones.filter((e) => String(e.explain?.veredicto ?? "").includes("NO EVALUADO"));
+    // Derivado, no pinado: si mañana el motor aprende la doble mayoría, este caso
+    // se entera. Un `toBe(1)` a mano no distinguiría eso de una regresión.
+    expect(noEvaluadas.map((e) => acuerdoPorId.get(e.agreement_id))).toEqual(["EXCLUSION_SOCIO_ESTATUTARIA"]);
+    expect(noEvaluadas.every((e) => e.severity === "WARNING")).toBe(true);
+    expect(noEvaluadas.every((e) => e.explain?.umbral_votos === "NO EVALUABLE")).toBe(true);
+    // Control discriminante: las otras 9 SÍ se evaluaron y traen umbral numérico.
+    const evaluadas = evaluaciones.filter((e) => !String(e.explain?.veredicto ?? "").includes("NO EVALUADO"));
+    expect(evaluadas).toHaveLength(9);
+    expect(evaluadas.every((e) => typeof e.explain?.umbral_votos === "number")).toBe(true);
+  });
+
+  it("ARGA no ve nada de esto y conserva sus propias evaluaciones", async () => {
+    // Que ARGA no vea lo de Garrigues solo dice algo si Garrigues tiene algo.
+    expect(resoluciones).toHaveLength(10);
+    expect(evaluaciones).toHaveLength(10);
+    const { data: cruzado, error: eCruz } = await arga.from("meeting_resolutions").select("id").eq("meeting_id", meetingId);
+    expect(eCruz).toBeNull();
+    expect(cruzado ?? []).toHaveLength(0);
+    const { data: cruzadoEval } = await arga.from("rule_evaluation_results").select("id").eq("tenant_id", GARRIGUES_TENANT);
+    expect(cruzadoEval ?? []).toHaveLength(0);
+    // Sin esto las dos aserciones de arriba serían vacuas.
+    const { data: propias, error: eProp } = await arga.from("meeting_resolutions").select("id").limit(50);
+    expect(eProp).toBeNull();
+    expect((propias ?? []).length).toBeGreaterThan(0);
+    const { data: propiasEval } = await arga.from("rule_evaluation_results").select("id").limit(50);
+    expect((propiasEval ?? []).length).toBeGreaterThan(0);
+    // Y al revés: Garrigues tampoco ve las de ARGA.
+    const { data: alReves } = await garr.from("rule_evaluation_results").select("id").neq("tenant_id", GARRIGUES_TENANT);
+    expect(alReves ?? []).toHaveLength(0);
+  });
+});
+
+describe("C1 — el ciclo registral de la Junta (módulo puro)", () => {
+  // La captura de Carril B, leída aquí como FUENTE para contrastar contra ella
+  // lo que el módulo deriva. Si alguien escribiera una fecha o un anuncio a mano
+  // en `orden-del-dia.ts`, este bloque lo vería: la fuente no lo respaldaría.
+  const actosBorme = bormeMatriz.actos as Array<{
+    fecha: string; tipo: string; anuncio?: string; registral?: string; nota?: string;
+  }>;
+
+  it("las inscripciones se DERIVAN del BORME: ni una fecha ni un número escritos a mano", () => {
+    const inscripciones = inscripcionesDeLaJunta();
+    expect(inscripciones.length).toBeGreaterThan(0);
+    for (const i of inscripciones) {
+      const actos = actosBorme.filter((a) => a.anuncio === i.anuncio);
+      // El anuncio existe en la fuente, y su fecha y sus datos registrales son
+      // exactamente los de la fuente: no hay margen para un valor inventado.
+      expect(actos.length).toBeGreaterThan(0);
+      expect(new Set(actos.map((a) => a.fecha))).toEqual(new Set([i.fecha]));
+      expect(new Set(actos.map((a) => a.registral))).toEqual(new Set([i.registral]));
+      expect(i.actos).toEqual(actos.map((a) => a.tipo));
+      // El ordinal sale del `registral`, no de un literal paralelo.
+      expect(i.registral).toContain(`I/A ${i.numeroInscripcion}`);
+      // Y cada punto que cubre es un punto real del expediente.
+      for (const p of i.puntos) expect(puntosConAcuerdo().map((x) => x.numero)).toContain(p);
+    }
+  });
+
+  it("dos anuncios y TRES acuerdos inscritos: el 338618 cubre dos puntos, no es dos inscripciones", () => {
+    const inscripciones = inscripcionesDeLaJunta();
+    expect(inscripciones).toHaveLength(2);
+    const puntosCubiertos = inscripciones.flatMap((i) => [...i.puntos]);
+    expect(puntosCubiertos.sort()).toEqual(["1.1", "1.2", "4"]);
+    // 3 acuerdos y 2 anuncios: la diferencia es EL hallazgo de esta tarea.
+    expect(puntosCubiertos.length).toBeGreaterThan(inscripciones.length);
+    const compartido = inscripciones.find((i) => i.puntos.length > 1)!;
+    expect(compartido.anuncio).toBe("338618/2026");
+    expect(compartido.numeroInscripcion).toBe("960");
+    expect(String(notaAnuncioCompartido(compartido))).toContain("no 2 inscripciones distintas");
+    // Discriminante: el que cubre UN punto no lleva la nota, así que la nota
+    // significa algo y no es decorado que salga siempre.
+    const individual = inscripciones.find((i) => i.puntos.length === 1)!;
+    expect(notaAnuncioCompartido(individual)).toBeNull();
+    // Los dos anuncios son del mismo día y de la misma hoja registral.
+    expect(new Set(inscripciones.map((i) => i.fecha))).toEqual(new Set(["2026-07-13"]));
+    expect(inscripciones.every((i) => i.registral.includes("H M-190538"))).toBe(true);
+  });
+
+  it("los dos vínculos NO tienen la misma procedencia y el módulo lo dice", () => {
+    const [conNota, sinNota] = inscripcionesDeLaJunta();
+    // El del 338618 lo dice el propio extracto: sus actos llevan la nota.
+    expect(actosBorme.filter((a) => a.anuncio === conNota.anuncio).some((a) => String(a.nota ?? "").includes("Junta"))).toBe(true);
+    // El del 338619 NO. El vínculo es de la spec y el texto lo advierte, en vez
+    // de presentar los dos como si estuvieran igual de acreditados.
+    expect(actosBorme.filter((a) => a.anuncio === sinNota.anuncio).some((a) => a.nota !== undefined)).toBe(false);
+    expect(sinNota.vinculo).toContain("NO lleva nota de vínculo");
+  });
+
+  it("un punto sin anuncio no recibe inscripción, y el auditor queda como candidato DESCARTADO", () => {
+    // Discriminante del helper: si devolviera algo para cualquier punto, las
+    // aserciones de arriba pasarían igual y no probarían nada.
+    expect(inscripcionDePunto("2")).toBeNull();
+    expect(inscripcionDePunto("10")).toBeNull();
+    expect(inscripcionDePunto("1.1")).not.toBeNull();
+    // El acto del auditor existe en la fuente y NO se adopta: se anota con su
+    // motivo. Sus datos también se derivan, no se transcriben.
+    const candidato = candidatoDescartadoDePunto("10")!;
+    expect(candidato.anuncio).toBe("304964/2026");
+    const acto = actosBorme.find((a) => a.anuncio === candidato.anuncio)!;
+    expect([candidato.fecha, candidato.registral]).toEqual([acto.fecha, acto.registral]);
+    expect(candidato.fecha < FECHA_JUNTA).toBe(false); // es posterior a la Junta: por eso es candidato
+    expect(candidato.motivo).toContain("el vínculo NO consta");
+    // Y no se le cuelga un candidato a cualquiera.
+    expect(candidatoDescartadoDePunto("2")).toBeNull();
+  });
+
+  it("la fila del expediente inscrito lleva lo acreditado y NADA más", () => {
+    const punto = puntosConAcuerdo().find((p) => p.numero === "1.1")!;
+    const fila = buildRegistryFilingRow({
+      agreementId: "00000000-0000-0000-0000-0000000000aa",
+      punto,
+      clase: { materia: "MODIFICACION_ESTATUTOS", matter_class: "ESTATUTARIA", inscribable: true },
+    });
+    expect(fila.status).toBe("INSCRITA");
+    expect([fila.borme_ref, fila.inscription_number]).toEqual(["338618/2026", "960"]);
+    // El DÍA es el dato que no puede fallar: en UTC se lee 2026-07-13.
+    expect(String(fila.registered_at).slice(0, 10)).toBe("2026-07-13");
+    // Ni presentación, ni calificación, ni instrumento: no constan.
+    expect([
+      fila.presentation_date, fila.filing_number, fila.estimated_resolution,
+      fila.qualification_outcome, fila.qualified_at,
+      fila.deed_date, fila.notary_name, fila.protocol_number, fila.elevated_at,
+      fila.published_at, fila.publication_reference,
+    ]).toEqual(Array(11).fill(null));
+    // La vía no la pone el DEFAULT 'NOTARIAL' de la columna.
+    expect(fila.filing_via).toBe("REGISTRO_MERCANTIL");
+    expect(fila.workflow_version).toBe(1);
+    const snap = (fila.procedure_snapshot as { c1_junta_socios_2026: Record<string, unknown> }).c1_junta_socios_2026;
+    expect((snap.inscripcion as { puntos_del_mismo_anuncio: string[] }).puntos_del_mismo_anuncio).toEqual(["1.1", "1.2"]);
+    expect(snap.sin_inscripcion).toBeUndefined();
+    expect(String(snap.elevacion)).toContain("no acreditada");
+  });
+
+  it("la fila del inscribible SIN inscripción existe, se distingue y dice por qué", () => {
+    const punto = puntosConAcuerdo().find((p) => p.numero === "10")!;
+    const fila = buildRegistryFilingRow({
+      agreementId: "00000000-0000-0000-0000-0000000000bb",
+      punto,
+      clase: { materia: "NOMBRAMIENTO_AUDITOR", matter_class: "ORDINARIA", inscribable: true },
+    });
+    // No se omite —quedaría indistinguible de un acuerdo no inscribible— pero
+    // tampoco se le fabrica un ciclo.
+    expect(fila.status).toBe("PREPARADA");
+    expect([fila.borme_ref, fila.inscription_number, fila.registered_at]).toEqual([null, null, null]);
+    const snap = (fila.procedure_snapshot as { c1_junta_socios_2026: Record<string, unknown> }).c1_junta_socios_2026;
+    expect(snap.inscripcion).toBeNull();
+    expect(snap.sin_inscripcion).toBe(MOTIVO_SIN_INSCRIPCION);
+    expect((snap.candidato_descartado as { anuncio: string }).anuncio).toBe("304964/2026");
+  });
+
+  it("un acuerdo no inscribible no tiene expediente registral: la fila ni se construye", () => {
+    const punto = puntosConAcuerdo().find((p) => p.numero === "7")!;
+    expect(() => buildRegistryFilingRow({
+      agreementId: "00000000-0000-0000-0000-0000000000cc",
+      punto,
+      clase: { materia: "APROBACION_CUENTAS", matter_class: "ORDINARIA", inscribable: false },
+    })).toThrow(/no es inscribible/);
+    // Y la clase tiene que ser la del punto, no otra cualquiera.
+    expect(() => buildRegistryFilingRow({
+      agreementId: "00000000-0000-0000-0000-0000000000cc",
+      punto,
+      clase: { materia: "NOMBRAMIENTO_AUDITOR", matter_class: "ORDINARIA", inscribable: true },
+    })).toThrow(/clase de NOMBRAMIENTO_AUDITOR/);
+  });
+});
+
+describe("C1 — el ciclo registral de la Junta en Cloud", () => {
+  // ⚠ Este bloque queda ROJO hasta que se ejecute el seed con permiso de
+  // escritura: `bun run scripts/seed-garrigues-junta-2026.ts --commit`.
+  // La tarea que lo escribió tenía prohibido escribir en Cloud. Sin
+  // graceful-skip a propósito: una sonda que se salta a sí misma es un gate
+  // verde que no asierta nada, y este bloque es el que prueba que el ciclo
+  // registral llegó.
+  let garr: SupabaseClient;
+  let arga: SupabaseClient;
+  type Filing = {
+    id: string;
+    agreement_id: string | null;
+    status: string;
+    filing_via: string;
+    workflow_version: number;
+    filing_number: string | null;
+    presentation_date: string | null;
+    inscription_number: string | null;
+    borme_ref: string | null;
+    registered_at: string | null;
+    published_at: string | null;
+    publication_reference: string | null;
+    qualification_outcome: string | null;
+    notary_name: string | null;
+    protocol_number: string | null;
+    deed_date: string | null;
+    elevated_at: string | null;
+    procedure_snapshot: Record<string, unknown> | null;
+  };
+  let filings: Filing[] = [];
+  /** agreement_id → punto del orden del día, por el `code` del acuerdo. */
+  let puntoPorAcuerdo = new Map<string, string>();
+  let inscribiblesEnCloud: string[] = [];
+
+  beforeAll(async () => {
+    // Sesión COMPARTIDA y memoizada (patrón de C3): sin logins nuevos.
+    [garr, arga] = await Promise.all([sesionDe("GARRIGUES"), sesionDe("ARGA")]);
+
+    const { data: m, error: eM } = await garr.from("meetings").select("id").eq("slug", MEETING_SLUG).maybeSingle();
+    if (eM) throw new Error(`meetings ${MEETING_SLUG}: ${eM.message}`);
+    if (!m) throw new Error(`No existe la reunión ${MEETING_SLUG}: ejecuta antes el seed.`);
+
+    const { data: ags, error: eAgs } = await garr.from("agreements")
+      .select("id, code, inscribable").eq("tenant_id", GARRIGUES_TENANT).eq("parent_meeting_id", m.id);
+    if (eAgs) throw new Error(`agreements: ${eAgs.message}`);
+    // El punto sale del `code` (`JGS-<fecha>-<punto>`), que es la identidad que
+    // el seed escribe; no de una coincidencia de materia.
+    puntoPorAcuerdo = new Map((ags ?? []).map((a) => [a.id, String(a.code).replace(`JGS-${FECHA_JUNTA}-`, "")]));
+    // DERIVADO del catálogo vía `agreements.inscribable`, no pinado a mano:
+    // inventario no es invariante.
+    inscribiblesEnCloud = (ags ?? []).filter((a) => a.inscribable).map((a) => a.id);
+
+    const { data: fs, error: eF } = await garr.from("registry_filings")
+      .select("id, agreement_id, status, filing_via, workflow_version, filing_number, presentation_date, inscription_number, borme_ref, registered_at, published_at, publication_reference, qualification_outcome, notary_name, protocol_number, deed_date, elevated_at, procedure_snapshot")
+      .eq("tenant_id", GARRIGUES_TENANT);
+    if (eF) throw new Error(`registry_filings: ${eF.message}`);
+    filings = (fs ?? []) as Filing[];
+  }, 30_000);
+
+  // SIN afterAll con signOut: la sesión es COMPARTIDA.
+
+  it("hay un expediente por acuerdo inscribible, y ninguno por acuerdo que no lo sea", () => {
+    expect(inscribiblesEnCloud.length).toBeGreaterThan(0);
+    expect(filings).toHaveLength(inscribiblesEnCloud.length);
+    expect(filings.every((f) => inscribiblesEnCloud.includes(String(f.agreement_id)))).toBe(true);
+    // Uno por acuerdo: `ExpedienteAcuerdo` pinta el más reciente y con dos filas
+    // el acuerdo enseñaría un expediente y escondería el otro.
+    expect(new Set(filings.map((f) => f.agreement_id)).size).toBe(filings.length);
+    expect(filings.every((f) => f.workflow_version === 1)).toBe(true);
+    // La vía no la puso el DEFAULT 'NOTARIAL' de la columna en ninguna.
+    expect(filings.every((f) => f.filing_via === "REGISTRO_MERCANTIL")).toBe(true);
+  });
+
+  it("solo los acreditados están INSCRITA, con el anuncio y la fecha del BORME", () => {
+    const inscritos = filings.filter((f) => f.status === "INSCRITA");
+    const puntosAcreditados = inscripcionesDeLaJunta().flatMap((i) => [...i.puntos]);
+    // Derivado de la fuente, no de un `toHaveLength(3)` a mano.
+    expect(inscritos.map((f) => puntoPorAcuerdo.get(String(f.agreement_id))).sort())
+      .toEqual([...puntosAcreditados].sort());
+    for (const f of inscritos) {
+      const insc = inscripcionDePunto(puntoPorAcuerdo.get(String(f.agreement_id))!)!;
+      expect([f.borme_ref, f.inscription_number]).toEqual([insc.anuncio, insc.numeroInscripcion]);
+      expect(String(f.registered_at).slice(0, 10)).toBe(insc.fecha);
+    }
+    // 3 acuerdos inscritos pero 2 anuncios: el 338618 NO puede leerse como dos
+    // inscripciones distintas. Esta es la aserción que lo impide.
+    expect(new Set(inscritos.map((f) => `${f.borme_ref}|${f.inscription_number}`)).size)
+      .toBe(inscripcionesDeLaJunta().length);
+    expect(inscritos.length).toBeGreaterThan(inscripcionesDeLaJunta().length);
+  });
+
+  it("los inscribibles sin anuncio existen, se distinguen y no llevan ni fecha ni asiento", () => {
+    const sinInscripcion = filings.filter((f) => f.status !== "INSCRITA");
+    // Discriminante: si no hubiera ninguno, todo lo de abajo pasaría en vacío.
+    expect(sinInscripcion.length).toBeGreaterThan(0);
+    expect(sinInscripcion.every((f) => f.status === "PREPARADA")).toBe(true);
+    for (const f of sinInscripcion) {
+      expect(inscripcionDePunto(puntoPorAcuerdo.get(String(f.agreement_id))!)).toBeNull();
+      expect([f.registered_at, f.inscription_number, f.borme_ref]).toEqual([null, null, null]);
+      const snap = (f.procedure_snapshot as { c1_junta_socios_2026?: Record<string, unknown> })?.c1_junta_socios_2026;
+      // La ausencia viaja con el dato: sin esto, «sin anuncio» sería
+      // indistinguible de «se les olvidó».
+      expect(snap?.sin_inscripcion).toBe(MOTIVO_SIN_INSCRIPCION);
+    }
+  });
+
+  it("NINGÚN expediente se inventa presentación, calificación ni elevación a público", () => {
+    expect(filings.length).toBeGreaterThan(0);
+    for (const f of filings) {
+      expect([
+        f.presentation_date, f.filing_number,
+        f.qualification_outcome, f.notary_name, f.protocol_number, f.deed_date,
+        f.elevated_at, f.published_at, f.publication_reference,
+      ]).toEqual(Array(9).fill(null));
+      const snap = (f.procedure_snapshot as { c1_junta_socios_2026?: Record<string, unknown> })?.c1_junta_socios_2026;
+      expect(String(snap?.elevacion)).toContain("no acreditada");
+    }
+  });
+
+  it("ARGA no ve nada de esto y conserva sus propios expedientes registrales", async () => {
+    // Que ARGA no vea lo de Garrigues solo dice algo si Garrigues tiene algo.
+    expect(filings.length).toBeGreaterThan(0);
+    const { data: cruzado, error: eCruz } = await arga.from("registry_filings")
+      .select("id").eq("tenant_id", GARRIGUES_TENANT);
+    expect(eCruz).toBeNull();
+    expect(cruzado ?? []).toHaveLength(0);
+    const { data: porAcuerdo } = await arga.from("registry_filings")
+      .select("id").in("agreement_id", [...puntoPorAcuerdo.keys()]);
+    expect(porAcuerdo ?? []).toHaveLength(0);
+    // Y ARGA sigue teniendo los suyos: sin esto lo de arriba sería vacuo.
+    const { data: propios, error: eProp } = await arga.from("registry_filings").select("id, tenant_id").limit(50);
+    expect(eProp).toBeNull();
+    expect((propios ?? []).length).toBeGreaterThan(0);
+    expect((propios ?? []).every((f) => f.tenant_id !== GARRIGUES_TENANT)).toBe(true);
+    // Al revés: Garrigues tampoco ve los de ARGA.
+    const { data: alReves } = await garr.from("registry_filings").select("id").neq("tenant_id", GARRIGUES_TENANT);
     expect(alReves ?? []).toHaveLength(0);
   });
 });
