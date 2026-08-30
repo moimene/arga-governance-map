@@ -1,0 +1,1336 @@
+{
+  "_meta": {
+    "encargo": "Prompt 1 — AIMS (gobernanza de IA) de docs/superpowers/plans/2026-08-29-prompts-datos-sinteticos-garrigues.md",
+    "tenant_destino": "00000000-0000-0000-0000-000000000002",
+    "fecha_generacion": "2026-08-30",
+    "firmeza_global": "SINTETICO",
+    "vocabulario_procedencia": {
+      "DECLARADO_USUARIO": "Lo afirma el usuario o un documento del despacho.",
+      "PLAN_NO_DESPLEGADO": "Figura en el Plan de Sistemas 2025-2027 pero no consta en produccion.",
+      "SIMULADO": "Hecho inventado para la demo, sin correlato real.",
+      "DEMO_PILOTO": "Criterio provisional pendiente de confirmacion por el despacho."
+    },
+    "reglas_de_lectura_obligatorias": [
+      "TODO registro de este fichero es SINTETICO. Ninguno acredita un hecho del despacho.",
+      "El array `sistemas` contiene UNICAMENTE sistemas NUEVOS. Los 6 del catalogo C2 (scripts/garrigues/ia/catalogo-ia.ts, codigos GARR-IA-001/002/003/101/102/201) NO se repiten aqui y NO deben sembrarse desde este fichero: `ai_systems.aims_reference_code` no es unico y una re-siembra duplicaria en silencio.",
+      "La capa de gobernanza que faltaba sobre esos 6 va en `ampliacion_gobernanza_catalogo_c2`, que es un OVERLAY de lectura/actualizacion, no filas nuevas. Se separo en otra clave precisamente para que un seeder distraido no la pueda insertar como alta.",
+      "El catalogo C2 deja `risk_level` a null a proposito porque nadie ha hecho la clasificacion del Reglamento (UE) 2024/1689. Este fichero NO la hace: solo propone, y lo marca como propuesta no validada. No sobreescribir `risk_level` con estas propuestas.",
+      "No se ha inventado ni un solo nombre de persona. Los responsables se expresan por cargo u organo real ya modelado en el tenant. Un nombre de ficcion en un incidente de IA no aportaba nada y si podia confundirse con un profesional real.",
+      "`status` de `ai_systems` no tiene CHECK en Cloud: el dominio lo sostiene este fichero, no el servidor."
+    ],
+    "anclas_reales_usadas": [
+      "PI-30 «Politica de uso de sistemas de inteligencia artificial generativa» (Edicion 02, julio de 2025): §3.1.1 herramientas corporativas, §3.1.2 herramientas no corporativas, §3.2 normas de uso, §6 Comite de IA. Catalogada en scripts/garrigues/normativo/catalogo-normativo.ts.",
+      "Plan de Sistemas 2025-2027 (Ano 2: 2026), Oficina del CISO | Direccion de Tecnologia e Innovacion: taxonomia de exposicion L1-L4, criterios CIA, seguridad en IA, proyectos y presupuesto 2026, roadmap.",
+      "Metodologia de evaluacion de riesgos penales del PPD: factores P1, P2, P3, P4; probabilidad bruta maxima 10; bandas de probabilidad relativa; codigo de color de la matriz.",
+      "Mapa penal evaluado 2025 del tenant: los nombres de las 9 areas de negocio y los 9 departamentos internos salen de scripts/garrigues/penal/extract-mapa.ts, no estan inventados.",
+      "Catalogo de gobierno del tenant (scripts/garrigues/gobierno/comites-2026.json): los slugs de comite usados existen."
+    ],
+    "lo_que_no_se_ha_generado_y_por_que": [
+      "Ninguna clasificacion firme de riesgo del AI Act. Decir «este sistema es de alto riesgo» es una calificacion juridica y ninguna ancla la contiene. Solo hay `clasificacion_ai_act_propuesta` con estado PROPUESTA_NO_VALIDADA.",
+      "Ningun nivel de riesgo calculado por la matriz oficial. El ancla da las bandas de probabilidad y el codigo de color, pero NO da el contenido de las celdas del cruce probabilidad x impacto. Componer ese cruce seria inventar la metodologia del despacho. Los niveles que aparecen son `nivel_riesgo_propuesto` con procedencia DEMO_PILOTO.",
+      "Ninguna composicion aritmetica del factor P4. El ancla da los pesos de medidas preventivas (0/0,15/0,25/0,35) e incidencias (0/0,25/0,5) pero no dice como entran en el algoritmo. Se declaran sus componentes y no se combinan.",
+      "Ninguna version, tamano ni parametro de los modelos open source de los workflows: el encargo dice «tipo Llama» y no hay fuente para concretar mas.",
+      "Ningun importe economico salvo los 25.000 EUR de la auditoria externa, que si constan en el Plan.",
+      "Ninguna hora del dia en ninguna cronologia. Las fechas que hay son de dia y estan marcadas SIMULADO en su propio registro."
+    ]
+  },
+
+  "sistemas": [
+    {
+      "code": "GARR-IA-004",
+      "name": "GA_IA Local",
+      "origen": "NUEVO_EN_ESTE_ENCARGO",
+      "amplia_a": "GARR-IA-003 (Garrigues GA_IA). Es el segundo despliegue de la misma infraestructura, no un producto distinto; se separa porque su regimen de aislamiento y su exposicion no son los mismos.",
+      "proposito": "Ejecutar consultas de IA generativa sobre asuntos ultraconfidenciales en un entorno aislado y sin salida a Internet.",
+      "familia": "INFRAESTRUCTURA_PROPIA",
+      "modelo_o_proveedor": "Infraestructura propia del Despacho. El modelo subyacente concreto NO consta en el Plan de Sistemas y no se inventa.",
+      "despliegue": "On-premise aislado, sin salida a Internet.",
+      "exposicion": {
+        "nivel": "L1",
+        "etiqueta": "Back-office interno",
+        "por_que_ese_y_no_el_contiguo": "No es L2 «Colaboracion regulada» porque el aislamiento sin salida a Internet excluye por construccion la extranet con contrapartes y notarias que define L2. La distancia con L2 no es de grado sino de arquitectura: si algun dia se abriera un canal a un tercero, dejaria de ser este sistema.",
+        "procedencia": "PLAN_NO_DESPLEGADO",
+        "ancla": "Plan de Sistemas 2025-2027, «Seguridad en IA»: «GA_IA Local sin salida a Internet para asuntos ultraconfidenciales»; taxonomia L1-L4."
+      },
+      "criticidad_cia": {
+        "confidencialidad": "Extrema",
+        "integridad": "No repudiable",
+        "disponibilidad": "No continua",
+        "justificacion": "Custodia del secreto profesional y de operaciones corporativas sensibles (M&A, Due Diligence), que es exactamente el supuesto de Confidencialidad Extrema del Plan. La disponibilidad no es continua porque no es un portal transaccional ni una plataforma de facturacion, que son los dos supuestos que el Plan reserva a Disponibilidad Continua.",
+        "procedencia": "PLAN_NO_DESPLEGADO",
+        "ancla": "Plan de Sistemas 2025-2027, «Modelo de clasificacion de activos»."
+      },
+      "categorias_datos": [
+        "Secretos de cliente amparados por el secreto profesional",
+        "Operaciones corporativas sensibles (M&A, Due Diligence)",
+        "Documentacion sujeta a secreto de sumario"
+      ],
+      "departamentos_usuarios": ["Mercantil", "Litigación y arbitraje", "Fiscal", "Reestructuraciones e insolvencias"],
+      "nota_departamentos": "Nombres tomados literalmente de las columnas del mapa penal evaluado 2025 del tenant (AREAS_NEGOCIO en scripts/garrigues/penal/extract-mapa.ts). La ASIGNACION de esos departamentos a este sistema es SIMULADA.",
+      "organo_responsable": {
+        "slug": "garrigues-comite-gobernanza-ia",
+        "nombre": "Comité de Gobernanza de la Inteligencia Artificial",
+        "por_que": "PI-30 §6 crea el Comité de IA, y el catalogo C2 ya asigna ese organo a los seis sistemas inventariados. Mantener el mismo organo evita abrir una segunda linea de ownership para la misma infraestructura.",
+        "procedencia": "DECLARADO_USUARIO",
+        "ancla": "PI-30 §6 «Comité de IA» + scripts/garrigues/ia/catalogo-ia.ts (owner_body_slug de GARR-IA-003)."
+      },
+      "organo_control_tecnico": {
+        "slug": "garrigues-oficina-tecnica-seguridad",
+        "nombre": "Oficina Técnica de Seguridad (OTS)",
+        "por_que": "El aislamiento de red y la ausencia de salida a Internet son medidas tecnicas, y el corpus ya atribuye a la OTS los requerimientos tecnicos de seguridad (PI-24 §5.3, controles CTR-GARR-29 a 32).",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "PI-24 §5.3 via CTR-GARR-29/30/31/32 en scripts/garrigues/normativo/obligaciones-ciber.ts. La atribucion concreta a ESTE sistema es propuesta, no consta."
+      },
+      "estado_ciclo_vida": {
+        "valor": "EN_DESPLIEGUE",
+        "por_que": "El roadmap del Plan situa «GA_IA Local sin internet» en la fase Q1-Q2 2026 «Blindar y Aislar». A fecha de generacion (2026-08-30) esa ventana ha pasado, pero NO hay evidencia de go-live. Declararlo ACTIVO seria dar por consumado un hito que solo consta como planificado.",
+        "procedencia": "PLAN_NO_DESPLEGADO",
+        "ancla": "Plan de Sistemas 2025-2027, roadmap, fase Q1-Q2 2026 «Blindar y Aislar»."
+      },
+      "rol_ai_act_propuesto": {
+        "rol": "INDETERMINADO",
+        "razonamiento": "Depende de un hecho que no consta: si el modelo subyacente es de un tercero, el Despacho seria responsable del despliegue; si lo construye o lo pone en servicio bajo su nombre, entraria en el rol de proveedor con la carga documental que eso arrastra. El Plan no dice cual de las dos cosas es.",
+        "estado": "PROPUESTA_NO_VALIDADA",
+        "procedencia": "DEMO_PILOTO"
+      },
+      "clasificacion_ai_act_propuesta": [
+        {
+          "caso_de_uso": "Consulta y analisis documental sobre asuntos ultraconfidenciales, con revision preceptiva del abogado.",
+          "propuesta": "Sin encaje aparente en el Anexo III. El resultado no decide sobre derechos de una persona ni se emite sin intervencion profesional.",
+          "duda_declarada": "Si de este entorno saliera algun dia un producto de autoservicio para el cliente (L4), la propuesta dejaria de valer y habria que rehacerla.",
+          "estado": "PROPUESTA_NO_VALIDADA"
+        }
+      ],
+      "conciliacion_pi30": {
+        "situacion": "NO_APLICA_LA_PROHIBICION",
+        "explicacion": "La prohibicion de PI-30 §2 recae sobre herramientas de IA Generativa DE TERCEROS. Este sistema es infraestructura propia y aislada; de hecho es la medida disenada para que el trabajo ultraconfidencial no tenga que salir a un tercero.",
+        "ancla": "PI-30 §2, citada literalmente en CTR-GARR-33."
+      },
+      "volumetria_uso": {
+        "valor": "Uso restringido: del orden de decenas de consultas al mes, concentradas en un numero reducido de asuntos.",
+        "procedencia": "SIMULADO",
+        "nota": "Cifra inventada para dar cuerpo a la demo. No hay telemetria detras. No debe leerse como medicion."
+      },
+      "firmeza": "SINTETICO",
+      "ancla": "Plan de Sistemas 2025-2027, «Seguridad en IA» y roadmap Q1-Q2 2026.",
+      "procedencia": "PLAN_NO_DESPLEGADO"
+    },
+    {
+      "code": "GARR-IA-005",
+      "name": "Chatbots sobre Gemini en GA_IA",
+      "origen": "NUEVO_EN_ESTE_ENCARGO",
+      "amplia_a": "GARR-IA-003 (Garrigues GA_IA). Corren sobre esa plataforma pero con un modelo de tercero que la propia PI-30 saca del paraguas de aprobacion.",
+      "proposito": "Ofrecer asistentes conversacionales internos construidos por el Despacho sobre la plataforma GA_IA, empleando modelos Gemini.",
+      "familia": "INFRAESTRUCTURA_PROPIA",
+      "modelo_o_proveedor": "Gemini (Google), integrado en plataforma propia.",
+      "despliegue": "Hibrido: orquestacion y corpus del Despacho sobre modelo de tercero.",
+      "exposicion": {
+        "nivel": "L1",
+        "etiqueta": "Back-office interno",
+        "por_que_ese_y_no_el_contiguo": "Hoy son asistentes de uso interno, que es la definicion de L1. NO es L3 «Entregables supervisados» porque el chatbot no produce por si mismo un entregable al cliente. Esta es la clasificacion mas fragil de todo el inventario: basta con que un equipo pegue la salida del chatbot en un entregable para que el sistema opere de facto como L3 sin que nadie lo haya reclasificado. Queda declarado como riesgo de clasificacion, no resuelto.",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "Taxonomia L1-L4 del Plan de Sistemas. La asignacion de nivel a este sistema es propuesta."
+      },
+      "criticidad_cia": {
+        "confidencialidad": "Extrema",
+        "integridad": "No repudiable",
+        "disponibilidad": "No continua",
+        "justificacion": "Trata consultas de profesionales sobre asuntos, luego cae en el supuesto de custodia del secreto profesional.",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "Criterios CIA del Plan de Sistemas."
+      },
+      "categorias_datos": [
+        "Consultas profesionales que pueden contener datos de asunto",
+        "Doctrina y material de conocimiento interno"
+      ],
+      "departamentos_usuarios": ["Tecnología", "Knowledge", "Fiscal", "Laboral", "Mercantil"],
+      "nota_departamentos": "Nombres reales de las columnas del mapa penal del tenant; la asignacion es SIMULADA. Nota de nomenclatura: el COR habla de «G-Digital» y el mapa penal de «Tecnología». Se usa el nombre del mapa por ser el que ya esta en el dato del tenant; la equivalencia queda como duda.",
+      "organo_responsable": {
+        "slug": "garrigues-comite-gobernanza-ia",
+        "nombre": "Comité de Gobernanza de la Inteligencia Artificial",
+        "por_que": "Es el organo que PI-30 §3.1.1 implica al excluir expresamente las funcionalidades de Gemini-Google del regimen de aprobacion de GA_IA: la excepcion es materia de gobernanza de IA, no de seguridad tecnica.",
+        "procedencia": "DECLARADO_USUARIO",
+        "ancla": "PI-30 §3.1.1 (exclusion de Gemini-Google) y §6."
+      },
+      "estado_ciclo_vida": {
+        "valor": "ACTIVO",
+        "por_que": "El usuario declara que el Despacho ha habilitado chatbots sobre Gemini dentro de GA_IA. No hay respaldo documental de esa habilitacion.",
+        "procedencia": "DECLARADO_USUARIO",
+        "ancla": "Encargo del carril de datos sinteticos (2026-08-29), Prompt 1."
+      },
+      "rol_ai_act_propuesto": {
+        "rol": "INDETERMINADO",
+        "razonamiento": "El Despacho construye el chatbot pero el modelo es de un tercero. Que eso lo situe como responsable del despliegue o como proveedor depende de si el sistema se pone en servicio bajo su propio nombre o marca, hecho que no consta. No se decide aqui.",
+        "estado": "PROPUESTA_NO_VALIDADA",
+        "procedencia": "DEMO_PILOTO"
+      },
+      "clasificacion_ai_act_propuesta": [
+        {
+          "caso_de_uso": "Asistencia conversacional interna sobre doctrina y conocimiento.",
+          "propuesta": "Sin encaje aparente en el Anexo III; obligaciones de transparencia previsibles por tratarse de interaccion conversacional.",
+          "duda_declarada": "La obligacion de transparencia depende del regimen concreto del sistema y no se afirma como deber: PI-30 §4 ya tiene un apartado de obligaciones de transparencia cuyo contenido no se ha leido en esta generacion.",
+          "estado": "PROPUESTA_NO_VALIDADA"
+        }
+      ],
+      "conciliacion_pi30": {
+        "situacion": "CONFLICTO_NO_RESUELTO",
+        "explicacion": "PI-30 §3.1.1 aprueba GA_IA como herramienta corporativa CON UNA EXCEPCION EXPRESA: excluye las funcionalidades de Gemini-Google, que quedan sujetas a lo dispuesto en el §3.2 en su totalidad. Construir chatbots corporativos precisamente sobre Gemini coloca al sistema en el borde de esa exclusion. No se ha localizado documento que resuelva la tension, y no se fabrica uno: se declara el conflicto.",
+        "ancla": "PI-30 §3.1.1, recogida literalmente en el campo `restrictions` de GARR-IA-003 en scripts/garrigues/ia/catalogo-ia.ts.",
+        "procedencia": "DECLARADO_USUARIO"
+      },
+      "volumetria_uso": {
+        "valor": "Uso interno frecuente: del orden de cientos de conversaciones al mes.",
+        "procedencia": "SIMULADO",
+        "nota": "Cifra inventada. Sin telemetria."
+      },
+      "firmeza": "SINTETICO",
+      "ancla": "PI-30 §3.1.1 (exclusion Gemini-Google) + declaracion del usuario en el encargo.",
+      "procedencia": "DECLARADO_USUARIO"
+    },
+    {
+      "code": "GARR-IA-301",
+      "name": "Workflow de traducción jurídica",
+      "origen": "NUEVO_EN_ESTE_ENCARGO",
+      "proposito": "Traducir documentacion juridica entre idiomas de trabajo del Despacho como paso previo a la revision del profesional.",
+      "familia": "WORKFLOW",
+      "modelo_o_proveedor": "Modelo open source tipo Llama, desplegado por el Despacho. Version y tamano no constan.",
+      "despliegue": "Desplegado y operado por el Despacho.",
+      "exposicion": {
+        "nivel": "L3",
+        "etiqueta": "Entregables supervisados",
+        "por_que_ese_y_no_el_contiguo": "No es L1 porque la salida no se queda dentro: acaba incorporandose a documentacion que llega al cliente o a la contraparte. No es L4 porque el cliente no accede al workflow ni obtiene la traduccion por autoservicio; media siempre la revision del abogado, que es exactamente la definicion de L3.",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "Taxonomia L1-L4 del Plan de Sistemas; la asignacion es propuesta."
+      },
+      "criticidad_cia": {
+        "confidencialidad": "Extrema",
+        "integridad": "No repudiable",
+        "disponibilidad": "No continua",
+        "justificacion": "Procesa el texto integro de contratos y escritos, luego trata secreto profesional. La integridad es no repudiable porque el texto traducido puede acabar en un documento con efectos.",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "Criterios CIA del Plan de Sistemas."
+      },
+      "categorias_datos": ["Contratos", "Escritos y documentacion de asunto", "Datos personales incidentales contenidos en los documentos"],
+      "departamentos_usuarios": ["Mercantil", "Litigación y arbitraje", "Fiscal", "Laboral", "Knowledge"],
+      "nota_departamentos": "Nombres reales del mapa penal del tenant; asignacion SIMULADA.",
+      "organo_responsable": {
+        "slug": "garrigues-comite-gobernanza-ia",
+        "nombre": "Comité de Gobernanza de la Inteligencia Artificial",
+        "por_que": "Es sistema de IA generativa construido por el Despacho; el organo que PI-30 §6 crea para gobernar el uso de IA es el que corresponde. No se elige el Comité de Práctica Profesional porque la calidad del entregable ya esta cubierta por la revision del abogado, no por el sistema.",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "PI-30 §6."
+      },
+      "estado_ciclo_vida": {
+        "valor": "ACTIVO",
+        "procedencia": "DECLARADO_USUARIO",
+        "ancla": "Encargo del carril de datos sinteticos (2026-08-29), Prompt 1: los cuatro workflows se dan como hecho de contexto."
+      },
+      "rol_ai_act_propuesto": {
+        "rol": "PROVEEDOR_PREVISIBLE",
+        "razonamiento": "Aqui el analisis si tiene base factual: el modelo es open source y quien lo despliega, integra y pone en servicio es el Despacho. No hay detras un proveedor comercial que asuma la documentacion tecnica del sistema. La consecuencia practica —que la carga documental recae en el Despacho y no en un tercero— es la que importa para el inventario.",
+        "estado": "PROPUESTA_NO_VALIDADA",
+        "procedencia": "DEMO_PILOTO"
+      },
+      "clasificacion_ai_act_propuesta": [
+        {
+          "caso_de_uso": "Traduccion de documentacion juridica con revision profesional posterior.",
+          "propuesta": "Sin encaje aparente en el Anexo III.",
+          "duda_declarada": "Ninguna relevante.",
+          "estado": "PROPUESTA_NO_VALIDADA"
+        }
+      ],
+      "conciliacion_pi30": {
+        "situacion": "NO_APLICA_LA_PROHIBICION",
+        "explicacion": "El modelo se ejecuta en infraestructura del Despacho, no en una herramienta de tercero, que es el supuesto de la prohibicion de PI-30 §2.",
+        "ancla": "PI-30 §2 via CTR-GARR-33."
+      },
+      "volumetria_uso": {
+        "valor": "Del orden de cientos de documentos al mes.",
+        "procedencia": "SIMULADO",
+        "nota": "Cifra inventada. Sin telemetria."
+      },
+      "firmeza": "SINTETICO",
+      "ancla": "Declaracion del usuario en el encargo (2026-08-29). El Plan de Sistemas NO cataloga estos workflows.",
+      "procedencia": "DECLARADO_USUARIO"
+    },
+    {
+      "code": "GARR-IA-302",
+      "name": "Workflow de conversión de PDF",
+      "origen": "NUEVO_EN_ESTE_ENCARGO",
+      "proposito": "Convertir documentacion en PDF a texto estructurado explotable por el resto de flujos del Despacho.",
+      "familia": "WORKFLOW",
+      "modelo_o_proveedor": "Modelo open source tipo Llama, desplegado por el Despacho. Version y tamano no constan.",
+      "despliegue": "Desplegado y operado por el Despacho.",
+      "exposicion": {
+        "nivel": "L1",
+        "etiqueta": "Back-office interno",
+        "por_que_ese_y_no_el_contiguo": "Es el unico de los cuatro workflows que NO produce entregable: prepara insumo para otros. Por eso L1 y no L3. La cautela relevante es distinta: un error de conversion no se ve, se propaga aguas abajo hacia sistemas que si son L3, de modo que su bajo nivel de exposicion no equivale a bajo riesgo.",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "Taxonomia L1-L4 del Plan de Sistemas; la asignacion es propuesta."
+      },
+      "criticidad_cia": {
+        "confidencialidad": "Extrema",
+        "integridad": "No repudiable",
+        "disponibilidad": "No continua",
+        "justificacion": "Ve el contenido integro de todo lo que se convierte, incluidos expedientes judiciales y escrituras.",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "Criterios CIA del Plan de Sistemas."
+      },
+      "categorias_datos": ["Expedientes judiciales", "Escrituras y documentacion registral", "Contratos"],
+      "departamentos_usuarios": ["Litigación y arbitraje", "Mercantil", "Administrativo", "Knowledge", "Tecnología"],
+      "nota_departamentos": "Nombres reales del mapa penal del tenant; asignacion SIMULADA.",
+      "organo_responsable": {
+        "slug": "garrigues-comite-gobernanza-ia",
+        "nombre": "Comité de Gobernanza de la Inteligencia Artificial",
+        "por_que": "Mismo criterio que el resto de workflows propios.",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "PI-30 §6."
+      },
+      "estado_ciclo_vida": {
+        "valor": "ACTIVO",
+        "procedencia": "DECLARADO_USUARIO",
+        "ancla": "Encargo del carril de datos sinteticos (2026-08-29), Prompt 1."
+      },
+      "rol_ai_act_propuesto": {
+        "rol": "PROVEEDOR_PREVISIBLE",
+        "razonamiento": "Mismo razonamiento que GARR-IA-301: modelo open source desplegado por el Despacho, sin tercero que asuma documentacion tecnica.",
+        "estado": "PROPUESTA_NO_VALIDADA",
+        "procedencia": "DEMO_PILOTO"
+      },
+      "clasificacion_ai_act_propuesta": [
+        {
+          "caso_de_uso": "Conversion de formato documental sin juicio juridico.",
+          "propuesta": "Sin encaje aparente en el Anexo III.",
+          "duda_declarada": "Ninguna relevante.",
+          "estado": "PROPUESTA_NO_VALIDADA"
+        }
+      ],
+      "conciliacion_pi30": {
+        "situacion": "NO_APLICA_LA_PROHIBICION",
+        "explicacion": "Ejecucion en infraestructura propia; no es herramienta de tercero.",
+        "ancla": "PI-30 §2 via CTR-GARR-33."
+      },
+      "volumetria_uso": {
+        "valor": "Del orden de miles de documentos al mes.",
+        "procedencia": "SIMULADO",
+        "nota": "Cifra inventada. Sin telemetria."
+      },
+      "firmeza": "SINTETICO",
+      "ancla": "Declaracion del usuario en el encargo (2026-08-29). El Plan de Sistemas NO cataloga estos workflows.",
+      "procedencia": "DECLARADO_USUARIO"
+    },
+    {
+      "code": "GARR-IA-303",
+      "name": "Workflow de cálculo de plazos y fechas procesales",
+      "origen": "NUEVO_EN_ESTE_ENCARGO",
+      "proposito": "Calcular plazos y fechas procesales a partir de la documentacion del procedimiento, como apoyo al control de vencimientos del asunto.",
+      "familia": "WORKFLOW",
+      "modelo_o_proveedor": "Modelo open source tipo Llama, desplegado por el Despacho. Version y tamano no constan.",
+      "despliegue": "Desplegado y operado por el Despacho.",
+      "exposicion": {
+        "nivel": "L3",
+        "etiqueta": "Entregables supervisados",
+        "por_que_ese_y_no_el_contiguo": "No es L1 aunque el calculo no salga del Despacho, porque de su resultado depende una actuacion externa con fecha limite: el efecto es exterior aunque el sistema sea interior. No es L4 porque no hay autoservicio del cliente. Si se admite que un plazo se anote en la agenda del asunto sin verificacion humana, la clasificacion L3 deja de describir la realidad.",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "Taxonomia L1-L4 del Plan de Sistemas; la asignacion es propuesta."
+      },
+      "criticidad_cia": {
+        "confidencialidad": "Extrema",
+        "integridad": "No repudiable",
+        "disponibilidad": "Continua",
+        "justificacion": "Es el unico de los cuatro workflows donde la disponibilidad aprieta: un vencimiento no espera a que el sistema vuelva. La integridad es el eje del riesgo: un plazo mal calculado no se detecta por inspeccion, se detecta cuando ya paso.",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "Criterios CIA del Plan de Sistemas."
+      },
+      "categorias_datos": ["Resoluciones y notificaciones judiciales", "Datos de procedimiento", "Expedientes judiciales"],
+      "departamentos_usuarios": ["Litigación y arbitraje", "Administrativo", "Laboral", "Fiscal"],
+      "nota_departamentos": "Nombres reales del mapa penal del tenant; asignacion SIMULADA.",
+      "organo_responsable": {
+        "slug": "garrigues-comite-gobernanza-ia",
+        "nombre": "Comité de Gobernanza de la Inteligencia Artificial",
+        "por_que": "Es el organo de gobierno de la IA. Se hace constar, sin embargo, que este sistema toca directamente la practica profesional y que el Comité de Práctica Profesional seria co-responsable natural del criterio de verificacion humana. No se le atribuye porque ninguna fuente lo dice; queda en `dudas`.",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "PI-30 §6."
+      },
+      "estado_ciclo_vida": {
+        "valor": "ACTIVO",
+        "procedencia": "DECLARADO_USUARIO",
+        "ancla": "Encargo del carril de datos sinteticos (2026-08-29), Prompt 1."
+      },
+      "rol_ai_act_propuesto": {
+        "rol": "PROVEEDOR_PREVISIBLE",
+        "razonamiento": "Modelo open source desplegado por el Despacho. Aqui la consecuencia es mas visible que en los demas: no hay proveedor externo a quien pedir la documentacion tecnica del sistema del que depende un vencimiento procesal.",
+        "estado": "PROPUESTA_NO_VALIDADA",
+        "procedencia": "DEMO_PILOTO"
+      },
+      "clasificacion_ai_act_propuesta": [
+        {
+          "caso_de_uso": "Calculo de plazos y fechas procesales para uso del propio Despacho.",
+          "propuesta": "NO se propone encaje en el Anexo III, apartado de administracion de justicia, y conviene decir por que, porque es la trampa facil de este sistema. Ese supuesto esta escrito para sistemas destinados a ser utilizados por una autoridad judicial o en su nombre. Un despacho que calcula sus propios vencimientos no es autoridad judicial ni actua en su nombre, de modo que la calificacion por Anexo III no se sostiene por el sujeto, por mucho que el resultado sea procesalmente critico.",
+          "duda_declarada": "Aqui hay una divergencia real entre dos lecturas y no se elige la comoda. Lectura A: fuera del Anexo III por el sujeto, luego regimen general, y el control debe ser interno y no regulatorio. Lectura B: si el calculo se ofreciera al cliente como servicio autonomo, cambiaria el escenario y habria que rehacer el analisis. La consecuencia practica es la misma en ambas: la criticidad de este caso de uso NO viene de su clasificacion regulatoria sino de su impacto, y el inventario no debe usar «riesgo limitado» como si fuera «poco importante».",
+          "estado": "PROPUESTA_NO_VALIDADA"
+        }
+      ],
+      "conciliacion_pi30": {
+        "situacion": "NO_APLICA_LA_PROHIBICION",
+        "explicacion": "Ejecucion en infraestructura propia; no es herramienta de tercero.",
+        "ancla": "PI-30 §2 via CTR-GARR-33."
+      },
+      "volumetria_uso": {
+        "valor": "Del orden de cientos de calculos al mes.",
+        "procedencia": "SIMULADO",
+        "nota": "Cifra inventada. Sin telemetria."
+      },
+      "firmeza": "SINTETICO",
+      "ancla": "Declaracion del usuario en el encargo (2026-08-29). El Plan de Sistemas NO cataloga estos workflows.",
+      "procedencia": "DECLARADO_USUARIO"
+    },
+    {
+      "code": "GARR-IA-304",
+      "name": "Workflow de preparación de modelos y escritos",
+      "origen": "NUEVO_EN_ESTE_ENCARGO",
+      "proposito": "Preparar borradores de modelos y escritos a partir de precedentes internos, para su revision y adaptacion por el profesional.",
+      "familia": "WORKFLOW",
+      "modelo_o_proveedor": "Modelo open source tipo Llama, desplegado por el Despacho. Version y tamano no constan.",
+      "despliegue": "Desplegado y operado por el Despacho.",
+      "exposicion": {
+        "nivel": "L3",
+        "etiqueta": "Entregables supervisados",
+        "por_que_ese_y_no_el_contiguo": "Produce el borrador de lo que sera un entregable, siempre bajo revision preceptiva: L3 exacto. No es L4 porque no hay acceso del cliente ni know-how embebido puesto a su disposicion.",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "Taxonomia L1-L4 del Plan de Sistemas; la asignacion es propuesta."
+      },
+      "criticidad_cia": {
+        "confidencialidad": "Extrema",
+        "integridad": "No repudiable",
+        "disponibilidad": "No continua",
+        "justificacion": "Se alimenta de precedentes internos que contienen material de asuntos anteriores; el riesgo dominante es que material de un asunto reaparezca en otro.",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "Criterios CIA del Plan de Sistemas."
+      },
+      "categorias_datos": ["Precedentes internos y modelos", "Documentacion de asuntos anteriores", "Doctrina"],
+      "departamentos_usuarios": ["Mercantil", "Litigación y arbitraje", "Laboral", "Fiscal", "Knowledge"],
+      "nota_departamentos": "Nombres reales del mapa penal del tenant; asignacion SIMULADA.",
+      "organo_responsable": {
+        "slug": "garrigues-comite-gobernanza-ia",
+        "nombre": "Comité de Gobernanza de la Inteligencia Artificial",
+        "por_que": "Mismo criterio que el resto de workflows propios.",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "PI-30 §6."
+      },
+      "estado_ciclo_vida": {
+        "valor": "ACTIVO",
+        "procedencia": "DECLARADO_USUARIO",
+        "ancla": "Encargo del carril de datos sinteticos (2026-08-29), Prompt 1."
+      },
+      "rol_ai_act_propuesto": {
+        "rol": "PROVEEDOR_PREVISIBLE",
+        "razonamiento": "Modelo open source desplegado por el Despacho, sin tercero que asuma documentacion tecnica.",
+        "estado": "PROPUESTA_NO_VALIDADA",
+        "procedencia": "DEMO_PILOTO"
+      },
+      "clasificacion_ai_act_propuesta": [
+        {
+          "caso_de_uso": "Redaccion asistida de borradores con revision profesional preceptiva.",
+          "propuesta": "Sin encaje aparente en el Anexo III.",
+          "duda_declarada": "Ninguna relevante en cuanto a clasificacion. La cautela esta en la reutilizacion de precedentes entre asuntos, que es materia de confidencialidad y no de clasificacion de riesgo.",
+          "estado": "PROPUESTA_NO_VALIDADA"
+        }
+      ],
+      "conciliacion_pi30": {
+        "situacion": "NO_APLICA_LA_PROHIBICION",
+        "explicacion": "Ejecucion en infraestructura propia; no es herramienta de tercero. Si aplica de lleno, en cambio, la regla de PI-30 §3.2(c): la salida debe revisarse, ajustarse y validarse, y no sustituye el trabajo del profesional.",
+        "ancla": "PI-30 §2 y §3.2(c)."
+      },
+      "volumetria_uso": {
+        "valor": "Del orden de cientos de borradores al mes.",
+        "procedencia": "SIMULADO",
+        "nota": "Cifra inventada. Sin telemetria."
+      },
+      "firmeza": "SINTETICO",
+      "ancla": "Declaracion del usuario en el encargo (2026-08-29). El Plan de Sistemas NO cataloga estos workflows.",
+      "procedencia": "DECLARADO_USUARIO"
+    }
+  ],
+
+  "ampliacion_gobernanza_catalogo_c2": {
+    "_aviso": "OVERLAY sobre los 6 sistemas que YA existen en scripts/garrigues/ia/catalogo-ia.ts. NO son altas. No se toca ni un `code`, `name`, `vendor`, `status` ni `risk_level` del catalogo C2: solo se anade la capa que ese catalogo no cubria (exposicion L1-L4, CIA, rol AI Act y conciliacion con PI-30). Si algo de aqui contradijera al catalogo, manda el catalogo.",
+    "sistemas": [
+      {
+        "code": "GARR-IA-001",
+        "name_en_catalogo": "Copilot",
+        "familia": "PUESTO_TRABAJO",
+        "exposicion": {
+          "nivel": "L1",
+          "por_que_ese_y_no_el_contiguo": "Es asistente del puesto de trabajo, uso exclusivo interno: L1. No es L2 porque no hay extranet con contraparte ni notaria. Lo que hace singular a este sistema no es su nivel sino su alcance: al ser transversal a toda la plantilla, un mismo nivel L1 cubre una superficie muchisimo mayor que la de cualquier otro sistema del inventario.",
+          "procedencia": "DEMO_PILOTO"
+        },
+        "criticidad_cia": { "confidencialidad": "Extrema", "integridad": "No repudiable", "disponibilidad": "No continua", "procedencia": "DEMO_PILOTO" },
+        "rol_ai_act_propuesto": { "rol": "RESPONSABLE_DEL_DESPLIEGUE_PREVISIBLE", "razonamiento": "Producto de un tercero que el Despacho utiliza; no lo construye ni lo pone en servicio bajo su nombre.", "estado": "PROPUESTA_NO_VALIDADA", "procedencia": "DEMO_PILOTO" },
+        "conciliacion_pi30": {
+          "situacion": "APROBACION_VERIFICADA_EN_LA_PROPIA_POLITICA",
+          "explicacion": "PI-30 §3.1.1 declara Copilot herramienta corporativa aprobada por el Despacho tras verificar los niveles de seguridad, confidencialidad y cumplimiento normativo exigibles. La conciliacion con la prohibicion del §2 la hace la propia politica al distinguir herramienta corporativa de herramienta de tercero no corporativa. No se anade justificacion inventada: la fuente ya la da.",
+          "cautela": "La aprobacion es del producto, no de cada uso. El incidente INC-IA-005 de este mismo fichero muestra por que: un asistente aprobado puede exponer material restringido si el permiso subyacente esta mal, y eso no lo cura la aprobacion de la herramienta.",
+          "ancla": "PI-30 §3.1.1."
+        },
+        "firmeza": "SINTETICO",
+        "ancla": "PI-30 §3.1.1 para la aprobacion; el resto de campos de esta ficha son propuesta.",
+        "procedencia": "DEMO_PILOTO"
+      },
+      {
+        "code": "GARR-IA-002",
+        "name_en_catalogo": "Harvey",
+        "familia": "COMERCIAL_SAAS",
+        "exposicion": {
+          "nivel": "L3",
+          "por_que_ese_y_no_el_contiguo": "Se usa para analisis documental cuyo resultado se incorpora al trabajo que llega al cliente, con revision preceptiva: L3. No es L1 porque la salida no se agota dentro. No es L4 porque el cliente no accede.",
+          "procedencia": "DEMO_PILOTO"
+        },
+        "criticidad_cia": { "confidencialidad": "Extrema", "integridad": "No repudiable", "disponibilidad": "No continua", "procedencia": "DEMO_PILOTO" },
+        "rol_ai_act_propuesto": { "rol": "RESPONSABLE_DEL_DESPLIEGUE_PREVISIBLE", "razonamiento": "SaaS de tercero utilizado por el Despacho.", "estado": "PROPUESTA_NO_VALIDADA", "procedencia": "DEMO_PILOTO" },
+        "conciliacion_pi30": {
+          "situacion": "APROBACION_VERIFICADA_EN_LA_PROPIA_POLITICA",
+          "explicacion": "Mismo tratamiento que Copilot en PI-30 §3.1.1: herramienta corporativa aprobada tras verificacion.",
+          "cautela": "El corpus no contiene el contrato ni las garantias concretas pactadas con el proveedor. Decir «hay contrato con garantias de no entrenamiento» seria inventar el hecho contractual. Lo unico acreditado es que la politica la declara aprobada.",
+          "ancla": "PI-30 §3.1.1."
+        },
+        "firmeza": "SINTETICO",
+        "ancla": "PI-30 §3.1.1 para la aprobacion; el resto de campos son propuesta.",
+        "procedencia": "DEMO_PILOTO"
+      },
+      {
+        "code": "GARR-IA-003",
+        "name_en_catalogo": "Garrigues GA_IA",
+        "familia": "INFRAESTRUCTURA_PROPIA",
+        "exposicion": {
+          "nivel": "L3",
+          "por_que_ese_y_no_el_contiguo": "El despliegue (3) con RAG sobre corpus documental alimenta trabajo que llega al cliente bajo revision: L3. Su gemelo aislado (GARR-IA-004, GA_IA Local) es L1. Que la misma plataforma tenga dos niveles segun despliegue no es una inconsistencia: es exactamente la razon por la que el Plan clasifica por exposicion y no por producto.",
+          "procedencia": "DEMO_PILOTO"
+        },
+        "criticidad_cia": { "confidencialidad": "Extrema", "integridad": "No repudiable", "disponibilidad": "No continua", "procedencia": "DEMO_PILOTO" },
+        "rol_ai_act_propuesto": { "rol": "INDETERMINADO", "razonamiento": "Plataforma propia, pero no consta si el modelo subyacente es de tercero. Mismo vacio que en GA_IA Local.", "estado": "PROPUESTA_NO_VALIDADA", "procedencia": "DEMO_PILOTO" },
+        "conciliacion_pi30": {
+          "situacion": "APROBADA_CON_EXCEPCION_EXPRESA",
+          "explicacion": "PI-30 §3.1.1 la aprueba como herramienta corporativa propia pero excluye las funcionalidades de Gemini-Google, que quedan sujetas al §3.2 en su totalidad. Esa excepcion es la que hace conflictivo a GARR-IA-005.",
+          "ancla": "PI-30 §3.1.1, ya recogida en `restrictions` del catalogo C2."
+        },
+        "firmeza": "SINTETICO",
+        "ancla": "PI-30 §3.1.1 y Plan de Sistemas («RAG masivo escalable de 100k a 10M paginas»).",
+        "procedencia": "DEMO_PILOTO"
+      },
+      {
+        "code": "GARR-IA-101",
+        "name_en_catalogo": "Acuerdo enterprise OpenAI",
+        "familia": "COMERCIAL_SAAS",
+        "exposicion": {
+          "nivel": "NO_CLASIFICABLE",
+          "por_que": "No se clasifica porque no hay uso concreto acreditado que clasificar. El catalogo C2 ya dice que es una declaracion del usuario sin respaldo documental y sin caso de uso. Asignarle un nivel L1-L4 seria fabricar el uso que falta.",
+          "procedencia": "DECLARADO_USUARIO"
+        },
+        "rol_ai_act_propuesto": { "rol": "NO_EVALUABLE", "razonamiento": "Sin caso de uso no hay rol que determinar.", "estado": "PROPUESTA_NO_VALIDADA", "procedencia": "DECLARADO_USUARIO" },
+        "conciliacion_pi30": {
+          "situacion": "CONFLICTO_NO_RESUELTO",
+          "explicacion": "PI-30 no menciona acuerdos enterprise y clasifica la version publica de este proveedor como herramienta NO corporativa (§3.1.2). Un acuerdo enterprise podria resolver la tension, pero el corpus no lo contiene y no se da por bueno. Este es, textualmente, un conflicto no resuelto, y se prefiere dejarlo asi antes que redactar una justificacion que nadie ha firmado.",
+          "ancla": "PI-30 §3.1.2 y descripcion de GARR-IA-101 en el catalogo C2."
+        },
+        "firmeza": "SINTETICO",
+        "ancla": "Catalogo C2 (DECLARADO_USUARIO) + PI-30 §3.1.2.",
+        "procedencia": "DECLARADO_USUARIO"
+      },
+      {
+        "code": "GARR-IA-102",
+        "name_en_catalogo": "Acuerdo enterprise Anthropic",
+        "familia": "COMERCIAL_SAAS",
+        "exposicion": {
+          "nivel": "NO_CLASIFICABLE",
+          "por_que": "Identica situacion que GARR-IA-101: sin caso de uso acreditado no hay exposicion que medir.",
+          "procedencia": "DECLARADO_USUARIO"
+        },
+        "rol_ai_act_propuesto": { "rol": "NO_EVALUABLE", "razonamiento": "Sin caso de uso no hay rol que determinar.", "estado": "PROPUESTA_NO_VALIDADA", "procedencia": "DECLARADO_USUARIO" },
+        "conciliacion_pi30": {
+          "situacion": "CONFLICTO_NO_RESUELTO",
+          "explicacion": "Misma cautela que con OpenAI: PI-30 no menciona el acuerdo y clasifica la version publica del proveedor como no corporativa.",
+          "ancla": "PI-30 §3.1.2 y descripcion de GARR-IA-102 en el catalogo C2."
+        },
+        "firmeza": "SINTETICO",
+        "ancla": "Catalogo C2 (DECLARADO_USUARIO) + PI-30 §3.1.2.",
+        "procedencia": "DECLARADO_USUARIO"
+      },
+      {
+        "code": "GARR-IA-201",
+        "name_en_catalogo": "Soluciones agénticas de proceso",
+        "familia": "WORKFLOW",
+        "exposicion": {
+          "nivel": "NO_CLASIFICABLE",
+          "por_que": "Es roadmap. No hay sistema desplegado cuya exposicion medir. El catalogo C2 ya lo marca PLANIFICADO y PLAN_NO_DESPLEGADO.",
+          "procedencia": "PLAN_NO_DESPLEGADO"
+        },
+        "rol_ai_act_propuesto": { "rol": "NO_EVALUABLE", "razonamiento": "No hay sistema en servicio.", "estado": "PROPUESTA_NO_VALIDADA", "procedencia": "PLAN_NO_DESPLEGADO" },
+        "conciliacion_pi30": {
+          "situacion": "PENDIENTE",
+          "explicacion": "Se concilia cuando exista. Anotarlo ahora seria dar por hecho el despliegue.",
+          "ancla": "Catalogo C2, GARR-IA-201."
+        },
+        "advertencia_de_gobierno": "Cuando esto se despliegue, la autonomia de ejecucion rompe el supuesto sobre el que descansa todo el resto del inventario: la revision humana preceptiva de PI-30 §3.2(c). Un agente que ejecuta no tiene revision previa por definicion. Es la unica linea del roadmap que obliga a rehacer el modelo de control, no solo a anadir una ficha.",
+        "firmeza": "SINTETICO",
+        "ancla": "Catalogo C2, GARR-IA-201 (PLAN_NO_DESPLEGADO).",
+        "procedencia": "PLAN_NO_DESPLEGADO"
+      }
+    ]
+  },
+
+  "evaluaciones": [
+    {
+      "_nota_metodologica_comun": "Las diez evaluaciones aplican los factores P1 y P2 de la metodologia REAL del PPD (P1: habitual 5 / ocasional 2,5 / remoto 1 / fuera de alcance sin valor; P2: solo Socio-Counsel-Director 1 / Asoc. Principal-Gerente y superior 1,25 / Asoc. Senior-mando intermedio y superior 1,5 / Staff y superior 2; bruto maximo 10; relativa = bruto/10; bandas Muy alta ≥0,8, Alta ≥0,6, Media ≥0,4, Baja ≥0,2, Muy baja ≥0). El factor P4 se declara por componentes y NO se compone en un numero, porque el ancla da los pesos pero no la formula. El `nivel_riesgo_propuesto` NO sale de la matriz oficial: el ancla no contiene las celdas del cruce. Se propone y se marca DEMO_PILOTO."
+    },
+    {
+      "id": "EV-IA-01",
+      "sistema": "GARR-IA-001",
+      "sistema_nombre": "Copilot",
+      "estado": "CONCLUIDA_CON_RESERVA",
+      "fecha": "2026-02-17",
+      "nota_fecha": "Fecha SIMULADA. No corresponde a ninguna sesion real.",
+      "amenazas": [
+        "Introduccion inadvertida de informacion de cliente en prompts, por ser una herramienta siempre presente en el puesto de trabajo.",
+        "Exposicion de contenido restringido a traves de la busqueda asistida cuando los permisos del repositorio no reflejan una barrera de informacion.",
+        "Dependencia del criterio del usuario para distinguir uso corporativo de uso no corporativo."
+      ],
+      "calculo_probabilidad": {
+        "P1": { "valor": 5, "etiqueta": "Trabajo habitual", "por_que": "El Plan lo describe transversal a toda la plantilla en el puesto de trabajo." },
+        "P2": { "valor": 2, "etiqueta": "Staff y superior", "por_que": "No hay restriccion de categoria: lo usa todo el personal." },
+        "bruto": 10,
+        "maximo_del_algoritmo": 10,
+        "relativa": 1.0,
+        "banda": "Muy alta"
+      },
+      "P4_entorno_control": {
+        "valoracion": "Aceptable",
+        "medidas_preventivas": { "etiqueta": "Hay varias medidas especificas", "peso_del_ancla": 0.35 },
+        "incidencias": { "etiqueta": "Con incidencias leves", "peso_del_ancla": 0.25, "referencia": "INC-IA-005" },
+        "nota": "Los pesos son los del ancla. NO se combinan con P1xP2 porque la formula de composicion no consta."
+      },
+      "impacto": { "valor": "Alto", "procedencia": "DEMO_PILOTO" },
+      "nivel_riesgo_propuesto": { "nivel": "Alto", "color": "#FFC000", "procedencia": "DEMO_PILOTO", "aviso": "Propuesta. Las celdas de la matriz oficial no constan en el ancla." },
+      "medidas_existentes": ["CTR-GARR-33", "CTR-IA-06", "CTR-IA-08"],
+      "residuo": { "nivel": "Medio", "color": "#FFFF00", "procedencia": "DEMO_PILOTO" },
+      "conclusion": "El sistema puede seguir en uso. La reserva es que la aprobacion documentada en PI-30 §3.1.1 cubre la herramienta, no cada uso, y el control efectivo depende de que los permisos del repositorio reflejen las barreras de informacion, que es un control ajeno al sistema de IA.",
+      "firmeza": "SINTETICO",
+      "ancla": "Metodologia P1/P2 del PPD (real) + PI-30 §3.1.1. Los valores asignados a este sistema son SIMULADOS.",
+      "procedencia": "SIMULADO"
+    },
+    {
+      "id": "EV-IA-02",
+      "sistema": "GARR-IA-002",
+      "sistema_nombre": "Harvey",
+      "estado": "CONCLUIDA_CONFORME",
+      "fecha": "2026-03-03",
+      "nota_fecha": "Fecha SIMULADA.",
+      "amenazas": [
+        "Tratamiento de documentacion de asunto en infraestructura de un tercero.",
+        "Alucinacion juridica incorporada a un entregable sin deteccion en revision.",
+        "Dependencia de garantias contractuales que el corpus documental no contiene."
+      ],
+      "calculo_probabilidad": {
+        "P1": { "valor": 2.5, "etiqueta": "Trabajo ocasional", "por_que": "Uso especializado, no transversal a la plantilla." },
+        "P2": { "valor": 1.5, "etiqueta": "Asoc. Senior / mando intermedio y superior", "por_que": "Perfil de uso concentrado en categorias con criterio juridico consolidado." },
+        "bruto": 3.75,
+        "maximo_del_algoritmo": 10,
+        "relativa": 0.375,
+        "banda": "Baja"
+      },
+      "P4_entorno_control": {
+        "valoracion": "Aceptable",
+        "medidas_preventivas": { "etiqueta": "Hay varias medidas especificas", "peso_del_ancla": 0.35 },
+        "incidencias": { "etiqueta": "Sin incidencias en los 2 ultimos anos", "peso_del_ancla": 0 },
+        "nota": "Pesos del ancla, sin componer."
+      },
+      "impacto": { "valor": "Muy alto", "procedencia": "DEMO_PILOTO", "por_que": "Trata material amparado por el secreto profesional." },
+      "nivel_riesgo_propuesto": { "nivel": "Medio", "color": "#FFFF00", "procedencia": "DEMO_PILOTO", "aviso": "Propuesta. Aqui se ve por que hace falta la matriz real: una probabilidad Baja con impacto Muy alto puede caer en Medio o en Alto segun la celda, y esa celda no consta." },
+      "medidas_existentes": ["CTR-IA-02", "CTR-IA-06"],
+      "residuo": { "nivel": "Bajo", "color": "#92D050", "procedencia": "DEMO_PILOTO" },
+      "conclusion": "Conforme para continuar. Se deja constancia expresa de que la evaluacion NO ha visto el contrato con el proveedor: la conformidad descansa en la aprobacion de PI-30 §3.1.1, no en garantias contractuales verificadas.",
+      "firmeza": "SINTETICO",
+      "ancla": "Metodologia P1/P2 del PPD + PI-30 §3.1.1. Valores SIMULADOS.",
+      "procedencia": "SIMULADO"
+    },
+    {
+      "id": "EV-IA-03",
+      "sistema": "GARR-IA-003",
+      "sistema_nombre": "Garrigues GA_IA (despliegue 3, RAG sobre corpus)",
+      "estado": "CONCLUIDA_CON_MEDIDAS",
+      "fecha": "2026-04-21",
+      "nota_fecha": "Fecha SIMULADA.",
+      "amenazas": [
+        "Fuga de contexto entre asuntos al recuperar fragmentos del corpus sin respetar barreras de informacion.",
+        "Inyeccion de instrucciones embebidas en documentacion de contraparte cargada en el corpus.",
+        "Perdida de integridad de las fuentes citadas en la respuesta.",
+        "Ampliacion de la superficie al escalar el corpus de 100k a 10M paginas."
+      ],
+      "calculo_probabilidad": {
+        "P1": { "valor": 5, "etiqueta": "Trabajo habitual" },
+        "P2": { "valor": 2, "etiqueta": "Staff y superior" },
+        "bruto": 10,
+        "maximo_del_algoritmo": 10,
+        "relativa": 1.0,
+        "banda": "Muy alta"
+      },
+      "P4_entorno_control": {
+        "valoracion": "Aceptable",
+        "medidas_preventivas": { "etiqueta": "Hay varias medidas especificas", "peso_del_ancla": 0.35 },
+        "incidencias": { "etiqueta": "Con incidencias graves", "peso_del_ancla": 0.5, "referencia": "INC-IA-003" },
+        "nota": "Pesos del ancla, sin componer."
+      },
+      "impacto": { "valor": "Muy alto", "procedencia": "DEMO_PILOTO" },
+      "nivel_riesgo_propuesto": { "nivel": "Muy alto", "color": "#FF0000", "procedencia": "DEMO_PILOTO" },
+      "medidas_existentes": ["CTR-IA-01", "CTR-IA-02", "CTR-IA-03", "CTR-IA-06"],
+      "medidas_previstas": ["CTR-IA-05"],
+      "residuo": { "nivel": "Alto", "color": "#FFC000", "procedencia": "DEMO_PILOTO", "por_que": "El residuo no baja de Alto mientras el control de fuga en el escalado del corpus (CTR-IA-05) siga en implantacion." },
+      "conclusion": "Continua en uso con las medidas descritas. El escalado del corpus no debe completarse antes de que CTR-IA-05 este operativo: es el unico punto donde una decision de capacidad y una decision de control estan acopladas.",
+      "firmeza": "SINTETICO",
+      "ancla": "Metodologia P1/P2 del PPD + Plan de Sistemas («RAG masivo escalable de 100k a 10M paginas con control de fuga de datos»). Valores SIMULADOS.",
+      "procedencia": "SIMULADO"
+    },
+    {
+      "id": "EV-IA-04",
+      "sistema": "GARR-IA-004",
+      "sistema_nombre": "GA_IA Local",
+      "estado": "PRELIMINAR_SOBRE_DISENO",
+      "fecha": "2026-05-12",
+      "nota_fecha": "Fecha SIMULADA.",
+      "amenazas": [
+        "Rotura del aislamiento por una via de salida no prevista (actualizaciones, telemetria, soporte remoto).",
+        "Concentracion de material ultraconfidencial en un unico entorno.",
+        "Falsa sensacion de seguridad: que el aislamiento se use para relajar la revision humana."
+      ],
+      "calculo_probabilidad": {
+        "P1": { "valor": 2.5, "etiqueta": "Trabajo ocasional", "por_que": "Uso reservado a asuntos ultraconfidenciales." },
+        "P2": { "valor": 1, "etiqueta": "Solo Socio / Counsel / Director", "por_que": "Acceso restringido a las categorias que llevan esos asuntos." },
+        "bruto": 2.5,
+        "maximo_del_algoritmo": 10,
+        "relativa": 0.25,
+        "banda": "Baja"
+      },
+      "P4_entorno_control": {
+        "valoracion": "Aceptable",
+        "medidas_preventivas": { "etiqueta": "Hay varias medidas especificas", "peso_del_ancla": 0.35 },
+        "incidencias": { "etiqueta": "Sin incidencias en los 2 ultimos anos", "peso_del_ancla": 0 },
+        "nota": "Pesos del ancla, sin componer. La ausencia de incidencias aqui no es merito del control: es que el sistema no consta desplegado."
+      },
+      "impacto": { "valor": "Muy alto", "procedencia": "DEMO_PILOTO" },
+      "nivel_riesgo_propuesto": { "nivel": "Medio", "color": "#FFFF00", "procedencia": "DEMO_PILOTO" },
+      "medidas_existentes": ["CTR-IA-04", "CTR-IA-06"],
+      "residuo": { "nivel": "Bajo", "color": "#92D050", "procedencia": "DEMO_PILOTO" },
+      "conclusion": "Evaluacion sobre el DISENO, no sobre el sistema en produccion: el Plan situa el hito en Q1-Q2 2026 y no consta go-live. La conclusion favorable queda condicionada a verificar el aislamiento efectivo una vez desplegado. Marcar esta evaluacion como cerrada sobre un sistema en produccion seria un error de lectura.",
+      "firmeza": "SINTETICO",
+      "ancla": "Metodologia P1/P2 del PPD + Plan de Sistemas, «Seguridad en IA» y roadmap. Valores SIMULADOS.",
+      "procedencia": "SIMULADO"
+    },
+    {
+      "id": "EV-IA-05",
+      "sistema": "GARR-IA-005",
+      "sistema_nombre": "Chatbots sobre Gemini en GA_IA",
+      "estado": "EN_CURSO_SIN_CONCLUSION",
+      "fecha_inicio": "2026-06-09",
+      "nota_fecha": "Fecha SIMULADA.",
+      "amenazas": [
+        "Uso corporativo de una funcionalidad que la propia politica excluye del regimen de aprobacion de la plataforma.",
+        "Deriva de clasificacion: que la salida del chatbot alimente entregables sin que nadie reclasifique el sistema a L3.",
+        "Ausencia de determinacion del rol (proveedor / responsable del despliegue) y, con ella, de la carga documental."
+      ],
+      "calculo_probabilidad": {
+        "P1": { "valor": 5, "etiqueta": "Trabajo habitual" },
+        "P2": { "valor": 2, "etiqueta": "Staff y superior" },
+        "bruto": 10,
+        "maximo_del_algoritmo": 10,
+        "relativa": 1.0,
+        "banda": "Muy alta"
+      },
+      "P4_entorno_control": {
+        "valoracion": "Insuficiente",
+        "medidas_preventivas": { "etiqueta": "Solo medidas generales", "peso_del_ancla": 0.15 },
+        "incidencias": { "etiqueta": "Sin incidencias en los 2 ultimos anos", "peso_del_ancla": 0 },
+        "nota": "Pesos del ancla, sin componer."
+      },
+      "impacto": { "valor": "SIN_DETERMINAR", "procedencia": "DEMO_PILOTO" },
+      "nivel_riesgo_propuesto": { "nivel": null, "color": "#D9D9D9", "procedencia": "DEMO_PILOTO", "aviso": "Gris = sin valor / no evaluado, conforme al codigo de color del ancla." },
+      "medidas_existentes": ["CTR-IA-06"],
+      "residuo": { "nivel": null, "color": "#D9D9D9" },
+      "conclusion": null,
+      "por_que_sigue_abierta": "Porque el punto que la bloquea es normativo interno y no tecnico: PI-30 §3.1.1 excluye expresamente las funcionalidades de Gemini-Google del paraguas de aprobacion de GA_IA y las remite al §3.2 en su totalidad. Hasta que el Comité de Gobernanza de la IA se pronuncie sobre si un chatbot corporativo construido sobre Gemini queda dentro o fuera de esa exclusion, cerrar la evaluacion seria decidir por el Comité. Se deja abierta a proposito.",
+      "firmeza": "SINTETICO",
+      "ancla": "PI-30 §3.1.1 (exclusion real) + metodologia P1/P2 del PPD. Valores SIMULADOS.",
+      "procedencia": "SIMULADO"
+    },
+    {
+      "id": "EV-IA-06",
+      "sistema": "GARR-IA-301",
+      "sistema_nombre": "Workflow de traducción jurídica",
+      "estado": "CONCLUIDA_CON_MEDIDAS",
+      "fecha": "2026-05-26",
+      "nota_fecha": "Fecha SIMULADA.",
+      "amenazas": [
+        "Error material en la traduccion de una clausula que invierta su sentido.",
+        "Traduccion plausible pero juridicamente inexacta de terminos sin equivalente directo entre ordenamientos.",
+        "Ausencia de proveedor externo que asuma la documentacion tecnica del modelo."
+      ],
+      "calculo_probabilidad": {
+        "P1": { "valor": 2.5, "etiqueta": "Trabajo ocasional" },
+        "P2": { "valor": 1.5, "etiqueta": "Asoc. Senior / mando intermedio y superior" },
+        "bruto": 3.75,
+        "maximo_del_algoritmo": 10,
+        "relativa": 0.375,
+        "banda": "Baja"
+      },
+      "P4_entorno_control": {
+        "valoracion": "Aceptable",
+        "medidas_preventivas": { "etiqueta": "Hay una medida especifica", "peso_del_ancla": 0.25 },
+        "incidencias": { "etiqueta": "Con incidencias leves", "peso_del_ancla": 0.25, "referencia": "INC-IA-004" },
+        "nota": "Pesos del ancla, sin componer."
+      },
+      "impacto": { "valor": "Alto", "procedencia": "DEMO_PILOTO" },
+      "nivel_riesgo_propuesto": { "nivel": "Medio", "color": "#FFFF00", "procedencia": "DEMO_PILOTO" },
+      "medidas_existentes": ["CTR-IA-02", "CTR-IA-06"],
+      "medidas_previstas": ["CTR-IA-10"],
+      "residuo": { "nivel": "Medio", "color": "#FFFF00", "procedencia": "DEMO_PILOTO", "por_que": "El incidente INC-IA-004 demuestra que la revision generica no basta para clausulas negativas: hasta que exista verificacion dirigida (CTR-IA-10) el residuo no baja." },
+      "conclusion": "Continua en uso con verificacion reforzada sobre clausulas de obligacion negativa, limitacion de responsabilidad y no competencia, que son donde una inversion de sentido pasa desapercibida.",
+      "firmeza": "SINTETICO",
+      "ancla": "Metodologia P1/P2 del PPD. Sistema y valores SIMULADOS sobre declaracion del usuario.",
+      "procedencia": "SIMULADO"
+    },
+    {
+      "id": "EV-IA-07",
+      "sistema": "GARR-IA-302",
+      "sistema_nombre": "Workflow de conversión de PDF",
+      "estado": "CONCLUIDA_CONFORME",
+      "fecha": "2026-04-07",
+      "nota_fecha": "Fecha SIMULADA.",
+      "amenazas": [
+        "Error de conversion silencioso que se propaga a los flujos que consumen el texto.",
+        "Perdida de estructura en documentos a doble columna o con tablas.",
+        "Volumen alto de documentacion sensible atravesando un solo componente."
+      ],
+      "calculo_probabilidad": {
+        "P1": { "valor": 5, "etiqueta": "Trabajo habitual" },
+        "P2": { "valor": 2, "etiqueta": "Staff y superior" },
+        "bruto": 10,
+        "maximo_del_algoritmo": 10,
+        "relativa": 1.0,
+        "banda": "Muy alta"
+      },
+      "P4_entorno_control": {
+        "valoracion": "Aceptable",
+        "medidas_preventivas": { "etiqueta": "Hay una medida especifica", "peso_del_ancla": 0.25 },
+        "incidencias": { "etiqueta": "Sin incidencias en los 2 ultimos anos", "peso_del_ancla": 0 },
+        "nota": "Pesos del ancla, sin componer."
+      },
+      "impacto": { "valor": "Bajo", "procedencia": "DEMO_PILOTO", "por_que": "Por si solo no produce efecto exterior; su dano se materializa a traves de otro sistema." },
+      "nivel_riesgo_propuesto": { "nivel": "Medio", "color": "#FFFF00", "procedencia": "DEMO_PILOTO" },
+      "medidas_existentes": ["CTR-IA-03", "CTR-IA-06"],
+      "residuo": { "nivel": "Bajo", "color": "#92D050", "procedencia": "DEMO_PILOTO" },
+      "conclusion": "Conforme. Se hace constar una asimetria util para el gobierno: es el sistema de menor impacto propio y el de mayor volumen, de modo que su nivel de exposicion L1 no debe leerse como irrelevancia. Un fallo aqui se ve tarde y en otro sitio.",
+      "firmeza": "SINTETICO",
+      "ancla": "Metodologia P1/P2 del PPD. Sistema y valores SIMULADOS sobre declaracion del usuario.",
+      "procedencia": "SIMULADO"
+    },
+    {
+      "id": "EV-IA-08",
+      "sistema": "GARR-IA-303",
+      "sistema_nombre": "Workflow de cálculo de plazos y fechas procesales",
+      "estado": "CONCLUIDA_ELEVA_A_EVALUACION_REFORZADA",
+      "fecha": "2026-06-23",
+      "nota_fecha": "Fecha SIMULADA.",
+      "amenazas": [
+        "Calculo erroneo de un vencimiento que se anote en la agenda del asunto sin verificacion.",
+        "Error sistematico, no aleatorio: un mismo criterio mal aprendido afecta a todos los asuntos del mismo tipo a la vez.",
+        "Deteccion tardia por construccion: un plazo mal calculado se descubre cuando ya ha pasado.",
+        "Ausencia de proveedor externo que asuma la documentacion tecnica del sistema."
+      ],
+      "calculo_probabilidad": {
+        "P1": { "valor": 2.5, "etiqueta": "Trabajo ocasional" },
+        "P2": { "valor": 1.5, "etiqueta": "Asoc. Senior / mando intermedio y superior" },
+        "bruto": 3.75,
+        "maximo_del_algoritmo": 10,
+        "relativa": 0.375,
+        "banda": "Baja"
+      },
+      "P4_entorno_control": {
+        "valoracion": "Insuficiente",
+        "medidas_preventivas": { "etiqueta": "Solo medidas generales", "peso_del_ancla": 0.15 },
+        "incidencias": { "etiqueta": "Sin incidencias en los 2 ultimos anos", "peso_del_ancla": 0 },
+        "nota": "Pesos del ancla, sin componer. La valoracion Insuficiente no se apoya en incidencias sino en la ausencia de una medida especifica de doble verificacion."
+      },
+      "impacto": { "valor": "Muy alto", "procedencia": "DEMO_PILOTO" },
+      "nivel_riesgo_propuesto": { "nivel": "Alto", "color": "#FFC000", "procedencia": "DEMO_PILOTO" },
+      "medidas_existentes": ["CTR-IA-06"],
+      "medidas_previstas": ["CTR-IA-10", "CTR-IA-09"],
+      "residuo": { "nivel": "SIN_DETERMINAR", "color": "#D9D9D9", "por_que": "No se fija residuo antes de la evaluacion reforzada. Poner una cifra ahora seria dar por hecho el resultado de un analisis que aun no se ha hecho." },
+      "conclusion": "Esta evaluacion NO se cierra con un residuo: concluye que el caso de uso debe elevarse a una evaluacion de impacto reforzada, y aqui esta el razonamiento, porque es contraintuitivo. La probabilidad calculada es Baja y, por la clasificacion regulatoria, este caso de uso NO encaja en el supuesto de administracion de justicia del Anexo III (ese supuesto mira a sistemas destinados a una autoridad judicial o a quien actua en su nombre, y un despacho que calcula sus propios vencimientos no lo es). Es decir: por metodologia sale bajo y por regulacion sale fuera. Y aun asi hay que reforzar, porque las dos cosas que miden probabilidad y clasificacion no capturan lo que define este sistema: que su error es sistematico y de deteccion imposible antes del vencimiento. Cerrarla en «Bajo» seria un ejemplo de libro de metodologia bien aplicada a la pregunta equivocada.",
+      "elevacion": {
+        "a_organo": "garrigues-comite-gobernanza-ia",
+        "con_traslado_a": "garrigues-comite-practica-profesional",
+        "motivo_del_traslado": "El criterio de verificacion humana de un plazo procesal es materia de practica profesional, no de tecnologia."
+      },
+      "firmeza": "SINTETICO",
+      "ancla": "Metodologia P1/P2 del PPD. Sistema y valores SIMULADOS sobre declaracion del usuario.",
+      "procedencia": "SIMULADO"
+    },
+    {
+      "id": "EV-IA-09",
+      "sistema": "GARR-IA-304",
+      "sistema_nombre": "Workflow de preparación de modelos y escritos",
+      "estado": "CONCLUIDA_CON_MEDIDAS",
+      "fecha": "2026-07-14",
+      "nota_fecha": "Fecha SIMULADA.",
+      "amenazas": [
+        "Reaparicion de material identificable de un asunto anterior en el borrador de otro.",
+        "Borrador plausible que el revisor acepta con menos escrutinio del que aplicaria a un texto propio.",
+        "Erosion del criterio profesional por sustitucion progresiva de la redaccion inicial."
+      ],
+      "calculo_probabilidad": {
+        "P1": { "valor": 5, "etiqueta": "Trabajo habitual" },
+        "P2": { "valor": 1.5, "etiqueta": "Asoc. Senior / mando intermedio y superior" },
+        "bruto": 7.5,
+        "maximo_del_algoritmo": 10,
+        "relativa": 0.75,
+        "banda": "Alta"
+      },
+      "P4_entorno_control": {
+        "valoracion": "Aceptable",
+        "medidas_preventivas": { "etiqueta": "Hay varias medidas especificas", "peso_del_ancla": 0.35 },
+        "incidencias": { "etiqueta": "Sin incidencias en los 2 ultimos anos", "peso_del_ancla": 0 },
+        "nota": "Pesos del ancla, sin componer."
+      },
+      "impacto": { "valor": "Alto", "procedencia": "DEMO_PILOTO" },
+      "nivel_riesgo_propuesto": { "nivel": "Alto", "color": "#FFC000", "procedencia": "DEMO_PILOTO" },
+      "medidas_existentes": ["CTR-IA-02", "CTR-IA-03", "CTR-IA-06"],
+      "residuo": { "nivel": "Medio", "color": "#FFFF00", "procedencia": "DEMO_PILOTO" },
+      "conclusion": "Continua en uso. La medida que sostiene el residuo es la anonimizacion del precedente antes de su incorporacion al corpus de modelos: sin ella, la reutilizacion de precedentes es indistinguible de una fuga entre asuntos.",
+      "firmeza": "SINTETICO",
+      "ancla": "Metodologia P1/P2 del PPD + PI-30 §3.2(c). Sistema y valores SIMULADOS sobre declaracion del usuario.",
+      "procedencia": "SIMULADO"
+    },
+    {
+      "id": "EV-IA-10",
+      "sistema": "GARR-IA-101, GARR-IA-102",
+      "sistema_nombre": "Acuerdos enterprise OpenAI y Anthropic",
+      "estado": "EN_CURSO_SIN_CONCLUSION",
+      "fecha_inicio": "2026-07-28",
+      "nota_fecha": "Fecha SIMULADA.",
+      "amenazas": [
+        "Que un acuerdo declarado pero no documentado se lea como habilitacion de uso.",
+        "Que la version publica del mismo proveedor, expresamente no corporativa en PI-30 §3.1.2, se confunda con la version cubierta por el acuerdo."
+      ],
+      "calculo_probabilidad": {
+        "P1": { "valor": null, "etiqueta": "Sin valor", "por_que": "El propio ancla contempla la rama «trabajo fuera de alcance = sin valor». No consta uso concreto de estos acuerdos, luego no hay frecuencia de exposicion que puntuar. Asignarle un 2,5 para poder cerrar el calculo seria fabricar el uso." },
+        "P2": { "valor": null, "etiqueta": "Sin valor" },
+        "bruto": null,
+        "relativa": null,
+        "banda": "Sin valor"
+      },
+      "P4_entorno_control": { "valoracion": "SIN_DETERMINAR" },
+      "impacto": { "valor": "SIN_DETERMINAR" },
+      "nivel_riesgo_propuesto": { "nivel": null, "color": "#D9D9D9", "procedencia": "DEMO_PILOTO" },
+      "medidas_existentes": ["CTR-GARR-33"],
+      "residuo": { "nivel": null, "color": "#D9D9D9" },
+      "conclusion": null,
+      "por_que_sigue_abierta": "Falta el documento. El catalogo C2 ya declara que estos dos registros son DECLARADO_USUARIO sin respaldo en el corpus, y PI-30 clasifica la version publica de ambos proveedores como herramienta NO corporativa. La evaluacion no puede avanzar sin el acuerdo, y el acuerdo no se inventa.",
+      "firmeza": "SINTETICO",
+      "ancla": "Catalogo C2 (GARR-IA-101/102) + PI-30 §3.1.2. La evaluacion como tal es SIMULADA.",
+      "procedencia": "SIMULADO"
+    },
+    {
+      "id": "EV-IA-AUD-2026",
+      "tipo": "COMPROMISO_AUDITORIA_EXTERNA",
+      "sistema": "Alcance transversal al inventario de IA",
+      "estado": "COMPROMETIDA_NO_EJECUTADA",
+      "objeto": "Auditoria externa de cumplimiento normativo (AI Act), seguridad tecnica y analisis de sesgo algoritmico.",
+      "presupuesto_eur": 25000,
+      "ejercicio": 2026,
+      "fecha_concreta": null,
+      "por_que_sin_fecha": "El Plan consigna la partida y el ejercicio, no un mes. Poner una fecha concreta la haria parecer una planificacion medida cuando seria inventada.",
+      "estado_de_ejecucion": "No consta encargo, adjudicacion ni informe. Se modela como COMPROMISO, no como hecho consumado: un inventario que diera por auditado lo que solo esta presupuestado estaria mintiendo en el sentido mas caro.",
+      "control_asociado": "CTR-IA-07",
+      "firmeza": "SINTETICO",
+      "ancla": "Plan de Sistemas 2025-2027, «Seguridad en IA»: partida especifica de 25.000 EUR para auditoria externa de cumplimiento normativo (AI Act), seguridad tecnica y analisis de sesgo algoritmico. El importe y el objeto son REALES; el estado de ejecucion es lectura conservadora, no dato.",
+      "procedencia": "PLAN_NO_DESPLEGADO"
+    }
+  ],
+
+  "incidentes": [
+    {
+      "_nota_comun": "Los seis incidentes son SIMULADOS en su integridad: no ha ocurrido ninguno. Todas las fechas son inventadas y se expresan solo a nivel de dia, sin hora, para que no puedan leerse como registro de un sistema de deteccion. Los intervinientes se identifican por cargo u organo, nunca por nombre."
+    },
+    {
+      "id": "INC-IA-001",
+      "titulo": "Cita jurisprudencial inexistente en un borrador de informe",
+      "sistema": "GARR-IA-003",
+      "severidad": "Media",
+      "estado": "RESUELTO",
+      "cronologia": [
+        { "fecha": "2026-02-05", "actuacion": "Un equipo genera con GA_IA el borrador de un informe para cliente que incluye tres referencias jurisprudenciales." },
+        { "fecha": "2026-02-06", "actuacion": "El socio responsable del asunto, en la revision preceptiva previa a la entrega, no logra localizar una de las tres resoluciones citadas." },
+        { "fecha": "2026-02-06", "actuacion": "Se verifica que la referencia no existe: organo, fecha y numero son verosimiles pero no corresponden a ninguna resolucion." },
+        { "fecha": "2026-02-09", "actuacion": "Se retira el borrador, se rehace la seccion con fuentes verificadas y se entrega al cliente." },
+        { "fecha": "2026-02-13", "actuacion": "Se traslada el caso al Comité de Gobernanza de la Inteligencia Artificial como ejemplo de uso." }
+      ],
+      "deteccion": "Revision preceptiva del profesional antes de la entrega. No hubo deteccion automatica: la salida era internamente coherente.",
+      "contencion": "El borrador no salio del Despacho. Ningun documento con la cita llego al cliente.",
+      "causa_raiz": "Alucinacion juridica del modelo generativo. La causa proxima es el modelo; la causa de gobierno es que el sistema presentaba la cita con el mismo formato y aplomo que las verificadas, sin senalar que no procedia de una fuente del corpus.",
+      "leccion": "La revision humana funciono, que es exactamente lo que PI-30 §3.2(c) exige, pero funciono por diligencia individual y no por control del sistema. La medida util no es insistir en revisar: es que el sistema distinga en su salida lo recuperado del corpus de lo generado.",
+      "control_reforzado": "CTR-IA-02",
+      "consecuencia_societaria": null,
+      "firmeza": "SINTETICO",
+      "ancla": "Plan de Sistemas 2025-2027, «Seguridad en IA»: guardrails para «evitar alucinaciones juridicas». El incidente concreto es inventado.",
+      "procedencia": "SIMULADO"
+    },
+    {
+      "id": "INC-IA-002",
+      "titulo": "Intento de inyección de prompt a través de documentación de contraparte",
+      "sistema": "GARR-IA-003",
+      "severidad": "Media",
+      "estado": "RESUELTO",
+      "cronologia": [
+        { "fecha": "2026-03-11", "actuacion": "Se incorpora al corpus documentacion remitida por la contraparte en un procedimiento." },
+        { "fecha": "2026-03-12", "actuacion": "La capa de orquestacion bloquea una consulta al detectar en el material instrucciones dirigidas al sistema, embebidas en el documento con formato no visible en lectura ordinaria." },
+        { "fecha": "2026-03-12", "actuacion": "Se aisla el documento y se analiza su contenido." },
+        { "fecha": "2026-03-17", "actuacion": "Se anade el patron detectado al conjunto de reglas de la capa de orquestacion y se cierra el incidente." }
+      ],
+      "deteccion": "Guardrail de la capa de orquestacion. Esta vez si hubo deteccion automatica.",
+      "contencion": "La consulta se bloqueo antes de generar respuesta. El documento quedo aislado del corpus consultable.",
+      "causa_raiz": "Contenido de tercero incorporado al corpus sin inspeccion previa de instrucciones embebidas. No se ha podido determinar si el texto era un intento deliberado o el residuo de otro sistema, y no se afirma que fuera deliberado.",
+      "leccion": "El vector no es el usuario: es el documento. Cualquier corpus que ingiera material de contraparte hereda la superficie de ataque de ese material, y eso escala con el corpus, no con el numero de usuarios.",
+      "control_reforzado": "CTR-IA-01",
+      "consecuencia_societaria": null,
+      "firmeza": "SINTETICO",
+      "ancla": "Plan de Sistemas 2025-2027: guardrails anti-jailbreak en la capa de orquestacion «para neutralizar inyecciones de prompt». El incidente concreto es inventado.",
+      "procedencia": "SIMULADO"
+    },
+    {
+      "id": "INC-IA-003",
+      "titulo": "Fuga de contexto entre asuntos en la recuperación del RAG",
+      "sistema": "GARR-IA-003",
+      "severidad": "Alta",
+      "estado": "EN_SEGUIMIENTO",
+      "cronologia": [
+        { "fecha": "2026-04-14", "actuacion": "Un equipo observa que entre las fuentes citadas en una respuesta figura un fragmento que no pertenece a su asunto." },
+        { "fecha": "2026-04-14", "actuacion": "Se comunica a la Oficina Técnica de Seguridad y se suspende el uso del corpus afectado." },
+        { "fecha": "2026-04-16", "actuacion": "Se confirma que el fragmento procedia de un asunto sujeto a barrera de informacion y que la recuperacion no aplicaba el filtro de alcance por asunto." },
+        { "fecha": "2026-04-17", "actuacion": "Se corrige el filtro de alcance y se restablece el servicio." },
+        { "fecha": "2026-04-23", "actuacion": "Se eleva al Comité de Seguridad y Privacidad y al Comité de Gobernanza de la Inteligencia Artificial." },
+        { "fecha": "2026-04-30", "actuacion": "Ambos comites acuerdan condicionar el escalado del corpus a la implantacion del control de fuga de datos." }
+      ],
+      "deteccion": "Observacion del propio equipo usuario al revisar las fuentes citadas. Es deteccion humana y tardia: el sistema no la senalo.",
+      "contencion": "Suspension del uso del corpus afectado el mismo dia. Se verifico que el fragmento no llego a incorporarse a ningun entregable.",
+      "causa_raiz": "El filtro de alcance por asunto no se aplicaba en la fase de recuperacion. La barrera de informacion existia en el gestor documental y no se propagaba al indice del RAG: dos sistemas con dos nociones distintas de quien puede ver que.",
+      "leccion": "Un RAG no hereda automaticamente las barreras del repositorio del que se alimenta. Mientras esa herencia no sea explicita y verificable, escalar el corpus multiplica la exposicion en lugar de la utilidad.",
+      "control_reforzado": "CTR-IA-03, CTR-IA-05",
+      "consecuencia_societaria": {
+        "hay": true,
+        "descripcion": "Elevado al Comité de Seguridad y Privacidad y al Comité de Gobernanza de la Inteligencia Artificial, con acuerdo de condicionar el escalado del corpus de 100k a 10M paginas a que el control de fuga de datos este operativo.",
+        "organos": ["garrigues-comite-seguridad-privacidad", "garrigues-comite-gobernanza-ia"],
+        "fecha_acuerdo": "2026-04-30",
+        "aviso_de_coherencia": "Este acuerdo NO se ha generado en el modulo de Secretaria por este encargo. Si Secretaria no contiene un acuerdo de esos organos en esa fecha, es una incoherencia REAL que la consola debe reportar, no un error a tapar."
+      },
+      "por_que_no_esta_cerrado": "Porque el control que lo cierra (CTR-IA-05) sigue en implantacion. Marcarlo RESUELTO con la medida pendiente seria cerrar el expediente antes que el riesgo.",
+      "firmeza": "SINTETICO",
+      "ancla": "Plan de Sistemas 2025-2027: «RAG masivo escalable de 100k a 10M paginas con control de fuga de datos». El incidente concreto es inventado.",
+      "procedencia": "SIMULADO"
+    },
+    {
+      "id": "INC-IA-004",
+      "titulo": "Error material en la traducción de una cláusula de no competencia",
+      "sistema": "GARR-IA-301",
+      "severidad": "Alta",
+      "estado": "RESUELTO",
+      "cronologia": [
+        { "fecha": "2026-05-18", "actuacion": "Se traduce el borrador de un contrato para su revision por el equipo de la operacion." },
+        { "fecha": "2026-05-19", "actuacion": "En la revision cruzada de segunda firma se detecta que una clausula de no competencia aparece traducida en sentido afirmativo, invirtiendo la obligacion." },
+        { "fecha": "2026-05-19", "actuacion": "Se revisa integramente el documento y se localizan otras dos construcciones negativas mal resueltas, sin efecto material." },
+        { "fecha": "2026-05-20", "actuacion": "Se corrige y se entrega. El texto erroneo no llego a la contraparte." },
+        { "fecha": "2026-05-29", "actuacion": "Se instaura verificacion dirigida sobre clausulas de obligacion negativa, limitacion de responsabilidad y no competencia." }
+      ],
+      "deteccion": "Revision cruzada de segunda firma. La revision ordinaria de lectura no lo habia detectado: el texto era gramaticalmente impecable y solo estaba invertido.",
+      "contencion": "El documento no salio del Despacho. No hubo firma ni comunicacion a la contraparte con el texto erroneo.",
+      "causa_raiz": "Perdida de la polaridad de la obligacion en la traduccion. La causa de gobierno es que la revision estaba definida como lectura general y no como verificacion dirigida a los puntos donde una inversion de sentido es indetectable por fluidez.",
+      "leccion": "En traduccion juridica el error peligroso no es el que suena raro: es el que suena bien. Revisar mas no ayuda; revisar dirigido, si.",
+      "control_reforzado": "CTR-IA-10",
+      "consecuencia_societaria": null,
+      "firmeza": "SINTETICO",
+      "ancla": "NINGUNA para el hecho. El sistema afectado procede de la declaracion del usuario (workflows sobre modelos open source). El incidente es inventado por completo.",
+      "procedencia": "SIMULADO"
+    },
+    {
+      "id": "INC-IA-005",
+      "titulo": "Acceso a documentación de un asunto con barrera de información a través del asistente del puesto de trabajo",
+      "sistema": "GARR-IA-001",
+      "severidad": "Alta",
+      "estado": "RESUELTO",
+      "cronologia": [
+        { "fecha": "2026-06-02", "actuacion": "Un profesional obtiene, mediante una consulta al asistente del puesto de trabajo, resultados procedentes de un asunto sujeto a barrera de informacion en el que no participa." },
+        { "fecha": "2026-06-02", "actuacion": "El propio profesional lo comunica de inmediato y cesa el acceso." },
+        { "fecha": "2026-06-03", "actuacion": "Se verifica que la barrera estaba correctamente declarada en el expediente pero no se habia trasladado a los permisos del repositorio subyacente." },
+        { "fecha": "2026-06-04", "actuacion": "Se corrigen los permisos y se revisa el resto de asuntos con barrera vigente." },
+        { "fecha": "2026-06-11", "actuacion": "Se eleva al Comité de Práctica Profesional por afectar al regimen de barreras de informacion." },
+        { "fecha": "2026-06-18", "actuacion": "El Comité acuerda una revision periodica de coherencia entre barreras declaradas y permisos efectivos." }
+      ],
+      "deteccion": "Comunicacion voluntaria e inmediata del propio usuario.",
+      "contencion": "Cese del acceso el mismo dia. No hubo descarga, reenvio ni uso de la informacion.",
+      "causa_raiz": "Permisos del repositorio no alineados con la barrera declarada. Conviene decirlo con precision porque es la leccion del caso: la causa raiz NO es el sistema de IA. El asistente se limito a hacer accesible, con mucha mas facilidad, algo que ya era accesible. La IA no creo la brecha; la hizo visible.",
+      "leccion": "Un asistente transversal al puesto de trabajo convierte cualquier permiso mal puesto en un hallazgo inmediato. Eso es incomodo a corto plazo y sano a medio, pero obliga a que las barreras de informacion se declaren donde se aplican los permisos y no solo donde se documenta el asunto.",
+      "control_reforzado": "CTR-IA-09",
+      "consecuencia_societaria": {
+        "hay": true,
+        "descripcion": "Elevado al Comité de Práctica Profesional, que acuerda una revision periodica de coherencia entre las barreras de informacion declaradas y los permisos efectivos en los repositorios.",
+        "organos": ["garrigues-comite-practica-profesional"],
+        "fecha_acuerdo": "2026-06-18",
+        "aviso_de_coherencia": "Este acuerdo NO se ha generado en Secretaria por este encargo. Su ausencia alli es una incoherencia REAL que la consola debe reportar."
+      },
+      "firmeza": "SINTETICO",
+      "ancla": "PI-30 §3.1.1 (Copilot como herramienta corporativa) para el sistema. El incidente es inventado.",
+      "procedencia": "SIMULADO"
+    },
+    {
+      "id": "INC-IA-006",
+      "titulo": "Uso de una herramienta de IA generativa no corporativa",
+      "sistema": null,
+      "sistema_nota": "Sin sistema del inventario asociado, y eso es el dato: la herramienta usada NO esta inventariada porque no es corporativa. PI-30 §3.1.2 la situa fuera del catalogo de herramientas aprobadas.",
+      "severidad": "Baja",
+      "estado": "EN_SEGUIMIENTO",
+      "cronologia": [
+        { "fecha": "2026-07-07", "actuacion": "Un profesional utiliza una herramienta publica de IA generativa para resumir un texto doctrinal de acceso publico." },
+        { "fecha": "2026-07-08", "actuacion": "Lo pone en conocimiento del Despacho por iniciativa propia al dudar de si el uso estaba permitido." },
+        { "fecha": "2026-07-10", "actuacion": "Se verifica que no se introdujo informacion confidencial ni datos personales, y que el material era de acceso publico." },
+        { "fecha": "2026-07-21", "actuacion": "Se programa refuerzo formativo sobre la distincion entre herramienta corporativa y no corporativa." }
+      ],
+      "deteccion": "Comunicacion voluntaria del propio usuario.",
+      "contencion": "No hubo nada que contener: no se volco informacion confidencial ni datos personales.",
+      "causa_raiz": "Desconocimiento de la frontera entre el §3.1.1 y el §3.1.2 de la politica, no incumplimiento de la prohibicion del §2, que no llego a activarse.",
+      "leccion": "El caso vale precisamente por lo que NO fue. Registrar como incidente un uso que no infringio la prohibicion es lo que permite ver donde esta la confusion antes de que produzca dano. Un canal que solo recoge lo grave llega siempre tarde.",
+      "control_reforzado": "CTR-GARR-33, CTR-IA-06",
+      "consecuencia_societaria": null,
+      "por_que_no_esta_cerrado": "El refuerzo formativo esta programado y no impartido.",
+      "firmeza": "SINTETICO",
+      "ancla": "PI-30 §3.1.2 (herramientas no corporativas) y §2 (prohibicion), ambas reales. El incidente es inventado.",
+      "procedencia": "SIMULADO"
+    }
+  ],
+
+  "controles_ia": [
+    {
+      "_nota_comun": "Prefijo CTR-IA-* deliberado. Los controles ya existentes del tenant usan CTR-GARR-01..35 (scripts/garrigues/normativo/obligaciones-pbcft.ts y obligaciones-ciber.ts); continuar esa numeracion desde otro carril garantizaria una colision cuando el carril de GRC genere los suyos. El vocabulario de `status` es el del proyecto (Efectivo / Parcial / Inefectivo) porque es el que admite el CHECK de `controls.status`."
+    },
+    {
+      "code": "CTR-IA-01",
+      "name": "Neutralización de inyecciones de prompt en la capa de orquestación",
+      "descripcion": "Control en tiempo real sobre la entrada, en la capa de orquestacion, para detectar y bloquear instrucciones dirigidas al sistema embebidas en el material tratado.",
+      "status": "Efectivo",
+      "sistemas_cubiertos": ["GARR-IA-003", "GARR-IA-004", "GARR-IA-005"],
+      "owner_body_slug": "garrigues-comite-gobernanza-ia",
+      "policy_code": "PI-30",
+      "por_que_control_propio": "Se modela separado de los otros dos guardrails porque falla de forma distinta: aqui hay un adversario y el fallo es que algo pase. Mezclarlo con la alucinacion, que no tiene adversario, haria imposible medir ninguno de los dos.",
+      "firmeza": "SINTETICO",
+      "ancla": "Plan de Sistemas 2025-2027, «Seguridad en IA»: guardrails anti-jailbreak en la capa de orquestacion «para neutralizar inyecciones de prompt». El control existe en el Plan; su estado Efectivo es propuesta.",
+      "procedencia": "PLAN_NO_DESPLEGADO"
+    },
+    {
+      "code": "CTR-IA-02",
+      "name": "Mitigación de alucinación jurídica en la salida",
+      "descripcion": "Medidas de la capa de orquestacion orientadas a evitar afirmaciones juridicas no sostenidas por fuente, y a que la salida distinga lo recuperado del corpus de lo generado.",
+      "status": "Parcial",
+      "sistemas_cubiertos": ["GARR-IA-002", "GARR-IA-003", "GARR-IA-004", "GARR-IA-005", "GARR-IA-301", "GARR-IA-304"],
+      "owner_body_slug": "garrigues-comite-gobernanza-ia",
+      "policy_code": "PI-30",
+      "por_que_control_propio": "Falla sin adversario y sin senal: el fallo es una salida internamente coherente. El incidente INC-IA-001 lo detecto una persona, no el control, y por eso el estado es Parcial y no Efectivo.",
+      "firmeza": "SINTETICO",
+      "ancla": "Plan de Sistemas 2025-2027, «Seguridad en IA»: guardrails para «evitar alucinaciones juridicas». El estado Parcial es propuesta.",
+      "procedencia": "PLAN_NO_DESPLEGADO"
+    },
+    {
+      "code": "CTR-IA-03",
+      "name": "Verificación de la integridad de las fuentes",
+      "descripcion": "Comprobacion de que las fuentes citadas en la respuesta existen en el corpus, corresponden al alcance del asunto consultado y no han sido alteradas.",
+      "status": "Parcial",
+      "sistemas_cubiertos": ["GARR-IA-003", "GARR-IA-004", "GARR-IA-005", "GARR-IA-302", "GARR-IA-304"],
+      "owner_body_slug": "garrigues-comite-gobernanza-ia",
+      "policy_code": "PI-30",
+      "por_que_control_propio": "Es el unico de los tres que mira al corpus y no al modelo. INC-IA-003 demuestra que puede fallar por una via que los otros dos no cubren: la fuente era autentica e integra, y aun asi no debia haberse recuperado.",
+      "firmeza": "SINTETICO",
+      "ancla": "Plan de Sistemas 2025-2027, «Seguridad en IA»: guardrails para «verificar la integridad de las fuentes». El estado Parcial es propuesta.",
+      "procedencia": "PLAN_NO_DESPLEGADO"
+    },
+    {
+      "code": "CTR-IA-04",
+      "name": "Aislamiento de GA_IA Local sin salida a Internet",
+      "descripcion": "Segregacion del entorno de IA destinado a asuntos ultraconfidenciales, sin conectividad saliente.",
+      "status": "Parcial",
+      "sistemas_cubiertos": ["GARR-IA-004"],
+      "owner_body_slug": "garrigues-oficina-tecnica-seguridad",
+      "policy_code": "PI-30",
+      "por_que_estado": "Parcial y no Efectivo porque el Plan lo situa en Q1-Q2 2026 y no consta go-live. Un control sobre un sistema que no consta desplegado no puede declararse Efectivo.",
+      "firmeza": "SINTETICO",
+      "ancla": "Plan de Sistemas 2025-2027, «Seguridad en IA» y roadmap fase «Blindar y Aislar».",
+      "procedencia": "PLAN_NO_DESPLEGADO"
+    },
+    {
+      "code": "CTR-IA-05",
+      "name": "Control de fuga de datos en el escalado del corpus RAG",
+      "descripcion": "Medidas de control de fuga aplicables al escalado del corpus documental de 100k a 10M paginas, incluida la propagacion verificable de las barreras de informacion del repositorio al indice de recuperacion.",
+      "status": "Inefectivo",
+      "aviso_estado": "OJO: el valor «Inefectivo» esta admitido por el CHECK de `controls.status` pero la UI lo enruta a «EN PROCESO» por un fallback silencioso (deuda declarada en G4, CTR-008). Aqui significa literalmente NO IMPLANTADO, no «en proceso».",
+      "sistemas_cubiertos": ["GARR-IA-003", "GARR-IA-005"],
+      "owner_body_slug": "garrigues-comite-seguridad-privacidad",
+      "policy_code": "PI-30",
+      "firmeza": "SINTETICO",
+      "ancla": "Plan de Sistemas 2025-2027, «Seguridad en IA»: «RAG masivo escalable de 100k a 10M paginas con control de fuga de datos».",
+      "procedencia": "PLAN_NO_DESPLEGADO"
+    },
+    {
+      "code": "CTR-IA-06",
+      "name": "Revisión, ajuste y validación humana de toda salida de IA generativa",
+      "descripcion": "Obligacion de revisar, ajustar y validar el resultado antes de utilizarlo, sobre la base de que la IA apoya pero no sustituye el juicio del profesional.",
+      "status": "Efectivo",
+      "sistemas_cubiertos": ["GARR-IA-001", "GARR-IA-002", "GARR-IA-003", "GARR-IA-004", "GARR-IA-005", "GARR-IA-301", "GARR-IA-302", "GARR-IA-303", "GARR-IA-304"],
+      "owner_body_slug": "garrigues-comite-gobernanza-ia",
+      "policy_code": "PI-30",
+      "cautela": "Es el control que cubre mas sistemas y el mas fragil, porque su eficacia no es del sistema sino de la diligencia de quien revisa. INC-IA-001 e INC-IA-004 lo confirman: funciono, pero por revision humana atenta, y en el segundo caso solo en la segunda firma.",
+      "firmeza": "SINTETICO",
+      "ancla": "PI-30 §3.2(c), que obliga a revisar, ajustar y validar todo output y declara que la IA no es un sustituto del trabajo. Ancla REAL; el alcance a los sistemas nuevos es propuesta.",
+      "procedencia": "DECLARADO_USUARIO"
+    },
+    {
+      "code": "CTR-IA-07",
+      "name": "Auditoría externa de cumplimiento AI Act, seguridad técnica y sesgo algorítmico",
+      "descripcion": "Auditoria externa presupuestada en 25.000 EUR para el ejercicio 2026, con alcance de cumplimiento normativo (AI Act), seguridad tecnica y analisis de sesgo algoritmico.",
+      "status": "Inefectivo",
+      "aviso_estado": "NO IMPLANTADO. Es un compromiso presupuestario, no un control operativo. Verlo en verde en la consola seria el peor error posible de este fichero.",
+      "sistemas_cubiertos": ["Alcance transversal al inventario"],
+      "owner_body_slug": "garrigues-comite-gobernanza-ia",
+      "policy_code": "PI-30",
+      "evaluacion_asociada": "EV-IA-AUD-2026",
+      "firmeza": "SINTETICO",
+      "ancla": "Plan de Sistemas 2025-2027, «Seguridad en IA»: partida especifica de 25.000 EUR. Importe y objeto REALES.",
+      "procedencia": "PLAN_NO_DESPLEGADO"
+    },
+    {
+      "code": "CTR-IA-08",
+      "name": "Restricción de generación de contenidos gráficos y audiovisuales",
+      "descripcion": "No se permite generar contenidos graficos ni audiovisuales. El uso extraordinario exige informe al Departamento de Intangibles y autorizacion del Comité de IA y, despues, del Senior Partner.",
+      "status": "Efectivo",
+      "sistemas_cubiertos": ["GARR-IA-001", "GARR-IA-002", "GARR-IA-003", "GARR-IA-004", "GARR-IA-005"],
+      "owner_body_slug": "garrigues-comite-gobernanza-ia",
+      "policy_code": "PI-30",
+      "nota_ownership": "La autorizacion final corresponde al Senior Partner, que es un CARGO y no un `governing_body`. El campo `owner_body_slug` recoge el Comité de IA, que es el organo que interviene; el cargo se deja en texto y no se convierte en FK, mismo criterio que G4 aplico al Codigo Etico y al PPD.",
+      "firmeza": "SINTETICO",
+      "ancla": "PI-30 §3.2(d), recogida literalmente en `restrictions` del catalogo C2. Ancla REAL.",
+      "procedencia": "DECLARADO_USUARIO"
+    },
+    {
+      "code": "CTR-IA-09",
+      "name": "Registro de casos de uso de IA y clasificación por caso de uso",
+      "descripcion": "Registro que asocie cada caso de uso a su sistema, su nivel de exposicion L1-L4, su rol previsible bajo el Reglamento (UE) 2024/1689 y su clasificacion, mantenido a nivel de caso de uso y no de producto.",
+      "status": "Inefectivo",
+      "aviso_estado": "NO IMPLANTADO. Es la ausencia mas relevante del inventario y por eso se modela como control y no se omite: sin este registro, cada reclasificacion de un sistema (por ejemplo, que un chatbot L1 pase a alimentar entregables L3) ocurre sin que nadie la advierta.",
+      "sistemas_cubiertos": ["Alcance transversal al inventario"],
+      "owner_body_slug": "garrigues-comite-gobernanza-ia",
+      "policy_code": "PI-30",
+      "firmeza": "SINTETICO",
+      "ancla": "NINGUNA. No consta en el Plan ni en PI-30. Se anade porque el propio encargo exige clasificar por caso de uso y no por producto, y sin registro esa exigencia no es sostenible en el tiempo. Es propuesta de la generacion, no hallazgo documental.",
+      "procedencia": "DEMO_PILOTO"
+    },
+    {
+      "code": "CTR-IA-10",
+      "name": "Verificación dirigida sobre resultados de alto impacto material",
+      "descripcion": "Verificacion especifica, distinta de la lectura de revision ordinaria, sobre las salidas donde un error es indetectable por fluidez: clausulas de obligacion negativa, limitacion de responsabilidad y no competencia en traduccion, y todo plazo o fecha procesal calculada.",
+      "status": "Parcial",
+      "sistemas_cubiertos": ["GARR-IA-301", "GARR-IA-303"],
+      "owner_body_slug": "garrigues-comite-practica-profesional",
+      "policy_code": "PI-30",
+      "por_que_ese_organo": "Es el unico control de este bloque cuyo contenido es criterio profesional y no tecnico: define QUE hay que verificar en un texto juridico, no como funciona el sistema. Atribuirlo al Comité de Gobernanza de la IA habria sido coherente en la forma y equivocado en el fondo.",
+      "aviso_ownership": "Esta atribucion es PROPUESTA. Ninguna fuente asigna al Comité de Práctica Profesional un control sobre salidas de IA. Va tambien a `dudas`.",
+      "firmeza": "SINTETICO",
+      "ancla": "NINGUNA como control formal. Deriva de los incidentes simulados INC-IA-004 y de la evaluacion EV-IA-08.",
+      "procedencia": "DEMO_PILOTO"
+    },
+    {
+      "code": "CTR-GARR-33",
+      "name": "Prohibición taxativa de volcado de información confidencial y datos de clientes en herramientas de IA Generativa de terceros",
+      "_referencia": "CONTROL YA EXISTENTE. No se genera aqui ni se duplica: vive en scripts/garrigues/normativo/obligaciones-ciber.ts con obligation_code OBL-GARR-CYBER-03, owner garrigues-comite-gobernanza-ia y policy_code PI-30. Se cita porque los incidentes INC-IA-006 y la evaluacion EV-IA-01 se apoyan en el.",
+      "accion_requerida": "NINGUNA. No insertar."
+    }
+  ],
+
+  "dudas": [
+    {
+      "id": "D-01",
+      "pregunta": "¿Cómo se compone el factor P4 en el algoritmo real de evaluación de riesgos del PPD?",
+      "por_que_importa": "El ancla da los pesos de medidas preventivas (0/0,15/0,25/0,35) y de incidencias (0/0,25/0,5) pero no dice si restan, multiplican o entran en otro tramo. Sin esa formula no se puede calcular un residuo numerico, y por eso todos los residuos de este fichero son bandas cualitativas propuestas y no cifras. Con la formula, las diez evaluaciones se recalculan solas.",
+      "bloquea": "Residuo numérico de EV-IA-01 a EV-IA-10."
+    },
+    {
+      "id": "D-02",
+      "pregunta": "¿Cuál es el contenido de las celdas de la matriz de riesgo/prioridad (probabilidad relativa x impacto)?",
+      "por_que_importa": "El ancla da las filas, las columnas y el código de color del resultado, pero no el cruce. EV-IA-02 lo enseña bien: probabilidad Baja con impacto Muy alto puede caer en Medio o en Alto según la celda, y esa diferencia cambia la prioridad de un sistema que trata secreto profesional. Todos los `nivel_riesgo_propuesto` de este fichero son propuestas por esta razón.",
+      "bloquea": "Nivel de riesgo de las diez evaluaciones."
+    },
+    {
+      "id": "D-03",
+      "pregunta": "¿Quedan los chatbots construidos sobre Gemini dentro o fuera de la exclusión de PI-30 §3.1.1?",
+      "por_que_importa": "Es la única contradicción de fondo que este encargo ha encontrado entre el dato declarado y la política vigente. PI-30 aprueba GA_IA con una excepción expresa que saca las funcionalidades de Gemini-Google del paraguas y las remite al §3.2 en su totalidad; el usuario declara que se han construido chatbots corporativos precisamente sobre Gemini. EV-IA-05 se ha dejado abierta a propósito porque cerrarla sería decidir por el Comité de Gobernanza de la IA.",
+      "bloquea": "EV-IA-05 y el estado real de GARR-IA-005."
+    },
+    {
+      "id": "D-04",
+      "pregunta": "¿El modelo subyacente de GA_IA y de GA_IA Local es propio del Despacho o de un tercero?",
+      "por_que_importa": "De ese hecho depende si el Despacho es responsable del despliegue o proveedor bajo el Reglamento (UE) 2024/1689, y con ello quién asume la documentación técnica. Ni el Plan ni PI-30 lo dicen. Por eso el rol de GARR-IA-003 y GARR-IA-004 queda INDETERMINADO en vez de elegir el que quedaba mejor.",
+      "bloquea": "rol_ai_act_propuesto de GARR-IA-003, GARR-IA-004 y GARR-IA-005."
+    },
+    {
+      "id": "D-05",
+      "pregunta": "¿Se desplegó efectivamente GA_IA Local? El roadmap lo sitúa en Q1-Q2 2026 y ya estamos en agosto.",
+      "por_que_importa": "Se ha optado por EN_DESPLIEGUE y no por ACTIVO, y por evaluar sobre diseño y no sobre producción. Si hubo go-live, EV-IA-04 debe rehacerse contra el sistema real y CTR-IA-04 puede pasar a Efectivo; si no lo hubo, hay un hito del Plan vencido que el módulo de GRC debería recoger como riesgo de transición.",
+      "bloquea": "Estado de GARR-IA-004, EV-IA-04 y CTR-IA-04."
+    },
+    {
+      "id": "D-06",
+      "pregunta": "¿Existen realmente los acuerdos enterprise con OpenAI y Anthropic, y qué garantías contienen?",
+      "por_que_importa": "El catálogo C2 ya los marca DECLARADO_USUARIO sin respaldo, y PI-30 §3.1.2 clasifica las versiones públicas de esos mismos proveedores como herramienta NO corporativa. Mientras no aparezca el documento, la conciliación con la prohibición del §2 es un conflicto no resuelto y EV-IA-10 no puede avanzar. Redactar una justificación contractual habría sido inventar el hecho jurídico que el bloque 0 prohíbe expresamente.",
+      "bloquea": "EV-IA-10 y la conciliación PI-30 de GARR-IA-101 y GARR-IA-102."
+    },
+    {
+      "id": "D-07",
+      "pregunta": "¿«G-Digital» y «Tecnología» son el mismo departamento?",
+      "por_que_importa": "El COR del despacho habla de G-Digital y las columnas del mapa penal evaluado 2025 ya cargado en el tenant hablan de Tecnología. Se ha usado «Tecnología» por ser el nombre que ya está en el dato, pero si son dos cosas distintas, la asignación de departamentos usuarios de varios sistemas está mal apuntada.",
+      "bloquea": "departamentos_usuarios de GARR-IA-005 y GARR-IA-302."
+    },
+    {
+      "id": "D-08",
+      "pregunta": "¿Puede atribuirse al Comité de Práctica Profesional un control sobre salidas de sistemas de IA (CTR-IA-10) y una co-responsabilidad sobre el cálculo de plazos procesales?",
+      "por_que_importa": "Es la única atribución de ownership de este fichero que no tiene respaldo documental y que aun así se ha propuesto, porque el contenido del control es criterio profesional y no técnico. Se marca como propuesta y no se da por buena, siguiendo la regla dura de G4: el ownership solo se atribuye donde la fuente lo dice.",
+      "bloquea": "owner_body_slug de CTR-IA-10 y el traslado de EV-IA-08."
+    },
+    {
+      "id": "D-09",
+      "pregunta": "¿Están confirmados los códigos GARR-IA-004, 005 y 301 a 304, y el prefijo CTR-IA-*?",
+      "por_que_importa": "`ai_systems.aims_reference_code` NO es único en Cloud y `policies.policy_code` ya dio ese problema en G4: una colisión no falla, duplica en silencio. Los códigos se han elegido dejando libre el rango 2xx que el catálogo C2 usa para el roadmap agéntico, pero nadie los ha reservado. Antes de sembrar hay que verificar contra Cloud que ninguno existe.",
+      "bloquea": "Cualquier siembra de este fichero."
+    },
+    {
+      "id": "D-10",
+      "pregunta": "¿Los acuerdos de comité que aparecen como consecuencia societaria de INC-IA-003 e INC-IA-005 existen en Secretaría?",
+      "por_que_importa": "Este encargo NO ha generado esos acuerdos: genera el incidente que dice haberlos motivado. Si Secretaría no tiene un acuerdo del Comité de Seguridad y Privacidad y del Comité de Gobernanza de la IA con fecha 2026-04-30, ni uno del Comité de Práctica Profesional con fecha 2026-06-18, la consola debe reportarlo como incoherencia. Está declarado a propósito y dentro de cada incidente, no escondido aquí.",
+      "bloquea": "Nada. Es un enganche deliberado para el Prompt 4."
+    },
+    {
+      "id": "D-11",
+      "pregunta": "¿Es aceptable reutilizar la metodología de evaluación de riesgos PENALES del PPD para evaluar riesgos de sistemas de IA?",
+      "por_que_importa": "El encargo pedía usar «la metodología del despacho» y la única metodología anclada con escala y nombres es la del PPD, que está construida para situaciones susceptibles de generar riesgo penal. Los factores P1 (frecuencia de exposición) y P2 (categoría de los sujetos activos) trasladan razonablemente; el concepto de «sujeto activo» no significa lo mismo cuando quien actúa es un sistema. Se ha usado por fidelidad al ancla, dejando constancia de que el despacho no la ha adoptado para IA.",
+      "bloquea": "Nada, pero condiciona la lectura de las diez evaluaciones."
+    },
+    {
+      "id": "D-12",
+      "pregunta": "¿Qué dice exactamente PI-30 §4 «Obligaciones de transparencia»?",
+      "por_que_importa": "El índice de la política tiene ese apartado y no se ha leído su contenido en esta generación. Cualquier afirmación sobre deberes de transparencia de los chatbots o de los workflows habría sido inventar una obligación teniendo la fuente al alcance. Se ha dejado como propuesta no validada en GARR-IA-005.",
+      "bloquea": "clasificacion_ai_act_propuesta de GARR-IA-005."
+    }
+  ]
+}

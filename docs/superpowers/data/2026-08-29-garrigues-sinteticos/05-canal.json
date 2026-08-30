@@ -1,0 +1,753 @@
+{
+  "meta": {
+    "prompt": "Prompt 5 — Canal de denuncias (Sistema Interno de Información)",
+    "plan_origen": "docs/superpowers/plans/2026-08-29-prompts-datos-sinteticos-garrigues.md",
+    "tenant_destino": "00000000-0000-0000-0000-000000000002",
+    "fecha_generacion": "2026-08-30",
+    "firmeza_global": "SINTETICO",
+    "advertencia": "Ninguno de estos expedientes ha ocurrido. Son casos inventados para poblar una demo alcanzable públicamente. Las personas que aparecen como instructor o decisor son de ficción y no corresponden a ningún profesional real del despacho. Las personas implicadas (informante y afectado) no llevan nombre: se identifican por código, que es como debe constar en un expediente real conforme al artículo 33 de la Ley 2/2023.",
+    "regla_de_omision_aplicada": "Todo registro que no ha podido declarar su procedencia no se ha generado. Lo omitido está en 'registros_omitidos' y explicado en 'dudas'."
+  },
+
+  "marco_legal_aplicado": {
+    "nota": "Los plazos y garantías que se aplican en los tres expedientes NO son sintéticos: son la ley. Se han cotejado literalmente contra el texto consolidado del BOE el 2026-08-30, artículo por artículo, por el mismo criterio con el que se cotejaron las 21 citas de PBC/FT en G4. La cita literal se conserva aquí para que cualquiera pueda contrastar sin volver a la fuente.",
+    "norma": "Ley 2/2023, de 20 de febrero, reguladora de la protección de las personas que informen sobre infracciones normativas y de lucha contra la corrupción",
+    "identificador_boe": "BOE-A-2023-4513",
+    "ultima_actualizacion_publicada_del_consolidado": "2023-02-21",
+    "fecha_cotejo": "2026-08-30",
+    "medio_cotejo": "API de datos abiertos del BOE, legislación consolidada, bloques a7, a8, a9, a2-8 (art. 26), a3-4 (art. 32), a3-5 (art. 33), a3-8 (art. 36), a3-10 (art. 38)",
+    "articulos": [
+      {
+        "articulo": "7.2",
+        "rubrica": "Canal interno de información",
+        "cita_literal": "A solicitud del informante, también podrá presentarse mediante una reunión presencial dentro del plazo máximo de siete días. […] Las comunicaciones verbales, incluidas las realizadas a través de reunión presencial, telefónicamente o mediante sistema de mensajería de voz, deberán documentarse […] a través de una transcripción completa y exacta de la conversación realizada por el personal responsable de tratarla. […] se ofrecerá al informante la oportunidad de comprobar, rectificar y aceptar mediante su firma la transcripción de la conversación.",
+        "usado_en": ["EXP-SII-2026-005"]
+      },
+      {
+        "articulo": "7.3",
+        "rubrica": "Canal interno de información",
+        "cita_literal": "Los canales internos de información permitirán incluso la presentación y posterior tramitación de comunicaciones anónimas.",
+        "usado_en": ["EXP-SII-2026-002"]
+      },
+      {
+        "articulo": "8.4",
+        "rubrica": "Responsable del Sistema interno de información",
+        "cita_literal": "El Responsable del Sistema deberá desarrollar sus funciones de forma independiente y autónoma respecto del resto de los órganos de la entidad u organismo, no podrá recibir instrucciones de ningún tipo en su ejercicio, y deberá disponer de todos los medios personales y materiales necesarios para llevarlas a cabo.",
+        "usado_en": ["EXP-SII-2026-002", "EXP-SII-2026-005", "EXP-SII-2026-001"]
+      },
+      {
+        "articulo": "9.2.c",
+        "rubrica": "Procedimiento de gestión de informaciones — acuse de recibo",
+        "cita_literal": "Envío de acuse de recibo de la comunicación al informante, en el plazo de siete días naturales siguientes a su recepción, salvo que ello pueda poner en peligro la confidencialidad de la comunicación.",
+        "usado_en": ["EXP-SII-2026-002", "EXP-SII-2026-005", "EXP-SII-2026-001"]
+      },
+      {
+        "articulo": "9.2.d",
+        "rubrica": "Procedimiento de gestión de informaciones — plazo de respuesta",
+        "cita_literal": "Determinación del plazo máximo para dar respuesta a las actuaciones de investigación, que no podrá ser superior a tres meses a contar desde la recepción de la comunicación o, si no se remitió un acuse de recibo al informante, a tres meses a partir del vencimiento del plazo de siete días después de efectuarse la comunicación, salvo casos de especial complejidad que requieran una ampliación del plazo, en cuyo caso, este podrá extenderse hasta un máximo de otros tres meses adicionales.",
+        "usado_en": ["EXP-SII-2026-002", "EXP-SII-2026-005", "EXP-SII-2026-001"]
+      },
+      {
+        "articulo": "9.2.f",
+        "rubrica": "Procedimiento de gestión de informaciones — audiencia de la persona afectada",
+        "cita_literal": "Establecimiento del derecho de la persona afectada a que se le informe de las acciones u omisiones que se le atribuyen, y a ser oída en cualquier momento. Dicha comunicación tendrá lugar en el tiempo y forma que se considere adecuado para garantizar el buen fin de la investigación.",
+        "usado_en": ["EXP-SII-2026-002", "EXP-SII-2026-005", "EXP-SII-2026-001"]
+      },
+      {
+        "articulo": "9.2.h",
+        "rubrica": "Procedimiento de gestión de informaciones — presunción de inocencia",
+        "cita_literal": "Exigencia del respeto a la presunción de inocencia y al honor de las personas afectadas.",
+        "usado_en": ["EXP-SII-2026-002", "EXP-SII-2026-005", "EXP-SII-2026-001"]
+      },
+      {
+        "articulo": "9.2.j",
+        "rubrica": "Procedimiento de gestión de informaciones — remisión al Ministerio Fiscal",
+        "cita_literal": "Remisión de la información al Ministerio Fiscal con carácter inmediato cuando los hechos pudieran ser indiciariamente constitutivos de delito. En el caso de que los hechos afecten a los intereses financieros de la Unión Europea, se remitirá a la Fiscalía Europea.",
+        "usado_en": ["EXP-SII-2026-001"]
+      },
+      {
+        "articulo": "26.1",
+        "rubrica": "Registro de informaciones",
+        "cita_literal": "Deberán contar con un libro-registro de las informaciones recibidas y de las investigaciones internas a que hayan dado lugar, garantizando, en todo caso, los requisitos de confidencialidad previstos en esta ley. Este registro no será público y únicamente a petición razonada de la Autoridad judicial competente, mediante auto, y en el marco de un procedimiento judicial y bajo la tutela de aquella, podrá accederse total o parcialmente al contenido del referido registro.",
+        "usado_en": ["EXP-SII-2026-002", "EXP-SII-2026-005", "EXP-SII-2026-001"]
+      },
+      {
+        "articulo": "26.2",
+        "rubrica": "Registro de informaciones — conservación",
+        "cita_literal": "En ningún caso podrán conservarse los datos por un período superior a diez años.",
+        "usado_en": ["EXP-SII-2026-002", "EXP-SII-2026-005", "EXP-SII-2026-001"]
+      },
+      {
+        "articulo": "32.1",
+        "rubrica": "Tratamiento de datos personales — acceso limitado",
+        "cita_literal": "El acceso a los datos personales contenidos en el Sistema interno de información quedará limitado, dentro del ámbito de sus competencias y funciones, exclusivamente a: a) El Responsable del Sistema y a quien lo gestione directamente. b) El responsable de recursos humanos o el órgano competente debidamente designado, solo cuando pudiera proceder la adopción de medidas disciplinarias contra un trabajador. […] c) El responsable de los servicios jurídicos de la entidad u organismo, si procediera la adopción de medidas legales […] d) Los encargados del tratamiento que eventualmente se designen. e) El delegado de protección de datos.",
+        "usado_en": ["EXP-SII-2026-002", "EXP-SII-2026-005", "EXP-SII-2026-001"],
+        "consecuencia_de_diseno": "Esta lista tasada es la razón por la que en los tres expedientes la lista de acceso es corta y nominal, y por la que el órgano decisor solo entra en el expediente cuando ya procede la medida disciplinaria."
+      },
+      {
+        "articulo": "32.3",
+        "rubrica": "Tratamiento de datos personales — supresión por falta de veracidad",
+        "cita_literal": "Si se acreditara que la información facilitada o parte de ella no es veraz, deberá procederse a su inmediata supresión desde el momento en que se tenga constancia de dicha circunstancia, salvo que dicha falta de veracidad pueda constituir un ilícito penal, en cuyo caso se guardará la información por el tiempo necesario durante el que se tramite el procedimiento judicial.",
+        "usado_en": ["EXP-SII-2026-002"],
+        "consecuencia_de_diseno": "El expediente que termina sin acreditarse NO activa esta regla: no acreditar unos hechos no equivale a acreditar que la información no era veraz. La distinción se hace explícita en ese expediente porque es exactamente donde un dato sintético mal cosido se equivocaría."
+      },
+      {
+        "articulo": "32.4",
+        "rubrica": "Tratamiento de datos personales — supresión a los tres meses",
+        "cita_literal": "En todo caso, transcurridos tres meses desde la recepción de la comunicación sin que se hubiesen iniciado actuaciones de investigación, deberá procederse a su supresión, salvo que la finalidad de la conservación sea dejar evidencia del funcionamiento del sistema. Las comunicaciones a las que no se haya dado curso solamente podrán constar de forma anonimizada […]",
+        "usado_en": [],
+        "consecuencia_de_diseno": "Ninguno de los tres expedientes activa esta regla, porque en los tres se iniciaron actuaciones de investigación. Se documenta aquí para que la consola no lo interprete como un olvido: la supresión a tres meses de PI-31 es el supuesto de comunicación SIN curso, no el de expediente instruido."
+      },
+      {
+        "articulo": "33.1",
+        "rubrica": "Preservación de la identidad",
+        "cita_literal": "Quien presente una comunicación o lleve a cabo una revelación pública tiene derecho a que su identidad no sea revelada a terceras personas.",
+        "usado_en": ["EXP-SII-2026-005", "EXP-SII-2026-001"]
+      },
+      {
+        "articulo": "33.3",
+        "rubrica": "Preservación de la identidad — excepciones",
+        "cita_literal": "La identidad del informante solo podrá ser comunicada a la Autoridad judicial, al Ministerio Fiscal o a la autoridad administrativa competente en el marco de una investigación penal, disciplinaria o sancionadora.",
+        "usado_en": ["EXP-SII-2026-001"]
+      },
+      {
+        "articulo": "36.2 y 36.3",
+        "rubrica": "Prohibición de represalias",
+        "cita_literal": "Se entiende por represalia cualesquiera actos u omisiones que estén prohibidos por la ley, o que, de forma directa o indirecta, supongan un trato desfavorable que sitúe a las personas que las sufren en desventaja particular con respecto a otra en el contexto laboral o profesional, solo por su condición de informantes […] a título enunciativo, se consideran represalias las que se adopten en forma de: […] c) Evaluación o referencias negativas respecto al desempeño laboral o profesional. […] f) Denegación de formación. g) Discriminación, o trato desfavorable o injusto.",
+        "usado_en": ["EXP-SII-2026-005", "EXP-SII-2026-001"],
+        "consecuencia_de_diseno": "Los hitos de seguimiento de represalias comprueban exactamente los supuestos que el artículo enumera (evaluación de desempeño, acceso a formación, asignación de asuntos), no una casilla genérica de 'sin represalias'."
+      },
+      {
+        "articulo": "36.4",
+        "rubrica": "Prohibición de represalias — plazo",
+        "cita_literal": "La persona que viera lesionados sus derechos por causa de su comunicación o revelación una vez transcurrido el plazo de dos años, podrá solicitar la protección de la autoridad competente que, excepcionalmente y de forma justificada, podrá extender el período de protección […]",
+        "usado_en": ["EXP-SII-2026-005", "EXP-SII-2026-001"],
+        "consecuencia_de_diseno": "La ventana de seguimiento de 24 meses que usan los dos expedientes se apoya en la referencia temporal de este apartado. Que el seguimiento interno dure exactamente 24 meses es DECISIÓN DE DISEÑO de la demo, no una obligación del artículo."
+      }
+    ]
+  },
+
+  "marco_interno_aplicado": [
+    {
+      "codigo": "PI-31",
+      "titulo": "Política Sistema Interno de Información (SII) de Garrigues",
+      "estado_en_el_tenant": "Sembrada en G4 desde el PDF real. Su índice publicado tiene 9 apartados: Objeto; Ámbito de aplicación; Sistema Interno de Información; Responsable del Sistema Interno de Información; Medidas de protección y garantías; Libro-registro de informaciones; Protección de datos personales; Histórico de versiones; Anexo.",
+      "owner_body_id_en_el_tenant": null,
+      "nota_ownership": "PI-31 quedó en G4 con FK de órgano NULA a propósito: su fuente hace responsable a un cargo (Senior Partner), no a un governing_body. Este fichero NO le atribuye órgano propietario. La atribución del expediente a un comité concreto es cruce de trabajo, no ownership de la política."
+    },
+    {
+      "codigo": "PI-02",
+      "titulo": "Política sobre conflicto de intereses, chequeo y resolución de los mismos",
+      "usado_en": ["EXP-SII-2026-005"]
+    },
+    {
+      "codigo": "PI-03",
+      "titulo": "Política sobre honorarios profesionales y facturación",
+      "usado_en": ["EXP-SII-2026-002"]
+    },
+    {
+      "codigo": "PI-26",
+      "titulo": "Política sobre seguridad de la información",
+      "usado_en": ["EXP-SII-2026-005"]
+    },
+    {
+      "codigo": "CE-2023",
+      "titulo": "Código Ético, edición 04, noviembre 2023",
+      "articulos_citados": [
+        "Artículo 13.- Dignidad y respeto",
+        "Artículo 14.- Secreto profesional",
+        "Artículo 19.- Tratamiento de la información",
+        "Artículo 20.- Conflictos de intereses",
+        "Artículo 37.- El Canal Interno de Información",
+        "Artículo 38.- Comunicaciones al Canal Interno de Información",
+        "Artículo 39.- Principios informadores del Canal Interno de Información"
+      ],
+      "nota": "Las rúbricas de estos artículos están tomadas literalmente del content_outline del Código Ético ya sembrado en el tenant. Se cita la rúbrica; NO se cita ni se parafrasea el texto del articulado, que no está extraído en el tenant."
+    }
+  ],
+
+  "personas_ficticias": [
+    {
+      "codigo": "PF-SII-01",
+      "nombre": "Marta Quintela Basanta",
+      "rol": "Responsable del Sistema Interno de Información",
+      "firmeza": "SINTETICO",
+      "procedencia": "SIMULADO",
+      "ancla": "Ley 2/2023 art. 8 (la figura existe y debe ser designada por el órgano de administración). La PERSONA es inventada.",
+      "nota": "No corresponde a ningún profesional real del despacho. En el tenant, el órgano de administración de la matriz es un administrador único, que es quien conforme al art. 8.1 designaría a esta figura; ese acto de designación NO se genera aquí (ver registros_omitidos)."
+    },
+    {
+      "codigo": "PF-SII-02",
+      "nombre": "Néstor Carbajosa Lemos",
+      "rol": "Instructor interno del área de Cumplimiento",
+      "firmeza": "SINTETICO",
+      "procedencia": "SIMULADO",
+      "ancla": "NINGUNA"
+    },
+    {
+      "codigo": "PF-SII-03",
+      "nombre": "Alicia Ferrán Ubiedo",
+      "rol": "Instructora interna del área de Cumplimiento",
+      "firmeza": "SINTETICO",
+      "procedencia": "SIMULADO",
+      "ancla": "NINGUNA"
+    },
+    {
+      "codigo": "PF-SII-04",
+      "nombre": "Julia Ordóñez Peláez",
+      "rol": "Instructora externa independiente (letrada ajena a la Firma, contratada al efecto)",
+      "firmeza": "SINTETICO",
+      "procedencia": "SIMULADO",
+      "ancla": "NINGUNA",
+      "nota": "Se recurre a instrucción externa en el expediente de materia sensible por la exigencia de que quien instruye no tenga relación con los implicados, no por mandato legal."
+    },
+    {
+      "codigo": "PF-SII-05",
+      "nombre": "Rodrigo Bastida Alfaro",
+      "rol": "Director de Personas",
+      "firmeza": "SINTETICO",
+      "procedencia": "SIMULADO",
+      "ancla": "Ley 2/2023 art. 32.1.b, que legitima el acceso del responsable de recursos humanos solo cuando pudiera proceder la adopción de medidas disciplinarias. La PERSONA es inventada."
+    }
+  ],
+
+  "expedientes": [
+    {
+      "id": "EXP-SII-2026-002",
+      "titulo": "Comunicación anónima sobre imputación de horas a un asunto que no corresponde",
+      "firmeza": "SINTETICO",
+      "procedencia": "SIMULADO",
+      "ancla": "PI-31 (Sistema Interno de Información, sembrada en el tenant) + PI-03 (honorarios profesionales y facturación) + Ley 2/2023 arts. 7.3, 9.2 y 32. Los HECHOS son inventados; el PROCEDIMIENTO y los plazos son los de la ley cotejada.",
+      "ejercicio": 2026,
+      "estado": "CERRADO",
+      "canal_entrada": {
+        "medio": "Formulario web del canal interno, comunicación escrita",
+        "soporte": "Plataforma del canal con generación de código de seguimiento y buzón seguro de retorno, sin recogida de datos identificativos",
+        "base_legal": "Ley 2/2023 art. 7.2 (comunicación por escrito a través de medio electrónico habilitado) y art. 7.3 (admisión de comunicaciones anónimas)",
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "Ley 2/2023 art. 7"
+      },
+      "tipo": "FACTURACION_IRREGULAR",
+      "anonima": true,
+      "regimen_de_identidad": {
+        "clase": "ANONIMA",
+        "diferencia_con_confidencial": "En una comunicación CONFIDENCIAL el informante se identifica y su identidad queda reservada al Responsable del Sistema, con las excepciones del art. 33.3. En una comunicación ANÓNIMA no hay identidad que reservar: el sistema no la conoce.",
+        "consecuencias_reales_en_la_instruccion": [
+          "El acuse de recibo del art. 9.2.c no se envía a una persona: se deposita en el buzón seguro asociado al código de seguimiento. Se cumple el plazo, cambia el destinatario.",
+          "La facultad de solicitar información adicional al informante (art. 9.2.e) existe pero queda condicionada a que el informante vuelva al buzón. En este expediente se solicitó aclaración sobre los periodos afectados el 2026-02-25 y no hubo respuesta, lo que obligó a instruir solo con fuentes internas.",
+          "NO procede seguimiento de protección frente a represalias: sin identidad conocida no hay persona a la que proteger ni indicador que vigilar. Esto no es una laguna del expediente, es la consecuencia del anonimato.",
+          "La ponderación de la credibilidad de la comunicación no puede apoyarse en la posición del informante, porque se desconoce. Se apoyó exclusivamente en la verificabilidad documental de lo comunicado."
+        ],
+        "firmeza": "SINTETICO",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "Ley 2/2023 arts. 7.3, 9.2.c, 9.2.e y 36. La consecuencia práctica es razonamiento aplicado al caso sintético, no cita literal."
+      },
+      "hechos_comunicados": {
+        "resumen": "Se comunica que un profesional habría imputado a un asunto de un cliente horas efectivamente dedicadas a otro asunto de cliente distinto, en dos periodos de facturación consecutivos, y que ello habría incrementado indebidamente la minuta girada.",
+        "afectado": {
+          "codigo": "AFE-2026-002-A",
+          "posicion": "Asociado principal, área de práctica mercantil",
+          "identidad": "No consta. El expediente se tramita con seudonimización desde el registro de entrada.",
+          "firmeza": "SINTETICO",
+          "procedencia": "SIMULADO",
+          "ancla": "NINGUNA"
+        },
+        "politica_interna_concernida": ["PI-03"],
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "PI-03. El hecho es inventado; la política que lo encuadra existe en el tenant."
+      },
+      "instructor": {
+        "persona": "PF-SII-02 — Néstor Carbajosa Lemos",
+        "designado_por": "PF-SII-01 — Responsable del Sistema Interno de Información",
+        "fecha_designacion": "2026-02-20",
+        "declaracion_ausencia_de_relacion": {
+          "fecha": "2026-02-20",
+          "contenido": "Declara por escrito no haber intervenido en ninguno de los dos asuntos concernidos, no tener línea de reporte con el afectado ni relación personal o económica con él, y no participar en la decisión sobre el expediente.",
+          "verificado_por": "PF-SII-01"
+        },
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "NINGUNA. La exigencia de que instructor y decisor no tengan relación con los implicados es criterio de diseño del expediente, no un mandato literal de la Ley 2/2023."
+      },
+      "organo_decisor": {
+        "denominacion": "Responsable del Sistema Interno de Información, en cuanto la conclusión es de archivo y no comporta medida disciplinaria",
+        "persona": "PF-SII-01 — Marta Quintela Basanta",
+        "separacion_instruccion_decision": "El instructor (PF-SII-02) formula propuesta motivada de archivo; no decide. La decisión de archivo la adopta PF-SII-01, que no ha practicado ninguna diligencia de instrucción.",
+        "por_que_no_interviene_direccion_de_personas": "Porque la conclusión no abre la vía disciplinaria. El art. 32.1.b de la Ley 2/2023 legitima el acceso del responsable de recursos humanos SOLO cuando pudiera proceder la adopción de medidas disciplinarias contra un trabajador. Al no proceder, no se le da acceso al expediente.",
+        "firmeza": "SINTETICO",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "Ley 2/2023 art. 32.1.b (literal cotejado). La atribución concreta de la competencia de archivo al Responsable del Sistema es decisión de diseño de la demo."
+      },
+      "medidas_cautelares": {
+        "adoptadas": false,
+        "motivacion": "No se apreció riesgo de destrucción de evidencia (los partes horarios y las minutas quedan en registros de SAP y del sistema de gestión de tiempos, fuera del alcance del afectado) ni riesgo para persona alguna. Adoptar cautelares habría supuesto un perjuicio al afectado sin justificación, con la comunicación aún no contrastada.",
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "Plan de Sistemas 2025-2027, sistemas de operaciones y gobierno: SAP S/4HANA (RISE) — ERP con OTC. El sistema donde vive el registro sí es real; el detalle del caso no."
+      },
+      "cronologia": [
+        { "fecha": "2026-02-10", "dias_desde_recepcion": 0, "actuacion": "Recepción de la comunicación por el formulario web. Alta en el libro-registro con código de seguimiento y sin datos identificativos.", "actor": "Canal interno", "base_legal": "Ley 2/2023 arts. 7.3 y 26.1", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Fecha inventada." },
+        { "fecha": "2026-02-13", "dias_desde_recepcion": 3, "actuacion": "Acuse de recibo depositado en el buzón seguro asociado al código, con información sobre los canales externos ante la autoridad competente.", "actor": "PF-SII-01", "base_legal": "Ley 2/2023 art. 9.2.c (plazo de 7 días naturales: cumplido en 3) y art. 9.2.b", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Fecha inventada; el plazo es el legal." },
+        { "fecha": "2026-02-20", "dias_desde_recepcion": 10, "actuacion": "Acuerdo motivado de admisión a trámite y designación de instructor. Se admite por ser la conducta comunicada verificable con registros internos y encuadrable en PI-03.", "actor": "PF-SII-01", "base_legal": null, "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "PI-03" },
+        { "fecha": "2026-02-23", "dias_desde_recepcion": 13, "actuacion": "Inicio de la instrucción. Extracción de los partes horarios de los dos asuntos en los periodos señalados y de las minutas giradas.", "actor": "PF-SII-02", "base_legal": null, "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "NINGUNA" },
+        { "fecha": "2026-02-25", "dias_desde_recepcion": 15, "actuacion": "Solicitud de aclaración al informante depositada en el buzón seguro, sobre la delimitación exacta de los periodos. Sin respuesta durante toda la instrucción.", "actor": "PF-SII-02", "base_legal": "Ley 2/2023 art. 9.2.e", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 9.2.e" },
+        { "fecha": "2026-03-10", "dias_desde_recepcion": 28, "actuacion": "Cotejo de los partes horarios con la carta de encargo y con el expediente de aceptación de ambos asuntos. Se localiza una instrucción escrita de reimputación firmada por el socio responsable.", "actor": "PF-SII-02", "base_legal": null, "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "PI-01 (aceptación de nuevos clientes y asuntos) y PI-03, ambas en el tenant. El documento concreto es inventado." },
+        { "fecha": "2026-03-17", "dias_desde_recepcion": 35, "actuacion": "Entrevista con el socio responsable del asunto, que confirma haber ordenado la reimputación por corresponder el trabajo a un encargo ampliado del mismo cliente, y aporta la comunicación al cliente.", "actor": "PF-SII-02", "base_legal": null, "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "NINGUNA" },
+        { "fecha": "2026-03-24", "dias_desde_recepcion": 42, "actuacion": "Audiencia de la persona afectada. Se le informa por escrito de las conductas que se le atribuyen y se le da oportunidad de alegar; aporta el hilo de correo con la instrucción de reimputación.", "actor": "PF-SII-02", "base_legal": "Ley 2/2023 art. 9.2.f", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 9.2.f" },
+        { "fecha": "2026-04-17", "dias_desde_recepcion": 66, "actuacion": "Cierre de la instrucción y propuesta motivada de archivo por no acreditación.", "actor": "PF-SII-02", "base_legal": null, "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "NINGUNA" },
+        { "fecha": "2026-04-24", "dias_desde_recepcion": 73, "actuacion": "Resolución de archivo. Se hace constar expresamente que los hechos NO han resultado acreditados y que ello no comporta reproche alguno para la persona afectada.", "actor": "PF-SII-01", "base_legal": "Ley 2/2023 art. 9.2.h", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 9.2.h" },
+        { "fecha": "2026-04-27", "dias_desde_recepcion": 76, "actuacion": "Comunicación de la resolución a la persona afectada, con constancia expresa de que no se practica anotación alguna en su expediente profesional.", "actor": "PF-SII-01", "base_legal": null, "firmeza": "SINTETICO", "procedencia": "DEMO_PILOTO", "ancla": "Derivado del art. 9.2.h (respeto al honor de la persona afectada). La ausencia de anotación es criterio de diseño." },
+        { "fecha": "2026-04-28", "dias_desde_recepcion": 77, "actuacion": "Respuesta al informante depositada en el buzón seguro, dentro del plazo del art. 9.2.d (vencía el 2026-05-10). No se recurrió a la ampliación.", "actor": "PF-SII-01", "base_legal": "Ley 2/2023 art. 9.2.d", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 9.2.d" }
+      ],
+      "conclusion": {
+        "sentido": "NO_ACREDITADA",
+        "motivacion": "La reimputación de horas comunicada existió materialmente, pero respondía a una instrucción escrita y previa del socio responsable, fundada en la ampliación del encargo del mismo cliente, y fue comunicada a este antes de la emisión de la minuta. No se ha acreditado ni imputación a cliente distinto ni incremento indebido de la minuta. No hay infracción de PI-03.",
+        "deslinde_expreso_frente_al_art_32_3": "NO se activa la supresión inmediata del art. 32.3 de la Ley 2/2023. Ese artículo obliga a suprimir cuando se ACREDITA que la información no era veraz. Aquí lo que no se ha acreditado son los hechos denunciados, que es cosa distinta: el informante pudo observar una reimputación real y desconocer su cobertura documental. Confundir 'no acreditado' con 'falso' castigaría al informante de buena fe, y la ley no lo pide.",
+        "conservacion": "El expediente se conserva en el libro-registro del art. 26.1, no público, accesible solo a petición razonada de la Autoridad judicial mediante auto. Límite absoluto de conservación: diez años (art. 26.2), esto es, no más allá de 2036-02-10.",
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "Ley 2/2023 arts. 26.1, 26.2 y 32.3, cotejados literalmente."
+      },
+      "medidas_adoptadas": [
+        {
+          "medida": "Archivo del expediente sin medida disciplinaria ni anotación en el expediente profesional del afectado.",
+          "proporcionalidad": "Es la única salida compatible con la presunción de inocencia cuando los hechos no se acreditan.",
+          "firmeza": "SINTETICO",
+          "procedencia": "SIMULADO",
+          "ancla": "Ley 2/2023 art. 9.2.h"
+        },
+        {
+          "medida": "Recomendación de mejora dirigida al área de facturación: que toda reimputación de horas entre asuntos deje rastro documental en el propio sistema de gestión de tiempos, y no solo en correo electrónico.",
+          "naturaleza": "Recomendación, no sanción. Nace de una debilidad de trazabilidad detectada al instruir, no de una infracción.",
+          "firmeza": "SINTETICO",
+          "procedencia": "SIMULADO",
+          "ancla": "PI-03. La debilidad concreta es inventada."
+        }
+      ],
+      "seguimiento_represalias": {
+        "aplica": false,
+        "motivacion": "La comunicación es anónima. No hay informante identificado sobre el que verificar evaluación de desempeño, asignación de asuntos o acceso a formación, que son los indicadores que el art. 36.3 enumera. Registrar un seguimiento vacío daría una falsa apariencia de control.",
+        "firmeza": "SINTETICO",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "Ley 2/2023 art. 36.3 (cotejado literalmente)."
+      },
+      "cruce_modulos": [
+        {
+          "modulo": "GRC",
+          "tipo_cruce": "EJERCICIO_DE_CONTROL",
+          "identificador_destino": "CTR-GARR-19",
+          "identificador_es_real": true,
+          "donde_vive": "scripts/garrigues/normativo/obligaciones-pbcft.ts",
+          "descripcion": "El expediente es una ejecución del control 'PPD — Canal Ético como vía de comunicación de incidencias, riesgos e incumplimientos del sistema normativo interno'. No lo modifica ni lo refuerza: lo ejercita.",
+          "verificable_como": "Existe al menos un expediente del canal en el ejercicio con resolución en plazo, asociado a CTR-GARR-19."
+        },
+        {
+          "modulo": "GRC",
+          "tipo_cruce": "CONTROL_PROPUESTO",
+          "identificador_destino": null,
+          "identificador_es_real": false,
+          "descripcion": "Se propone un control nuevo de trazabilidad de las reimputaciones de horas entre asuntos, con evidencia en el propio sistema de gestión de tiempos. NO existe hoy en el catálogo de controles del tenant y NO debe sembrarse como existente.",
+          "verificable_como": "Si la consola encuentra este control como 'Efectivo' en el catálogo, es un error de siembra: nació aquí como propuesta."
+        }
+      ]
+    },
+
+    {
+      "id": "EXP-SII-2026-005",
+      "titulo": "Comunicación confidencial sobre acceso a documentación de un asunto separado por muralla china",
+      "firmeza": "SINTETICO",
+      "procedencia": "SIMULADO",
+      "ancla": "PI-31 + PI-02 (conflicto de intereses) + PI-26 (seguridad de la información) + Código Ético arts. 14, 19 y 20 (rúbricas literales del tenant) + Ley 2/2023 arts. 7.2, 9.2, 33 y 36. Los HECHOS son inventados.",
+      "ejercicio": 2026,
+      "estado": "CERRADO_CON_SEGUIMIENTO_ABIERTO",
+      "canal_entrada": {
+        "medio": "Comunicación verbal en reunión presencial, solicitada por el informante",
+        "soporte": "Transcripción completa y exacta de la conversación, ofrecida al informante para comprobación y rectificación, y aceptada por él mediante firma el 2026-04-09. No se grabó: el informante no prestó consentimiento a la grabación y sí a la transcripción.",
+        "base_legal": "Ley 2/2023 art. 7.2, que admite la reunión presencial a solicitud del informante dentro del plazo máximo de siete días y exige documentar la comunicación verbal por grabación o por transcripción completa, previo consentimiento",
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "Ley 2/2023 art. 7.2 (cotejado literalmente)."
+      },
+      "tipo": "CONFLICTO_DE_INTERES_Y_MURALLA_CHINA",
+      "anonima": false,
+      "regimen_de_identidad": {
+        "clase": "CONFIDENCIAL",
+        "diferencia_con_anonima": "El informante se identifica ante el Responsable del Sistema y su identidad queda reservada. No es anonimato: hay identidad, y por eso hay algo que proteger y alguien a quien informar del resultado.",
+        "consecuencias_reales_en_la_instruccion": [
+          "La identidad del informante no se reveló al afectado ni a los testigos. Las diligencias se formularon de modo que no permitieran deducirla, lo que obligó a ampliar el universo de accesos revisados más allá del estrictamente necesario.",
+          "El informante pudo ser requerido para aclaración y respondió, lo que permitió acotar la ventana temporal de los accesos.",
+          "Al existir identidad conocida, sí procede el programa de seguimiento de represalias del art. 36.",
+          "El informante fue advertido por escrito de los supuestos tasados del art. 33.3 en que su identidad podría ser comunicada, y de que en tal caso se le trasladaría previamente salvo que ello comprometiera la investigación o el procedimiento."
+        ],
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "Ley 2/2023 arts. 33.1 y 33.3 (cotejados literalmente)."
+      },
+      "hechos_comunicados": {
+        "resumen": "Se comunica que un profesional adscrito al equipo de uno de dos asuntos separados por una muralla china habría accedido reiteradamente, en el gestor documental, a documentación del asunto del que estaba excluido, sin necesidad de conocer, y que ello habría podido favorecer la posición de una de las partes.",
+        "informante": {
+          "codigo": "INF-2026-005",
+          "posicion": "Profesional del mismo departamento que el afectado, sin relación jerárquica con él",
+          "identidad": "Conocida por el Responsable del Sistema. No consta en el expediente accesible.",
+          "firmeza": "SINTETICO",
+          "procedencia": "SIMULADO",
+          "ancla": "NINGUNA"
+        },
+        "afectado": {
+          "codigo": "AFE-2026-005-A",
+          "posicion": "Asociado senior",
+          "firmeza": "SINTETICO",
+          "procedencia": "SIMULADO",
+          "ancla": "NINGUNA"
+        },
+        "politica_interna_concernida": ["PI-02", "PI-26", "CE-2023"],
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "PI-02, PI-26 y Código Ético arts. 14, 19 y 20 existen en el tenant. El hecho es inventado."
+      },
+      "instructor": {
+        "persona": "PF-SII-03 — Alicia Ferrán Ubiedo",
+        "designado_por": "PF-SII-01",
+        "fecha_designacion": "2026-04-15",
+        "declaracion_ausencia_de_relacion": {
+          "fecha": "2026-04-15",
+          "contenido": "Declara no estar adscrita a ninguno de los dos asuntos separados por la muralla, no figurar en ninguna de las listas de acceso de ambos, y no tener relación jerárquica, personal ni económica con informante ni afectado.",
+          "verificado_por": "PF-SII-01",
+          "como_se_verifico": "Contraste de la declaración contra las listas de acceso de ambos asuntos en el gestor documental, realizado por PF-SII-01 y no por la propia instructora."
+        },
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "Plan de Sistemas 2025-2027: iManage DMS & Teams VDR, con control estricto de roles. El sistema es real; la lista de acceso concreta es inventada."
+      },
+      "organo_decisor": {
+        "denominacion": "Dirección de Personas, sobre propuesta motivada de la instructora, por comportar la conclusión medida disciplinaria",
+        "persona": "PF-SII-05 — Rodrigo Bastida Alfaro",
+        "separacion_instruccion_decision": "La instructora (PF-SII-03) practica todas las diligencias y formula propuesta; no decide ni asiste a la deliberación. La decisión disciplinaria la adopta PF-SII-05, que no ha practicado ninguna diligencia y que accede al expediente solo cuando ya procede la medida.",
+        "acceso_al_expediente": "El acceso de la Dirección de Personas se abre el 2026-06-15, cuando la propuesta ya identifica una medida disciplinaria posible, y no antes.",
+        "firmeza": "SINTETICO",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "Ley 2/2023 art. 32.1.b (cotejado literalmente): el acceso del responsable de recursos humanos se legitima 'solo cuando pudiera proceder la adopción de medidas disciplinarias'. La atribución de la competencia decisoria concreta a la Dirección de Personas es decisión de diseño de la demo, no consta en el índice publicado de PI-31."
+      },
+      "medidas_cautelares": {
+        "adoptadas": true,
+        "detalle": "Suspensión preventiva del acceso del afectado a la documentación del asunto del que estaba excluido, desde el 2026-04-16 y por el tiempo de la instrucción. No se le apartó de su propio asunto ni se alteraron sus condiciones.",
+        "motivacion": "Evitar la continuación del acceso mientras se contrastaba, con el mínimo perjuicio posible para el afectado. Se le comunicó por escrito el mismo día, indicando su carácter cautelar y no sancionador.",
+        "proporcionalidad": "La medida se limita al acceso concreto cuestionado. Apartarlo del asunto propio habría anticipado el reproche antes de oírle.",
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "Ley 2/2023 art. 9.2.h (presunción de inocencia). La medida concreta es inventada."
+      },
+      "cronologia": [
+        { "fecha": "2026-04-07", "dias_desde_recepcion": 0, "actuacion": "Solicitud de reunión presencial por el informante y celebración de la misma. Alta en el libro-registro.", "actor": "PF-SII-01", "base_legal": "Ley 2/2023 arts. 7.2 y 26.1", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 7.2" },
+        { "fecha": "2026-04-09", "dias_desde_recepcion": 2, "actuacion": "Acuse de recibo al informante e información sobre canales externos. Comprobación, rectificación puntual y aceptación firmada de la transcripción por el informante.", "actor": "PF-SII-01", "base_legal": "Ley 2/2023 arts. 9.2.c (7 días naturales: cumplido en 2), 9.2.b y 7.2", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 arts. 7.2 y 9.2.c" },
+        { "fecha": "2026-04-15", "dias_desde_recepcion": 8, "actuacion": "Acuerdo motivado de admisión a trámite y designación de instructora, con verificación previa de su ausencia de relación con los implicados.", "actor": "PF-SII-01", "base_legal": null, "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "PI-02" },
+        { "fecha": "2026-04-16", "dias_desde_recepcion": 9, "actuacion": "Inicio de la instrucción. Adopción y comunicación escrita de la medida cautelar de suspensión de acceso.", "actor": "PF-SII-03", "base_legal": null, "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "NINGUNA" },
+        { "fecha": "2026-04-28", "dias_desde_recepcion": 21, "actuacion": "Extracción del registro de accesos del gestor documental sobre la ventana temporal comunicada, ampliada deliberadamente para no permitir deducir la identidad del informante.", "actor": "PF-SII-03", "base_legal": "Ley 2/2023 art. 33.1", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Plan de Sistemas: iManage DMS. El registro concreto es inventado." },
+        { "fecha": "2026-05-06", "dias_desde_recepcion": 29, "actuacion": "Revisión del acta de constitución de la muralla china y de las listas de acceso de ambos asuntos. Se constata que el afectado figuraba excluido del segundo asunto desde su apertura.", "actor": "PF-SII-03", "base_legal": null, "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "PI-02" },
+        { "fecha": "2026-05-19", "dias_desde_recepcion": 42, "actuacion": "Audiencia de la persona afectada. Se le informa por escrito de las conductas atribuidas y de los accesos concretos; alega desconocimiento de la exclusión y necesidad de consultar un precedente interno.", "actor": "PF-SII-03", "base_legal": "Ley 2/2023 art. 9.2.f", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 9.2.f" },
+        { "fecha": "2026-06-02", "dias_desde_recepcion": 56, "actuacion": "Contraste de la alegación: se verifica que la exclusión le fue notificada y aceptada electrónicamente, y que no se ha hallado rastro de traslado de la documentación fuera del gestor documental ni comunicación a terceros.", "actor": "PF-SII-03", "base_legal": null, "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "NINGUNA" },
+        { "fecha": "2026-06-05", "dias_desde_recepcion": 59, "actuacion": "Cierre de la instrucción y propuesta motivada: acreditación parcial.", "actor": "PF-SII-03", "base_legal": null, "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "NINGUNA" },
+        { "fecha": "2026-06-15", "dias_desde_recepcion": 69, "actuacion": "Apertura de acceso al expediente a la Dirección de Personas, por proceder desde ese momento la valoración de una medida disciplinaria.", "actor": "PF-SII-01", "base_legal": "Ley 2/2023 art. 32.1.b", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 32.1.b" },
+        { "fecha": "2026-06-19", "dias_desde_recepcion": 73, "actuacion": "Resolución: acreditado el acceso indebido; no acreditado el uso en favor de la contraparte ni la intención de favorecerla. Medida disciplinaria de amonestación escrita.", "actor": "PF-SII-05", "base_legal": "Ley 2/2023 art. 9.2.h", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 9.2.h" },
+        { "fecha": "2026-06-23", "dias_desde_recepcion": 77, "actuacion": "Comunicación del resultado al informante y activación del programa de seguimiento de represalias. Dentro del plazo del art. 9.2.d, que vencía el 2026-07-07; no se recurrió a la ampliación.", "actor": "PF-SII-01", "base_legal": "Ley 2/2023 arts. 9.2.d y 36", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 9.2.d" },
+        { "fecha": "2026-06-30", "dias_desde_recepcion": 84, "actuacion": "Traslado de una nota de lecciones aprendidas, seudonimizada y sin datos del expediente, al Comité de Práctica Profesional, para revisión del procedimiento de constitución y verificación de murallas chinas.", "actor": "PF-SII-01", "base_legal": null, "firmeza": "SINTETICO", "procedencia": "DEMO_PILOTO", "ancla": "Comité de Práctica Profesional: órgano real ya modelado en el tenant (slug garrigues-comite-practica-profesional). Que el SII le traslade estas notas es decisión de diseño, no consta en el índice publicado de PI-31." }
+      ],
+      "conclusion": {
+        "sentido": "ACREDITADA_PARCIALMENTE",
+        "acreditado": "Acceso reiterado, en once ocasiones a lo largo de cinco semanas, a documentación de un asunto del que el afectado estaba formalmente excluido, sin necesidad de conocer y pese a haber recibido y aceptado la notificación de exclusión. Infracción de PI-02 y de PI-26.",
+        "no_acreditado": "Que la información obtenida se utilizara en favor de la contraparte, que se comunicara a terceros o que saliera del gestor documental. La comunicación atribuía esa finalidad; la instrucción no la ha sostenido y así se hace constar.",
+        "por_que_importa_el_deslinde": "La medida se gradúa sobre lo acreditado, no sobre lo denunciado. Sancionar por la finalidad no probada sería desproporcionado y vulneraría la presunción de inocencia del art. 9.2.h.",
+        "valoracion_del_art_9_2_j": "Se valoró expresamente si los hechos podían ser indiciariamente constitutivos de delito a efectos de la remisión inmediata al Ministerio Fiscal. La instructora concluyó motivadamente que el acceso interno acreditado, sin revelación ni uso externo probados, no alcanzaba ese umbral. La valoración consta en el expediente. ESTA CALIFICACIÓN ES SINTÉTICA Y NO ES UN DICTAMEN: figura en 'dudas' como punto que requiere validación del Comité Legal antes de cualquier uso.",
+        "conservacion": "Libro-registro del art. 26.1; límite de diez años del art. 26.2, no más allá de 2036-04-07.",
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "Ley 2/2023 arts. 9.2.h, 9.2.j, 26.1 y 26.2, cotejados literalmente. La calificación del caso es inventada."
+      },
+      "medidas_adoptadas": [
+        { "medida": "Amonestación escrita, incorporada al expediente profesional del afectado.", "proporcionalidad": "Se gradúa sobre lo acreditado —acceso indebido reiterado— y no sobre la finalidad denunciada y no probada.", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Código Ético (CE-2023) y régimen disciplinario aplicable. La sanción concreta es inventada." },
+        { "medida": "Revocación definitiva del acceso y revisión de las listas de acceso de ambos asuntos.", "proporcionalidad": "Medida correctora, no sancionadora.", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "PI-26" },
+        { "medida": "Formación específica obligatoria sobre PI-02 y sobre el funcionamiento operativo de las murallas chinas, para el afectado y para el equipo de ambos asuntos.", "proporcionalidad": "Se extiende al equipo porque la instrucción detectó que la notificación de exclusión no venía acompañada de bloqueo técnico efectivo, lo que es un defecto del procedimiento y no del individuo.", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "PI-02" }
+      ],
+      "seguimiento_represalias": {
+        "aplica": true,
+        "ventana": "24 meses desde la resolución (2026-06-19 a 2028-06-19)",
+        "base_de_la_ventana": "La ley no fija una duración de seguimiento interno. Los 24 meses se apoyan en la referencia temporal del art. 36.4, que trata como excepcional la protección más allá de los dos años. Es DECISIÓN DE DISEÑO, no obligación legal.",
+        "indicadores_vigilados": [
+          "Evaluación de desempeño y referencias profesionales (art. 36.3.c)",
+          "Acceso a formación (art. 36.3.f)",
+          "Asignación de asuntos y carga de trabajo, como trato desfavorable o injusto (art. 36.3.g)",
+          "Modificación sustancial de condiciones de trabajo (art. 36.3.a)"
+        ],
+        "hitos": [
+          { "fecha": "2026-09-21", "estado": "PROGRAMADO", "actuacion": "Primera verificación a tres meses de la resolución.", "resultado": null, "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 36.3. Fecha inventada; es futura respecto de la fecha de generación de este fichero (2026-08-30) y por eso no tiene resultado." },
+          { "fecha": "2026-12-21", "estado": "PROGRAMADO", "actuacion": "Segunda verificación a seis meses.", "resultado": null, "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Fecha inventada, futura." },
+          { "fecha": "2027-06-21", "estado": "PROGRAMADO", "actuacion": "Tercera verificación a doce meses.", "resultado": null, "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Fecha inventada, futura." }
+        ],
+        "nota_honestidad": "Este expediente NO tiene todavía ninguna verificación de represalias ejecutada, porque su resolución es de junio de 2026 y el primer hito cae después de la fecha de generación. Rellenarlo con resultados 'sin incidencias' habría sido fabricar una medición.",
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "Ley 2/2023 arts. 36.3 y 36.4, cotejados literalmente."
+      },
+      "cruce_modulos": [
+        {
+          "modulo": "GRC",
+          "tipo_cruce": "EJERCICIO_DE_CONTROL",
+          "identificador_destino": "CTR-GARR-20",
+          "identificador_es_real": true,
+          "donde_vive": "scripts/garrigues/normativo/obligaciones-pbcft.ts",
+          "descripcion": "La medida disciplinaria adoptada es una ejecución del control 'PPD — Código Ético y sistema disciplinario aplicables a la vulneración del sistema normativo interno'.",
+          "verificable_como": "Existe un expediente del canal con medida disciplinaria efectivamente adoptada, asociado a CTR-GARR-20."
+        },
+        {
+          "modulo": "SECRETARIA",
+          "tipo_cruce": "ELEVACION_A_ORGANO",
+          "identificador_destino": "garrigues-comite-practica-profesional",
+          "identificador_es_real": true,
+          "donde_vive": "scripts/garrigues/gobierno/comites-2026.json (slug 'comite-practica-profesional'; en el tenant, con prefijo 'garrigues-')",
+          "fecha": "2026-06-30",
+          "descripcion": "Traslado de nota de lecciones aprendidas al Comité de Práctica Profesional.",
+          "ADVERTENCIA_DE_MODELADO": "El Comité de Práctica Profesional está modelado en el tenant como estructura CONSULTIVA (config.naturaleza='CONSULTIVO') y, por decisión de G3, los órganos consultivos quedan FUERA de los selectores de adopción de acuerdos. Por tanto este cruce NO debe materializarse como un 'acuerdo' societario ni como acto inscribible: su rastro correcto en Secretaría es un informe o acta de órgano consultivo. Si la consola encuentra un acuerdo adoptado por este comité, es un defecto de siembra, no un dato.",
+          "verificable_como": "Existe rastro documental en Secretaría fechado el 2026-06-30 asociado a garrigues-comite-practica-profesional, y su tipo NO es acuerdo adoptado."
+        },
+        {
+          "modulo": "GRC",
+          "tipo_cruce": "CONTROL_PROPUESTO",
+          "identificador_destino": null,
+          "identificador_es_real": false,
+          "descripcion": "Se propone un control de bloqueo TÉCNICO —no solo notificación— del acceso al gestor documental en asuntos con muralla china, con revisión periódica del registro de accesos. NO existe hoy en el catálogo del tenant.",
+          "verificable_como": "Si aparece como control 'Efectivo' del catálogo, es un error de siembra: nació aquí como propuesta.",
+          "sistema_afectado_real": "iManage DMS & Teams VDR (Plan de Sistemas 2025-2027), nivel de exposición L1-L2 según la taxonomía del CISO."
+        }
+      ]
+    },
+
+    {
+      "id": "EXP-SII-2026-001",
+      "titulo": "Comunicación confidencial sobre trato degradante reiterado en el entorno de trabajo",
+      "nota_de_tratamiento": "Materia sensible. La redacción de este expediente es deliberadamente sobria: se describen la calificación y el procedimiento, no los hechos en detalle. Un expediente de esta naturaleza no se ilustra.",
+      "firmeza": "SINTETICO",
+      "procedencia": "SIMULADO",
+      "ancla": "PI-31 + Código Ético art. 13 (Dignidad y respeto, rúbrica literal del tenant) + mapa de riesgos penales del tenant, RSK-GARR-PEN-002 (art. 173.1 CP) + Ley 2/2023 arts. 9.2, 32, 33 y 36. Los HECHOS son inventados.",
+      "ejercicio": 2025,
+      "estado": "CERRADO_CON_SEGUIMIENTO_ABIERTO",
+      "canal_entrada": {
+        "medio": "Comunicación escrita remitida al buzón electrónico del canal interno",
+        "soporte": "Escrito del informante, con indicación de correo electrónico seguro a efectos de notificaciones",
+        "base_legal": "Ley 2/2023 art. 7.2 (comunicación por escrito a través de medio electrónico habilitado; el informante puede indicar un correo electrónico o lugar seguro a efectos de recibir las notificaciones)",
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "Ley 2/2023 art. 7.2"
+      },
+      "tipo": "CONDUCTA_EN_EL_ENTORNO_LABORAL_TRATO_DEGRADANTE",
+      "anonima": false,
+      "regimen_de_identidad": {
+        "clase": "CONFIDENCIAL",
+        "consecuencias_reales_en_la_instruccion": [
+          "La identidad del informante se reservó frente al afectado y frente a la Dirección de Personas hasta la fase de decisión, y no se reveló a los testigos.",
+          "Se advirtió por escrito al informante de los supuestos tasados del art. 33.3 y de que, de concurrir, se le trasladaría previamente salvo compromiso de la investigación.",
+          "Se instruyó a los testigos sobre su deber de confidencialidad y sobre la tipificación del quebranto, conforme al art. 9.2.g.",
+          "Al ser el afectado el superior funcional directo del informante, la reserva de identidad no era sostenible frente a él en la práctica. Se le informó de las conductas atribuidas SIN identificar al informante, y se adoptó la medida cautelar precisamente para que la reserva no dependiera de la buena voluntad del afectado."
+        ],
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "Ley 2/2023 arts. 9.2.g, 33.1 y 33.3, cotejados literalmente."
+      },
+      "hechos_comunicados": {
+        "resumen": "Se comunica un patrón reiterado de trato vejatorio y menosprecio público hacia integrantes de un equipo en reuniones internas, atribuido a su responsable funcional.",
+        "informante": { "codigo": "INF-2025-001", "posicion": "Integrante del equipo afectado, con línea de reporte funcional al denunciado", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "NINGUNA" },
+        "afectado": { "codigo": "AFE-2025-001-A", "posicion": "Asociado principal con responsabilidad funcional sobre el equipo. NO es socio: el régimen disciplinario aplicable es por ello el general y no el del Código de Conducta del Socio.", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "El Código de Conducta del Socio existe en el tenant como norma diferenciada. La elección de un afectado no socio es deliberada, para no aplicar un régimen cuyo contenido no está extraído." },
+        "politica_interna_concernida": ["CE-2023", "PI-31"],
+        "delito_del_mapa_penal_concernido": "RSK-GARR-PEN-002 — art. 173.1 CP, delitos contra la integridad moral: trato degradante, acoso laboral y acoso inmobiliario",
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "scripts/garrigues/penal/mapa-penal.ts, RSK-GARR-PEN-002 (real, sembrado). El hecho es inventado."
+      },
+      "deslinde_expreso_frente_al_articulo_184_CP": {
+        "contenido": "La instrucción hace constar expresamente que NO se comunicó ni se investigó conducta alguna de naturaleza sexual, y que el expediente no guarda relación con el art. 184 CP (RSK-GARR-PEN-004 del mapa penal) ni con el protocolo de acoso. El deslinde se documenta para evitar que la calificación se arrastre por proximidad temática.",
+        "por_que_se_hace_explicito": "Mezclar el art. 173.1 y el art. 184 es el error más fácil y el más dañino en esta materia: cambia el tipo, el protocolo aplicable y el reproche que recae sobre la persona afectada.",
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "Mapa penal del tenant: RSK-GARR-PEN-002 (art. 173.1) y RSK-GARR-PEN-004 (art. 184), ambos reales."
+      },
+      "instructor": {
+        "persona": "PF-SII-04 — Julia Ordóñez Peláez, letrada externa independiente",
+        "designada_por": "PF-SII-01",
+        "fecha_designacion": "2025-10-13",
+        "por_que_externa": "El afectado tiene responsabilidad funcional dentro de la propia estructura y relación profesional con parte del área de Cumplimiento. Ningún instructor interno podía acreditar ausencia de relación con los implicados. Se recurrió a instrucción externa para que la separación fuese real y no nominal.",
+        "declaracion_ausencia_de_relacion": {
+          "fecha": "2025-10-13",
+          "contenido": "Declara no haber prestado servicios a la Firma ni a ninguna sociedad del grupo en los cinco años anteriores, y no tener relación personal, profesional ni económica con informante, afectado ni testigos.",
+          "verificado_por": "PF-SII-01"
+        },
+        "condicion_de_encargado_del_tratamiento": "Al ser externa, su acceso a datos personales del sistema se articula como encargado del tratamiento designado, que es una de las posiciones tasadas del art. 32.1.d.",
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "Ley 2/2023 art. 32.1.d (cotejado literalmente). La persona y el encargo son inventados."
+      },
+      "organo_decisor": {
+        "denominacion": "Dirección de Personas, sobre propuesta motivada de la instructora externa",
+        "persona": "PF-SII-05 — Rodrigo Bastida Alfaro",
+        "separacion_instruccion_decision": "La instructora es externa y no decide. El decisor es interno, no ha practicado diligencia alguna y accede al expediente el 2026-01-26, cuando la propuesta ya identifica medida disciplinaria.",
+        "declaracion_ausencia_de_relacion_del_decisor": "PF-SII-05 declara no tener relación jerárquica directa ni personal con informante ni afectado. La declaración se verifica antes de abrirle el acceso, no después.",
+        "firmeza": "SINTETICO",
+        "procedencia": "DEMO_PILOTO",
+        "ancla": "Ley 2/2023 art. 32.1.b. La atribución concreta de competencia decisoria es decisión de diseño de la demo: el índice publicado de PI-31 no la detalla."
+      },
+      "medidas_cautelares": {
+        "adoptadas": true,
+        "detalle": "Reasignación temporal de la línea de reporte del informante a otro responsable, desde el 2025-10-14 y por el tiempo de la instrucción, sin merma alguna de retribución, categoría, asignación de asuntos ni expectativas de promoción.",
+        "motivacion": "Evitar el contacto jerárquico directo mientras se instruye, protegiendo al informante sin anticipar reproche al afectado.",
+        "proporcionalidad": "La medida recae sobre la línea de reporte, no sobre la posición del afectado. Se evitó deliberadamente cualquier medida que, adoptada sobre el informante, pudiera constituir por sí misma alguno de los tratos desfavorables que el art. 36.3 enumera.",
+        "comunicacion": "Comunicada por escrito a ambos el 2025-10-14, motivada y con indicación expresa de su carácter cautelar y no sancionador.",
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "Ley 2/2023 arts. 9.2.h y 36.3 (cotejados literalmente). La medida concreta es inventada."
+      },
+      "cronologia": [
+        { "fecha": "2025-10-06", "dias_desde_recepcion": 0, "actuacion": "Recepción del escrito en el buzón del canal. Alta en el libro-registro.", "actor": "PF-SII-01", "base_legal": "Ley 2/2023 art. 26.1", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Fecha inventada." },
+        { "fecha": "2025-10-08", "dias_desde_recepcion": 2, "actuacion": "Acuse de recibo al informante en el correo seguro indicado, con información sobre los canales externos.", "actor": "PF-SII-01", "base_legal": "Ley 2/2023 arts. 9.2.c (7 días naturales: cumplido en 2) y 9.2.b", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 9.2.c" },
+        { "fecha": "2025-10-13", "dias_desde_recepcion": 7, "actuacion": "Acuerdo motivado de admisión a trámite y designación de instructora externa independiente, previa verificación de su ausencia de relación con los implicados.", "actor": "PF-SII-01", "base_legal": "Ley 2/2023 art. 32.1.d", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 32.1.d" },
+        { "fecha": "2025-10-14", "dias_desde_recepcion": 8, "actuacion": "Adopción y comunicación escrita de la medida cautelar. Inicio de la instrucción.", "actor": "PF-SII-04", "base_legal": null, "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "NINGUNA" },
+        { "fecha": "2025-11-25", "dias_desde_recepcion": 50, "actuacion": "Primera audiencia de la persona afectada. Se le informa por escrito de las conductas atribuidas y del periodo, sin identificar al informante, y se le da oportunidad de alegar.", "actor": "PF-SII-04", "base_legal": "Ley 2/2023 arts. 9.2.f y 33.1", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 9.2.f" },
+        { "fecha": "2025-12-18", "dias_desde_recepcion": 73, "actuacion": "Acuerdo motivado de AMPLIACIÓN del plazo de respuesta, adoptado antes del vencimiento de los tres meses (2026-01-06), por especial complejidad: número de testimonios a practicar y necesidad de una segunda audiencia tras las alegaciones. Comunicado al informante y al afectado.", "actor": "PF-SII-01", "base_legal": "Ley 2/2023 art. 9.2.d, que permite extender el plazo hasta un máximo de otros tres meses adicionales en casos de especial complejidad", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 9.2.d (cotejado literalmente). La motivación concreta es inventada." },
+        { "fecha": "2026-01-09", "dias_desde_recepcion": 95, "actuacion": "Segunda audiencia de la persona afectada, sobre los elementos aparecidos tras su primera comparecencia.", "actor": "PF-SII-04", "base_legal": "Ley 2/2023 art. 9.2.f, que reconoce el derecho a ser oída en cualquier momento", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 9.2.f" },
+        { "fecha": "2026-01-16", "dias_desde_recepcion": 102, "actuacion": "Cierre de la instrucción. Informe con propuesta motivada y con la valoración expresa del art. 9.2.j.", "actor": "PF-SII-04", "base_legal": "Ley 2/2023 art. 9.2.j", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 9.2.j" },
+        { "fecha": "2026-01-26", "dias_desde_recepcion": 112, "actuacion": "Apertura de acceso al expediente a la Dirección de Personas, por proceder desde ese momento la valoración de medida disciplinaria.", "actor": "PF-SII-01", "base_legal": "Ley 2/2023 art. 32.1.b", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 32.1.b" },
+        { "fecha": "2026-02-06", "dias_desde_recepcion": 123, "actuacion": "Resolución del expediente. Hechos acreditados en cuanto al trato degradante reiterado.", "actor": "PF-SII-05", "base_legal": null, "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "NINGUNA" },
+        { "fecha": "2026-02-10", "dias_desde_recepcion": 127, "actuacion": "Comunicación del resultado al informante y activación del programa de seguimiento de represalias. Dentro del plazo ampliado del art. 9.2.d, que vencía el 2026-04-06.", "actor": "PF-SII-01", "base_legal": "Ley 2/2023 arts. 9.2.d y 36", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 9.2.d" },
+        { "fecha": "2026-02-20", "dias_desde_recepcion": 137, "actuacion": "Ejecución de la medida disciplinaria y de las medidas correctoras. Levantamiento de la cautelar y consolidación de la nueva línea de reporte del informante, a petición expresa de este y sin merma de condiciones.", "actor": "PF-SII-05", "base_legal": null, "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "NINGUNA" },
+        { "fecha": "2026-03-03", "dias_desde_recepcion": 148, "actuacion": "Traslado al Comité de Prevención de Delitos de una nota seudonimizada, sin datos del expediente, a efectos de seguimiento del riesgo del art. 173.1 CP en el mapa penal.", "actor": "PF-SII-01", "base_legal": null, "firmeza": "SINTETICO", "procedencia": "DEMO_PILOTO", "ancla": "Comité de Prevención de Delitos: órgano real del tenant (slug garrigues-comite-prevencion-delitos). Que el SII le traslade esta nota es decisión de diseño, no consta en el índice publicado de PI-31." }
+      ],
+      "conclusion": {
+        "sentido": "ACREDITADA",
+        "acreditado": "Patrón reiterado de trato vejatorio y menosprecio público hacia integrantes del equipo en reuniones internas, a lo largo de aproximadamente ocho meses, corroborado por cuatro testimonios coincidentes y por documentación interna. Infracción del Código Ético en su artículo 13, Dignidad y respeto.",
+        "no_acreditado": "No se ha acreditado conducta alguna de naturaleza sexual ni represalia previa contra el informante por razones distintas de las investigadas.",
+        "valoracion_del_art_9_2_j": {
+          "se_practico": true,
+          "contenido": "La instructora valoró expresamente si los hechos podían ser indiciariamente constitutivos del delito del art. 173.1 CP a efectos de la remisión inmediata al Ministerio Fiscal, y concluyó motivadamente que la conducta acreditada, con ser una infracción grave del sistema normativo interno, no alcanzaba en el caso el umbral típico. La valoración, su motivación y su fecha constan en el expediente.",
+          "ADVERTENCIA": "Esta calificación es SINTÉTICA y NO constituye dictamen ni criterio del despacho. Es exactamente el tipo de afirmación que no debe leerse como acreditada. Figura en 'dudas' como punto que requiere validación del Comité Legal antes de cualquier uso, y como el punto más delicado de todo este fichero.",
+          "firmeza": "SINTETICO",
+          "procedencia": "DEMO_PILOTO",
+          "ancla": "Ley 2/2023 art. 9.2.j (cotejado literalmente). La calificación del caso es inventada y no está validada."
+        },
+        "conservacion": "Libro-registro del art. 26.1; límite de diez años del art. 26.2, no más allá de 2035-10-06.",
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "Código Ético art. 13 (rúbrica literal del tenant) y Ley 2/2023 arts. 9.2.j, 26.1 y 26.2."
+      },
+      "medidas_adoptadas": [
+        { "medida": "Sanción disciplinaria conforme al régimen general aplicable, con constancia en el expediente profesional del afectado.", "proporcionalidad": "Se gradúa sobre la reiteración y la posición de responsabilidad funcional acreditadas, y no sobre la calificación penal, que no se sostuvo.", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Código Ético art. 13. La sanción concreta es inventada y no se detalla su intensidad, que corresponde al régimen laboral aplicable y no a este fichero." },
+        { "medida": "Separación funcional definitiva del afectado respecto del equipo, con reasignación de la responsabilidad sobre este.", "proporcionalidad": "Medida correctora dirigida a que la conducta no pueda repetirse sobre las mismas personas.", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "NINGUNA" },
+        { "medida": "Acompañamiento a las personas del equipo afectadas, ofrecido y no impuesto, a través de los recursos internos de apoyo.", "proporcionalidad": "Se ofrece; no se registra en el expediente quién lo acepta.", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "NINGUNA" },
+        { "medida": "Revisión del procedimiento de escalado de conductas en reuniones de equipo, para que no dependa de que la persona afectada acuda al canal.", "proporcionalidad": "Medida sistémica: la instrucción evidenció que el patrón llevaba meses sin escalarse.", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "NINGUNA" }
+      ],
+      "seguimiento_represalias": {
+        "aplica": true,
+        "ventana": "24 meses desde la ejecución de la resolución (2026-02-20 a 2028-02-20)",
+        "base_de_la_ventana": "Igual que en EXP-SII-2026-005: apoyada en la referencia de dos años del art. 36.4, pero DECISIÓN DE DISEÑO en cuanto a su duración exacta.",
+        "indicadores_vigilados": [
+          "Evaluación de desempeño y referencias profesionales (art. 36.3.c)",
+          "Acceso a formación (art. 36.3.f)",
+          "Asignación de asuntos y carga de trabajo (art. 36.3.g)",
+          "Modificación sustancial de condiciones de trabajo y promoción (art. 36.3.a)"
+        ],
+        "hitos": [
+          { "fecha": "2026-05-20", "estado": "EJECUTADO", "actuacion": "Primera verificación a tres meses. Entrevista reservada con el informante y contraste de los cuatro indicadores.", "resultado": "Sin indicios de represalia. Se detecta y corrige una exclusión del informante de una acción formativa de área, atribuida a un error de lista de distribución tras el cambio de línea de reporte. Se documenta la corrección porque la denegación de formación es uno de los supuestos que el art. 36.3.f enumera, y no podía quedar sin explicación.", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 36.3.f (cotejado literalmente). El hecho es inventado." },
+          { "fecha": "2026-08-20", "estado": "EJECUTADO", "actuacion": "Segunda verificación a seis meses.", "resultado": "Sin indicios de represalia. Evaluación de desempeño del informante en línea con su histórico; acceso a formación regularizado; asignación de asuntos sin desviación respecto de su categoría.", "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Ley 2/2023 art. 36.3. El resultado es inventado." },
+          { "fecha": "2026-11-20", "estado": "PROGRAMADO", "actuacion": "Tercera verificación a nueve meses.", "resultado": null, "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Fecha inventada, futura respecto de la generación de este fichero (2026-08-30)." },
+          { "fecha": "2027-02-22", "estado": "PROGRAMADO", "actuacion": "Cuarta verificación a doce meses.", "resultado": null, "firmeza": "SINTETICO", "procedencia": "SIMULADO", "ancla": "Fecha inventada, futura." }
+        ],
+        "firmeza": "SINTETICO",
+        "procedencia": "SIMULADO",
+        "ancla": "Ley 2/2023 arts. 36.3 y 36.4, cotejados literalmente."
+      },
+      "cruce_modulos": [
+        {
+          "modulo": "GRC",
+          "tipo_cruce": "EJERCICIO_DE_CONTROL",
+          "identificador_destino": "CTR-GARR-20",
+          "identificador_es_real": true,
+          "donde_vive": "scripts/garrigues/normativo/obligaciones-pbcft.ts",
+          "descripcion": "La sanción disciplinaria es ejecución del control 'PPD — Código Ético y sistema disciplinario aplicables a la vulneración del sistema normativo interno'."
+        },
+        {
+          "modulo": "GRC",
+          "tipo_cruce": "ACTUALIZACION_DE_RIESGO",
+          "identificador_destino": "RSK-GARR-PEN-002",
+          "identificador_es_real": true,
+          "donde_vive": "scripts/garrigues/penal/mapa-penal.ts",
+          "descripcion": "El expediente constituye una incidencia materializada sobre el riesgo del art. 173.1 CP.",
+          "ADVERTENCIA_METODOLOGICA": "Conforme al factor P4 de la metodología real del PPD, la existencia de incidencias en los dos últimos años altera la valoración del entorno de control (sin incidencias = 0; incidencias leves = 0,25; incidencias graves = 0,5). Este expediente ES una incidencia en ese sentido. NO se recalcula aquí la banda de RSK-GARR-PEN-002, porque el mapa penal del tenant está extraído por color desde el PDF fuente y su banda es dato acreditado: pisarla con un recálculo sintético contaminaría dato real con dato inventado. La consola debe REPORTAR la tensión, no resolverla.",
+          "verificable_como": "Existe una incidencia del canal en los dos últimos años asociada a RSK-GARR-PEN-002, y la banda de ese riesgo NO ha sido modificada por este fichero."
+        },
+        {
+          "modulo": "SECRETARIA",
+          "tipo_cruce": "ELEVACION_A_ORGANO",
+          "identificador_destino": "garrigues-comite-prevencion-delitos",
+          "identificador_es_real": true,
+          "donde_vive": "scripts/garrigues/gobierno/comites-2026.json (slug 'comite-prevencion-delitos')",
+          "fecha": "2026-03-03",
+          "descripcion": "Traslado de nota seudonimizada al Comité de Prevención de Delitos para seguimiento del riesgo penal.",
+          "ADVERTENCIA_DE_MODELADO": "Igual que el Comité de Práctica Profesional, este comité está modelado como estructura CONSULTIVA y queda fuera de los selectores de adopción de acuerdos. Su rastro en Secretaría debe ser informe o acta de órgano consultivo, NUNCA un acuerdo adoptado ni un acto inscribible.",
+          "verificable_como": "Existe rastro documental en Secretaría fechado el 2026-03-03 asociado a garrigues-comite-prevencion-delitos, y su tipo NO es acuerdo adoptado."
+        }
+      ]
+    }
+  ],
+
+  "resumen_de_contraste": {
+    "nota": "Los tres expedientes se han construido para que difieran en las tres dimensiones que pedía el encargo, y para que la diferencia sea comprobable y no decorativa.",
+    "matriz": [
+      { "expediente": "EXP-SII-2026-002", "tipo": "Facturación", "identidad": "ANÓNIMA", "gravedad": "Media", "desenlace": "NO ACREDITADA", "cautelares": "No", "ampliacion_de_plazo": "No", "seguimiento_represalias": "No aplica (anonimato)", "instructor": "Interno", "decisor": "Responsable del SII (no hay vía disciplinaria)" },
+      { "expediente": "EXP-SII-2026-005", "tipo": "Conflicto de interés / muralla china", "identidad": "CONFIDENCIAL", "gravedad": "Media-alta", "desenlace": "ACREDITADA PARCIALMENTE", "cautelares": "Sí, sobre el acceso", "ampliacion_de_plazo": "No", "seguimiento_represalias": "Sí, sin hito ejecutado aún", "instructor": "Interno", "decisor": "Dirección de Personas" },
+      { "expediente": "EXP-SII-2026-001", "tipo": "Conducta en el entorno laboral", "identidad": "CONFIDENCIAL", "gravedad": "Alta", "desenlace": "ACREDITADA", "cautelares": "Sí, sobre la línea de reporte", "ampliacion_de_plazo": "Sí, motivada y en plazo", "seguimiento_represalias": "Sí, dos hitos ejecutados con resultado", "instructor": "EXTERNO independiente", "decisor": "Dirección de Personas" }
+    ],
+    "comprobacion_de_plazos": [
+      { "expediente": "EXP-SII-2026-002", "recepcion": "2026-02-10", "acuse": "2026-02-13", "dias_hasta_acuse": 3, "limite_acuse_art_9_2_c": "2026-02-17", "respuesta": "2026-04-28", "dias_hasta_respuesta": 77, "limite_art_9_2_d": "2026-05-10", "amplio": false, "cumple": true },
+      { "expediente": "EXP-SII-2026-005", "recepcion": "2026-04-07", "acuse": "2026-04-09", "dias_hasta_acuse": 2, "limite_acuse_art_9_2_c": "2026-04-14", "respuesta": "2026-06-23", "dias_hasta_respuesta": 77, "limite_art_9_2_d": "2026-07-07", "amplio": false, "cumple": true },
+      { "expediente": "EXP-SII-2026-001", "recepcion": "2025-10-06", "acuse": "2025-10-08", "dias_hasta_acuse": 2, "limite_acuse_art_9_2_c": "2025-10-13", "respuesta": "2026-02-10", "dias_hasta_respuesta": 127, "limite_ordinario_art_9_2_d": "2026-01-06", "acuerdo_de_ampliacion": "2025-12-18", "ampliacion_acordada_antes_del_vencimiento": true, "limite_ampliado_art_9_2_d": "2026-04-06", "amplio": true, "cumple": true }
+    ]
+  },
+
+  "registros_omitidos": [
+    {
+      "que_se_omitio": "Un cuarto expediente sobre regalo o atención de un proveedor por encima del umbral de PI-23.",
+      "por_que": "PI-23 existe en el tenant, pero de ella solo está extraído el resumen y el índice: NO consta el umbral cuantitativo. Generar un expediente cuyo eje es superar un umbral obligaría a inventar la cifra del umbral, que es una regla interna, no un hecho del caso. Un importe inventado presentado como umbral de política es exactamente lo que la regla dura prohíbe.",
+      "que_haria_falta_para_generarlo": "El apartado de PI-23 que fija el umbral, o su confirmación por el despacho."
+    },
+    {
+      "que_se_omitio": "El acto de designación del Responsable del Sistema Interno de Información por el administrador único, y su notificación a la Autoridad Independiente de Protección del Informante en el plazo de diez días hábiles del art. 8.3.",
+      "por_que": "Sería un acuerdo del órgano de administración de la matriz. Generarlo aquí invadiría el ámbito del Prompt 3 (Secretaría) y crearía un acuerdo societario desde el módulo del canal, que no es su propietario. Además, afirmar que la notificación se practicó sería atribuir al despacho una actuación ante un organismo público que no consta.",
+      "que_haria_falta_para_generarlo": "Que el Prompt 3 lo genere como acuerdo del administrador único, o autorización expresa para cruzar el límite de módulo."
+    },
+    {
+      "que_se_omitio": "La intensidad concreta de la sanción disciplinaria en EXP-SII-2026-001 (días de suspensión, tipo de amonestación).",
+      "por_que": "La graduación disciplinaria depende del convenio y del régimen laboral aplicable, que no están en ninguna de las anclas. Poner una cifra la haría parecer medida."
+    },
+    {
+      "que_se_omitio": "Recálculo de la banda del riesgo RSK-GARR-PEN-002 tras la incidencia acreditada.",
+      "por_que": "La banda del mapa penal es dato acreditado, extraído por color del PDF real. Sobrescribirla con un cálculo sintético mezclaría dato real con dato inventado en la misma celda, que es el peor resultado posible para una demo pública."
+    },
+    {
+      "que_se_omitio": "Números de expediente correlativos que sugirieran un volumen anual de comunicaciones del canal.",
+      "por_que": "Los identificadores elegidos (001, 002, 005) NO deben leerse como que existen cinco expedientes: son etiquetas. Si se necesita una cifra de volumen del canal, tiene que venir del despacho, no de la numeración de este fichero."
+    }
+  ],
+
+  "dudas": [
+    "PUNTO MÁS DELICADO DEL FICHERO. En EXP-SII-2026-001 la instrucción concluye que la conducta acreditada NO alcanza el umbral típico del art. 173.1 CP y que por tanto no procede la remisión inmediata al Ministerio Fiscal del art. 9.2.j. Esa calificación es una afirmación jurídica sobre un caso, aunque el caso sea inventado, y no está validada por nadie. Debe pasar por el Comité Legal antes de sembrarse, o sustituirse por una fórmula que registre que la valoración se practicó sin declarar su sentido.",
+    "Lo mismo, con menor carga, en EXP-SII-2026-005: la conclusión de que el acceso interno acreditado sin uso externo probado no alcanza umbral penal necesita validación.",
+    "PI-31 está en el tenant solo por resumen e índice de nueve apartados. NO consta quién es el órgano decisor del expediente, ni si el despacho ha optado por Responsable del Sistema unipersonal o colegiado (art. 8.2), ni el detalle del procedimiento del apartado 3. Toda la arquitectura de instructor/decisor de este fichero está marcada DEMO_PILOTO por eso. Si el despacho facilita el apartado 4 de PI-31, hay que reemplazarla, no ajustarla.",
+    "La separación entre quien instruye y quien decide, y la exigencia de que ninguno de los dos tenga relación con los implicados, NO figura como tal en la Ley 2/2023 con esa literalidad. Es criterio de diseño del expediente. Si PI-31 dice otra cosa, manda PI-31.",
+    "La ventana de seguimiento de represalias de 24 meses se apoya en la referencia a los dos años del art. 36.4, pero el artículo regula la protección ante la autoridad competente transcurrido ese plazo, no la duración del seguimiento interno. Es una analogía razonable, no una obligación. Confirmar con el despacho si su práctica interna usa otra ventana.",
+    "Los dos comités a los que se elevan notas —Práctica Profesional y Prevención de Delitos— están modelados en el tenant como estructuras CONSULTIVAS y G3 los dejó fuera de los selectores de adopción. Su rastro en Secretaría no puede ser un acuerdo. Si el Prompt 4 (consola) espera un 'acuerdo correlativo' para cerrar el indicador de incidentes elevados sin acuerdo, ese indicador dará un falso positivo sobre estos dos cruces: es una tensión real del modelo y debe reportarse, no taparse.",
+    "Que el Sistema Interno de Información traslade notas a esos comités es decisión de diseño de la demo. Ninguna ancla lo dice. Podría además rozar el art. 32.1, que enumera de forma tasada quién accede a los datos del sistema: por eso las notas se describen como seudonimizadas y sin datos del expediente, pero el punto merece revisión.",
+    "El art. 26.2 fija el límite absoluto de diez años de conservación. Las fechas de expurgo calculadas en los tres expedientes (2036-02-10, 2036-04-07 y 2035-10-06) son el tope legal, no la política de retención del despacho, que puede ser más corta. Si PI-31 §6 o PI-21 fijan una retención menor, manda la interna.",
+    "En EXP-SII-2026-002 la denuncia anónima no obtiene respuesta a la solicitud de aclaración. Se ha resuelto instruyendo solo con fuentes internas. Queda por confirmar si la práctica del despacho en anónimas sin retorno es instruir igualmente o archivar por imposibilidad de contraste; se ha optado por instruir porque los hechos eran verificables documentalmente, pero es una decisión de política, no de derecho.",
+    "El Prompt 1 (AIMS) tiene entre sus incidentes previstos 'un uso de Copilot sobre documentación de un asunto con muralla china'. EXP-SII-2026-005 trata una vulneración de muralla china por acceso al gestor documental, SIN intervención de ninguna herramienta de IA. Son hechos distintos y así están redactados, pero se ejecutan en paralelo y podrían leerse como el mismo suceso contado dos veces. La consola debe comprobarlo explícitamente y, si el lote de AIMS ha generado un incidente coincidente en fecha y perfil, reportarlo como duplicado, no fusionarlos.",
+    "Los dos controles propuestos —trazabilidad de reimputación de horas y bloqueo técnico de murallas chinas— NO existen en el catálogo del tenant. Están marcados como propuesta. Si aparecen sembrados como controles 'Efectivo', es un defecto de siembra atribuible a este fichero y hay que retirarlos.",
+    "Los códigos de expediente (EXP-SII-2026-002, -005 y EXP-SII-2026-001, este último con hechos de 2025 y resolución en 2026) mezclan criterios de numeración. Se ha mantenido el año de resolución en el identificador y el año de recepción en el campo 'ejercicio'. Si el tenant tiene una convención distinta para numerar expedientes del canal, hay que renumerar antes de sembrar."
+  ]
+}
