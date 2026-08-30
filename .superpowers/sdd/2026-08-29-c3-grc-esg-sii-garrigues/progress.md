@@ -306,3 +306,49 @@ Lo que NO se hizo, que importa tanto como lo hecho:
 - `TenantBranding` no declara `modules`.
 - El `organoTipo` por defecto: el motor dice Junta y `normalizeBodyTypeForRpc`
   dice Consejo. Alcanzable desde dato; es criterio legal, no de tipos.
+
+---
+
+## Tarea 5 — CERRADA (2026-08-30)
+
+Commits `22d0579` (dato + arista) y `49c26bc` (UI + fuga de caché).
+
+**Criterio de aceptación, punto por punto:**
+- Desde un riesgo de banda alta se llega a su hallazgo y vuelta: **sí**, 8 de 8
+  por FK, verificado renderizando.
+- El KPI «Con hallazgo» deja de marcar 0 sobre 82: **8 de 82**. ARGA sigue en
+  1 de 167, sin tocar.
+- Todo plan sembrado con `tenant_id` y etiqueta de simulado: **no se siembra
+  ninguno** — ver abajo.
+
+**Desviación del plan, deliberada y con fuente.** El paso 4 decía «planes de
+acción simulados y etiquetados». Al ir a la fuente resultó que la extracción de
+G5 ya lo había decidido con el documento delante, y lo dejó escrito en
+`penal/seguimiento-ppd.ts`: *«El Plan de acción del §246 no se siembra porque
+la fuente describe el mecanismo y no publica la lista.»* Sembrar ocho planes
+verosímiles los haría indistinguibles de los reales. Se sigue la fuente y el
+criterio del carril, no el paso del plan.
+
+**Lo que el gate de esta tarea sí muerde, demostrado:**
+- Mutando `{risk.findings && null}`: el grep del gate 6 de G5 encuentra 2
+  coincidencias y sigue verde; el render test cae (1 pass / 1 fail).
+- Mutando el guard del estado vacío a `true`: 2 de 4 caen (ARGA vería la fuente
+  ajena).
+- Quitando el tenant de la queryKey: 0 pass / 2 fail.
+- Quitando `enabled`: 1 pass / 1 fail.
+
+**Hallazgo no buscado:** `ActionPlans.tsx` tenía la queryKey sin tenant. RLS
+filtra la consulta pero no la caché — gotcha nº10, vivo en mi superficie.
+
+**Corrección de premisa propia:** `enabled: false` no impide que TanStack
+registre la entrada en caché; la registra y no la busca. La primera versión del
+test asertaba que no había entrada y era falso.
+
+**Fragilidad eliminada, no error corregido:** el código del hallazgo salía de
+`i + 1`. La asignación de hoy coincidía con el orden del array, así que no
+había daño observable; lo que desaparece es que reordenar el catálogo pudiera
+reasignarlos en silencio.
+
+**No ejecutado a propósito:** `seed-garrigues-penal.ts --apply`, porque también
+escribe en `controls`, congelada en este carril. El enlace va por script propio
+que solo toca `findings` y `risks`. Idempotente: 2ª pasada 0/0/8.
