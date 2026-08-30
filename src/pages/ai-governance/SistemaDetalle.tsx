@@ -825,12 +825,50 @@ export default function SistemaDetalle() {
               ) : (
                 <>
                   <h2 className="text-sm font-bold text-[var(--g-text-primary)]">
-                    Este sistema no tiene evaluación de impacto en derechos fundamentales registrada
+                    No consta acreditado que el artículo 27 alcance a este sistema
                   </h2>
-                  <p className="text-xs text-[var(--g-text-secondary)] max-w-xl mx-auto">
-                    El artículo 27 del Reglamento (UE) 2024/1689 exige esta evaluación al desplegador
-                    antes de poner en servicio determinados sistemas de alto riesgo. Mientras no se
-                    registre, esta consola no puede afirmar que exista ni que se haya notificado.
+                  <p className="text-xs text-[var(--g-text-secondary)] max-w-2xl mx-auto">
+                    La evaluación de impacto en derechos fundamentales del Reglamento (UE) 2024/1689
+                    no obliga a todo desplegador. Exige <strong>dos condiciones a la vez</strong>, y
+                    de ninguna de las dos consta acreditación:
+                  </p>
+                  <div className="max-w-2xl mx-auto space-y-3 pt-2 text-left">
+                    <div
+                      className="p-3 bg-[var(--g-surface-subtle)]/40 border border-[var(--g-border-subtle)] text-xs space-y-1"
+                      style={{ borderRadius: "var(--g-radius-md)" }}
+                    >
+                      <span className="font-bold text-[var(--g-text-primary)] block">
+                        1 · Que el sistema sea de alto riesgo del anexo III
+                      </span>
+                      <span className="block text-[var(--g-text-secondary)]">
+                        El propio artículo excluye los de su punto 2. No se ha realizado la
+                        clasificación del art. 6 sobre este inventario, así que no consta ni que lo
+                        sea ni que no lo sea.
+                      </span>
+                    </div>
+                    <div
+                      className="p-3 bg-[var(--g-surface-subtle)]/40 border border-[var(--g-border-subtle)] text-xs space-y-1"
+                      style={{ borderRadius: "var(--g-radius-md)" }}
+                    >
+                      <span className="font-bold text-[var(--g-text-primary)] block">
+                        2 · Que el desplegador sea de una de las tres categorías del artículo
+                      </span>
+                      <span className="block text-[var(--g-text-secondary)]">
+                        Organismo de Derecho público, entidad privada que preste servicios públicos,
+                        o desplegador de los sistemas del anexo III, punto 5, letras b) y c)
+                        —solvencia crediticia y evaluación de riesgos en seguros de vida y salud—.
+                      </span>
+                      <span className="block text-[var(--g-text-secondary)]">
+                        No hay en el corpus documental de este tenant ningún elemento que acredite
+                        ninguna de las tres. Su ausencia no prueba lo contrario: el corpus no cubre
+                        la contratación pública.
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-[var(--g-text-secondary)] max-w-2xl mx-auto pt-1">
+                    Determinar si el artículo alcanza al sujeto es cuestión jurídica, no de
+                    configuración. Si se resuelve que sí, la evaluación se registra aquí y esta
+                    pantalla pasa a mostrarla.
                   </p>
                 </>
               )}
