@@ -33,7 +33,15 @@ import {
   subsuncionDe,
   textoAcuerdo,
   TEXTOS_ACUERDO,
+  MOTIVO_SIN_INSCRIPCION,
+  candidatoDescartadoDePunto,
+  inscripcionDePunto,
+  inscripcionesDeLaJunta,
+  notaAnuncioCompartido,
 } from "../../../scripts/garrigues/junta-2026/orden-del-dia";
+// La captura BORME como FUENTE del bloque registral: la sonda contrasta contra
+// ella lo que el módulo deriva, no contra otra copia del propio módulo.
+import bormeMatriz from "../../../scripts/garrigues/borme/jya-garrigues-slp.json";
 import {
   baseComputoJunta,
   baseComputoTodasLasClases,
@@ -45,6 +53,7 @@ import {
   buildAgreementRow,
   buildAttendeeRows,
   buildQuorumData,
+  buildRegistryFilingRow,
   buildResolutionRow,
   censoPrecondicion,
   concurrenciaCertificada,
@@ -1359,6 +1368,280 @@ describe("C1 — resoluciones, votos y evaluación de la Junta en Cloud", () => 
     expect((propiasEval ?? []).length).toBeGreaterThan(0);
     // Y al revés: Garrigues tampoco ve las de ARGA.
     const { data: alReves } = await garr.from("rule_evaluation_results").select("id").neq("tenant_id", GARRIGUES_TENANT);
+    expect(alReves ?? []).toHaveLength(0);
+  });
+});
+
+describe("C1 — el ciclo registral de la Junta (módulo puro)", () => {
+  // La captura de Carril B, leída aquí como FUENTE para contrastar contra ella
+  // lo que el módulo deriva. Si alguien escribiera una fecha o un anuncio a mano
+  // en `orden-del-dia.ts`, este bloque lo vería: la fuente no lo respaldaría.
+  const actosBorme = bormeMatriz.actos as Array<{
+    fecha: string; tipo: string; anuncio?: string; registral?: string; nota?: string;
+  }>;
+
+  it("las inscripciones se DERIVAN del BORME: ni una fecha ni un número escritos a mano", () => {
+    const inscripciones = inscripcionesDeLaJunta();
+    expect(inscripciones.length).toBeGreaterThan(0);
+    for (const i of inscripciones) {
+      const actos = actosBorme.filter((a) => a.anuncio === i.anuncio);
+      // El anuncio existe en la fuente, y su fecha y sus datos registrales son
+      // exactamente los de la fuente: no hay margen para un valor inventado.
+      expect(actos.length).toBeGreaterThan(0);
+      expect(new Set(actos.map((a) => a.fecha))).toEqual(new Set([i.fecha]));
+      expect(new Set(actos.map((a) => a.registral))).toEqual(new Set([i.registral]));
+      expect(i.actos).toEqual(actos.map((a) => a.tipo));
+      // El ordinal sale del `registral`, no de un literal paralelo.
+      expect(i.registral).toContain(`I/A ${i.numeroInscripcion}`);
+      // Y cada punto que cubre es un punto real del expediente.
+      for (const p of i.puntos) expect(puntosConAcuerdo().map((x) => x.numero)).toContain(p);
+    }
+  });
+
+  it("dos anuncios y TRES acuerdos inscritos: el 338618 cubre dos puntos, no es dos inscripciones", () => {
+    const inscripciones = inscripcionesDeLaJunta();
+    expect(inscripciones).toHaveLength(2);
+    const puntosCubiertos = inscripciones.flatMap((i) => [...i.puntos]);
+    expect(puntosCubiertos.sort()).toEqual(["1.1", "1.2", "4"]);
+    // 3 acuerdos y 2 anuncios: la diferencia es EL hallazgo de esta tarea.
+    expect(puntosCubiertos.length).toBeGreaterThan(inscripciones.length);
+    const compartido = inscripciones.find((i) => i.puntos.length > 1)!;
+    expect(compartido.anuncio).toBe("338618/2026");
+    expect(compartido.numeroInscripcion).toBe("960");
+    expect(String(notaAnuncioCompartido(compartido))).toContain("no 2 inscripciones distintas");
+    // Discriminante: el que cubre UN punto no lleva la nota, así que la nota
+    // significa algo y no es decorado que salga siempre.
+    const individual = inscripciones.find((i) => i.puntos.length === 1)!;
+    expect(notaAnuncioCompartido(individual)).toBeNull();
+    // Los dos anuncios son del mismo día y de la misma hoja registral.
+    expect(new Set(inscripciones.map((i) => i.fecha))).toEqual(new Set(["2026-07-13"]));
+    expect(inscripciones.every((i) => i.registral.includes("H M-190538"))).toBe(true);
+  });
+
+  it("los dos vínculos NO tienen la misma procedencia y el módulo lo dice", () => {
+    const [conNota, sinNota] = inscripcionesDeLaJunta();
+    // El del 338618 lo dice el propio extracto: sus actos llevan la nota.
+    expect(actosBorme.filter((a) => a.anuncio === conNota.anuncio).some((a) => String(a.nota ?? "").includes("Junta"))).toBe(true);
+    // El del 338619 NO. El vínculo es de la spec y el texto lo advierte, en vez
+    // de presentar los dos como si estuvieran igual de acreditados.
+    expect(actosBorme.filter((a) => a.anuncio === sinNota.anuncio).some((a) => a.nota !== undefined)).toBe(false);
+    expect(sinNota.vinculo).toContain("NO lleva nota de vínculo");
+  });
+
+  it("un punto sin anuncio no recibe inscripción, y el auditor queda como candidato DESCARTADO", () => {
+    // Discriminante del helper: si devolviera algo para cualquier punto, las
+    // aserciones de arriba pasarían igual y no probarían nada.
+    expect(inscripcionDePunto("2")).toBeNull();
+    expect(inscripcionDePunto("10")).toBeNull();
+    expect(inscripcionDePunto("1.1")).not.toBeNull();
+    // El acto del auditor existe en la fuente y NO se adopta: se anota con su
+    // motivo. Sus datos también se derivan, no se transcriben.
+    const candidato = candidatoDescartadoDePunto("10")!;
+    expect(candidato.anuncio).toBe("304964/2026");
+    const acto = actosBorme.find((a) => a.anuncio === candidato.anuncio)!;
+    expect([candidato.fecha, candidato.registral]).toEqual([acto.fecha, acto.registral]);
+    expect(candidato.fecha < FECHA_JUNTA).toBe(false); // es posterior a la Junta: por eso es candidato
+    expect(candidato.motivo).toContain("el vínculo NO consta");
+    // Y no se le cuelga un candidato a cualquiera.
+    expect(candidatoDescartadoDePunto("2")).toBeNull();
+  });
+
+  it("la fila del expediente inscrito lleva lo acreditado y NADA más", () => {
+    const punto = puntosConAcuerdo().find((p) => p.numero === "1.1")!;
+    const fila = buildRegistryFilingRow({
+      agreementId: "00000000-0000-0000-0000-0000000000aa",
+      punto,
+      clase: { materia: "MODIFICACION_ESTATUTOS", matter_class: "ESTATUTARIA", inscribable: true },
+    });
+    expect(fila.status).toBe("INSCRITA");
+    expect([fila.borme_ref, fila.inscription_number]).toEqual(["338618/2026", "960"]);
+    // El DÍA es el dato que no puede fallar: en UTC se lee 2026-07-13.
+    expect(String(fila.registered_at).slice(0, 10)).toBe("2026-07-13");
+    // Ni presentación, ni calificación, ni instrumento: no constan.
+    expect([
+      fila.presentation_date, fila.filing_number, fila.estimated_resolution,
+      fila.qualification_outcome, fila.qualified_at,
+      fila.deed_date, fila.notary_name, fila.protocol_number, fila.elevated_at,
+      fila.published_at, fila.publication_reference,
+    ]).toEqual(Array(11).fill(null));
+    // La vía no la pone el DEFAULT 'NOTARIAL' de la columna.
+    expect(fila.filing_via).toBe("REGISTRO_MERCANTIL");
+    expect(fila.workflow_version).toBe(1);
+    const snap = (fila.procedure_snapshot as { c1_junta_socios_2026: Record<string, unknown> }).c1_junta_socios_2026;
+    expect((snap.inscripcion as { puntos_del_mismo_anuncio: string[] }).puntos_del_mismo_anuncio).toEqual(["1.1", "1.2"]);
+    expect(snap.sin_inscripcion).toBeUndefined();
+    expect(String(snap.elevacion)).toContain("no acreditada");
+  });
+
+  it("la fila del inscribible SIN inscripción existe, se distingue y dice por qué", () => {
+    const punto = puntosConAcuerdo().find((p) => p.numero === "10")!;
+    const fila = buildRegistryFilingRow({
+      agreementId: "00000000-0000-0000-0000-0000000000bb",
+      punto,
+      clase: { materia: "NOMBRAMIENTO_AUDITOR", matter_class: "ORDINARIA", inscribable: true },
+    });
+    // No se omite —quedaría indistinguible de un acuerdo no inscribible— pero
+    // tampoco se le fabrica un ciclo.
+    expect(fila.status).toBe("PREPARADA");
+    expect([fila.borme_ref, fila.inscription_number, fila.registered_at]).toEqual([null, null, null]);
+    const snap = (fila.procedure_snapshot as { c1_junta_socios_2026: Record<string, unknown> }).c1_junta_socios_2026;
+    expect(snap.inscripcion).toBeNull();
+    expect(snap.sin_inscripcion).toBe(MOTIVO_SIN_INSCRIPCION);
+    expect((snap.candidato_descartado as { anuncio: string }).anuncio).toBe("304964/2026");
+  });
+
+  it("un acuerdo no inscribible no tiene expediente registral: la fila ni se construye", () => {
+    const punto = puntosConAcuerdo().find((p) => p.numero === "7")!;
+    expect(() => buildRegistryFilingRow({
+      agreementId: "00000000-0000-0000-0000-0000000000cc",
+      punto,
+      clase: { materia: "APROBACION_CUENTAS", matter_class: "ORDINARIA", inscribable: false },
+    })).toThrow(/no es inscribible/);
+    // Y la clase tiene que ser la del punto, no otra cualquiera.
+    expect(() => buildRegistryFilingRow({
+      agreementId: "00000000-0000-0000-0000-0000000000cc",
+      punto,
+      clase: { materia: "NOMBRAMIENTO_AUDITOR", matter_class: "ORDINARIA", inscribable: true },
+    })).toThrow(/clase de NOMBRAMIENTO_AUDITOR/);
+  });
+});
+
+describe("C1 — el ciclo registral de la Junta en Cloud", () => {
+  // ⚠ Este bloque queda ROJO hasta que se ejecute el seed con permiso de
+  // escritura: `bun run scripts/seed-garrigues-junta-2026.ts --commit`.
+  // La tarea que lo escribió tenía prohibido escribir en Cloud. Sin
+  // graceful-skip a propósito: una sonda que se salta a sí misma es un gate
+  // verde que no asierta nada, y este bloque es el que prueba que el ciclo
+  // registral llegó.
+  let garr: SupabaseClient;
+  let arga: SupabaseClient;
+  type Filing = {
+    id: string;
+    agreement_id: string | null;
+    status: string;
+    filing_via: string;
+    workflow_version: number;
+    filing_number: string | null;
+    presentation_date: string | null;
+    inscription_number: string | null;
+    borme_ref: string | null;
+    registered_at: string | null;
+    published_at: string | null;
+    publication_reference: string | null;
+    qualification_outcome: string | null;
+    notary_name: string | null;
+    protocol_number: string | null;
+    deed_date: string | null;
+    elevated_at: string | null;
+    procedure_snapshot: Record<string, unknown> | null;
+  };
+  let filings: Filing[] = [];
+  /** agreement_id → punto del orden del día, por el `code` del acuerdo. */
+  let puntoPorAcuerdo = new Map<string, string>();
+  let inscribiblesEnCloud: string[] = [];
+
+  beforeAll(async () => {
+    // Sesión COMPARTIDA y memoizada (patrón de C3): sin logins nuevos.
+    [garr, arga] = await Promise.all([sesionDe("GARRIGUES"), sesionDe("ARGA")]);
+
+    const { data: m, error: eM } = await garr.from("meetings").select("id").eq("slug", MEETING_SLUG).maybeSingle();
+    if (eM) throw new Error(`meetings ${MEETING_SLUG}: ${eM.message}`);
+    if (!m) throw new Error(`No existe la reunión ${MEETING_SLUG}: ejecuta antes el seed.`);
+
+    const { data: ags, error: eAgs } = await garr.from("agreements")
+      .select("id, code, inscribable").eq("tenant_id", GARRIGUES_TENANT).eq("parent_meeting_id", m.id);
+    if (eAgs) throw new Error(`agreements: ${eAgs.message}`);
+    // El punto sale del `code` (`JGS-<fecha>-<punto>`), que es la identidad que
+    // el seed escribe; no de una coincidencia de materia.
+    puntoPorAcuerdo = new Map((ags ?? []).map((a) => [a.id, String(a.code).replace(`JGS-${FECHA_JUNTA}-`, "")]));
+    // DERIVADO del catálogo vía `agreements.inscribable`, no pinado a mano:
+    // inventario no es invariante.
+    inscribiblesEnCloud = (ags ?? []).filter((a) => a.inscribable).map((a) => a.id);
+
+    const { data: fs, error: eF } = await garr.from("registry_filings")
+      .select("id, agreement_id, status, filing_via, workflow_version, filing_number, presentation_date, inscription_number, borme_ref, registered_at, published_at, publication_reference, qualification_outcome, notary_name, protocol_number, deed_date, elevated_at, procedure_snapshot")
+      .eq("tenant_id", GARRIGUES_TENANT);
+    if (eF) throw new Error(`registry_filings: ${eF.message}`);
+    filings = (fs ?? []) as Filing[];
+  }, 30_000);
+
+  // SIN afterAll con signOut: la sesión es COMPARTIDA.
+
+  it("hay un expediente por acuerdo inscribible, y ninguno por acuerdo que no lo sea", () => {
+    expect(inscribiblesEnCloud.length).toBeGreaterThan(0);
+    expect(filings).toHaveLength(inscribiblesEnCloud.length);
+    expect(filings.every((f) => inscribiblesEnCloud.includes(String(f.agreement_id)))).toBe(true);
+    // Uno por acuerdo: `ExpedienteAcuerdo` pinta el más reciente y con dos filas
+    // el acuerdo enseñaría un expediente y escondería el otro.
+    expect(new Set(filings.map((f) => f.agreement_id)).size).toBe(filings.length);
+    expect(filings.every((f) => f.workflow_version === 1)).toBe(true);
+    // La vía no la puso el DEFAULT 'NOTARIAL' de la columna en ninguna.
+    expect(filings.every((f) => f.filing_via === "REGISTRO_MERCANTIL")).toBe(true);
+  });
+
+  it("solo los acreditados están INSCRITA, con el anuncio y la fecha del BORME", () => {
+    const inscritos = filings.filter((f) => f.status === "INSCRITA");
+    const puntosAcreditados = inscripcionesDeLaJunta().flatMap((i) => [...i.puntos]);
+    // Derivado de la fuente, no de un `toHaveLength(3)` a mano.
+    expect(inscritos.map((f) => puntoPorAcuerdo.get(String(f.agreement_id))).sort())
+      .toEqual([...puntosAcreditados].sort());
+    for (const f of inscritos) {
+      const insc = inscripcionDePunto(puntoPorAcuerdo.get(String(f.agreement_id))!)!;
+      expect([f.borme_ref, f.inscription_number]).toEqual([insc.anuncio, insc.numeroInscripcion]);
+      expect(String(f.registered_at).slice(0, 10)).toBe(insc.fecha);
+    }
+    // 3 acuerdos inscritos pero 2 anuncios: el 338618 NO puede leerse como dos
+    // inscripciones distintas. Esta es la aserción que lo impide.
+    expect(new Set(inscritos.map((f) => `${f.borme_ref}|${f.inscription_number}`)).size)
+      .toBe(inscripcionesDeLaJunta().length);
+    expect(inscritos.length).toBeGreaterThan(inscripcionesDeLaJunta().length);
+  });
+
+  it("los inscribibles sin anuncio existen, se distinguen y no llevan ni fecha ni asiento", () => {
+    const sinInscripcion = filings.filter((f) => f.status !== "INSCRITA");
+    // Discriminante: si no hubiera ninguno, todo lo de abajo pasaría en vacío.
+    expect(sinInscripcion.length).toBeGreaterThan(0);
+    expect(sinInscripcion.every((f) => f.status === "PREPARADA")).toBe(true);
+    for (const f of sinInscripcion) {
+      expect(inscripcionDePunto(puntoPorAcuerdo.get(String(f.agreement_id))!)).toBeNull();
+      expect([f.registered_at, f.inscription_number, f.borme_ref]).toEqual([null, null, null]);
+      const snap = (f.procedure_snapshot as { c1_junta_socios_2026?: Record<string, unknown> })?.c1_junta_socios_2026;
+      // La ausencia viaja con el dato: sin esto, «sin anuncio» sería
+      // indistinguible de «se les olvidó».
+      expect(snap?.sin_inscripcion).toBe(MOTIVO_SIN_INSCRIPCION);
+    }
+  });
+
+  it("NINGÚN expediente se inventa presentación, calificación ni elevación a público", () => {
+    expect(filings.length).toBeGreaterThan(0);
+    for (const f of filings) {
+      expect([
+        f.presentation_date, f.filing_number,
+        f.qualification_outcome, f.notary_name, f.protocol_number, f.deed_date,
+        f.elevated_at, f.published_at, f.publication_reference,
+      ]).toEqual(Array(9).fill(null));
+      const snap = (f.procedure_snapshot as { c1_junta_socios_2026?: Record<string, unknown> })?.c1_junta_socios_2026;
+      expect(String(snap?.elevacion)).toContain("no acreditada");
+    }
+  });
+
+  it("ARGA no ve nada de esto y conserva sus propios expedientes registrales", async () => {
+    // Que ARGA no vea lo de Garrigues solo dice algo si Garrigues tiene algo.
+    expect(filings.length).toBeGreaterThan(0);
+    const { data: cruzado, error: eCruz } = await arga.from("registry_filings")
+      .select("id").eq("tenant_id", GARRIGUES_TENANT);
+    expect(eCruz).toBeNull();
+    expect(cruzado ?? []).toHaveLength(0);
+    const { data: porAcuerdo } = await arga.from("registry_filings")
+      .select("id").in("agreement_id", [...puntoPorAcuerdo.keys()]);
+    expect(porAcuerdo ?? []).toHaveLength(0);
+    // Y ARGA sigue teniendo los suyos: sin esto lo de arriba sería vacuo.
+    const { data: propios, error: eProp } = await arga.from("registry_filings").select("id, tenant_id").limit(50);
+    expect(eProp).toBeNull();
+    expect((propios ?? []).length).toBeGreaterThan(0);
+    expect((propios ?? []).every((f) => f.tenant_id !== GARRIGUES_TENANT)).toBe(true);
+    // Al revés: Garrigues tampoco ve los de ARGA.
+    const { data: alReves } = await garr.from("registry_filings").select("id").neq("tenant_id", GARRIGUES_TENANT);
     expect(alReves ?? []).toHaveLength(0);
   });
 });

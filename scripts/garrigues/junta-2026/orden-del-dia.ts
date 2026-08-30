@@ -35,6 +35,11 @@
  * EAD Trust: `CANAL_ESTATUTARIO` nombra el canal del acto real, nada más.
  */
 
+// Task 9. La captura de Carril B de la matriz: es la ÚNICA fuente de los datos
+// registrales de este módulo. Import estático de un JSON del repo — el módulo
+// sigue siendo puro (sin red, sin `fs`).
+import borme from "../borme/jya-garrigues-slp.json";
+
 export type PuntoOrdenDia = {
   /** "1.1", "1.2", "2".."12" y "acta". Clave de enlace con el acuerdo en Task 6. */
   numero: string;
@@ -546,4 +551,177 @@ export function textoAcuerdo(numero: string): TextoAcuerdo {
   const t = TEXTOS_ACUERDO[numero];
   if (!t) throw new Error(`texto de acuerdo: falta el punto ${numero}`);
   return t;
+}
+
+// ───────────────────────── Task 9: el ciclo registral, la inscripción y el BORME ──
+
+/**
+ * Acto del BORME tal y como lo transcribe la captura de Carril B. Solo se
+ * declaran las claves que este módulo lee; el fichero trae alguna más.
+ */
+type ActoBorme = {
+  fecha: string;
+  tipo: string;
+  anuncio?: string;
+  registral?: string;
+  detalle?: string;
+  cargo?: string;
+  persona?: string;
+  nota?: string;
+};
+
+const ACTOS_BORME = borme.actos as ActoBorme[];
+
+/**
+ * Qué anuncio del BORME inscribe qué punto de esta Junta.
+ *
+ * **Esta tabla no contiene ni una fecha, ni un número de inscripción, ni un
+ * dato registral.** Solo el par anuncio ↔ punto y de dónde sale ese vínculo.
+ * Todo lo demás se DERIVA de `scripts/garrigues/borme/jya-garrigues-slp.json`
+ * en `inscripcionesDeLaJunta()`, que además falla si el anuncio no está en el
+ * fichero o si sus actos no coinciden en fecha y datos registrales. Un dato
+ * inventado no tiene por dónde entrar: no hay sitio donde escribirlo.
+ *
+ * **Los dos vínculos NO tienen la misma procedencia y por eso se etiquetan por
+ * separado.** El del 338618 lo dice el propio extracto en sus notas; el del
+ * 338619 lo dice la spec, y su acto en el fichero no lleva nota de vínculo.
+ */
+const VINCULO_ANUNCIO_PUNTO: ReadonlyArray<{
+  anuncio: string;
+  puntos: readonly string[];
+  vinculo: string;
+}> = [
+  {
+    anuncio: "338618/2026",
+    puntos: ["1.1", "1.2"],
+    vinculo:
+      "El propio extracto lo dice: sus tres actos llevan nota de vínculo con esta Junta — «Inscripción del acuerdo 1.1 de la Junta de Socios de 06/05/2026», «Reelección acordada por la Junta de 06/05/2026 (hasta 30/06/2032)» y «Terminación anticipada del mandato anterior…, acuerdo 1.1 de la Junta».",
+  },
+  {
+    anuncio: "338619/2026",
+    puntos: ["4"],
+    vinculo:
+      "Lo afirma la captura de Carril B en la spec de gobernanza del tenant (2026-08-03, apartado «Ciclo registral confirmado por BORME»), que enumera exactamente dos anuncios para esta Junta: 338618 (I/A 960) y 338619 (I/A 961, alta del socio Silva Castañón). ATENCIÓN: a diferencia del 338618, el acto de este anuncio NO lleva nota de vínculo en el fichero de Carril B — el vínculo es de la spec, no del extracto. Además el extracto da de alta a Silva Castañón con el cargo registral «Soc.Prof.» por compra de las participaciones 163A-164A: dos títulos de clase A, que es exactamente el patrón de socio de cuota del art. 7 (`SOCIOS_CUOTA` en `estructura-art7.ts`).",
+  },
+];
+
+/**
+ * Puntos con otro acto del BORME que un revisor va a proponer como su
+ * inscripción, con el motivo por el que NO se usa.
+ *
+ * Solo el número de anuncio y el motivo: los datos del acto se derivan del
+ * fichero igual que los de las inscripciones acreditadas.
+ */
+const CANDIDATO_DESCARTADO: Record<string, { anuncio: string; motivo: string }> = {
+  "10": {
+    anuncio: "304964/2026",
+    motivo:
+      "Es posterior a la Junta (19/06/2026) y podría ser la inscripción de este punto, pero el vínculo NO consta: el acto no lleva la nota que sí llevan los del anuncio 338618, la captura de Carril B solo confirma dos anuncios para esta Junta, y el cargo que reelige es «Aud.C.Con.» (auditor de cuentas consolidadas) mientras el punto 10 del orden del día habla del auditor de la sociedad. Se deja anotado en vez de adoptarlo o de callarlo: la duda es el dato.",
+  },
+};
+
+export type InscripcionAcreditada = {
+  /** Número de anuncio del BORME, verbatim de la fuente ("338618/2026"). */
+  anuncio: string;
+  /** Puntos del orden del día que cubre. Puede ser MÁS DE UNO. */
+  puntos: readonly string[];
+  /** Fecha del asiento según la fuente ("2026-07-13"). */
+  fecha: string;
+  /** Datos registrales verbatim ("S 8, H M-190538, I/A 960"). */
+  registral: string;
+  /** Ordinal de la inscripción, DERIVADO de `registral` ("960"). */
+  numeroInscripcion: string;
+  /** Tipos de acto del BORME que el anuncio agrupa. */
+  actos: readonly string[];
+  /** De dónde sale el vínculo con esta Junta. No todos son iguales. */
+  vinculo: string;
+};
+
+/**
+ * Las inscripciones acreditadas de esta Junta, derivadas de la fuente.
+ *
+ * Lanza —no devuelve un hueco— si el anuncio no está en el fichero, si sus
+ * actos discrepan en fecha o en datos registrales, si el `registral` no trae
+ * el ordinal `I/A`, o si el punto no existe en el orden del día. Cualquiera de
+ * esas cuatro cosas significaría que la fuente y este módulo han dejado de
+ * hablar del mismo expediente.
+ */
+export function inscripcionesDeLaJunta(): InscripcionAcreditada[] {
+  return VINCULO_ANUNCIO_PUNTO.map(({ anuncio, puntos, vinculo }) => {
+    const actos = ACTOS_BORME.filter((a) => a.anuncio === anuncio);
+    if (!actos.length) {
+      throw new Error(`inscripción: el anuncio ${anuncio} no está en la captura BORME de la matriz`);
+    }
+    const fechas = new Set(actos.map((a) => a.fecha));
+    const registrales = new Set(actos.map((a) => a.registral ?? ""));
+    if (fechas.size !== 1 || registrales.size !== 1) {
+      throw new Error(
+        `inscripción ${anuncio}: sus ${actos.length} actos no coinciden — fechas {${[...fechas].join(", ")}}, registral {${[...registrales].join(" | ")}}`,
+      );
+    }
+    const registral = [...registrales][0];
+    const ordinal = /\bI\/A\s+(\d+)\b/.exec(registral);
+    if (!ordinal) {
+      throw new Error(`inscripción ${anuncio}: «${registral}» no trae el ordinal I/A de la inscripción`);
+    }
+    // El punto tiene que existir en el orden del día: si alguien renombra un
+    // punto, esto revienta en vez de dejar una inscripción colgando de nada.
+    for (const p of puntos) ordinalEnOrdenDelDia(p);
+    return {
+      anuncio,
+      puntos,
+      fecha: [...fechas][0],
+      registral,
+      numeroInscripcion: ordinal[1],
+      actos: actos.map((a) => a.tipo),
+      vinculo,
+    };
+  });
+}
+
+/** La inscripción que cubre el punto, o `null` si la fuente no acredita ninguna. */
+export function inscripcionDePunto(numero: string): InscripcionAcreditada | null {
+  return inscripcionesDeLaJunta().find((i) => i.puntos.includes(numero)) ?? null;
+}
+
+/** El acto del BORME descartado para el punto, con sus datos y el motivo. */
+export function candidatoDescartadoDePunto(numero: string): {
+  anuncio: string;
+  fecha: string;
+  registral: string;
+  actos: string[];
+  motivo: string;
+} | null {
+  const candidato = CANDIDATO_DESCARTADO[numero];
+  if (!candidato) return null;
+  const actos = ACTOS_BORME.filter((a) => a.anuncio === candidato.anuncio);
+  if (!actos.length) {
+    throw new Error(`candidato descartado del punto ${numero}: el anuncio ${candidato.anuncio} no está en la captura BORME`);
+  }
+  return {
+    anuncio: candidato.anuncio,
+    fecha: actos[0].fecha,
+    registral: actos[0].registral ?? "",
+    actos: actos.map((a) => `${a.tipo}${a.cargo ? ` · ${a.cargo}` : ""}${a.persona ? ` · ${a.persona}` : ""}`),
+    motivo: candidato.motivo,
+  };
+}
+
+/** Por qué un acuerdo inscribible puede quedarse sin inscripción en el expediente. */
+export const MOTIVO_SIN_INSCRIPCION =
+  "Sin inscripción acreditada: no consta anuncio del BORME que ate este acuerdo a un asiento del Registro Mercantil. La captura de Carril B confirma DOS anuncios para la Junta de 06/05/2026 —338618/2026 (I/A 960) y 338619/2026 (I/A 961)— y ningún otro acto del fichero lleva la nota de vínculo con esta Junta que sí llevan los del 338618. No se le atribuye fecha, ni anuncio, ni número de inscripción, ni protocolo notarial: el expediente queda visiblemente incompleto en lugar de completarse por inferencia.";
+
+/**
+ * La elevación a público: **no acreditada para ninguno de los acuerdos**.
+ *
+ * El art. 31.3 de los Estatutos explica quién PODRÍA elevarlos; no acredita que
+ * nadie los elevara, ni ante qué notario, ni con qué protocolo, ni cuándo.
+ */
+export const ELEVACION_NO_ACREDITADA =
+  "Elevación a instrumento público no acreditada: no consta notario, ni número de protocolo, ni fecha de escritura en ninguna fuente del repositorio, para ninguno de los acuerdos de esta Junta. El art. 31.3 de los Estatutos permite que la elevación la haga cualquiera de los administradores «sin necesidad de delegación expresa», pero eso explica la FACULTAD, no acredita el ACTO. Las columnas de instrumento quedan a NULL.";
+
+/** Un anuncio que cubre varios acuerdos es UNA inscripción, no varias. */
+export function notaAnuncioCompartido(insc: InscripcionAcreditada): string | null {
+  if (insc.puntos.length < 2) return null;
+  return `El anuncio ${insc.anuncio} (inscripción ${insc.numeroInscripcion}) cubre ${insc.puntos.length} acuerdos de esta Junta —puntos ${insc.puntos.join(" y ")}—: es UNA sola inscripción con varios acuerdos dentro, no ${insc.puntos.length} inscripciones distintas. Como registry_filings.agreement_id es singular hay un expediente por acuerdo, y los ${insc.puntos.length} comparten anuncio, fecha y número de inscripción.`;
 }

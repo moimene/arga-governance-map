@@ -60,5 +60,5 @@ Reportado al orquestador y elevado al usuario, que decidió la base de clase A *
 | 6 | Los acuerdos con resolución por materia | **COMPLETA con 9 de 10** ([informe](task-6-report.md)). El décimo (`MODIFICACION_ESTATUTOS`) bloqueado: el art. 36 no existe en los Estatutos entregados | sin ronda separada, por instrucción de cierre — declarado en el informe | 42 pass / 0 fail en su sonda · lint 0 · tsc 0 |
 | 7 | Resoluciones y evaluación del motor | **COMPLETA** ([informe](task-7-report.md)). Cuarta vía: `meeting_votes` vacía, el motor evalúa umbral y alcanzabilidad. **P0 destapado: el motor nunca supo evaluar una SLP** | control discriminante ARGA antes/después + positivo SLP | 62 pass / 0 fail · lint 0 · tsc 0 |
 | 8 | Acta por RPC + certificación sin VºBº | pendiente | — | — |
-| 9 | Ciclo registral (13/07/2026, anuncios 960 y 961) | pendiente | — | — |
+| 9 | Ciclo registral | **COMPLETA** ([informe](task-9-report.md)). 3 acuerdos INSCRITA en 2 anuncios reales, 4 en PREPARADA sin fecha ni anuncio ni protocolo. Cero invención | controles de no-invención medidos en Cloud | 74 pass / 0 fail · lint 0 · tsc 0 |
 | 10 | Verificación viva, control ARGA y cierre | pendiente | — | — |

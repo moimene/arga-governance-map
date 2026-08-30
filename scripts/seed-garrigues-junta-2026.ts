@@ -105,6 +105,12 @@ import {
   puntosConAcuerdo,
   subsuncionDe,
   textoAcuerdo,
+  ELEVACION_NO_ACREDITADA,
+  MOTIVO_SIN_INSCRIPCION,
+  candidatoDescartadoDePunto,
+  inscripcionDePunto,
+  inscripcionesDeLaJunta,
+  notaAnuncioCompartido,
   type PuntoOrdenDia,
 } from "./garrigues/junta-2026/orden-del-dia";
 import { votingRightsFromCapitalHolding } from "../src/lib/secretaria/meeting-census";
@@ -931,6 +937,202 @@ export async function buildRuleEvaluationRow(args: {
   return { ...sinHash, evaluation_hash: await sha256Hex(canonical(sinHash)) };
 }
 
+// ──────────────── Task 9: el ciclo registral, la inscripción del 13/07 y el BORME ──
+
+/**
+ * Estado del expediente cuando la fuente acredita la inscripción.
+ *
+ * Vocabulario medido contra Cloud: el CHECK `registry_filings_v2_status_check`
+ * **solo aplica a `workflow_version = 2`** (`PREPARADA · ELEVADA · PRESENTADA ·
+ * SUBSANACION · DENEGADA · INSCRITA · PUBLICADA`); en v1 la columna es texto
+ * libre con DEFAULT `'PREPARACION'` y no hay ningún trigger sobre la tabla. Se
+ * escribe igualmente dentro de ese vocabulario porque es el que `statusLabel()`
+ * sabe traducir: `'PREPARACION'` —el default de la tabla— no tiene entrada y la
+ * ficha lo pintaría en crudo.
+ *
+ * `REGISTERED`, que proponía el plan, **no existe en ninguna de las dos escaleras**.
+ */
+const FILING_ESTADO_INSCRITA = "INSCRITA";
+
+/**
+ * Estado del expediente cuando la fuente NO acredita inscripción. Es el peldaño
+ * MÁS BAJO del ciclo: no afirma elevación, ni presentación, ni calificación.
+ *
+ * Y aun así afirma algo, así que la fila lo acota: `PREPARADA` describe el
+ * estado de ESTE registro —la plataforma ha reconstruido el expediente del
+ * acuerdo— y no un acto del mundo real. Lo que la fuente no dice va escrito en
+ * `procedure_snapshot.c1_junta_socios_2026.sin_inscripcion`.
+ *
+ * La alternativa era no crear la fila. Se descarta: `ExpedienteAcuerdo` solo
+ * pinta el bloque registral `{registryFiling ? … : null}`, así que sin fila los
+ * cuatro acuerdos sin inscripción quedarían **indistinguibles de un acuerdo no
+ * inscribible** — el expediente incompleto se vería completo.
+ */
+const FILING_ESTADO_SIN_INSCRIPCION = "PREPARADA";
+
+/**
+ * La vía. Columna NOT NULL con DEFAULT `'NOTARIAL'`: omitirla **no deja NULL,
+ * afirma que se presentó por vía notarial** — la misma mina que
+ * `meeting_resolutions.required_majority_code` en Task 7.
+ *
+ * `REGISTRO_MERCANTIL` (el valor que usan las filas v2 de ARGA) nombra el
+ * destino, que sí consta —RM de Madrid, hoja M-190538, en los datos registrales
+ * de la propia fuente—, y no dice nada sobre el camino (notarial o telemático),
+ * que no consta.
+ */
+const FILING_VIA = "REGISTRO_MERCANTIL";
+
+export type RegistryFilingRow = {
+  tenant_id: string;
+  entity_id: string;
+  agreement_id: string;
+  workflow_version: 1;
+  filing_via: string;
+  status: string;
+  filing_number: null;
+  presentation_date: null;
+  estimated_resolution: null;
+  inscription_number: string | null;
+  borme_ref: string | null;
+  registered_at: string | null;
+  publication_reference: null;
+  published_at: null;
+  qualification_outcome: null;
+  qualified_at: null;
+  deed_id: null;
+  deed_reference: null;
+  deed_date: null;
+  notary_id: null;
+  notary_name: null;
+  protocol_number: null;
+  elevated_at: null;
+  procedure_snapshot: Record<string, unknown>;
+};
+
+/**
+ * El expediente registral de un acuerdo inscribible.
+ *
+ * ## Por qué `workflow_version = 1` y no el ciclo gobernado v2
+ *
+ * Medido contra Cloud antes de escribir una línea. El ciclo v2
+ * (`fn_registry_prepare_filing` → `record_presentation` → `record_qualification`
+ * → `record_inscription`) es la vía gobernada, con su `registry_filing_events`
+ * append-only, y **aquí no se puede recorrer sin inventar**:
+ *
+ *  1. `fn_registry_record_inscription` exige `status = 'PRESENTADA'` **y**
+ *     `qualification_outcome = 'POSITIVA'` antes de inscribir. Llegar ahí obliga
+ *     a dar `p_presentation_date` y `p_filing_number` a `record_presentation` y
+ *     una fecha de calificación a `record_qualification`: **tres datos que la
+ *     fuente no acredita**. El ciclo gobernado no es opcional en su orden.
+ *  2. Las cuatro RPC exigen `p_evidence_artifact_id` NOT NULL y lo verifican
+ *     contra `secretaria_document_artifacts` (`fn_registry_assert_artifact` con
+ *     `p_require_verified = true`). No hay artefacto de este expediente: la
+ *     certificación es Task 8 y el artefacto documental no existe.
+ *  3. El CHECK `registry_filings_v2_projection_check` obliga en v2 a
+ *     `base_document_artifact_id` NOT NULL, y si el documento base fuera
+ *     `'ESCRITURA'`, `registry_filings_escritura_metadata_check` exige
+ *     `deed_date`, `notary_name` y `protocol_number` — **exactamente los tres
+ *     datos que esta tarea tiene prohibido inventar**.
+ *
+ * Escribir eventos a mano tampoco vale: `registry_filing_events` es append-only
+ * con guard, y fabricar un rastro de auditoría gobernado es peor que no tenerlo.
+ * Queda elevado como brecha de producto: **hoy la plataforma no sabe registrar
+ * un expediente ya inscrito cuya presentación no consta.**
+ *
+ * ## Qué se escribe y qué no
+ *
+ * Todo lo acreditado sale de `inscripcionDePunto()`, que lo DERIVA de la captura
+ * BORME. Todo lo demás va a NULL **explícito** —no omitido— para que un `update`
+ * de una ejecución posterior limpie cualquier valor que alguien hubiera puesto a
+ * mano, y para que la fila enseñe su propio silencio.
+ */
+export function buildRegistryFilingRow(args: {
+  agreementId: string;
+  punto: PuntoOrdenDia;
+  clase: ClaseMateria;
+}): RegistryFilingRow {
+  const { agreementId, punto, clase } = args;
+  if (!punto.materia) throw new Error(`expediente registral: el punto ${punto.numero} no tiene materia`);
+  if (clase.materia !== punto.materia) {
+    throw new Error(`expediente registral: clase de ${clase.materia} aplicada al punto ${punto.numero} (${punto.materia})`);
+  }
+  // Un expediente registral de un acuerdo NO inscribible afirmaría que hay algo
+  // que inscribir. La inscribibilidad la dice `materia_catalog`, no este seed.
+  if (!clase.inscribable) {
+    throw new Error(`expediente registral: el punto ${punto.numero} (${punto.materia}) no es inscribible según materia_catalog`);
+  }
+
+  const insc = inscripcionDePunto(punto.numero);
+  const descartado = candidatoDescartadoDePunto(punto.numero);
+
+  return {
+    tenant_id: GARRIGUES_TENANT,
+    entity_id: GARRIGUES_MATRIZ_UUID,
+    agreement_id: agreementId,
+    workflow_version: 1,
+    filing_via: FILING_VIA,
+    status: insc ? FILING_ESTADO_INSCRITA : FILING_ESTADO_SIN_INSCRIPCION,
+    // Asiento de presentación: no consta ni en los inscritos.
+    filing_number: null,
+    presentation_date: null,
+    estimated_resolution: null,
+    inscription_number: insc ? insc.numeroInscripcion : null,
+    borme_ref: insc ? insc.anuncio : null,
+    // `date` no hay: la columna del asiento es `registered_at` (timestamptz).
+    // 00:00Z conserva el DÍA en UTC —`slice(0,10)` da 2026-07-13—, que es el
+    // dato que no puede fallar; ver la historia de `FECHA_1_ISO`. Hoy ninguna
+    // superficie del Tramitador pinta esta columna: brecha de producto anotada,
+    // que NO se compensa metiendo la fecha en una columna que sí se pinte.
+    registered_at: insc ? `${insc.fecha}T00:00:00.000Z` : null,
+    // La publicación en el boletín es otro acto: la fuente da el número de
+    // anuncio pero NO identifica el boletín (no hay CVE de 13/07/2026 en su
+    // lista) ni su fecha de publicación.
+    publication_reference: null,
+    published_at: null,
+    // La inscripción implica que hubo calificación positiva, pero la
+    // calificación es un acto con fecha y la fuente no la da. Además esas dos
+    // columnas pertenecen al ciclo v2 gobernado, que aquí no se recorre.
+    qualification_outcome: null,
+    qualified_at: null,
+    deed_id: null,
+    deed_reference: null,
+    deed_date: null,
+    notary_id: null,
+    notary_name: null,
+    protocol_number: null,
+    elevated_at: null,
+    procedure_snapshot: {
+      c1_junta_socios_2026: {
+        punto: punto.numero,
+        materia: punto.materia,
+        junta: FECHA_JUNTA,
+        inscripcion: insc
+          ? {
+              anuncio: insc.anuncio,
+              fecha: insc.fecha,
+              registral: insc.registral,
+              numero_inscripcion: insc.numeroInscripcion,
+              actos_del_anuncio: insc.actos,
+              puntos_del_mismo_anuncio: insc.puntos,
+              anuncio_compartido: notaAnuncioCompartido(insc),
+              vinculo_con_la_junta: insc.vinculo,
+              fuente: "scripts/garrigues/borme/jya-garrigues-slp.json (captura Carril B de la matriz, 2026-08-03)",
+            }
+          : null,
+        ...(insc ? {} : { sin_inscripcion: MOTIVO_SIN_INSCRIPCION }),
+        ...(descartado ? { candidato_descartado: descartado } : {}),
+        elevacion: ELEVACION_NO_ACREDITADA,
+        estado: insc
+          ? `${FILING_ESTADO_INSCRITA}: la fuente acredita el asiento (anuncio ${insc.anuncio}, ${insc.registral}, ${insc.fecha}). No acredita ni la presentación ni la calificación como actos con fecha, y esas columnas quedan a NULL.`
+          : `${FILING_ESTADO_SIN_INSCRIPCION}: es el peldaño más bajo del ciclo y describe el estado de ESTE registro —la plataforma ha reconstruido el expediente del acuerdo—, no un acto del mundo real. No afirma elevación, ni presentación, ni calificación, ni inscripción.`,
+        workflow:
+          "workflow_version 1. El ciclo gobernado v2 exige recorrer PRESENTADA + calificación POSITIVA antes de inscribir y un artefacto documental verificado; los tres datos que eso pide (fecha de presentación, asiento y fecha de calificación) no constan, y el artefacto no existe. Ver la cabecera de buildRegistryFilingRow().",
+        alcance:
+          "Reconstrucción demo sin efecto jurídico. El expediente real consta en el Registro Mercantil de Madrid (hoja M-190538); la plataforma lo reproduce, no lo sustituye. No se afirma presentación, envío, entrega ni interacción real con ningún registro ni con EAD Trust.",
+      },
+    },
+  };
+}
 
 async function main() {
   if (!SUPABASE_URL.includes("hzqwefkwsxopwrmtksbg")) fail(`Target inesperado (${SUPABASE_URL}).`);
@@ -1355,6 +1557,52 @@ async function main() {
     ].join("\n"),
   );
 
+  // ────────────── Task 9 · el ciclo registral: elevación, inscripción y BORME ──
+
+  // Quién tiene expediente registral lo dice `materia_catalog.inscribable`, no
+  // este seed: el conjunto se DERIVA y no se pina. Si mañana el catálogo cambia
+  // la inscribibilidad de una materia, este número cambia con él.
+  const inscribibles = conAcuerdo.filter((p) => claseporMateria.get(p.materia!)!.inscribable);
+  const noInscribibles = conAcuerdo.filter((p) => !claseporMateria.get(p.materia!)!.inscribable);
+  const conInscripcion = inscribibles.filter((p) => inscripcionDePunto(p.numero));
+  const sinInscripcion = inscribibles.filter((p) => !inscripcionDePunto(p.numero));
+
+  console.log(`\n── Task 9 · el ciclo registral de los ${inscribibles.length} acuerdos inscribibles ──`);
+  console.table(inscribibles.map((p) => {
+    const insc = inscripcionDePunto(p.numero);
+    return {
+      punto: p.numero,
+      materia: p.materia,
+      estado: insc ? FILING_ESTADO_INSCRITA : FILING_ESTADO_SIN_INSCRIPCION,
+      anuncio: insc?.anuncio ?? "—",
+      inscripcion: insc ? `I/A ${insc.numeroInscripcion}` : "—",
+      fecha: insc?.fecha ?? "—",
+      comparte_anuncio: insc && insc.puntos.length > 1
+        ? `sí · con el punto ${insc.puntos.filter((x) => x !== p.numero).join(", ")}`
+        : "—",
+      instrumento: "no acreditado",
+      candidato_descartado: candidatoDescartadoDePunto(p.numero)?.anuncio ?? "—",
+    };
+  }));
+  console.log(
+    [
+      `${conInscripcion.length} de ${inscribibles.length} acuerdos inscribibles con inscripción ACREDITADA; ${sinInscripcion.length} sin anuncio en la fuente: ${sinInscripcion.map((p) => p.materia).join(", ")}.`,
+      ...inscripcionesDeLaJunta().map((i) =>
+        `Anuncio ${i.anuncio} · ${i.registral} · ${i.fecha} · puntos ${i.puntos.join(", ")} · actos ${i.actos.join(", ")}\n  Vínculo: ${i.vinculo}`,
+      ),
+      // 2 anuncios y 3 acuerdos inscritos: el aviso viaja también en cada fila.
+      ...inscripcionesDeLaJunta().map(notaAnuncioCompartido).filter(Boolean) as string[],
+      `Los ${sinInscripcion.length} sin inscripción NO se omiten: se escriben en ${FILING_ESTADO_SIN_INSCRIPCION} con anuncio, fecha, asiento y protocolo a NULL. ${MOTIVO_SIN_INSCRIPCION}`,
+      ...inscribibles
+        .map((p) => [p, candidatoDescartadoDePunto(p.numero)] as const)
+        .filter(([, c]) => c)
+        .map(([p, c]) => `Punto ${p.numero}: candidato DESCARTADO ${c!.anuncio} (${c!.fecha}, ${c!.registral}) — ${c!.motivo}`),
+      ELEVACION_NO_ACREDITADA,
+      `Los ${noInscribibles.length} acuerdos no inscribibles (${noInscribibles.map((p) => p.materia).join(", ")}) no generan expediente registral: lo dice materia_catalog. El depósito de las cuentas de 2025 es otro procedimiento y la fuente no acredita ni su presentación ni su fecha.`,
+      `Fuente ÚNICA de todo lo anterior: scripts/garrigues/borme/jya-garrigues-slp.json. Ni una fecha, ni un número de anuncio, ni un protocolo se escriben a mano en este seed.`,
+    ].join("\n"),
+  );
+
   if (!COMMIT) { console.log("\nDry-run. Nada escrito. Añade --commit para aplicar."); return; }
 
   if ((prev ?? []).length === 1) {
@@ -1645,6 +1893,90 @@ async function main() {
   }
   console.log(
     `✓ ${escritas} evaluación(es) del motor persistidas · ${evaluaciones.filter((e) => e.evaluable).length}/${evaluaciones.length} evaluables · sello ${SELLO_CLIENTE}`,
+  );
+
+  // ── Task 9 · el expediente registral de cada acuerdo inscribible ─────────
+
+  // `registry_filings` NO tiene índice único ninguno —solo la PK— ni un solo
+  // trigger (medido en Cloud). La clave de idempotencia es (tenant_id,
+  // agreement_id), que aquí es 1:1 porque cada acuerdo tiene un expediente. Si
+  // apareciera más de uno, el seed PARA: elegir cuál actualizar sería adivinar,
+  // y `ExpedienteAcuerdo` pinta el más reciente por `created_at`.
+  const { data: prevFilings, error: ePrevFilings } = await admin.from("registry_filings")
+    .select("id, tenant_id, entity_id, agreement_id, workflow_version, filing_via, status, filing_number, presentation_date, estimated_resolution, inscription_number, borme_ref, registered_at, publication_reference, published_at, qualification_outcome, qualified_at, deed_id, deed_reference, deed_date, notary_id, notary_name, protocol_number, elevated_at, procedure_snapshot")
+    .eq("tenant_id", GARRIGUES_TENANT);
+  if (ePrevFilings) fail(`registry_filings lookup: ${ePrevFilings.message}`);
+  const filingsPorAcuerdo = new Map<string, Record<string, unknown>>();
+  for (const f of prevFilings ?? []) {
+    const clave = String(f.agreement_id);
+    if (filingsPorAcuerdo.has(clave)) {
+      fail(`hay más de un registry_filings para el acuerdo ${clave}: parar y decidir a mano cuál es el del expediente.`);
+    }
+    filingsPorAcuerdo.set(clave, f as Record<string, unknown>);
+  }
+
+  const idsFiling: string[] = [];
+  for (const punto of inscribibles) {
+    const acuerdo = idsAcuerdo.find((a) => a.punto === punto.numero);
+    if (!acuerdo) fail(`expediente registral: el punto ${punto.numero} no tiene acuerdo en Cloud.`);
+    const fila = buildRegistryFilingRow({
+      agreementId: acuerdo!.id,
+      punto,
+      clase: claseporMateria.get(punto.materia!)!,
+    });
+    const previo = filingsPorAcuerdo.get(acuerdo!.id);
+    if (!previo) {
+      const { data, error } = await admin.from("registry_filings").insert(fila).select("id").single();
+      if (error) fail(`registry_filings insert punto ${punto.numero}: ${error.message}`);
+      idsFiling.push(data.id);
+      console.log(`✓ expediente registral del punto ${punto.numero} creado en ${fila.status}${fila.borme_ref ? ` · anuncio ${fila.borme_ref} · inscripción ${fila.inscription_number}` : " · sin inscripción acreditada"}`);
+      continue;
+    }
+    idsFiling.push(String(previo.id));
+    // `registered_at` es timestamptz: se escribe `2026-07-13T00:00:00.000Z` y
+    // vuelve `2026-07-13 00:00:00+00`. Comparadas como texto NUNCA son iguales y
+    // el seed reescribiría en cada ejecución diciendo «actualizado» sin que nada
+    // haya cambiado — una señal falsa. Se comparan como instante.
+    const sinCambios = Object.entries(fila).every(([k, v]) =>
+      k === "registered_at"
+        ? (v === null ? previo[k] === null : previo[k] !== null && Date.parse(String(previo[k])) === Date.parse(String(v)))
+        : canonical(previo[k]) === canonical(v));
+    if (sinCambios) { console.log(`= expediente registral del punto ${punto.numero} sin cambios`); continue; }
+    const { error } = await admin.from("registry_filings").update(fila).eq("id", previo.id);
+    if (error) fail(`registry_filings update punto ${punto.numero}: ${error.message}`);
+    console.log(`✓ expediente registral del punto ${punto.numero} actualizado`);
+  }
+
+  // Un expediente del tenant que no corresponda a un acuerdo inscribible de esta
+  // Junta es un residuo: no se borra en silencio, se dice.
+  const filingsHuerfanos = (prevFilings ?? []).filter((f) => !idsFiling.includes(String(f.id)));
+  if (filingsHuerfanos.length) {
+    console.log(`⚠ ${filingsHuerfanos.length} registry_filings del tenant fuera de este expediente (acuerdos ${filingsHuerfanos.map((f) => f.agreement_id).join(", ")}). No se tocan: decidir a mano.`);
+  }
+
+  // Verificación posterior: lo que quedó escrito de verdad, contra lo acreditado.
+  const { data: escritos, error: eEscritos } = await admin.from("registry_filings")
+    .select("agreement_id, status, inscription_number, borme_ref, registered_at, presentation_date, notary_name, protocol_number, deed_date")
+    .in("id", idsFiling);
+  if (eEscritos) fail(`registry_filings relectura: ${eEscritos.message}`);
+  const inscritos = (escritos ?? []).filter((f) => f.status === FILING_ESTADO_INSCRITA);
+  if (inscritos.length !== conInscripcion.length) {
+    fail(`registry_filings: ${inscritos.length} expediente(s) en ${FILING_ESTADO_INSCRITA} y la fuente acredita ${conInscripcion.length}.`);
+  }
+  // Ni una fecha, ni un asiento, ni un protocolo fuera de lo acreditado.
+  const anuncios = new Set(inscritos.map((f) => `${f.borme_ref}|${f.inscription_number}`));
+  if (anuncios.size !== inscripcionesDeLaJunta().length) {
+    fail(`registry_filings: ${anuncios.size} anuncio(s) distintos entre los inscritos y la fuente acredita ${inscripcionesDeLaJunta().length}.`);
+  }
+  const inventado = (escritos ?? []).find((f) =>
+    f.presentation_date !== null || f.notary_name !== null || f.protocol_number !== null || f.deed_date !== null
+    || (f.status !== FILING_ESTADO_INSCRITA && (f.registered_at !== null || f.inscription_number !== null || f.borme_ref !== null)),
+  );
+  if (inventado) {
+    fail(`registry_filings: el expediente del acuerdo ${inventado.agreement_id} tiene un dato que la fuente no acredita.`);
+  }
+  console.log(
+    `✓ ${idsFiling.length} expediente(s) registral(es) · ${inscritos.length} ${FILING_ESTADO_INSCRITA} en ${anuncios.size} anuncio(s) del BORME · ${idsFiling.length - inscritos.length} en ${FILING_ESTADO_SIN_INSCRIPCION} sin fecha, sin anuncio y sin protocolo`,
   );
 }
 
