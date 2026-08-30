@@ -30,6 +30,6 @@ declare const Bun: {
   write(path: string, data: string | Uint8Array): Promise<number>;
   spawnSync(
     cmd: string[],
-    opts?: { stdout?: "pipe" | "inherit"; stderr?: "pipe" | "inherit" },
+    opts?: { cwd?: string; stdout?: "pipe" | "inherit"; stderr?: "pipe" | "inherit" },
   ): { stdout: Uint8Array; stderr: Uint8Array; exitCode: number; success: boolean };
 };
