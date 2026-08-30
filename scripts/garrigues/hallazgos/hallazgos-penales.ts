@@ -52,6 +52,11 @@ export const ES_CODIGO_POR_POSICION = /^FND-GARR-PEN-\d{2}$/;
  * texto y no como dato porque no hay dato: es la razón de que no lo haya.
  */
 export const PLAN_ACCION_AUSENCIA = {
+  // El catalogo declara a QUE tenant pertenece, y la pantalla lo compara con
+  // el suyo. Guard por DATO, no por literal en el componente: el dia que otro
+  // tenant tenga su propia procedencia, esto sigue siendo correcto sin tocarlo,
+  // y ARGA nunca ve un texto que habla de una fuente que no es suya.
+  tenantId: "00000000-0000-0000-0000-000000000002",
   titulo: "Sin planes de acción publicados",
   motivo:
     "El Manual del Sistema de Gestión de Riesgos Penales describe el mecanismo del Plan de " +
