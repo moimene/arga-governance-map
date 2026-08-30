@@ -42,6 +42,7 @@ interface KpiCounts {
   convocatorias_proximas: number;
   reuniones_semana: number;
   actas_pendientes_aprobacion: number;
+  actas_total: number;
   tramitaciones_curso: number;
   tramitaciones_subsanacion: number;
   acuerdos_sin_sesion_votando: number;
@@ -194,6 +195,20 @@ function useSecretariaKpis(entityId?: string | null) {
         return count ?? 0;
       }
 
+      // Sin el total, CERO actas es indistinguible de «todas aprobadas», y el
+      // panel afirmaba lo segundo EN VERDE. Un tenant sin una sola acta leia
+      // que su ciclo documental estaba al dia.
+      async function countActasTotal() {
+        let query = supabase
+          .from("minutes")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId!);
+        if (entityId) query = query.eq("entity_id", entityId);
+        const { count, error } = await query;
+        if (error) throw error;
+        return count ?? 0;
+      }
+
       async function countTramitaciones(statuses: string[]) {
         if (agreementIds?.length === 0) return 0;
         let query = supabase
@@ -257,10 +272,11 @@ function useSecretariaKpis(entityId?: string | null) {
         return count ?? 0;
       }
 
-      const [conv, reun, actas, tram, tramSub, asoc, du, libros, compliancePending] = await Promise.all([
+      const [conv, reun, actas, actasTotal, tram, tramSub, asoc, du, libros, compliancePending] = await Promise.all([
         countConvocatorias(),
         countReunionesSemana(),
         countActasPendientesAprobacion(),
+        countActasTotal(),
         countTramitaciones(["EN_TRAMITE", "PRESENTADA"]),
         countTramitaciones(["SUBSANACION"]),
         countAcuerdosSinSesion(),
@@ -273,6 +289,7 @@ function useSecretariaKpis(entityId?: string | null) {
         convocatorias_proximas: conv,
         reuniones_semana: reun,
         actas_pendientes_aprobacion: actas,
+        actas_total: actasTotal,
         tramitaciones_curso: tram,
         tramitaciones_subsanacion: tramSub,
         acuerdos_sin_sesion_votando: asoc,
@@ -1186,18 +1203,22 @@ export default function SecretariaDashboard() {
               status="OK"
               note="Todas cumplen plazos legales"
             />
-            <ComplianceRow
-              label="Quórum en reuniones"
-              status="OK"
-              note="Última sesión: 9/9 presentes"
-            />
+            {/* «Última sesión: 9/9 presentes» era un LITERAL, no un dato: a un
+                tenant sin reuniones se le enseñaba una cifra fabricada. Sin una
+                fuente que lo calcule, la fila no se pinta. */}
             <ComplianceRow
               label="Actas pendientes de aprobación"
               status={kpis && kpis.actas_pendientes_aprobacion > 0 ? "WARNING" : "OK"}
               note={
-                kpis && kpis.actas_pendientes_aprobacion > 0
-                  ? countLabel(kpis.actas_pendientes_aprobacion, "acta en borrador", "actas en borrador")
-                  : "Todas aprobadas"
+                // Cero actas NO es «todas aprobadas»: era el mismo estado verde
+                // para un ciclo documental al día y para uno que no ha empezado.
+                !kpis
+                  ? "—"
+                  : kpis.actas_pendientes_aprobacion > 0
+                    ? countLabel(kpis.actas_pendientes_aprobacion, "acta en borrador", "actas en borrador")
+                    : kpis.actas_total === 0
+                      ? "Sin actas registradas"
+                      : "Todas aprobadas"
               }
             />
             <ComplianceRow
