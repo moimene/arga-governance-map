@@ -362,6 +362,28 @@ describe("C1 — asistencia, base de cómputo y gate del censo (módulo puro)", 
     );
     expect(censoPrecondicion(malSembrado).ok).toBe(false);
   });
+
+  it("el gate mira a TODOS los socios, no a una muestra por clase", () => {
+    // La primera versión tomaba el primero de cada clase con `find`. Un censo con
+    // 344 de 345 socios de clase A mal sembrados pasaba el gate diciendo que
+    // reproduce la proporción del art. 7, porque el único que miraba era el bueno.
+    // Muestrear no sirve para un gate cuyo trabajo es no congelar un peso
+    // equivocado en un registro INMUTABLE.
+    const censo = [
+      socio("A-01", "A"),
+      ...Array.from({ length: 20 }, (_, i) => socio(`A-${i + 2}`, "A")),
+      socio("B-01", "B"),
+    ];
+    expect(censoPrecondicion(censo).ok).toBe(true);
+
+    // Uno solo, y en mitad de la lista: el gate tiene que cerrar igual.
+    const unoMalEnMedio = censo.map((s, i) =>
+      i === 12 ? { ...s, holding: { ...s.holding, numero_titulos: 7 } } : s,
+    );
+    const r = censoPrecondicion(unoMalEnMedio);
+    expect(r.ok).toBe(false);
+    expect(r.detalle).toContain("1 de 22 socios");
+  });
 });
 
 describe("C1 — la reunión, la asistencia del acta y el censo WORM en Cloud", () => {

@@ -332,12 +332,25 @@ export function evaluarVotacion(
       majoritySpec = pack.votacion.mayoria.CONSEJO;
     } else if (input.tipoSocial === 'SA' || input.tipoSocial === 'SAU') {
       majoritySpec = pack.votacion.mayoria.SA;
-    } else if (input.tipoSocial === 'SL' || input.tipoSocial === 'SLU' || input.tipoSocial === 'SLP') {
-      // C1 — la SLP lee la rama SL, mismo criterio que `effective-rule.ts:89`.
-      // Sin esta rama `majoritySpec` quedaba undefined y el motor devolvía
-      // `majority_spec_missing` en BLOCKING para toda sociedad profesional:
-      // una mayoría que sí está en el pack se presentaba como inexistente.
+    } else if (input.tipoSocial === 'SL' || input.tipoSocial === 'SLU') {
       majoritySpec = pack.votacion.mayoria.SL;
+    } else if (input.tipoSocial === 'SLP') {
+      // C1 — la SLP lee la rama SL, mismo criterio que `effective-rule.ts:89`.
+      // Sin esta rama `majoritySpec` quedaba undefined y el motor devolvia
+      // `majority_spec_missing` en BLOCKING para toda sociedad profesional:
+      // una mayoria que si esta en el pack se presentaba como inexistente.
+      //
+      // EXCEPTO si el pack es el fallback de prototipo. Ese pack no trae la
+      // mayoria de nadie: la inventa (`favor > contra`, art. 198 LSC de
+      // relleno). Antes de abrir esta rama, la SLP no llegaba a leerlo y
+      // quedaba en BLOCKING; abrirla sin esta guarda convertia un fallo
+      // cerrado en una adopcion proclamada sobre una regla inventada.
+      // El hecho —«esto es el fallback»— viaja en el propio pack
+      // (`prototype-rule-pack-fallback.ts`), asi que la guarda vale para
+      // TODO llamante del motor, no solo para el punto del stepper que
+      // construye el warning `prototype_rule_pack_fallback_used`.
+      const esFallbackPrototipo = pack.reglaEspecifica?.prototype_fallback === true;
+      if (!esFallbackPrototipo) majoritySpec = pack.votacion.mayoria.SL;
     }
 
     if (majoritySpec) break;

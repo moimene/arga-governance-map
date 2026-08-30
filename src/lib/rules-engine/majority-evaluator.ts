@@ -292,6 +292,13 @@ function evaluateFormula(
   // 4/5 (80 %) del total. Art. 30.3.b) de los Estatutos de la SLP: la admisión
   // de un nuevo socio de cuota exige el 80 % de los votos, no de los emitidos.
   if (formulaActual === 'favor >= 4/5_capital') {
+    // Sin base no hay mayoria reforzada que proclamar: con `capital_total = 0`
+    // el umbral es 0 y `favor >= 0` daria por alcanzado un 80% con cero votos.
+    // Las ramas hermanas de 2/3 y 1/2 comparten el agujero; no se tocan aqui
+    // porque ARGA las usa en 27 packs vivos y moverlas cambia su calculo.
+    if (capital_total <= 0) {
+      return { alcanzada: false, valorRequerido: 0, valorObtenido: favor };
+    }
     const requerido = (4 * capital_total) / 5;
     return {
       alcanzada: favor >= requerido,

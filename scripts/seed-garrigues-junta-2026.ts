@@ -420,12 +420,34 @@ export function censoPrecondicion(socios: SocioCenso[]): {
     (code === "A" ? TITULOS_POR_SOCIO_CUOTA : 1) * (claseArt7(code)?.votosPorTitulo ?? 0);
   const votos = (h: HoldingCenso) => votingRightsFromCapitalHolding(h) ?? 0;
 
-  // Dos titulares de clases distintas: la comparación es de proporciones, así que
-  // no depende de qué socio concreto se tome ni de ningún literal.
   const clases = [...new Set(socios.map((s) => s.holding.share_class?.class_code ?? "?"))].sort();
   if (clases.length < 2) {
     return { ok: false, ratioRpc: null, ratioVotos: null, detalle: `censo con una sola clase (${clases.join(", ")}): la proporción no es comprobable` };
   }
+
+  // Se recorren TODOS los socios, no una muestra por clase. La versión anterior
+  // tomaba el primero de cada clase con `find`, así que un censo con 344 de 345
+  // socios de clase A mal sembrados pasaba el gate diciendo «reproduce la
+  // proporción del art. 7». El gate existe para no congelar un peso equivocado
+  // en un registro INMUTABLE: muestrear no sirve para eso.
+  const desviados: string[] = [];
+  for (const s of socios) {
+    const code = s.holding.share_class?.class_code ?? "?";
+    const esperado = pesoArt7(code);
+    if (esperado === 0) {
+      return { ok: false, ratioRpc: null, ratioVotos: null, detalle: `clase ${code} sin peso en el art. 7: la proporción no es comprobable` };
+    }
+    if (votos(s.holding) !== esperado) {
+      desviados.push(`${s.full_name} (clase ${code}: ${votos(s.holding)} votos, art. 7 impone ${esperado})`);
+    }
+  }
+  if (desviados.length) {
+    return {
+      ok: false, ratioRpc: pesoArt7(clases[0]) / pesoArt7(clases[1]), ratioVotos: null,
+      detalle: `${desviados.length} de ${socios.length} socios no guardan el peso del art. 7: ${desviados.slice(0, 3).join("; ")}${desviados.length > 3 ? ` …y ${desviados.length - 3} más` : ""}`,
+    };
+  }
+
   const a = socios.find((s) => s.holding.share_class?.class_code === clases[0])!;
   const b = socios.find((s) => s.holding.share_class?.class_code === clases[1])!;
   if (pesoArt7(clases[1]) === 0 || votos(b.holding) === 0) {
