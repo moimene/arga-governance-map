@@ -1,4 +1,5 @@
 import { Link, useParams } from "react-router-dom";
+import { horaNoAcreditadaEn } from "@/lib/secretaria/fecha-sin-hora-acreditada";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -196,7 +197,15 @@ export default function OrganoDetalle() {
                 ) : bodyMeetings.map((m) => (
                   <TableRow key={m.id}>
                     <TableCell><Link to={`/organos/${body.slug}/reuniones/${m.slug}`} className="font-mono text-xs text-primary hover:underline">{formatDate(m.scheduled_start)}</Link></TableCell>
-                    <TableCell className="font-mono text-xs">{formatTime(m.scheduled_start)}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {/* Sin esto, la columna «Hora» afirmaba «02:00» —00:00Z en
+                          Madrid— para un expediente que declara que su hora NO
+                          consta. Es el shell TGMS: quedo fuera del barrido de
+                          /secretaria/*, que es donde se hizo el arreglo. */}
+                      {horaNoAcreditadaEn((m as { quorum_data?: unknown }).quorum_data)
+                        ? "no acreditada"
+                        : formatTime(m.scheduled_start)}
+                    </TableCell>
                     <TableCell className="text-sm">{m.modality ?? "—"}</TableCell>
                     <TableCell><StatusBadge label={m.status ?? "—"} /></TableCell>
                     <TableCell className="text-sm">{m.minutes_status === "FIRMADA" ? <span className="text-status-active">Firmada</span> : "—"}</TableCell>

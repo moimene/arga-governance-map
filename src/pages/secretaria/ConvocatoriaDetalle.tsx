@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { generateIcs } from "@/lib/secretaria/convocatoria-ics";
 import { fechaConHoraSiConsta, horaNoAcreditadaEn } from "@/lib/secretaria/fecha-sin-hora-acreditada";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -373,33 +374,6 @@ function selectedTemplateFromTrace(trace?: Record<string, unknown> | null) {
   return typeof id === "string" && id.trim() ? id : null;
 }
 
-function generateIcs(convocatoria: {
-  title: string;
-  meeting_date: string;
-  start_time?: string | null;
-  location?: string | null;
-  body_name?: string | null;
-}): string {
-  const dt = new Date(convocatoria.meeting_date);
-  const dateStr = dt.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-  const domain = typeof window !== "undefined" && window.location.hostname ? window.location.hostname : "governance.local";
-  const uid = `convocatoria-${Date.now()}@${domain}`;
-  const summary = convocatoria.title ?? "Reunión " + (convocatoria.body_name ?? "");
-
-  return [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//Secretaría Societaria//ES",
-    "BEGIN:VEVENT",
-    `UID:${uid}`,
-    `DTSTAMP:${dateStr}`,
-    `DTSTART:${dateStr}`,
-    `SUMMARY:${summary}`,
-    convocatoria.location ? `LOCATION:${convocatoria.location}` : "",
-    "END:VEVENT",
-    "END:VCALENDAR",
-  ].filter(Boolean).join("\r\n");
-}
 
 function downloadIcs(content: string, filename: string) {
   const blob = new Blob([content], { type: "text/calendar;charset=utf-8" });
@@ -766,6 +740,7 @@ export default function ConvocatoriaDetalle() {
                 const ics = generateIcs({
                   title: `${conv.body_name ?? "Reunión"} — ${conv.entity_name ?? ""}`,
                   meeting_date: conv.fecha_1!,
+                  hora_no_acreditada: horaNoAcreditadaEn(conv.rule_trace),
                   location: null,
                   body_name: conv.body_name,
                 });
@@ -812,7 +787,7 @@ export default function ConvocatoriaDetalle() {
           <Card title="Datos de la convocatoria" icon={Calendar}>
             <KV label="Fecha de registro DEMO" value={conv.fecha_emision ? new Date(conv.fecha_emision).toLocaleDateString("es-ES") : "—"} />
             <KV label="Fecha 1ª convocatoria" value={fechaConHoraSiConsta(conv.fecha_1, horaNoAcreditadaEn(conv.rule_trace))} />
-            <KV label="Fecha 2ª convocatoria" value={conv.fecha_2 ? new Date(conv.fecha_2).toLocaleString("es-ES") : "—"} />
+            <KV label="Fecha 2ª convocatoria" value={fechaConHoraSiConsta(conv.fecha_2, horaNoAcreditadaEn(conv.rule_trace))} />
             <KV label="Modalidad" value={conv.modalidad ? statusLabel(conv.modalidad) : "—"} />
             <KV label="Junta universal" value={conv.junta_universal ? "Sí" : "No"} />
             <KV label="2ª convocatoria reforzada" value={conv.is_second_call ? "Sí" : "No"} />

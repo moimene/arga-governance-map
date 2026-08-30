@@ -1,4 +1,5 @@
 import { Link, useParams } from "react-router-dom";
+import { horaNoAcreditadaEn } from "@/lib/secretaria/fecha-sin-hora-acreditada";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -43,7 +44,10 @@ export default function ReunionDetalle() {
   const isConvocada = meeting.status === "CONVOCADA";
   const isCelebrada = meeting.status === "CELEBRADA";
   const meetingDate = formatDate(meeting.scheduled_start);
-  const meetingTime = formatTime(meeting.scheduled_start);
+  // Un clic desde la tabla de OrganoDetalle: la misma hora fabricada, ahora en
+  // la cabecera de la ficha de la reunión.
+  const horaNoAcreditada = horaNoAcreditadaEn((meeting as { quorum_data?: unknown }).quorum_data);
+  const meetingTime = horaNoAcreditada ? null : formatTime(meeting.scheduled_start);
   const monthNames = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
   let titleDate = meetingDate;
   if (meeting.scheduled_start) {
@@ -68,7 +72,7 @@ export default function ReunionDetalle() {
             {meeting.modality && <StatusBadge label={meeting.modality} tone="neutral" />}
           </>
         }
-        metadata={<>{meetingDate} · {meetingTime}h{meeting.venue ? ` · ${meeting.venue}` : ""}</>}
+        metadata={<>{meetingDate}{meetingTime ? <> · {meetingTime}h</> : <> · hora no acreditada</>}{meeting.venue ? ` · ${meeting.venue}` : ""}</>}
         owner={meeting.secretary_name && <>Convocada por: <span className="font-medium text-foreground">{meeting.secretary_name}</span></>}
         actions={
           isConvocada ? (

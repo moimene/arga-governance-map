@@ -1,4 +1,5 @@
 import { BoardPackMeeting } from "@/hooks/useBoardPackData";
+import { horaNoAcreditadaEn } from "@/lib/secretaria/fecha-sin-hora-acreditada";
 import { useTenantBranding } from "@/context/TenantBrandContext";
 import { groupFullLabel, shellLabel } from "@/lib/tenant-brand-labels";
 
@@ -56,7 +57,9 @@ export function BPPortada({ meeting, generatedAt }: BPPortadaProps) {
             {formatMeetingDate(meeting.scheduled_start)}
           </p>
           <p className="text-sm text-[var(--g-text-secondary)]">
-            {formatTime(meeting.scheduled_start)}
+            {horaNoAcreditadaEn((meeting as { quorum_data?: unknown }).quorum_data)
+              ? "hora no acreditada"
+              : formatTime(meeting.scheduled_start)}
             {meeting.location ? ` · ${meeting.location}` : ""}
           </p>
           <span

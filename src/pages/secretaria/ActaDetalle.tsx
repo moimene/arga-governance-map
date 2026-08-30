@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { horaNoAcreditadaEn } from "@/lib/secretaria/fecha-sin-hora-acreditada";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { AlertTriangle, ArrowLeft, FileSignature, Gavel, Link2, Loader2, Shield, Stamp, Lock, Unlock } from "lucide-react";
@@ -422,8 +423,15 @@ export default function ActaDetalle() {
     entityType: entity,
     isUniversal,
     date: formatDateOnly(meetingDate) || m.created_at,
-    startTime: formatTimeOnly(meeting?.scheduled_start) || "Hora indicada en convocatoria",
-    endTime: formatTimeOnly(meeting?.scheduled_end),
+    // Si el expediente declara que su hora no consta, el acta no la inventa.
+    // El fallback existente —«Hora indicada en convocatoria»— es exactamente la
+    // redaccion correcta para ese caso y ya estaba escrito.
+    startTime: horaNoAcreditadaEn((meeting as { quorum_data?: unknown } | null)?.quorum_data)
+      ? "Hora indicada en convocatoria"
+      : formatTimeOnly(meeting?.scheduled_start) || "Hora indicada en convocatoria",
+    endTime: horaNoAcreditadaEn((meeting as { quorum_data?: unknown } | null)?.quorum_data)
+      ? ""
+      : formatTimeOnly(meeting?.scheduled_end),
     place: meeting?.location ?? "Domicilio social",
     convocationText,
     convocationPublicationText,
@@ -468,8 +476,15 @@ export default function ActaDetalle() {
     entityType: entity,
     isUniversal,
     date: formatDateOnly(meetingDate) || m.created_at,
-    startTime: formatTimeOnly(meeting?.scheduled_start) || "Hora indicada en convocatoria",
-    endTime: formatTimeOnly(meeting?.scheduled_end),
+    // Si el expediente declara que su hora no consta, el acta no la inventa.
+    // El fallback existente —«Hora indicada en convocatoria»— es exactamente la
+    // redaccion correcta para ese caso y ya estaba escrito.
+    startTime: horaNoAcreditadaEn((meeting as { quorum_data?: unknown } | null)?.quorum_data)
+      ? "Hora indicada en convocatoria"
+      : formatTimeOnly(meeting?.scheduled_start) || "Hora indicada en convocatoria",
+    endTime: horaNoAcreditadaEn((meeting as { quorum_data?: unknown } | null)?.quorum_data)
+      ? ""
+      : formatTimeOnly(meeting?.scheduled_end),
     place: meeting?.location ?? "Domicilio social",
     convocationText,
     convocationPublicationText,

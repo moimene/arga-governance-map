@@ -89,6 +89,8 @@ type MeetingWithJoins = {
   notice_days?: number | null;
   second_call_date?: string | null;
   second_call_time?: string | null;
+  /** El expediente puede declarar aqui que su HORA no esta acreditada. */
+  quorum_data?: { hora_no_acreditada?: unknown } | null;
   meeting_participants?: ParticipantRow[];
   meeting_agenda?: AgendaItemRow[];
   meeting_resolutions?: ResolutionRow[];
@@ -445,8 +447,20 @@ async function resolveMeetingVars(meetingId: string, tenantId: string): Promise<
     });
   };
   const meetingDate = meetingTyped.date || meetingTyped.scheduled_date || formatScheduledDate(meetingTyped.scheduled_start);
-  const meetingStartTime = meetingTyped.start_time || formatScheduledTime(meetingTyped.scheduled_start);
-  const meetingEndTime = meetingTyped.end_time || formatScheduledTime(meetingTyped.scheduled_end);
+  // Este resolvedor alimenta las variables de TODAS las plantillas del motor
+  // documental, asi que una hora fabricada aqui entra en cualquier documento
+  // que se genere. Cuando el expediente declara que su hora no consta, las
+  // variables de hora quedan vacias: una plantilla puede omitir un valor
+  // ausente, pero no puede desmentir uno que le llega con pinta de dato.
+  // `scheduled_end` es ademas una SEGUNDA hora fabricada — la convencion de
+  // +2 h de la plataforma— y por eso se trata igual y no aparte.
+  const horaNoAcreditada = meetingTyped.quorum_data?.hora_no_acreditada === true;
+  const meetingStartTime = horaNoAcreditada
+    ? ""
+    : meetingTyped.start_time || formatScheduledTime(meetingTyped.scheduled_start);
+  const meetingEndTime = horaNoAcreditada
+    ? ""
+    : meetingTyped.end_time || formatScheduledTime(meetingTyped.scheduled_end);
 
   return {
     status: meetingTyped.status,

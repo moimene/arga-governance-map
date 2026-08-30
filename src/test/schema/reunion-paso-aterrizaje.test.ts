@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeAll } from "bun:test";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { deriveReunionInitialStep } from "@/pages/secretaria/ReunionStepper";
+import { deriveReunionInitialStep } from "@/lib/secretaria/reunion-paso-aterrizaje";
 import { GARRIGUES_TENANT, sesionDe } from "../helpers/supabase-test-client";
 
 /**

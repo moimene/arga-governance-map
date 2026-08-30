@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, beforeAll } from "bun:test";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -12,23 +13,55 @@ describe("C1 — la hora que no consta no se pinta como si constara", () => {
       .toBe("6 may 2026 · hora no acreditada");
   });
 
-  it("SIN bandera: se pinta EXACTAMENTE lo de antes (es el caso de ARGA)", () => {
-    // La mitad que importa del contrato, y la que se me escapó primero: no
-    // basta con que la hora siga estando. Los cuatro puntos de llamada usaban
-    // TRES formatos distintos, y un helper con formato único le cambiaba a ARGA
-    // «20/8/2026, 10:00:00» por «20 ago 2026, 10:00». La hora seguía ahí y aun
-    // así era un cambio a ARGA, que es lo que el contrato prohíbe. Se comprueba
-    // contra el literal que producía cada sitio ANTES del cambio.
+  it("SIN bandera, cada formato produce lo de antes — y los tres SIGUEN SIENDO DISTINTOS", () => {
+    // Dos correcciones a la primera versión de este test, las dos de la lente:
+    //
+    // 1. Recomputaba `d.toLocaleString(...)` con las mismas opciones que el
+    //    helper: se comparaba consigo mismo por el mismo camino. Caía si
+    //    cambiabas UNO de los dos y sobrevivía al cambio que de verdad importa
+    //    —el que toca los dos, que es lo que hace un refactor—.
+    // 2. No se puede pinar la cadena entera: `toLocaleString("es-ES")` depende
+    //    de la zona horaria del runner, así que el literal completo sería
+    //    frágil y alguien lo relajaría volviendo a recomputar.
+    //
+    // Lo que se pina es la PROPIEDAD LITERAL QUE DISCRIMINA: que los tres
+    // formatos den tres cadenas DISTINTAS, y la forma característica de cada
+    // una escrita a mano. El fallo real fue unificar tres formatos en uno, y
+    // eso iguala las tres cadenas: es lo que este test tiene que cazar.
     const iso = "2026-12-17T08:00:00.000Z";
-    const d = new Date(iso);
-    // Listas y detalle de convocatoria: `toLocaleString("es-ES")` pelado.
-    expect(fechaConHoraSiConsta(iso, false)).toBe(d.toLocaleString("es-ES"));
-    // Paso 1 del stepper.
-    expect(fechaConHoraSiConsta(iso, false, { dateStyle: "medium", timeStyle: "short" }))
-      .toBe(d.toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" }));
-    // Contenido del acta.
-    expect(fechaConHoraSiConsta(iso, false, { dateStyle: "long", timeStyle: "short" }))
-      .toBe(d.toLocaleString("es-ES", { dateStyle: "long", timeStyle: "short" }));
+    const plano = fechaConHoraSiConsta(iso, false);
+    const medio = fechaConHoraSiConsta(iso, false, { dateStyle: "medium", timeStyle: "short" });
+    const largo = fechaConHoraSiConsta(iso, false, { dateStyle: "long", timeStyle: "short" });
+
+    expect(new Set([plano, medio, largo]).size).toBe(3);   // unificar formatos rompe esto
+
+    expect(plano).toMatch(/^\d{1,2}\/\d{1,2}\/\d{4}, \d{1,2}:\d{2}:\d{2}$/);  // numérico y CON segundos
+    expect(medio).toMatch(/^\d{1,2} \w{3} \d{4}, \d{1,2}:\d{2}$/);              // mes abreviado, SIN segundos
+    expect(largo).toMatch(/^\d{1,2} de \w+ de \d{4}, \d{1,2}:\d{2}$/);          // mes completo
+    for (const v of [plano, medio, largo]) expect(v).not.toContain("no acreditada");
+  });
+
+  it("y los PUNTOS DE LLAMADA conservan su formato — aquí es donde falló de verdad", () => {
+    // El guard anterior protegía el helper. El fallo histórico no fue tocar el
+    // helper: fue IMPONER un formato en un punto de llamada, y eso pasaba la
+    // suite entera (medido por la lente: 3803 pass con el mutante puesto).
+    // Se pina el formato que cada superficie pasa, leyéndolo del fuente: si
+    // alguien se lo cambia, esto cae.
+    const fuentes: Array<[string, RegExp]> = [
+      // Sin opciones → `toLocaleString("es-ES")` pelado.
+      ["src/pages/secretaria/ConvocatoriasList.tsx", /fechaConHoraSiConsta\(c\.fecha_1, horaNoAcreditadaEn\(c\.rule_trace\)\)/],
+      ["src/pages/secretaria/ReunionesLista.tsx", /fechaConHoraSiConsta\(m\.scheduled_start, horaNoAcreditadaEn\(m\.quorum_data\)\)/],
+      // Con su formato propio.
+      ["src/pages/secretaria/ReunionStepper.tsx", /dateStyle: "medium", timeStyle: "short"/],
+      ["src/pages/secretaria/ReunionStepper.tsx", /dateStyle: "long", timeStyle: "short"/],
+    ];
+    for (const [ruta, patron] of fuentes) {
+      const src = readFileSync(ruta, "utf8");
+      expect(patron.test(src)).toBe(true);
+    }
+    // Control positivo del método: un patrón que NO está tiene que dar falso,
+    // o esto no distinguiría nada.
+    expect(/dateStyle: "full"/.test(readFileSync("src/pages/secretaria/ReunionStepper.tsx", "utf8"))).toBe(false);
   });
 
   it("sin fecha, guion; y la bandera tolera null y formas raras", () => {
