@@ -100,10 +100,10 @@ import {
   convocatoriaText,
   puntosQueMaterializan,
   puntosSinMateriaAcreditada,
-  NOTA_PUNTO_BLOQUEADO,
-  PUNTO_BLOQUEADO,
+  SUBSUNCION_ART36,
   ordinalEnOrdenDelDia,
   puntosConAcuerdo,
+  subsuncionDe,
   textoAcuerdo,
   type PuntoOrdenDia,
 } from "./garrigues/junta-2026/orden-del-dia";
@@ -437,7 +437,7 @@ export function censoPrecondicion(socios: SocioCenso[]): {
 }
 
 
-// ────────────────────────────── Task 6: los 9 acuerdos, con su regla y su punto ──
+// ───────────────────────────── Task 6: los 10 acuerdos, con su regla y su punto ──
 
 /**
  * La regla que sirve un acuerdo: el pack POR MATERIA del tenant Garrigues.
@@ -550,6 +550,11 @@ export function buildAgreementRow(args: {
   const texto = textoAcuerdo(punto.numero);
   const referencia = String(pack.mayoriaSL.referencia ?? "");
   if (!referencia) throw new Error(`acuerdo: el pack ${pack.packId} no trae referencia de mayoría`);
+  // La subsunción viaja con el acuerdo cuando la hay, y solo cuando la hay: los
+  // otros 9 resuelven su mayoría por cita directa y una clave vacía sugeriría lo
+  // contrario. Es el mismo objeto que el pack lleva en
+  // `reglaEspecifica.subsuncionArt36`, así que la sonda puede contrastarlos.
+  const subsuncion = subsuncionDe(punto.numero);
 
   return {
     tenant_id: GARRIGUES_TENANT,
@@ -584,10 +589,14 @@ export function buildAgreementRow(args: {
           tenant: "GARRIGUES",
         },
         mayoria: pack.mayoriaSL,
+        ...(subsuncion ? { subsuncion } : {}),
         required_majority_code: {
           valor: null,
-          motivo:
-            "El vocabulario de required_majority_code (SIMPLE < REFORZADA_2_3 < UNANIMIDAD, fn_majority_level) no expresa la base de cómputo del art. 30.1 de los Estatutos, que es la mayoría de los votos del capital social y no la de los votos emitidos. Escribir un código de esa escalera afirmaría otra regla; la aplicable es la del rule pack y está copiada aquí al lado.",
+          motivo: subsuncion
+            // Aquí la escalera SÍ tiene una palabra para «dos tercios», así que
+            // el motivo del NULL no puede ser el mismo que en los otros nueve.
+            ? "REFORZADA_2_3 (fn_majority_level) sí nombra los dos tercios, pero se deja NULL por dos razones: no expresa la base de cómputo —votos de las participaciones en que se divide el capital social, no votos emitidos ni capital presente— y, sobre todo, escribir la mayoría en una columna estructurada la presentaría como FIRME cuando se aplica por SUBSUNCIÓN etiquetada INFERIDO. La mayoría aplicable vive en el rule pack y la subsunción, con su lectura alternativa, está aquí al lado."
+            : "El vocabulario de required_majority_code (SIMPLE < REFORZADA_2_3 < UNANIMIDAD, fn_majority_level) no expresa la base de cómputo del art. 30.1 de los Estatutos, que es la mayoría de los votos del capital social y no la de los votos emitidos. Escribir un código de esa escalera afirmaría otra regla; la aplicable es la del rule pack y está copiada aquí al lado.",
         },
         texto_del_acuerdo:
           texto.contenido === "ACREDITADO"
@@ -613,11 +622,21 @@ async function main() {
     fail("preflight: hay números de punto repetidos; Task 6 no podría enlazar el acuerdo con su punto.");
   }
 
-  // Task 6: 9 acuerdos, no 10. El punto 1.1 está bloqueado (ver PUNTO_BLOQUEADO).
+  // Task 6-bis: 10 acuerdos. Ya no hay punto bloqueado — el 1.1 se desbloqueó
+  // con la decisión del usuario de 2026-08-30 (ver SUBSUNCION_ART36).
   const conAcuerdo = puntosConAcuerdo();
-  if (conAcuerdo.length !== 9) fail(`preflight: ${conAcuerdo.length} puntos con acuerdo, esperados 9.`);
-  if (conAcuerdo.some((p) => p.numero === PUNTO_BLOQUEADO)) {
-    fail(`preflight: el punto ${PUNTO_BLOQUEADO} está bloqueado y no puede materializar acuerdo.`);
+  if (conAcuerdo.length !== 10) fail(`preflight: ${conAcuerdo.length} puntos con acuerdo, esperados 10.`);
+  if (conAcuerdo.length !== materializan.length) {
+    fail("preflight: hay puntos que materializan sin acuerdo; si vuelve a haber un bloqueo, decláralo aquí.");
+  }
+  // La etiqueta no es decorativa: si alguien la degrada a FIRME o le quita la
+  // lectura alternativa, el seed no escribe. Es el único sitio del pipeline por
+  // el que pasan los 10 acuerdos antes de tocar Cloud.
+  if (SUBSUNCION_ART36.procedencia !== "INFERIDO") {
+    fail("preflight: la subsunción del art. 36 debe seguir etiquetada INFERIDO.");
+  }
+  if (!SUBSUNCION_ART36.lecturaAlternativa.includes("30.2.f") || !SUBSUNCION_ART36.lecturaAlternativa.includes("30.1")) {
+    fail("preflight: la lectura alternativa del art. 36 (30.2.f tasado → 30.1) no puede perderse.");
   }
   for (const p of conAcuerdo) textoAcuerdo(p.numero);   // lanza si falta un texto
   // Los ordinales son los de la convocatoria: si dos coincidieran, dos acuerdos
@@ -695,7 +714,9 @@ async function main() {
     // no se muere: un ensayo que revienta sin enseñar qué falta no sirve de nada.
     const msg =
       `materias sin rule pack del tenant Garrigues: ${sinPack.join(", ")}. ` +
-      `Aplica antes supabase/migrations/20260829170000_c1_packs_materias_junta.sql.`;
+      `Aplica antes supabase/migrations/20260829170000_c1_packs_materias_junta.sql ` +
+      `(APROBACION_CUENTAS, NOMBRAMIENTO_AUDITOR, DELEGACION_FACULTADES) y ` +
+      `supabase/migrations/20260830120000_c1_pack_modificacion_estatutos_junta.sql (MODIFICACION_ESTATUTOS).`;
     if (COMMIT) fail(msg);
     console.log(`\n⚠ ${msg}\n  El dry-run continúa para enseñar el resto; con --commit para aquí.`);
   }
@@ -924,7 +945,7 @@ async function main() {
 
   const claseporMateria = new Map((cat ?? []).map((c) => [c.materia, c as ClaseMateria]));
 
-  console.log("\n── Task 6 · los 9 acuerdos, su punto y su regla ──");
+  console.log(`\n── Task 6 · los ${conAcuerdo.length} acuerdos, su punto y su regla ──`);
   console.table(conAcuerdo.map((p) => {
     const pack = packPorMateria.get(p.materia!);
     const clase = claseporMateria.get(p.materia!)!;
@@ -937,16 +958,20 @@ async function main() {
       mayoria: pack ? `${pack.mayoriaSL.fuente} · ${pack.mayoriaSL.formula}` : "—",
       referencia: pack ? String(pack.mayoriaSL.referencia).slice(0, 52) : "—",
       texto: textoAcuerdo(p.numero).contenido,
+      regla: subsuncionDe(p.numero) ? "SUBSUNCIÓN · INFERIDO" : "cita directa",
       gate: materiasConGate.has(p.materia!) ? "INFORME_PRECEPTIVO_ORGANO" : "—",
     };
   }));
   console.log(
     [
-      `Punto ${PUNTO_BLOQUEADO} SIN acuerdo — ${NOTA_PUNTO_BLOQUEADO}`,
-      `Gate del informe preceptivo previsto en ${conAcuerdo.filter((p) => materiasConGate.has(p.materia!)).length} de ${conAcuerdo.length} acuerdos.`,
+      `Punto 1.1 (art. 36) — mayoría de 2/3 por SUBSUNCIÓN en el art. 30.2.a), etiquetada ${SUBSUNCION_ART36.procedencia} y decidida por ${SUBSUNCION_ART36.decididoPor}.`,
+      `  Lectura aplicada: ${SUBSUNCION_ART36.lecturaAplicada}`,
+      `  Lectura ALTERNATIVA (viaja con el acuerdo): ${SUBSUNCION_ART36.lecturaAlternativa}.`,
+      `  Registro canónico: ${SUBSUNCION_ART36.registroCanonico}`,
+      `Gate del informe preceptivo previsto en ${conAcuerdo.filter((p) => materiasConGate.has(p.materia!)).length} de ${conAcuerdo.length} acuerdos. MODIFICACION_ESTATUTOS NO entra: ${SUBSUNCION_ART36.consecuenciaNoAplicada}`,
       `Arista punto ↔ acuerdo: agenda_items.order_number (ordinal de la convocatoria) → agreements.agenda_item_id (uuid, FK).`,
       `source_convocatoria_id queda a NULL: el guard exige convocatoria EMITIDA e inmutable y ésta está en ${ESTADO}.`,
-      `required_majority_code queda a NULL a propósito: la escalera SIMPLE/REFORZADA_2_3/UNANIMIDAD no expresa la base del art. 30.1.`,
+      `required_majority_code queda a NULL en los ${conAcuerdo.length}: la escalera SIMPLE/REFORZADA_2_3/UNANIMIDAD no expresa la base del art. 30.1, y en el 1.1 escribir REFORZADA_2_3 presentaría como FIRME una mayoría aplicada por subsunción INFERIDA.`,
     ].join("\n"),
   );
 
@@ -1045,7 +1070,7 @@ async function main() {
     console.log(`✓ payload verificado: ${creado.total_partes} partes · Σ voting_weight=${suma.toFixed(6)} · ratio ${ratio.toFixed(2)} (art. 7)`);
   }
 
-  // ── Task 6 · los 9 acuerdos ──────────────────────────────────────────────
+  // ── Task 6 · los 10 acuerdos ─────────────────────────────────────────────
 
   // 1) El punto celebrado. Índice único (meeting_id, order_number): la clave de
   //    idempotencia es el ordinal, y NO se borra y reinserta — un agenda_item

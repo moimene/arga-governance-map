@@ -26,10 +26,10 @@ import {
   MESA_SECRETARIO,
   REPRESENTANTE_UNICO,
   SOCIOS_PRESENCIALES,
-  PUNTO_BLOQUEADO,
-  NOTA_PUNTO_BLOQUEADO,
+  SUBSUNCION_ART36,
   ordinalEnOrdenDelDia,
   puntosConAcuerdo,
+  subsuncionDe,
   textoAcuerdo,
   TEXTOS_ACUERDO,
 } from "../../../scripts/garrigues/junta-2026/orden-del-dia";
@@ -518,39 +518,92 @@ const MATERIAS_SLP = [
 /** Las 3 que hasta C1 solo existían en ARGA: su pack lleva prefijo GARR_. */
 const MATERIAS_NUEVAS = ["APROBACION_CUENTAS", "NOMBRAMIENTO_AUDITOR", "DELEGACION_FACULTADES"];
 
+/**
+ * La 4ª que solo existía en ARGA, y va aparte de `MATERIAS_NUEVAS` **porque su
+ * mayoría es otra**: las tres de arriba se adoptan por la cláusula general del
+ * art. 30.1 y ésta por los 2/3 del art. 30.2.a) — y encima por subsunción
+ * etiquetada. Meterla en la misma lista habría convertido las aserciones del
+ * art. 30.1 en un filtro que ya no distingue nada.
+ */
+const MATERIA_ESTATUTOS = "MODIFICACION_ESTATUTOS";
+
 type MayoriaSL = { fuente?: string; formula?: string; referencia?: string; baseComputo?: string };
 type PackPayload = { materia?: string; votacion?: { mayoria?: { SL?: MayoriaSL } } };
 
 describe("C1 — los acuerdos de la Junta (módulo puro)", () => {
-  it("son 9, no 10: el punto bloqueado sigue en el orden del día pero no produce acuerdo", () => {
-    expect(puntosConAcuerdo()).toHaveLength(9);
+  it("son 10: el punto 1.1 se desbloqueó y ya no queda ningún punto decisorio sin acuerdo", () => {
+    // Task 6 lo dejaba en 9. Este 10 NO es «actualizar un número»: el punto 1.1
+    // pasó a tener regla el 2026-08-30, y lo que este caso fija es que ya no
+    // existe la categoría «punto que se delibera y no produce acuerdo».
+    expect(puntosConAcuerdo()).toHaveLength(10);
     expect(puntosQueMaterializan()).toHaveLength(10);   // el contrato de Task 4 no se toca
-    const bloqueado = ORDEN_DEL_DIA.find((p) => p.numero === PUNTO_BLOQUEADO)!;
-    expect(bloqueado.materia).toBe("MODIFICACION_ESTATUTOS");
-    expect(bloqueado.materializa).toBe(true);           // se deliberó
-    expect(puntosConAcuerdo().map((p) => p.materia)).not.toContain("MODIFICACION_ESTATUTOS");
-    // La razón se escribe: el art. 36 no consta y la mayoría del 30.2.f está tasada.
-    expect(NOTA_PUNTO_BLOQUEADO).toContain("art. 36");
-    expect(NOTA_PUNTO_BLOQUEADO).toContain("30.2.f");
-    expect(NOTA_PUNTO_BLOQUEADO).toContain("Comité Legal");
+    expect(ORDEN_DEL_DIA).toHaveLength(14);             // ni el de las 14 entradas
+    expect(puntosConAcuerdo().map((p) => p.numero)).toEqual(puntosQueMaterializan().map((p) => p.numero));
+    const uno = ORDEN_DEL_DIA.find((p) => p.numero === "1.1")!;
+    expect(uno.materia).toBe(MATERIA_ESTATUTOS);
+    expect(uno.materializa).toBe(true);
+    expect(puntosConAcuerdo().map((p) => p.materia)).toContain(MATERIA_ESTATUTOS);
   });
 
-  it("los 9 son exactamente las 6 materias SLP más las 3 que solo existían en ARGA", () => {
+  it("la mayoría del 1.1 va etiquetada INFERIDO y arrastra su lectura alternativa", () => {
+    // La aserción que impide que la subsunción se presente mañana como cita.
+    const sub = subsuncionDe("1.1")!;
+    expect(sub).toBe(SUBSUNCION_ART36);
+    expect(sub.procedencia).toBe("INFERIDO");
+    expect(sub.decididoPor).toContain("2026-08-30");
+    // Qué regula el art. 36, y de dónde se sabe: BORME 338618/2026 (I/A 960).
+    expect(sub.objeto).toContain("plazo de duración de los administradores");
+    expect(sub.objeto).toContain("338618");
+    // La lectura aplicada y la ALTERNATIVA, las dos, dentro del registro.
+    expect(sub.lecturaAplicada).toContain("30.2.a");
+    expect(sub.lecturaAlternativa).toContain("30.2.f");
+    expect(sub.lecturaAlternativa).toContain("30.1");
+    expect(sub.registroCanonico).toBe("docs/legal/2026-08-30-modificacion-art-36-mayoria-aplicada.md");
+    // Y la consecuencia que NO se aplicó queda nombrada: bajo la lectura
+    // aplicada, el art. 39.5.b.i arrastraría el informe preceptivo. El gate demo
+    // no se amplía sobre algo inferido, y eso se dice en vez de callarse.
+    expect(sub.consecuenciaNoAplicada).toContain("39.5.b.i");
+    // Los otros nueve resuelven por cita directa: una subsunción vacía en todos
+    // haría que esta etiqueta no distinguiera nada.
+    for (const p of puntosConAcuerdo().filter((x) => x.numero !== "1.1")) {
+      expect(subsuncionDe(p.numero)).toBeNull();
+    }
+  });
+
+  it("los 10 son las 6 materias SLP, las 3 del art. 30.1 y la modificación de estatutos", () => {
     expect(puntosConAcuerdo().map((p) => p.materia).sort())
-      .toEqual([...MATERIAS_SLP, ...MATERIAS_NUEVAS].sort());
+      .toEqual([...MATERIAS_SLP, ...MATERIAS_NUEVAS, MATERIA_ESTATUTOS].sort());
   });
 
   it("el ordinal es la posición en la convocatoria, con huecos donde no hay acuerdo", () => {
-    // 1 (bloqueado), 6, 9, 10 (sin materia) y 14 (acta) NO aparecen: no se
-    // renumera, porque el ordinal apunta al elemento del array de la convocatoria.
+    // 6, 9, 10 (sin materia) y 14 (acta) NO aparecen: no se renumera, porque el
+    // ordinal apunta al elemento del array de la convocatoria. El 1 ya SÍ está:
+    // es el punto 1.1, primer elemento del orden del día.
     expect(puntosConAcuerdo().map((p) => ordinalEnOrdenDelDia(p.numero)))
-      .toEqual([2, 3, 4, 5, 7, 8, 11, 12, 13]);
+      .toEqual([1, 2, 3, 4, 5, 7, 8, 11, 12, 13]);
     expect(ordinalEnOrdenDelDia("1.1")).toBe(1);
     expect(ordinalEnOrdenDelDia("acta")).toBe(ORDEN_DEL_DIA.length);
     expect(() => ordinalEnOrdenDelDia("99")).toThrow(/no está en el orden del día/);
   });
 
-  it("los 9 tienen texto, y el INFERIDO no identifica a ninguna persona del acta", () => {
+  it("el texto del 1.1 dice lo acreditado y NO reconstruye la disposición transitoria", () => {
+    const t = textoAcuerdo("1.1");
+    // ACREDITADO por dos vías: el BORME y el cotejo del Comité Legal de 2026-08-05.
+    expect(t.contenido).toBe("ACREDITADO");
+    expect(t.decision).toContain("artículo 36");
+    expect(t.decision).toContain("338618/2026");
+    expect(t.decision).toContain("seis años");
+    // El título del punto enuncia una transitoria de conversión a Consejo que la
+    // fuente no acredita: el texto la nombra como no acreditada en vez de
+    // inventarle contenido.
+    expect(t.decision).toContain("no acredita");
+    expect(t.decision).toContain("no la reconstruye");
+    // Y la etiqueta de la mayoría viaja también en el texto que lee el abogado.
+    expect(t.decision).toContain("INFERIDO");
+    expect(t.decision).toContain("30.2.a");
+  });
+
+  it("los 10 tienen texto, y el INFERIDO no identifica a ninguna persona del acta", () => {
     const personas = [...SOCIOS_PRESENCIALES, MESA_PRESIDENTA, MESA_SECRETARIO, REPRESENTANTE_UNICO];
     for (const p of puntosConAcuerdo()) {
       const t = textoAcuerdo(p.numero);
@@ -626,6 +679,55 @@ describe("C1 — los acuerdos de la Junta (módulo puro)", () => {
     expect(ce.contenido_acuerdo).toBe("INFERIDO");
   });
 
+  it("el acuerdo del 1.1 lleva la subsunción dentro, y los demás no la llevan", () => {
+    const punto = puntosConAcuerdo().find((p) => p.numero === "1.1")!;
+    const packEstatutos: PackResuelto = {
+      packId: "GARR_MODIFICACION_ESTATUTOS",
+      version: "1.0.0",
+      materia: MATERIA_ESTATUTOS,
+      mayoriaSL: {
+        fuente: "ESTATUTOS",
+        formula: "favor >= 2/3_votos_totales",
+        referencia: "art. 30.2.a) Estatutos",
+      },
+    };
+    const fila = buildAgreementRow({
+      meetingId: "m-1", bodyId: "b-1", agendaItemId: "ai-1", punto,
+      clase: { materia: MATERIA_ESTATUTOS, matter_class: "ESTATUTARIA", inscribable: true },
+      pack: packEstatutos,
+    });
+    expect(fila.matter_class).toBe("ESTATUTARIA");
+    expect(fila.inscribable).toBe(true);
+    // La cita de la mayoría se copia del pack: si el pack cambiara a la lectura
+    // alternativa (art. 30.1), el acuerdo la seguiría sin tocar el seed.
+    expect(fila.statutory_basis).toBe("art. 30.2.a) Estatutos");
+    expect(fila.statutory_basis).not.toMatch(/LSC/);
+    const ce = fila.compliance_explain.c1_junta_socios_2026 as {
+      subsuncion?: { procedencia?: string; lecturaAlternativa?: string };
+      mayoria: { fuente: string };
+      required_majority_code: { valor: null; motivo: string };
+    };
+    expect(ce.subsuncion?.procedencia).toBe("INFERIDO");
+    expect(ce.subsuncion?.lecturaAlternativa).toContain("30.2.f");
+    expect(ce.mayoria.fuente).toBe("ESTATUTOS");
+    // NULL también aquí, y por un motivo distinto al de los otros nueve: la
+    // escalera sí sabe decir «dos tercios», pero escribirlo presentaría como
+    // firme una mayoría que se aplica por subsunción etiquetada.
+    expect(ce.required_majority_code.valor).toBeNull();
+    expect(ce.required_majority_code.motivo).toContain("REFORZADA_2_3");
+    expect(ce.required_majority_code.motivo).toContain("SUBSUNCIÓN");
+
+    // Control: un acuerdo cuya regla sale de una cita directa NO lleva la clave.
+    // Sin esto, «la subsunción está» no distinguiría de «se pinta siempre».
+    const otro = puntosConAcuerdo().find((p) => p.materia === "APROBACION_CUENTAS")!;
+    const filaOtro = buildAgreementRow({
+      meetingId: "m-1", bodyId: "b-1", agendaItemId: "ai-2", punto: otro,
+      clase: { materia: "APROBACION_CUENTAS", matter_class: "ORDINARIA", inscribable: false },
+      pack: packDe("APROBACION_CUENTAS"),
+    });
+    expect("subsuncion" in (filaOtro.compliance_explain.c1_junta_socios_2026 as object)).toBe(false);
+  });
+
   it("el acuerdo se niega a que le crucen la clase o el pack de otra materia", () => {
     const punto = puntosConAcuerdo().find((p) => p.materia === "APROBACION_CUENTAS")!;
     const base = {
@@ -642,7 +744,7 @@ describe("C1 — los acuerdos de la Junta (módulo puro)", () => {
   });
 });
 
-describe("C1 — los 9 acuerdos de la Junta en Cloud", () => {
+describe("C1 — los 10 acuerdos de la Junta en Cloud", () => {
   let garr: SupabaseClient;
   let arga: SupabaseClient;
   let meetingId: string | null = null;
@@ -686,12 +788,13 @@ describe("C1 — los 9 acuerdos de la Junta en Cloud", () => {
   // error de login, son consultas que devuelven vacío y aserciones que fallan
   // en un fichero que no ha hecho nada mal.
 
-  it("hay 9 acuerdos, son los 9 puntos con materia y ninguno es la modificación bloqueada", () => {
-    expect(acuerdos).toHaveLength(9);
+  it("hay 10 acuerdos, son los 10 puntos con materia e incluyen la modificación del art. 36", () => {
+    expect(acuerdos).toHaveLength(10);
     expect(acuerdos.map((a) => a.agreement_kind).sort())
       .toEqual(puntosConAcuerdo().map((p) => p.materia).sort());
-    // El control que importa: el punto 1.1 NO produjo acuerdo.
-    expect(acuerdos.map((a) => a.agreement_kind)).not.toContain("MODIFICACION_ESTATUTOS");
+    // El punto 1.1 SÍ produce acuerdo desde Task 6-bis. Lo que sigue sin poder
+    // pasar es que aparezca sin regla del tenant: eso lo cierra el caso del pack.
+    expect(acuerdos.map((a) => a.agreement_kind)).toContain(MATERIA_ESTATUTOS);
     expect(acuerdos.every((a) => a.adoption_mode === "MEETING")).toBe(true);
     expect(acuerdos.every((a) => a.status === "ADOPTED")).toBe(true);
     expect(acuerdos.every((a) => String(a.decision_date).slice(0, 10) === FECHA_JUNTA)).toBe(true);
@@ -705,7 +808,7 @@ describe("C1 — los 9 acuerdos de la Junta en Cloud", () => {
       .select("materia, matter_class, inscribable")
       .in("materia", acuerdos.map((a) => a.agreement_kind));
     expect(error).toBeNull();
-    expect(data).toHaveLength(9);
+    expect(data).toHaveLength(10);
     for (const c of data!) {
       const a = acuerdos.find((x) => x.agreement_kind === c.materia)!;
       expect([a.agreement_kind, a.matter_class, a.inscribable])
@@ -719,7 +822,7 @@ describe("C1 — los 9 acuerdos de la Junta en Cloud", () => {
       .select("id, order_number, title, kind, matter_code, tenant_id, source_convocatoria_id")
       .eq("meeting_id", meetingId);
     expect(error).toBeNull();
-    expect(items).toHaveLength(9);
+    expect(items).toHaveLength(10);
     expect(items!.every((i) => i.tenant_id === GARRIGUES_TENANT)).toBe(true);
     expect(items!.every((i) => i.kind === "DECISORIO")).toBe(true);
     // El vínculo por FK a la convocatoria no se escribe: está en BORRADOR y el
@@ -738,12 +841,12 @@ describe("C1 — los 9 acuerdos de la Junta en Cloud", () => {
       expect(item!.matter_code).toBe(a.agreement_kind);
     }
     // Y es 1:1 — dos acuerdos sobre el mismo punto serían el mismo acuerdo.
-    expect(new Set(acuerdos.map((a) => a.agenda_item_id)).size).toBe(9);
+    expect(new Set(acuerdos.map((a) => a.agenda_item_id)).size).toBe(10);
   });
 
   it("cada acuerdo resuelve al pack POR MATERIA del tenant Garrigues, no al de órgano", async () => {
     // Sin esto el bucle de abajo no itera y el caso pasa en vacío.
-    expect(acuerdos).toHaveLength(9);
+    expect(acuerdos).toHaveLength(10);
     const { data: packs, error } = await garr.from("rule_packs")
       .select("id, materia, organo_tipo, tenant_id, rule_pack_versions!inner(version, is_active)")
       .eq("rule_pack_versions.is_active", true);
@@ -815,6 +918,62 @@ describe("C1 — los 9 acuerdos de la Junta en Cloud", () => {
     expect(garrVe ?? []).toHaveLength(0);
   });
 
+  it("la modificación de estatutos va por los 2/3 del art. 30.2.a), no por el 199.a LSC de ARGA", async () => {
+    // La arista, no el rótulo: la mayoría que enseña el acuerdo tiene que venir
+    // del pack del tenant. Si dejara de leerse y resolviera al homónimo de ARGA,
+    // la referencia sería «art. 199.a LSC» (mayoría simple del capital) y este
+    // caso caería por los dos lados.
+    const { data, error } = await garr.from("rule_packs")
+      .select("id, materia, tenant_id, rule_pack_versions!inner(payload, is_active)")
+      .eq("materia", MATERIA_ESTATUTOS)
+      .eq("rule_pack_versions.is_active", true);
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1);
+    expect(data![0].id).toBe("GARR_MODIFICACION_ESTATUTOS");
+    expect(data![0].tenant_id).toBe(GARRIGUES_TENANT);
+    const payload = data![0].rule_pack_versions[0].payload as PackPayload & {
+      reglaEspecifica?: { subsuncionArt36?: Record<string, string> };
+    };
+    const sl = payload?.votacion?.mayoria?.SL ?? {};
+    expect(sl.fuente).toBe("ESTATUTOS");
+    expect(sl.referencia).toContain("30.2.a");
+    expect(sl.referencia).not.toMatch(/LSC/);
+    expect(String(sl.formula)).toContain("2/3");
+
+    // La etiqueta INFERIDO y la lectura alternativa viajan DENTRO del pack: es
+    // el segundo de los tres sitios (módulo, pack y docs/legal).
+    const sub = payload?.reglaEspecifica?.subsuncionArt36 ?? {};
+    expect(sub.procedencia).toBe("INFERIDO");
+    expect(sub.lecturaAplicada).toBe(SUBSUNCION_ART36.lecturaAplicada);
+    expect(sub.lecturaAlternativa).toBe(SUBSUNCION_ART36.lecturaAlternativa);
+    expect(sub.objeto).toContain("338618");
+
+    // Y el acuerdo copia esa cita, que es lo que hace de esto una arista.
+    const a = acuerdos.find((x) => x.agreement_kind === MATERIA_ESTATUTOS)!;
+    expect(a.rule_pack_id).toBe("GARR_MODIFICACION_ESTATUTOS");
+    expect(a.statutory_basis).toBe(sl.referencia);
+    expect(a.matter_class).toBe("ESTATUTARIA");
+    expect(a.inscribable).toBe(true);
+    const ce = (a.compliance_explain?.c1_junta_socios_2026 ?? {}) as {
+      subsuncion?: Record<string, string>;
+    };
+    expect(ce.subsuncion?.procedencia).toBe("INFERIDO");
+    expect(ce.subsuncion?.lecturaAlternativa).toContain("30.2.f");
+
+    // Control discriminante: el homónimo de ARGA existe, dice otra cosa y
+    // Garrigues no lo ve.
+    const { data: deArga } = await arga.from("rule_packs")
+      .select("id, tenant_id, rule_pack_versions!inner(payload, is_active)")
+      .eq("id", MATERIA_ESTATUTOS)
+      .eq("rule_pack_versions.is_active", true);
+    expect(deArga).toHaveLength(1);
+    const slArga = (deArga![0].rule_pack_versions[0].payload as PackPayload)?.votacion?.mayoria?.SL ?? {};
+    expect(slArga.referencia).toContain("199");
+    expect(String(slArga.referencia)).not.toContain("30.2.a");
+    const { data: garrVeArga } = await garr.from("rule_packs").select("id").eq("id", MATERIA_ESTATUTOS);
+    expect(garrVeArga ?? []).toHaveLength(0);
+  });
+
   it("el gate del informe preceptivo dispara en 4 acuerdos y solo en esos 4", async () => {
     const { data: reqs, error } = await garr.from("agreement_document_requirements")
       .select("agreement_id, requirement_code, blocking_policy, fase, title, legal_basis")
@@ -823,10 +982,19 @@ describe("C1 — los 9 acuerdos de la Junta en Cloud", () => {
     expect(error).toBeNull();
     const conGate = new Set(reqs!.map((r) => acuerdos.find((a) => a.id === r.agreement_id)!.agreement_kind));
     expect(conGate).toEqual(CON_GATE);
-    // Y NO dispara en los otros 5: sin esta línea, «el gate funciona» solo
-    // significaría «el panel se pinta siempre».
-    expect(reqs).toHaveLength(4);
-    expect(acuerdos.filter((a) => !CON_GATE.has(a.agreement_kind))).toHaveLength(5);
+    // Y NO dispara en los demás: sin esta línea, «el gate funciona» solo
+    // significaría «el panel se pinta siempre». El número de acuerdos sin gate
+    // se DERIVA (era 5 con 9 acuerdos, es 6 con 10): pinarlo a mano lo habría
+    // convertido en inventario, y volvería a romperse al siguiente acuerdo.
+    expect(reqs).toHaveLength(CON_GATE.size);
+    const sinGate = acuerdos.filter((a) => !CON_GATE.has(a.agreement_kind));
+    expect(sinGate).toHaveLength(acuerdos.length - CON_GATE.size);
+    expect(sinGate.length).toBeGreaterThan(0);
+    // El décimo acuerdo entra por aquí: bajo la lectura aplicada del art. 30.2.a)
+    // el art. 39.5.b.i lo llevaría al informe preceptivo, pero el gate demo NO se
+    // amplía sobre una subsunción etiquetada INFERIDO. Si alguien lo añade al
+    // config del órgano, esta línea cae y hay que ir al Comité Legal, no al test.
+    expect(sinGate.map((a) => a.agreement_kind)).toContain(MATERIA_ESTATUTOS);
     // Las columnas reales son `blocking_policy` y `fase`, no `blocking`/`phase`.
     expect(reqs!.every((r) => r.blocking_policy === "BLOCKING" && r.fase === "PRE_CONVOCATORIA")).toBe(true);
     // El copy nombra al órgano informante y su artículo.

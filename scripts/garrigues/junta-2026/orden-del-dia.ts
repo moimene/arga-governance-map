@@ -338,31 +338,87 @@ export function convocatoriaText(): string {
 // ─────────────────────────────────────────── Task 6: los acuerdos y su regla ──
 
 /**
- * El punto 1.1 **no materializa acuerdo**, y no es una omisión: está bloqueado.
+ * El punto 1.1 estuvo bloqueado en Task 6 y **dejó de estarlo el 2026-08-30**.
  *
- * El acuerdo real modificó el **artículo 36** de los Estatutos, y ese artículo
- * **no existe en el texto entregado**: la numeración salta de 35 a 37. Además, la
- * mayoría reforzada de 2/3 del art. 30.2.f) está tasada para la modificación de
- * **quince artículos enumerados** (1, 2, 9, 10, 11, 12, 13, 17, 18, 19, 20, 21,
- * 26, 42 y 47) — no hay categoría abstracta de «artículos nucleares» a la que
- * adscribir el 36. Sin artículo que cotejar no hay mayoría que citar, y afirmar
- * una sería inventarla.
+ * Task 6 no lo materializó por dos motivos, y hoy ninguno de los dos se sostiene:
  *
- * El punto sigue **en el orden del día** (`materializa: true` no se toca: es el
- * contrato de Task 4 y el punto se deliberó). Lo que no existe es su acuerdo.
- * Desbloquearlo es dictamen del Comité Legal, no seed.
+ *  1. *«El art. 36 no consta en el texto entregado; la numeración salta de 35 a
+ *     37.»* **Falso, y se pudo comprobar sin fuente nueva.** El cotejo del Comité
+ *     Legal sobre el texto vigente
+ *     (`docs/legal/2026-08-04-decisiones-comite-legal-slp-garrigues.md`, apartado
+ *     del 2026-08-05) dice literalmente: «Mandato administradores (art. 36, Insc.
+ *     960ª): 6 años reelegibles», que además cuadra con el mandato de Vives
+ *     30/06/2026 → 30/06/2032. Y el BORME lo corrobora por segunda vía: anuncio
+ *     338618/2026, I/A 960, «se modifica el artículo 36 … por el cambio del plazo
+ *     de duración de los administradores».
+ *  2. *«Sin artículo que cotejar no hay mayoría que citar.»* Eso sí era cierto: la
+ *     mayoría no salía de una cita. **Sigue sin salir de una cita** — sale de una
+ *     SUBSUNCIÓN decidida por el usuario, y por eso va etiquetada. Ver
+ *     `SUBSUNCION_ART36`.
+ *
+ * Lo que cambió no es el dato: es que ahora hay una decisión, y está fechada,
+ * atribuida y contrastable, con su lectura alternativa al lado.
  */
-export const PUNTO_BLOQUEADO = "1.1";
-
-export const NOTA_PUNTO_BLOQUEADO =
-  "Punto deliberado sin acuerdo materializado: modifica el art. 36 de los Estatutos, artículo que no consta en el texto entregado (la secuencia salta de 35 a 37), y la mayoría reforzada del art. 30.2.f) está tasada para quince artículos enumerados entre los que no figura. Pendiente de dictamen del Comité Legal.";
+export type Subsuncion = {
+  /** NO es `Fuente` (tipo cerrado, sin 'INFERIDO'): lo inferido es la subsunción. */
+  procedencia: "INFERIDO";
+  decididoPor: string;
+  objeto: string;
+  lecturaAplicada: string;
+  lecturaAlternativa: string;
+  efectoSiSeRevisa: string;
+  consecuenciaNoAplicada: string;
+  registroCanonico: string;
+};
 
 /**
- * Los 9 puntos que SÍ producen un `agreements` en Task 6: los 10 que
- * materializan menos el bloqueado. **9, no 10.**
+ * La subsunción del punto 1.1 en el art. 30.2.a), **etiquetada `INFERIDO`**.
+ *
+ * Copia fiel de `reglaEspecifica.subsuncionArt36` del pack
+ * `GARR_MODIFICACION_ESTATUTOS` (migración `20260830120000`). Se duplica aquí a
+ * propósito: el pack la lleva al dato y este módulo la lleva al
+ * `compliance_explain` del acuerdo, que es lo que la ficha enseña. La sonda
+ * contrasta las dos copias, así que una divergencia se ve.
+ *
+ * **La `fuente` de la mayoría es `ESTATUTOS` y eso es correcto** — la mayoría sale
+ * de los Estatutos. Lo `INFERIDO` es el paso de razonamiento que lleva ESTE
+ * acuerdo a ESE artículo, y por eso vive en su propia clave.
  */
-export const puntosConAcuerdo = (): PuntoOrdenDia[] =>
-  puntosQueMaterializan().filter((p) => p.numero !== PUNTO_BLOQUEADO);
+export const SUBSUNCION_ART36: Subsuncion = {
+  procedencia: "INFERIDO",
+  decididoPor: "el usuario, 2026-08-30",
+  objeto:
+    "el art. 36 regula el plazo de duración de los administradores (BORME 338618/2026, I/A 960; y cotejo del Comité Legal de 2026-08-05: mandato de 6 años reelegibles)",
+  lecturaAplicada:
+    "El art. 30.2.a) —nombramiento, reelección y separación de los administradores— alcanza a modificar el artículo que regula su plazo, de modo que la modificación del art. 36 se adopta por la mayoría reforzada de 2/3.",
+  lecturaAlternativa:
+    "el art. 30.2.f) tasa quince artículos (1, 2, 9, 10, 11, 12, 13, 17, 18, 19, 20, 21, 26, 42 y 47) y el 36 no figura; por esa vía la modificación iría por la mayoría general del art. 30.1",
+  efectoSiSeRevisa:
+    "Si el Comité Legal acoge la lectura alternativa, cambia la mayoría de este pack (2/3 → art. 30.1) y decae el perímetro del art. 39.5.b.i para este acuerdo. No hay captura emitida que rectificar: la ficha enseña las dos lecturas.",
+  consecuenciaNoAplicada:
+    "Bajo la lectura aplicada, el art. 39.5.b.i llevaría este acuerdo al informe preceptivo del Consejo de Socios. El gate demo NO se amplía sobre una subsunción INFERIDA: su config son 4 materias FIRMES y sigue disparando en 4.",
+  registroCanonico: "docs/legal/2026-08-30-modificacion-art-36-mayoria-aplicada.md",
+};
+
+/** Los puntos cuyo contenido descansa en una subsunción etiquetada, por número. */
+export const SUBSUNCION_POR_PUNTO: Record<string, Subsuncion> = {
+  "1.1": SUBSUNCION_ART36,
+};
+
+/** La subsunción del punto, o `null` si su regla sale de una cita directa. */
+export const subsuncionDe = (numero: string): Subsuncion | null =>
+  SUBSUNCION_POR_PUNTO[numero] ?? null;
+
+/**
+ * Los puntos que producen un `agreements`. **Hoy son los 10 que materializan**:
+ * desde que cayó el bloqueo del 1.1 no hay ninguno excluido.
+ *
+ * No se colapsa contra `puntosQueMaterializan` aunque devuelvan lo mismo: son dos
+ * preguntas distintas —«¿está en el orden del día como decisorio?» y «¿tiene
+ * acuerdo en el expediente?»— y la segunda ya divergió una vez. Mantenerla
+ * separada es lo que permitió bloquear y desbloquear sin tocar Task 4.
+ */
+export const puntosConAcuerdo = (): PuntoOrdenDia[] => puntosQueMaterializan();
 
 /**
  * Ordinal 1-based del punto dentro de `ORDEN_DEL_DIA`.
@@ -388,11 +444,11 @@ export function ordinalEnOrdenDelDia(numero: string): number {
  * Texto del acuerdo por punto.
  *
  * `contenido` califica **el contenido del acuerdo**, no su redacción: ningún
- * literal del certificado obra en el repo, así que los 9 textos son
+ * literal del certificado obra en el repo, así que todos los textos son
  * reconstrucción y todos lo dicen.
  *
  *  - `ACREDITADO` — lo decidido consta en fuente externa (tabla vinculante del
- *    plan, confirmada por BORME para 1.2, 6 y 10; art. 31.3 de los Estatutos
+ *    plan, confirmada por BORME para 1.1, 1.2, 6 y 10; art. 31.3 de los Estatutos
  *    para el 12).
  *  - `INFERIDO` — el certificado recoge el punto pero no lo que se decidió.
  *    Estos textos **no identifican a ninguna persona**: nombrar a un socio
@@ -409,6 +465,17 @@ const DISCLAIMER =
   "Reconstrucción demo sin efecto jurídico: el certificado del acta no transcribe el literal del acuerdo.";
 
 export const TEXTOS_ACUERDO: Record<string, TextoAcuerdo> = {
+  "1.1": {
+    // ACREDITADO por dos vías independientes: el BORME (qué artículo y qué
+    // regula) y el cotejo del Comité Legal de 2026-08-05 (el plazo: 6 años).
+    // Lo que NO está acreditado es la disposición transitoria que enuncia el
+    // título del punto, y el texto lo dice en vez de reconstruirla.
+    contenido: "ACREDITADO",
+    propuesta:
+      "Modificar el artículo 36 de los Estatutos Sociales, que regula el plazo de duración del cargo de administrador, fijándolo en seis años reelegibles.",
+    decision:
+      `Se acuerda modificar el artículo 36 de los Estatutos Sociales, relativo al plazo de duración del cargo de administrador, que queda fijado en seis años reelegibles. La modificación quedó inscrita el 13 de julio de 2026 (BORME, anuncio 338618/2026, inscripción 960 de la hoja M-190538). El orden del día enuncia además una disposición transitoria de conversión a Consejo de Administración que la fuente disponible no acredita, y este texto no la reconstruye. La mayoría aplicada es la reforzada de dos tercios del artículo 30.2.a de los Estatutos, por subsunción etiquetada INFERIDO cuya lectura alternativa consta en el expediente. ${DISCLAIMER}`,
+  },
   "1.2": {
     contenido: "ACREDITADO",
     propuesta:
