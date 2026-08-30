@@ -19,11 +19,13 @@ import {
   type SubcaseRegime,
   computeWhistleblowingDeadlines,
   evaluateSubcasePerimeter,
+  ORGANOS_SII_POR_DEFECTO,
   sanitizeMetadata,
   validateCaseCloseoutGuard,
   generateLibroRegistroEntry,
   evaluateAntiRetaliationRisk,
 } from "@/lib/sii/whistleblowing-engine";
+import { SII_ORGANOS_GARRIGUES, SII_TENANT } from "../../scripts/garrigues/sii/canal-interno";
 
 
 
@@ -490,6 +492,10 @@ export function useCreateWhistleblowingReport() {
         affectsICT: payload.affectsICT,
         affectsPersonalData: payload.affectsPersonalData,
         isBoardOrExecutiveTarget: payload.isBoardOrExecutiveTarget,
+        // Los órganos por tenant. El defecto es lo que el motor tenía
+        // cableado, así que ARGA ve exactamente lo mismo que antes; Garrigues
+        // ve los suyos, que además no son colegiados.
+        organos: tenantId === SII_TENANT ? SII_ORGANOS_GARRIGUES : ORGANOS_SII_POR_DEFECTO,
       });
 
       const subcases = perimeter.subcasesToCreate.map((s, idx) => ({

@@ -321,6 +321,31 @@ export interface SubcasePerimeterResult {
  * Evalúa los hechos comunicados y determina qué subexpedientes autónomos
  * deben generarse según los regímenes aplicables (Penal, RGPD, DORA, AIMS, Laboral).
  */
+/**
+ * Órganos que el motor nombra en los subexpedientes. Los valores por defecto
+ * son EXACTAMENTE los que el motor tenía cableados, así que quien no los pase
+ * ve lo mismo de siempre — ARGA incluida.
+ *
+ * Existen porque no son universales: «Comité de Cumplimiento» y «Comisión de
+ * Auditoría y Control» son órganos de una aseguradora, y hay tenants donde no
+ * existen. En un despacho, el Responsable del SII es un órgano UNIPERSONAL, y
+ * llamarlo comisión cambia quién responde.
+ */
+export interface OrganosSii {
+  /** Destinatario del subexpediente penal. */
+  readonly comiteCumplimientoPenal: string;
+  /** Destinatario del subexpediente de cumplimiento general. */
+  readonly comiteCumplimiento: string;
+  /** A quién se asigna la tramitación cuando afecta a la alta dirección. */
+  readonly organoEscalado: string;
+}
+
+export const ORGANOS_SII_POR_DEFECTO: OrganosSii = {
+  comiteCumplimientoPenal: "Comité de Cumplimiento / Posible Remisión Fiscalía",
+  comiteCumplimiento: "Comité de Cumplimiento",
+  organoEscalado: "la Presidencia de la Comisión de Auditoría y Control",
+};
+
 export function evaluateSubcasePerimeter(params: {
   category: string;
   summary: string;
@@ -329,7 +354,9 @@ export function evaluateSubcasePerimeter(params: {
   affectsICT?: boolean;
   affectsPersonalData?: boolean;
   isBoardOrExecutiveTarget?: boolean;
+  organos?: OrganosSii;
 }): SubcasePerimeterResult {
+  const organos = params.organos ?? ORGANOS_SII_POR_DEFECTO;
   const text = `${params.category} ${params.summary} ${params.detailedDescription}`.toLowerCase();
   const subcases: SubcasePerimeterResult["subcasesToCreate"] = [];
 
@@ -351,7 +378,7 @@ export function evaluateSubcasePerimeter(params: {
     subcases.push({
       regime: "PENAL_31BIS",
       label: "Subexpediente de Responsabilidad Penal Corporativa (Art. 31 bis CP)",
-      authorityTarget: "Comité de Cumplimiento / Posible Remisión Fiscalía",
+      authorityTarget: organos.comiteCumplimientoPenal,
       ownerRole: "Responsable de Cumplimiento Penal",
       reason: "Hechos con posibles indicios de tipología penal corporativa o corrupción.",
     });
@@ -451,7 +478,7 @@ export function evaluateSubcasePerimeter(params: {
     subcases.push({
       regime: "COMPLIANCE_GENERAL",
       label: "Subexpediente de Cumplimiento Normativo General",
-      authorityTarget: "Comité de Cumplimiento",
+      authorityTarget: organos.comiteCumplimiento,
       ownerRole: "Responsable del Sistema Interno de Información",
       reason: "Investigación ordinaria del Sistema Interno de Información.",
     });
@@ -531,14 +558,18 @@ export interface ConflictEvaluationResult {
  */
 export function evaluateConflictOfInterest(
   investigator: { id: string; name: string; department: string; isBoardLevel?: boolean },
-  caseContext: { targetDepartment?: string; targetPersonName?: string; isBoardTarget?: boolean }
+  caseContext: { targetDepartment?: string; targetPersonName?: string; isBoardTarget?: boolean },
+  // Por defecto, exactamente lo que decia antes: quien no lo pase no nota nada.
+  organos: OrganosSii = ORGANOS_SII_POR_DEFECTO,
 ): ConflictEvaluationResult {
   // 1. Conflicto por Alta Dirección / Consejo -> Escalado a Comisión de Auditoría
   if (caseContext.isBoardTarget) {
     return {
       hasConflict: true,
       reason: "CONSEJO_ALTA_DIRECCION",
-      description: "La comunicación afecta a miembros del Consejo de Administración o Alta Dirección. La tramitación debe asignarse a la Presidencia de la Comisión de Auditoría y Control.",
+      description:
+        "La comunicación afecta a miembros del Consejo de Administración o Alta Dirección. " +
+        `La tramitación debe asignarse a ${organos.organoEscalado}.`,
       actionRequired: "ESCALADO_COMITE_AUDITORIA",
     };
   }

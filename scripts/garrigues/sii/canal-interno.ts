@@ -104,3 +104,24 @@ export const SII_ART_25 = {
   rubrica: "Información sobre los canales interno y externo de información",
   norma: "Ley 2/2023, de 20 de febrero",
 } as const;
+
+/**
+ * Los órganos que el motor debe nombrar en el tenant Garrigues.
+ *
+ * Sustituyen a los valores por defecto —«Comité de Cumplimiento», «Presidencia
+ * de la Comisión de Auditoría y Control»—, que son órganos de una aseguradora.
+ * Aquí el Responsable del SII es un **órgano unipersonal**: el Senior Partner
+ * (PI-31 §4). No hay comité que presida nada.
+ *
+ * El escalado no va «al Senior Partner» sin más: la propia política prevé que,
+ * si él está en conflicto, es el **órgano de administración** quien designa a
+ * la persona que resuelve. Eso es lo que se nombra.
+ */
+export const SII_ORGANOS_GARRIGUES = {
+  comiteCumplimientoPenal:
+    "Responsable del SII (Senior Partner) / Posible remisión a Fiscalía",
+  comiteCumplimiento: "Responsable del SII (Senior Partner)",
+  organoEscalado:
+    "el Responsable del SII (Senior Partner) o, si concurre conflicto de interés, " +
+    "a la persona que designe el órgano de administración (PI-31 §4)",
+} as const;
