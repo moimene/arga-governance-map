@@ -6,6 +6,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { MAPA_PENAL, CELDAS_BANDA_ALTA } from "./garrigues/penal/mapa-penal";
 import { CONTROLES_SEGUIMIENTO, SEGUIMIENTO_DESCRIPCION } from "./garrigues/penal/seguimiento-ppd";
+import { codigoHallazgo } from "./garrigues/hallazgos/hallazgos-penales";
 
 const TENANT = "00000000-0000-0000-0000-000000000002";
 const APPLY = process.argv.includes("--apply");
@@ -78,8 +79,12 @@ console.log(`${APPLY ? "APLICADO" : "DRY-RUN"}: ${creados} altas, ${actualizados
 const ORIGEN = "Mapa de riesgos penales evaluado 2025 (áreas de negocio)";
 
 let hallazgos = 0;
-for (const [i, c] of CELDAS_BANDA_ALTA.entries()) {
-  const code = `FND-GARR-PEN-${String(i + 1).padStart(2, "0")}`;
+for (const c of CELDAS_BANDA_ALTA) {
+  // El codigo se deriva de la CELDA (riesgo + area), no de la posicion en el
+  // array: con `i + 1` bastaba reordenar el catalogo para que los ocho
+  // hallazgos cambiaran de celda en silencio, sin tocar codigo y sin que
+  // ningun gate lo notara. Ver garrigues/hallazgos/hallazgos-penales.ts.
+  const code = codigoHallazgo(c);
   const fila = {
     tenant_id: TENANT,
     code,

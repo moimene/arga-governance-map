@@ -129,7 +129,7 @@ export function evaluarConvocatoria(
     ? restarUnMes(input.fechaJunta)
     : restarDias(input.fechaJunta, antelacionDiasRequerida);
 
-  const organoTipoUpper = (input.organoTipo ?? 'JGA').toUpperCase();
+  const organoTipoUpper = (input.organoTipo ?? 'JUNTA_GENERAL').toUpperCase();
   const isJunta = organoTipoUpper === 'JGA' || organoTipoUpper === 'JGE' || organoTipoUpper.includes('JUNTA');
   explainNodes.push(
     createExplainNode(
@@ -413,7 +413,7 @@ function calcularAntelacion(
   organoNoticeDays?: number,
 ): { dias: number; mensual: boolean } {
   // Defaults por órgano cuando no hay pack aplicable.
-  const organoUpper = (organoTipo ?? 'JGA').toUpperCase();
+  const organoUpper = (organoTipo ?? 'JUNTA_GENERAL').toUpperCase();
   const isJunta = organoUpper === 'JGA' || organoUpper === 'JGE' || organoUpper.includes('JUNTA');
   const isConsejo = !isJunta && (organoUpper === 'CDA' || organoUpper.includes('CONSEJO'));
   const isComision = !isJunta && !isConsejo &&

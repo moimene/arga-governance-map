@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   evaluarConstitucion,
   calcularDenominadorAjustado,
-  type ConstitucionOutput,
 } from '../constitucion-engine';
+// `ConstitucionOutput` es público y vive en ../types; constitucion-engine solo
+// lo importa, no lo re-exporta.
 import type {
+  ConstitucionOutput,
   ConstitucionInput,
   RulePack,
   RuleParamOverride,
@@ -24,8 +26,8 @@ describe('constitucion-engine', () => {
       organoTipo: 'JUNTA_GENERAL',
       modosAdopcionPermitidos: ['MEETING'],
       convocatoria: {
-        antelacionDias: { SA: { valor: 15, fuente: 'LEY' }, SL: { valor: 5, fuente: 'LEY' } },
-        canales: { SA: ['BORME'], SL: ['NOTIFICACION'] },
+        antelacionDias: { SA: { valor: 15, fuente: 'LEY' }, SL: { valor: 5, fuente: 'LEY' } , SAU: { valor: 15, fuente: 'LEY' }, SLU: { valor: 5, fuente: 'LEY' }, SLP: { valor: 5, fuente: 'LEY' } },
+        canales: { SA: ['BORME'], SL: ['NOTIFICACION'] , SAU: ['BORME'], SLU: ['NOTIFICACION'], SLP: ['NOTIFICACION'] },
         contenidoMinimo: [],
       },
       constitucion: {

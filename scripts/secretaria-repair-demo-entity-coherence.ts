@@ -140,6 +140,13 @@ function client() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
+// `SupabaseClient` a secas resuelve `Database = unknown`, y con un schema
+// desconocido `.select()` devuelve `GenericStringError[]`: por eso los
+// `as Row[]` de este fichero eran conversiones entre tipos que no se solapan.
+// El tipo se deriva de la fabrica real, que es lo que de verdad circula.
+type Cliente = ReturnType<typeof client>;
+
+
 const SQL_PROBES: Record<string, string> = {
   cross_entity_meeting_agreements: `
 select
@@ -298,16 +305,20 @@ where c.tenant_id = '${DEMO_TENANT}'
   };
 }
 
-async function selectAll(supabase: SupabaseClient, table: string, columns = "*") {
+async function selectAll(supabase: Cliente, table: string, columns = "*") {
   const { data, error } = await supabase
     .from(table)
     .select(columns)
     .eq("tenant_id", DEMO_TENANT);
   if (error) throw new Error(`${table}: ${error.message}`);
-  return (data ?? []) as Row[];
+  // `table` y `columns` son DINAMICOS, asi que PostgREST no puede resolver el
+  // select contra el schema y tipa `data` como `GenericStringError[]`. No es un
+  // defecto del script: es lo que significa consultar una tabla que solo se
+  // conoce en tiempo de ejecucion. La forma la conoce quien llama.
+  return (data ?? []) as unknown as Row[];
 }
 
-async function loadData(supabase: SupabaseClient) {
+async function loadData(supabase: Cliente) {
   const [
     entities,
     capitalProfiles,
@@ -609,7 +620,7 @@ function inferFlows(params: {
 
 function buildReport(
   data: Awaited<ReturnType<typeof loadData>>,
-  mode: "report" | "apply",
+  mode: Report["mode"],
   repairs: string[] = [],
   entityFilterId?: string | null,
 ): Report {
@@ -1084,7 +1095,7 @@ function activeBodyConditionsFor(data: Awaited<ReturnType<typeof loadData>>, bod
 }
 
 async function createMissingCensusSnapshots(
-  supabase: SupabaseClient,
+  supabase: Cliente,
   data: Awaited<ReturnType<typeof loadData>>,
   entityId: string,
   dryRun = false,
@@ -1158,7 +1169,7 @@ async function createMissingCensusSnapshots(
   return repairs;
 }
 
-async function applySafeRepairs(supabase: SupabaseClient, entityId: string, dryRun = false) {
+async function applySafeRepairs(supabase: Cliente, entityId: string, dryRun = false) {
   const repairs: string[] = [];
   let data = await loadData(supabase);
 
@@ -1230,7 +1241,7 @@ async function applySafeRepairs(supabase: SupabaseClient, entityId: string, dryR
   return repairs;
 }
 
-async function safeRepairsForAllEntities(supabase: SupabaseClient, entityIds: string[], dryRun: boolean) {
+async function safeRepairsForAllEntities(supabase: Cliente, entityIds: string[], dryRun: boolean) {
   const repairs: string[] = [];
   for (const entityId of entityIds) {
     const entityRepairs = await applySafeRepairs(supabase, entityId, dryRun);

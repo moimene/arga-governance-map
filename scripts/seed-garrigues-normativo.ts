@@ -41,6 +41,8 @@ import { createClient } from "@supabase/supabase-js";
 import { GARRIGUES_TENANT } from "./garrigues/entities-catalog";
 import { NORMATIVO_CATALOG, type NormativoEntry } from "./garrigues/normativo/catalogo-normativo";
 
+
+
 const SUPABASE_URL =
   process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "https://hzqwefkwsxopwrmtksbg.supabase.co";
 const SERVICE_KEY_NAMES = [
@@ -51,6 +53,18 @@ const SERVICE_KEY_NAMES = [
   "SERVICE_ROLE_KEY", "SERVICE_ROLE_SECRET", "SUPABASE_SERVICE_ROLE", "SB_SERVICE_ROLE_KEY",
 ];
 const SERVICE_KEY = SERVICE_KEY_NAMES.map((n) => process.env[n]).find(Boolean) ?? "";
+
+// El cliente NO esta tipado contra `Database` — ese es un hallazgo abierto del
+// arbol, no algo que se arregle aqui. Lo que si se arregla: los helpers
+// anotaban `ReturnType<typeof createClient>`, que instancia los genericos con
+// sus valores POR DEFECTO (`unknown` / `never`) y no coincide con lo que
+// devuelve la llamada real. Se deriva de la fabrica de verdad, asi que el tipo
+// sigue al codigo aunque cambie la firma de createClient.
+function crearAdmin() {
+  return createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+}
+type AdminClient = ReturnType<typeof crearAdmin>;
+
 const COMMIT = process.argv.includes("--commit");
 
 function fail(msg: string): never {
@@ -138,7 +152,7 @@ const provenanceFor = (e: NormativoEntry) => {
   };
 };
 
-async function resolveOwnerSlugs(admin: ReturnType<typeof createClient>): Promise<Map<string, { id: string; name: string }>> {
+async function resolveOwnerSlugs(admin: AdminClient): Promise<Map<string, { id: string; name: string }>> {
   const slugs = Array.from(new Set(Object.values(OWNER_BY_CODE).map((o) => o.slug)));
   const { data, error } = await admin
     .from("governing_bodies")
@@ -215,7 +229,7 @@ async function main() {
   }
   if (!SERVICE_KEY) fail(`Falta la service-role key (${SERVICE_KEY_NAMES.join(", ")}).`);
 
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+  const admin = crearAdmin();
   const ownerBySlug = await resolveOwnerSlugs(admin);
   const rows = NORMATIVO_CATALOG.map((e) => buildRow(e, ownerBySlug));
 

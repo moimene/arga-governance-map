@@ -1,3 +1,13 @@
+// NOTA (gate de tipos, 2026-08-30): este fichero tenía 18 directivas
+// `@ts-expect-error new column not in generated types yet` sobre `kind` y
+// `kind_resolution`. Se retiran porque estaban SIN USAR — pero NO porque las
+// columnas se hayan añadido a los tipos: `supabaseAdmin` está declarado como
+// `SupabaseClient` **sin el parámetro genérico del esquema**, así que
+// `.insert()` acepta cualquier objeto y aquí no se comprueba ningún nombre de
+// columna. Las directivas vigilaban algo que nunca llegó a vigilarse.
+// (Los tipos generados existen en supabase/functions/_types/database.ts y sí
+// contienen `agenda_items.kind`; simplemente no están cableados a ningún
+// cliente. Eso es hallazgo aparte, no se arregla aquí.)
 // src/test/schema/agenda-item-kind.test.ts
 /**
  * Agenda Item Kind — schema guardrails for migrations
@@ -158,7 +168,6 @@ describe.skipIf(!hasAdminClient())(
           order_number: 1,
           title: `${SENTINEL} — ${kindResolution}`,
           tenant_id: DEMO_TENANT,
-          // @ts-expect-error new column not in generated types yet
           kind: agendaKind,
         })
         .select("id")
@@ -174,7 +183,6 @@ describe.skipIf(!hasAdminClient())(
           agenda_item_index: 1,
           resolution_text: `${SENTINEL} — resolution for ${kindResolution}`,
           status: "ADOPTED",
-          // @ts-expect-error new column not in generated types yet
           kind_resolution: kindResolution,
         });
       expect(errR).toBeNull();
@@ -183,7 +191,6 @@ describe.skipIf(!hasAdminClient())(
       const newKind = agendaKind === "DECISORIO" ? "DELIBERATIVO" : "DECISORIO";
       const { error: errU } = await supabaseAdmin!
         .from("agenda_items")
-        // @ts-expect-error new column not in generated types yet
         .update({ kind: newKind })
         .eq("id", agenda!.id);
 
@@ -293,7 +300,6 @@ describe.skipIf(!hasAdminClient())(
       // 4. Attempt to change agenda kind — must be rejected by T2.
       const { error: errU } = await supabaseAdmin!
         .from("agenda_items")
-        // @ts-expect-error new column not in generated types yet
         .update({ kind: "DECISORIO" })
         .eq("id", agenda!.id);
       expect(errU).not.toBeNull();
@@ -333,7 +339,6 @@ describe.skipIf(!hasAdminClient())(
       // DRAFT meeting + no resolutions => T1 and T2 should let this through.
       const { error: errU } = await supabaseAdmin!
         .from("agenda_items")
-        // @ts-expect-error new column not in generated types yet
         .update({ kind: "DECISORIO" })
         .eq("id", agenda!.id);
       expect(errU).toBeNull();
@@ -392,7 +397,6 @@ describe.skipIf(!hasAdminClient())(
 
       const { error: errU } = await supabaseAdmin!
         .from("agenda_items")
-        // @ts-expect-error new column not in generated types yet
         .update({ kind: "DECISORIO" })
         .eq("id", agenda!.id);
       expect(errU).not.toBeNull();
@@ -449,7 +453,6 @@ describe.skipIf(!hasAdminClient())(
 
       const { error: errU } = await supabaseAdmin!
         .from("agenda_items")
-        // @ts-expect-error new column not in generated types yet
         .update({ kind: "DECISORIO" })
         .eq("id", agenda!.id);
       expect(errU).toBeNull();
@@ -556,7 +559,6 @@ describe.skipIf(!hasAdminClient())(
       // The kind change — triggers T3 INSERT into changelog
       const { error: errU } = await supabaseAdmin!
         .from("agenda_items")
-        // @ts-expect-error new column not in generated types yet
         .update({ kind: "DECISORIO" })
         .eq("id", agenda!.id);
       expect(errU).toBeNull();
@@ -615,7 +617,6 @@ describe.skipIf(!hasAdminClient())(
       // not CLOSED), T3 must skip (status not in CONVOKED/OPEN).
       const { error: errU } = await supabaseAdmin!
         .from("agenda_items")
-        // @ts-expect-error new column not in generated types yet
         .update({ kind: "DECISORIO" })
         .eq("id", agenda!.id);
       expect(errU).toBeNull();
@@ -718,7 +719,6 @@ describe.skipIf(!hasAdminClient())(
             order_number: 1,
             title: `${SENTINEL} — ${agendaKind} / ${kindResolution}`,
             tenant_id: DEMO_TENANT,
-            // @ts-expect-error new column not in generated types yet
             kind: agendaKind,
           });
         expect(errA).toBeNull();
@@ -732,7 +732,6 @@ describe.skipIf(!hasAdminClient())(
             agenda_item_index: 1,
             resolution_text: `${SENTINEL} — ${agendaKind} / ${kindResolution}`,
             status: "ADOPTED",
-            // @ts-expect-error new column not in generated types yet
             kind_resolution: kindResolution,
           });
 
@@ -859,7 +858,6 @@ describe.skipIf(!hasAdminClient())(
           order_number: 1,
           title: `${SENTINEL} — INFORMATIVO agenda`,
           tenant_id: DEMO_TENANT,
-          // @ts-expect-error new column not in generated types yet
           kind: "INFORMATIVO",
         });
       expect(errA).toBeNull();
@@ -904,7 +902,6 @@ describe.skipIf(!hasAdminClient())(
           order_number: 1,
           title: `${SENTINEL} — DECISORIO agenda`,
           tenant_id: DEMO_TENANT,
-          // @ts-expect-error new column not in generated types yet
           kind: "DECISORIO",
         });
       expect(errA).toBeNull();
@@ -949,7 +946,6 @@ describe.skipIf(!hasAdminClient())(
           order_number: 1,
           title: `${SENTINEL} — top-level INFO agenda`,
           tenant_id: DEMO_TENANT,
-          // @ts-expect-error new column not in generated types yet
           kind: "INFORMATIVO",
         });
       expect(errA).toBeNull();
@@ -1074,7 +1070,6 @@ describe.skipIf(!hasAdminClient())(
           order_number: 1,
           title: `${SENTINEL} — junta convocada vicio`,
           tenant_id: DEMO_TENANT,
-          // @ts-expect-error new column not in generated types yet
           kind: "DELIBERATIVO",
         })
         .select("id")
@@ -1120,7 +1115,6 @@ describe.skipIf(!hasAdminClient())(
           order_number: 1,
           title: `${SENTINEL} — junta universal allow`,
           tenant_id: DEMO_TENANT,
-          // @ts-expect-error new column not in generated types yet
           kind: "DELIBERATIVO",
         })
         .select("id")
@@ -1159,7 +1153,6 @@ describe.skipIf(!hasAdminClient())(
           order_number: 1,
           title: `${SENTINEL} — junta draft allow`,
           tenant_id: DEMO_TENANT,
-          // @ts-expect-error new column not in generated types yet
           kind: "DELIBERATIVO",
         })
         .select("id")
@@ -1229,7 +1222,6 @@ describe.skipIf(!hasAdminClient())(
       // Trigger T3 INSERT into changelog
       await supabaseAdmin
         .from("agenda_items")
-        // @ts-expect-error new column not in generated types yet
         .update({ kind: "DECISORIO" })
         .eq("id", agenda!.id);
 

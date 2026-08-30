@@ -77,7 +77,6 @@ function createChallengerMockScope(
 ): SecretariaScopeController {
   return {
     mode,
-    selectedEntityId: "ent-alpha-01",
     selectedEntity: {
       id: "ent-alpha-01",
       name: entityName,
@@ -85,9 +84,9 @@ function createChallengerMockScope(
       legalForm: "SA",
       jurisdiction: "ES",
       status: "ACTIVA",
+      materiality: "Pendiente",
       parentEntityId: null,
       tipoSocial: "SA",
-      tipoOrganoAdmin: "CONSEJO_ADMINISTRACION",
     },
     entities: [
       {
@@ -97,9 +96,9 @@ function createChallengerMockScope(
         legalForm: "SA",
         jurisdiction: "ES",
         status: "ACTIVA",
+        materiality: "Pendiente",
         parentEntityId: null,
         tipoSocial: "SA",
-        tipoOrganoAdmin: "CONSEJO_ADMINISTRACION",
       },
       {
         id: "ent-child-02",
@@ -108,9 +107,9 @@ function createChallengerMockScope(
         legalForm: "SL",
         jurisdiction: "ES",
         status: "ACTIVA",
+        materiality: "Pendiente",
         parentEntityId: "ent-alpha-01",
         tipoSocial: "SL",
-        tipoOrganoAdmin: "ADMINISTRADOR_UNICO",
       },
     ],
     isLoadingEntities: false,
@@ -276,7 +275,6 @@ describe("Milestone 2 — Empirical Challenger Verification Suite", () => {
     it("filters modules based on tenant whitelist", () => {
       const brandingWithOnlySecretaria = {
         nombre: "Secretaría Only Client",
-        // @ts-expect-error test typing
         modules: ["secretaria"],
       };
 

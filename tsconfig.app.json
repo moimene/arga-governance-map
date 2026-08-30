@@ -1,3 +1,16 @@
+// tsconfig.app.json — perímetro de PRODUCCIÓN. Solo `src` sin sus tests.
+//
+// EL GATE REAL ES `bun run typecheck`, que ejecuta `tsc -b` (modo build con
+// referencias). NO uses `bunx tsc --noEmit` ni `tsc -p <config>` como señal
+// verde: el tsconfig.json raíz referencia proyectos y uno suelto no equivale.
+// Esto vivía solo en CLAUDE.md:253, a 250 líneas del fichero que protege.
+//
+// Los tests y `scripts/` NO entran aquí a propósito: tienen su propio proyecto
+// en tsconfig.tests.json, referenciado desde la raíz, para que `tsc -b` los
+// cubra SIN ensanchar el contrato de producción. Si un test necesita una API
+// más moderna, se amplía el `lib` de AQUEL, no el de este: de lo contrario
+// mañana alguien usa esa API en `src/` y compila porque se la habilitó un
+// script.
 {
   "compilerOptions": {
     "allowImportingTsExtensions": true,
@@ -33,6 +46,13 @@
     "src"
   ],
   "exclude": [
+    // "src/test/**" es material de test COMPLETO, no solo los `*.test.*`:
+    // helpers, el preload de JSDOM, el shim de `bun:test` y las declaraciones
+    // ambiente. Sin esta linea entraban 5 ficheros en el proyecto de
+    // PRODUCCION, y uno de ellos —que importa `bun:test`— no compilaba porque
+    // ese alias solo existe en el proyecto de tests. Verificado antes de
+    // excluir: ningun fichero de produccion importa de `src/test/`.
+    "src/test/**",
     "**/__tests__/**",
     "**/*.test.ts",
     "**/*.test.tsx"

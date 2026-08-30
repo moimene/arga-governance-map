@@ -18,7 +18,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { evaluarConvocatoria } from '../convocatoria-engine';
-import type { RulePack, ConvocatoriaInput } from '../types';
+import type { RulePack, ConvocatoriaInput, ReglaConvocatoria } from '../types';
 
 /**
  * createTestPack — mismo helper que convocatoria-engine.test.ts: pack
@@ -37,10 +37,16 @@ function createTestPack(overrides?: Partial<RulePack>): RulePack {
       antelacionDias: {
         SA: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
         SL: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+        SAU: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
+        SLU: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+        SLP: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
       },
       canales: {
         SA: ['BORME', 'WEB_SOCIEDAD'],
         SL: ['BUROFAX', 'EMAIL_CERTIFICADO'],
+        SAU: ['BORME', 'WEB_SOCIEDAD'],
+        SLU: ['BUROFAX', 'EMAIL_CERTIFICADO'],
+        SLP: ['BUROFAX', 'EMAIL_CERTIFICADO'],
       },
       contenidoMinimo: ['Orden del día', 'Lugar', 'Hora', 'Fecha'],
       documentosObligatorios: [
@@ -92,16 +98,22 @@ function createTestPack(overrides?: Partial<RulePack>): RulePack {
 // Fragmento `convocatoria` de GARR_JUNTA_SOCIOS v1.1.0 (SA no cambia en la
 // subida de versión — se conserva por completitud del pack real, aunque este
 // test no lo ejercita).
-const JUNTA_SOCIOS_V110_CONVOCATORIA = {
+const JUNTA_SOCIOS_V110_CONVOCATORIA: ReglaConvocatoria = {
   canales: {
     SA: ['BORME', 'WEB_INSCRITA'],
     SL: ['COMUNICACION_INDIVIDUAL_CON_ACUSE'],
     SLP: ['COMUNICACION_INDIVIDUAL_CON_ACUSE'],
+    // Unipersonales: mismo canal que su tipo de origen. El pack real de
+    // Garrigues es SLP; SAU y SLU estan por completitud del Record.
+    SAU: ['BORME', 'WEB_INSCRITA'],
+    SLU: ['COMUNICACION_INDIVIDUAL_CON_ACUSE'],
   },
   antelacionDias: {
     SA: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
     SL: { valor: 15, fuente: 'ESTATUTOS', referencia: 'arts. 27.4 Estatutos y 176 LSC (supletoria)' },
     SLP: { valor: 15, fuente: 'ESTATUTOS', referencia: 'arts. 27.4 Estatutos y 176 LSC (supletoria)' },
+    SAU: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
+    SLU: { valor: 15, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
   },
   contenidoMinimo: ['Fecha hora y lugar', 'Orden del día', 'Texto íntegro de la propuesta cuando proceda'],
   documentosObligatorios: [
