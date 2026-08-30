@@ -4,6 +4,8 @@ import { useAiIncidentById, useUpdateAiIncident } from "@/hooks/useAiIncidents";
 import { useIncidentRegimes, useUpdateIncidentRegime, useCreateIncidentReport } from "@/hooks/useAimsMultiregime";
 import {
   evaluateMultiregimeIncident,
+  formatDeadline,
+  formatIncidentDate,
   formatRemainingTime,
   RiaIncidentSeverity,
 } from "@/lib/aims/incident-clocks";
@@ -219,7 +221,7 @@ export default function AiIncidenteDetalle() {
               <span>•</span>
               <span className="flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5" />
-                Reportado: {new Date(incident.reported_at).toLocaleDateString("es-ES")}
+                Reportado: {formatIncidentDate(incident.reported_at)}
               </span>
             </div>
             <h1 className="text-2xl font-bold text-[var(--g-text-primary)]">{incident.title}</h1>
@@ -350,7 +352,7 @@ export default function AiIncidenteDetalle() {
             <div className="pt-2 border-t border-[var(--g-border-subtle)] flex justify-between items-center text-xs">
               <span className="text-[var(--g-text-secondary)]">Vencimiento:</span>
               <span className="font-mono font-bold text-[var(--g-text-primary)]">
-                {clocks.ria?.deadlineDate ? new Date(clocks.ria.deadlineDate).toLocaleDateString("es-ES") : "—"}
+                {formatDeadline(clocks.ria?.deadlineDate)}
               </span>
             </div>
           </div>
@@ -386,7 +388,7 @@ export default function AiIncidenteDetalle() {
             <div className="pt-2 border-t border-[var(--g-border-subtle)] flex justify-between items-center text-xs">
               <span className="text-[var(--g-text-secondary)]">Vencimiento 72h:</span>
               <span className="font-mono font-bold text-[var(--g-text-primary)]">
-                {clocks.gdpr?.deadlineDate ? new Date(clocks.gdpr.deadlineDate).toLocaleString("es-ES") : "—"}
+                {formatDeadline(clocks.gdpr?.deadlineDate)}
               </span>
             </div>
           </div>
@@ -426,7 +428,7 @@ export default function AiIncidenteDetalle() {
                   : "Informe inicial (4 h desde clasificación):"}
               </span>
               <span className="font-mono font-bold text-[var(--g-text-primary)]">
-                {clocks.dora?.initialDeadlineDate ? new Date(clocks.dora.initialDeadlineDate).toLocaleString("es-ES") : "—"}
+                {formatDeadline(clocks.dora?.initialDeadlineDate)}
               </span>
             </div>
           </div>
@@ -654,13 +656,13 @@ export default function AiIncidenteDetalle() {
                 <div className="flex justify-between py-1.5 border-b border-[var(--g-border-subtle)]">
                   <span>Fecha Notificación:</span>
                   <span className="font-semibold text-[var(--g-text-primary)]">
-                    {new Date(incident.reported_at).toLocaleDateString("es-ES")}
+                    {formatIncidentDate(incident.reported_at)}
                   </span>
                 </div>
                 <div className="flex justify-between py-1.5">
                   <span>Fecha Cierre:</span>
                   <span className="font-semibold text-[var(--g-text-primary)]">
-                    {incident.closed_at ? new Date(incident.closed_at).toLocaleDateString("es-ES") : "Abierto"}
+                    {incident.closed_at ? formatIncidentDate(incident.closed_at) : "Abierto"}
                   </span>
                 </div>
               </div>
