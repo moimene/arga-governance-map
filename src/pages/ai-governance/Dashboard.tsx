@@ -31,6 +31,9 @@ import {
   type AimsReadinessStatus,
 } from "@/lib/aims/readiness";
 import { useScope } from "@/context/ScopeContext";
+import { useTenantContext } from "@/context/TenantContext";
+import { useBodyBySlug } from "@/hooks/useBodies";
+import { aiGovernanceBodySlug } from "@/lib/aims/governing-body";
 
 const RISK_COLORS: Record<string, string> = {
   Inaceptable: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
@@ -440,6 +443,12 @@ function HandoffAffordances() {
 
 export default function AiDashboard() {
   const { scope } = useScope();
+  // Órgano de gobierno de la IA del tenant. Doble puerta: el mapa no devuelve
+  // slug para un tenant sin órgano declarado, y `useBodyBySlug` filtra por
+  // `tenant_id`, así que tampoco lo encontraría. Si no hay fila, no se pinta
+  // nada — que es lo que corresponde cuando nadie ha constituido el órgano.
+  const { tenantId } = useTenantContext();
+  const { data: aiBody } = useBodyBySlug(aiGovernanceBodySlug(tenantId) ?? undefined);
   const { data: rawSystems = [], isLoading: loadingSystems } = useAiSystemsList();
   const { data: rawIncidents = [], isLoading: loadingIncidents } = useAiIncidentsList();
   const { data: rawAssessments = [], isLoading: loadingAssessments } = useAllAssessments();
@@ -543,6 +552,30 @@ export default function AiDashboard() {
           Sistemas IA, evaluaciones e incidentes materiales. AIMS conserva el alta y actualización; GRC y Secretaría reciben handoffs de solo lectura.
         </p>
       </div>
+
+      {aiBody && (
+        <Link
+          to={`/organos/${aiBody.slug}`}
+          className="mb-6 flex items-center gap-3 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-5 py-3 transition-colors hover:bg-[var(--g-surface-subtle)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center bg-[var(--g-surface-subtle)] text-[var(--g-brand-3308)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <UserCheck className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
+              Órgano de gobierno de la IA
+            </span>
+            <span className="block truncate text-sm font-medium text-[var(--g-text-primary)]">
+              {aiBody.name}
+            </span>
+          </span>
+          <ArrowRight className="h-4 w-4 shrink-0 text-[var(--g-text-secondary)]" />
+        </Link>
+      )}
 
       <section className="mb-6 grid gap-4 xl:grid-cols-[1.2fr_0.9fr]">
         <div
