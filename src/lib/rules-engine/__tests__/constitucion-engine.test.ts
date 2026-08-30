@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   evaluarConstitucion,
   calcularDenominadorAjustado,
-  type ConstitucionOutput,
 } from '../constitucion-engine';
+// `ConstitucionOutput` es público y vive en ../types; constitucion-engine solo
+// lo importa, no lo re-exporta.
 import type {
+  ConstitucionOutput,
   ConstitucionInput,
   RulePack,
   RuleParamOverride,

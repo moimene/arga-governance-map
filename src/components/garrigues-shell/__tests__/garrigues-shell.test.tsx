@@ -136,10 +136,13 @@ describe("Garrigues Shell Architecture & Packaging Tests", () => {
       const all = getEnabledGarriguesModules(null);
       expect(all).toHaveLength(3);
 
+      // `TenantBranding` no declara `modules`, aunque el dato en Cloud sí lo
+      // lleva: es la lista blanca por tenant que lee `isModuleEnabled`. El
+      // shape se declara aquí en vez de disfrazarlo con un cast a un mapa.
       const filtered = getEnabledGarriguesModules({
         nombre: "Test Tenant",
-        modules: ["secretaria", "ai-governance"] as unknown as Record<string, string>,
-      });
+        modules: ["secretaria", "ai-governance"],
+      } as Parameters<typeof getEnabledGarriguesModules>[0]);
       // @ts-expect-error test shape
       const enabled = getEnabledGarriguesModules({ modules: ["secretaria", "ai-governance"] });
       expect(enabled.map((m) => m.id)).toEqual(["secretaria", "ai-governance"]);
