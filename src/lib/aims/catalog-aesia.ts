@@ -8,12 +8,19 @@
  * dice. Se pinta en pantalla.
  *
  * `guideRef` SE HA RETIRADO (2026-09-05). Atribuía a cada requisito un número
- * de Guía AESIA ("Guía 12 AESIA", "Guía 2 AESIA", …) que no se ha podido
- * cotejar contra publicación oficial de la Agencia. Diez de los doce requisitos
- * llevaban además una guía distinta de la suya. Se retira el campo entero en
- * lugar de sustituirlo por otro número: una atribución no verificable no se
- * corrige inventando la correcta, se deja de afirmar. El día que haya cotejo
- * documentado, vuelve como cita con su fecha de verificación.
+ * de Guía AESIA ("Guía 12 AESIA", "Guía 2 AESIA", …) y diez de los doce
+ * llevaban una guía distinta de la que les corresponde.
+ *
+ * PRECISIÓN (review adversarial, 2026-09-05): las guías SÍ existen — AESIA
+ * publica un catálogo numerado en aesia.digital.gob.es/es/guias— así que el
+ * motivo NO es que la fuente no exista. Son dos motivos distintos:
+ *   1. la ATRIBUCIÓN requisito → guía estaba mal en 10 de 12, y
+ *   2. una guía de la Agencia no es la fuente de un requisito del Reglamento:
+ *      la fuente es el artículo, y la propia AESIA las publica como material
+ *      no vinculante.
+ * Se retira el campo entero en lugar de sustituirlo por otro número: una
+ * atribución equivocada no se corrige adivinando la correcta. El día que haya
+ * un cotejo documentado guía a guía, puede volver con su fecha de verificación.
  *
  * `subpartId` ("17.1.a", "9.2.a", "A.5.1"…) ES UNA CLAVE INTERNA de
  * agrupación, NO una cita del apartado y la letra del artículo: su desglose no

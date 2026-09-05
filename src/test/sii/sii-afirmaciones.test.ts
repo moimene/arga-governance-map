@@ -154,8 +154,19 @@ describe("SII — lo que SÍ debe seguir dicho", () => {
   it("dice en pantalla que la persistencia es local y sin eficacia jurídica", () => {
     // Decisión de producto: el canal no se conecta a Cloud, Y LA PANTALLA LO
     // DICE. Si el aviso desaparece, el módulo vuelve a aparentar producción.
+    //
+    // El guard exigía solo que la constante APARECIERA en el fuente, y el
+    // `import` bastaba: borrar el `{SII_AVISO_PERSISTENCIA_LOCAL}` renderizado
+    // dejando el import mantenía el test en verde (derrotado por mutación en la
+    // review adversarial). Ahora se exige la aparición DENTRO de JSX —`{…}`—,
+    // que es la forma en que un texto llega a la pantalla, y no en la línea de
+    // import.
+    const renderiza = (src: string) =>
+      /\{\s*SII_AVISO_PERSISTENCIA_LOCAL\s*\}/.test(
+        src.replace(/^import[^;]*;$/gm, ""),
+      );
     const pantallas = superficie.filter(([f]) => f.startsWith("src/pages/sii/"));
-    const conAviso = pantallas.filter(([, src]) => src.includes("SII_AVISO_PERSISTENCIA_LOCAL"));
+    const conAviso = pantallas.filter(([, src]) => renderiza(src));
     expect(conAviso.map(([f]) => f).sort()).toEqual([
       "src/pages/sii/SiiDashboard.tsx",
       "src/pages/sii/SiiLayout.tsx",
@@ -166,8 +177,11 @@ describe("SII — lo que SÍ debe seguir dicho", () => {
   });
 
   it("marca los expedientes sembrados como simulados donde se listan y donde se abren", () => {
-    expect(leer("src/pages/sii/SiiDashboard.tsx")).toContain("SII_ETIQUETA_SIMULADO");
-    expect(leer("src/pages/sii/SiiCaseDetalle.tsx")).toContain("SII_ETIQUETA_SIMULADO");
+    // Mismo criterio: la etiqueta tiene que RENDERIZARSE, no solo importarse.
+    const renderizaEtiqueta = (ruta: string) =>
+      /\{\s*SII_ETIQUETA_SIMULADO\s*\}/.test(leer(ruta).replace(/^import[^;]*;$/gm, ""));
+    expect(renderizaEtiqueta("src/pages/sii/SiiDashboard.tsx")).toBe(true);
+    expect(renderizaEtiqueta("src/pages/sii/SiiCaseDetalle.tsx")).toBe(true);
   });
 });
 

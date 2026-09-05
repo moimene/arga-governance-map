@@ -43,8 +43,8 @@ const principios = [
   { icon: Globe, title: "Federado por diseño", desc: "Corporativo define mínimos; las filiales gestionan particularidades locales." },
   { icon: LinkIcon, title: "Trazabilidad visible", desc: "Toda decisión es trazable hasta la norma, el control y la evidencia." },
   { icon: Lock, title: "Permisos granulares", desc: "RBAC + ABAC + scope = acceso solo a lo que necesitas." },
-  { icon: Eye, title: "Auditoría nativa", desc: "Todo cambio queda registrado de forma inmutable." },
-  { icon: ShieldAlert, title: "SII segregado", desc: "El canal interno tiene su propio entorno técnico y funcional." },
+  { icon: Eye, title: "Auditoría nativa", desc: "Los cambios de los flujos conectados quedan registrados con traza." },
+  { icon: ShieldAlert, title: "SII segregado", desc: "El canal interno se presenta en una zona separada, con su propia puerta de acceso." },
 ];
 
 const modulos = [

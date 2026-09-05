@@ -38,13 +38,25 @@ export type ModuleStatus = {
 };
 
 /**
- * Estados de `incidents` que NO cuentan como abierto (vocabulario real de Cloud:
- * `Abierto | Cerrado | En investigación | Resuelto`).
- * Exportado a propósito: `src/test/schema/console-read-model.test.ts` comprueba
- * contra Cloud que este literal existe de verdad como estado, de modo que la
- * constante es carga estructural y no un rótulo que nadie verifica.
+ * Vocabulario real de `incidents.status` en Cloud, partido en abierto y cerrado.
+ *
+ * `Resuelto` NO es abierto: un incidente resuelto ya no está en curso. La primera
+ * versión de este read model solo excluía `Cerrado` con un `.neq()`, así que
+ * contaba los resueltos como abiertos y sobreestimaba el KPI (ARGA tiene un
+ * incidente por estado: decía 3 donde son 2). Lo cazó la review adversarial.
+ *
+ * Se usa una lista POSITIVA de abiertos en vez de `.neq()` por dos motivos: un
+ * `.neq()` en PostgREST descarta también las filas con `status IS NULL` (lógica
+ * trivaluada), y la columna es nullable; y una lista positiva no se rompe en
+ * silencio cuando aparece un estado nuevo — lo deja fuera de «abierto», que es
+ * lo conservador.
+ *
+ * Ambas listas se exportan porque `src/test/schema/console-read-model.test.ts`
+ * comprueba contra Cloud que su UNIÓN es exactamente el conjunto de estados que
+ * existen. Si aparece uno nuevo, el gate rompe en vez de clasificarlo a ciegas.
  */
-export const INCIDENT_CLOSED = "Cerrado";
+export const INCIDENT_OPEN_STATUSES = ["Abierto", "En investigación"];
+export const INCIDENT_CLOSED_STATUSES = ["Cerrado", "Resuelto"];
 
 /**
  * Estados de `ai_risk_assessments` que valen como evaluación resuelta.
@@ -109,14 +121,14 @@ export function useModuleStatus() {
           .from("incidents")
           .select("id", { count: "exact", head: true })
           .eq("tenant_id", tenantId!)
-          .neq("status", INCIDENT_CLOSED),
+          .in("status", INCIDENT_OPEN_STATUSES),
 
         // GRC: de esos, los que el owner marcó como incidente mayor
         supabase
           .from("incidents")
           .select("id", { count: "exact", head: true })
           .eq("tenant_id", tenantId!)
-          .neq("status", INCIDENT_CLOSED)
+          .in("status", INCIDENT_OPEN_STATUSES)
           .eq("is_major_incident", true),
 
         // GRC: notificaciones regulatorias con deadline < 72h

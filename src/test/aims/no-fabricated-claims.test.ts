@@ -197,6 +197,20 @@ describe("A3 — un cero sin dato no se pinta como un cero bueno", () => {
       /neutral:/.test(src),
       "KpiCard ya no tiene tono neutro: el cero sin dato vuelve a ser verde",
     ).toBe(true);
+
+    // …y el tono neutro tiene que PINTAR neutro. Comprobar solo que la clave
+    // `neutral:` existe no dice nada de su valor: mapearla a
+    // `var(--status-success)` devolvía el cero sin dato al verde y el gate
+    // seguía pasando (derrotado por mutación en la review adversarial).
+    for (const clave of ["neutral:"]) {
+      for (const bloque of src.split(clave).slice(1)) {
+        const valor = bloque.slice(0, 80);
+        expect(
+          /status-(success|active)/.test(valor),
+          `el tono neutro se pinta con un color de éxito: ${valor.split("\n")[0].trim()}`,
+        ).toBe(false);
+      }
+    }
     for (const [etiqueta, coleccion] of [
       ["Riesgo Alto sin eval. aprobada", "systems"],
       ["Incidentes abiertos", "incidents"],
@@ -235,8 +249,10 @@ describe("A3 — un cero sin dato no se pinta como un cero bueno", () => {
 describe("A3 — no se cita lo que no se ha cotejado", () => {
   it("no se atribuye ninguna Guía AESIA a ningún requisito", () => {
     // El catálogo daba a cada requisito un número de Guía AESIA («Guía 12
-    // AESIA», «Guía 2 AESIA»…) que no se ha podido cotejar contra publicación
-    // oficial, y diez de los doce llevaban además una guía distinta de la suya.
+    // AESIA», «Guía 2 AESIA»…) y diez de los doce llevaban una guía distinta de
+    // la suya. Las guías existen (AESIA publica un catálogo numerado): el
+    // defecto era la ATRIBUCIÓN, y que una guía no vinculante no es la fuente
+    // de un requisito del Reglamento — la fuente es el artículo.
     // Se retiró el campo entero. Este gate impide que vuelva por cualquiera de
     // las dos puertas: el DATO del catálogo y el RÓTULO de pantalla.
     for (const f of superficieAims()) {

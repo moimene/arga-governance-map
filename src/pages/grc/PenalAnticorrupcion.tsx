@@ -577,7 +577,10 @@ export default function PenalAnticorrupcion() {
                               
                               // ¿Hay ya un bundle de evidencia archivado?
                               const controlEvidence = delitoEvidences.filter(e => e.source_object_id === control.id);
-                              // Codex #2-UI: solo cuenta como "Firmado" la evidencia final (SEALED/VERIFIED);
+                              // Codex #2-UI: solo cuenta como final la evidencia SEALED/VERIFIED.
+                              // El chip decía «Firmado» sobre una evidencia que la misma
+                              // pantalla describe, 80 líneas más abajo, como «archivada con
+                              // hash — sin sello ni firma atribuidos». No hay firma: «Archivado».
                               // los bundles sandbox quedan en OPEN y no deben presentarse como firmados.
                               const controlFinalEvidence = controlEvidence.filter(e => isFinalSealedEvidence(e.status));
                               const controlHasSandbox = controlEvidence.some(e => !isFinalSealedEvidence(e.status));
@@ -609,7 +612,7 @@ export default function PenalAnticorrupcion() {
                                   <td className="px-4 py-3.5 text-right">
                                     {controlFinalEvidence.length > 0 ? (
                                       <span className="inline-flex items-center gap-0.5 text-[9px] text-[var(--status-success)] font-semibold">
-                                        <CheckCircle2 className="h-3.5 w-3.5" /> Firmado
+                                        <CheckCircle2 className="h-3.5 w-3.5" /> Archivado
                                       </span>
                                     ) : (
                                       <div className="inline-flex items-center gap-1.5 justify-end">

@@ -267,6 +267,13 @@ function evaluarNotificacion(input: NoSessionInput): NoSessionOutput['gates'][0]
 
   // AUSENCIA DE CONSTANCIA ≠ CUMPLIMIENTO. Con la lista vacía —o con menos
   // constancias que destinatarios— el filtro anterior daba `pendienteCount = 0`
+  // El adjetivo «fehaciente» NO aparece en el art. 100 RRM ni es su estándar: la
+  // rúbrica del artículo es «Supuestos especiales» y lo que exige es que quede
+  // CONSTANCIA de la recepción. Calificar de fehaciente una constancia de demo
+  // es afirmar una cualidad probatoria que el sistema no sostiene, así que el
+  // rótulo describe lo que se comprueba —hay constancia, o no la hay— y deja el
+  // juicio sobre su eficacia a quien lo tenga que hacer.
+  //
   // y el gate proclamaba «Todas (0) notificaciones ENTREGADAS fehacientemente»
   // citando el art. 100 RRM. Un gate que no puede fallar por falta de dato no
   // acredita nada: sin constancia, no hay notificación fehaciente acreditada.
@@ -277,12 +284,12 @@ function evaluarNotificacion(input: NoSessionInput): NoSessionOutput['gates'][0]
       ok: false,
       severity: 'BLOCKING',
       explain: [{
-        regla: 'Notificación fehaciente',
+        regla: 'Constancia de recepción',
         fuente: 'LEY',
-        referencia: 'art. 100 RRM (notificación fehaciente del procedimiento por escrito)',
+        referencia: 'art. 100 RRM (constancia de la recepción por cada destinatario)',
         resultado: 'BLOCKING',
         mensaje: notificaciones.length === 0
-          ? `Sin constancia de notificación registrada${destinatarios > 0 ? ` para ${destinatarios} destinatario(s)` : ''}: la notificación fehaciente no consta acreditada.`
+          ? `Sin constancia de notificación registrada${destinatarios > 0 ? ` para ${destinatarios} destinatario(s)` : ''}: no consta acreditada la recepción.`
           : `Solo constan ${notificaciones.length} notificación(es) de ${destinatarios} destinatario(s): faltan constancias por acreditar.`,
       }],
     };
@@ -291,9 +298,9 @@ function evaluarNotificacion(input: NoSessionInput): NoSessionOutput['gates'][0]
   if (pendienteCount > 0) {
     allDelivered = false;
     explain.push({
-      regla: 'Notificación fehaciente',
+      regla: 'Constancia de recepción',
       fuente: 'LEY',
-      referencia: 'art. 100 RRM (notificación fehaciente del procedimiento por escrito)',
+      referencia: 'art. 100 RRM (constancia de la recepción por cada destinatario)',
       resultado: 'BLOCKING',
       mensaje: `${pendienteCount} notificación(es) aún no ENTREGADA(S) (estado: ${input.notificaciones
         .filter(n => n.estado !== 'ENTREGADA')
@@ -302,11 +309,11 @@ function evaluarNotificacion(input: NoSessionInput): NoSessionOutput['gates'][0]
     });
   } else {
     explain.push({
-      regla: 'Notificación fehaciente',
+      regla: 'Constancia de recepción',
       fuente: 'LEY',
-      referencia: 'art. 100 RRM (notificación fehaciente del procedimiento por escrito)',
+      referencia: 'art. 100 RRM (constancia de la recepción por cada destinatario)',
       resultado: 'OK',
-      mensaje: `Todas (${input.notificaciones.length}) notificaciones ENTREGADAS fehacientemente`,
+      mensaje: `Consta la recepción de las ${input.notificaciones.length} notificación(es) registradas`,
     });
   }
 

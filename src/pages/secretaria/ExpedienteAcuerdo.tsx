@@ -303,8 +303,11 @@ function NotaDeExpediente({ explain }: { explain: unknown }) {
   );
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default function ExpedienteAcuerdo() {
   const { id } = useParams<{ id: string }>();
+  const { tenantId } = useTenantContext();
   const navigate = useNavigate();
   const scope = useSecretariaScope();
   const { data: agreement, isLoading } = useAgreement(id);
@@ -346,24 +349,31 @@ export default function ExpedienteAcuerdo() {
   // ITEM-104: cross-link inverso — certificaciones de este acuerdo (por agreement_id
   // directo o por pertenencia al array agreements_certified de una certificación
   // minute-based) y el expediente registral más reciente.
+  // `id` viene de la URL y entra en un filtro `.or(...)`, que es un lenguaje de
+  // consulta con su propia gramática: una coma o un paréntesis la alterarían.
+  // RLS acota el daño al propio tenant, pero un parámetro de ruta no entra crudo
+  // en una consulta. Si no es un UUID, no se consulta.
+  const idEsUuid = !!id && UUID_RE.test(id);
+
   const { data: certificaciones = [], isLoading: certsLoading } = useQuery({
-    queryKey: ["agreement_certifications", id],
+    queryKey: ["agreement_certifications", tenantId, id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("certifications")
         .select(
           "id, tipo_certificacion, signature_status, legal_gate_status, created_at, agreement_id, agreements_certified, minute_id",
         )
+        .eq("tenant_id", tenantId!)
         .or(`agreement_id.eq.${id},agreements_certified.cs.{${id}}`)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as AgreementCertRow[];
     },
-    enabled: !!id,
+    enabled: idEsUuid && !!tenantId,
   });
 
   const { data: registryFiling = null } = useQuery({
-    queryKey: ["agreement_registry_filing", id],
+    queryKey: ["agreement_registry_filing", tenantId, id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("registry_filings")

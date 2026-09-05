@@ -40,10 +40,20 @@ const AFIRMACIONES_RETIRADAS = [
 ];
 
 async function sinAfirmacionesRetiradas(page: import('@playwright/test').Page) {
-  const cuerpo = await page.locator('body').innerText();
+  // `innerText` devuelve el texto YA TRANSFORMADO POR CSS: en estas pantallas hay
+  // 21 clases `uppercase`, así que «QSeal Custodia» reaparecido dentro de una de
+  // ellas llegaría como «QSEAL CUSTODIA» y una comparación sensible a mayúsculas
+  // lo dejaría pasar. Es el gotcha nº11 registrado en CLAUDE.md. Se compara en
+  // minúsculas, y además contra el `textContent` crudo, que NO lleva la
+  // transformación, por si la clase se retira.
+  const [conCss, crudo] = await Promise.all([
+    page.locator('body').innerText(),
+    page.locator('body').textContent(),
+  ]);
+  const normalizado = `${conCss}\n${crudo ?? ''}`.toLowerCase();
   for (const frase of AFIRMACIONES_RETIRADAS) {
-    expect(cuerpo, `la pantalla ha recuperado una afirmación retirada: «${frase}»`)
-      .not.toContain(frase);
+    expect(normalizado, `la pantalla ha recuperado una afirmación retirada: «${frase}»`)
+      .not.toContain(frase.toLowerCase());
   }
 }
 

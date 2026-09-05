@@ -74,10 +74,27 @@ describe("actas pendientes de aprobación — criterio autoritativo, no la marca
   });
 
   it("el panel consume el criterio canónico y no reescribe el suyo", () => {
+    // ADVERTENCIA DE ALCANCE: esto es un guard de FUENTE, no de comportamiento.
+    // Una llamada de señuelo a `minuteHasLegalSignature` satisfacía la primera
+    // versión mientras el filtro real volvía al criterio legacy en JS
+    // (`filter(row => !!row.signed_at)`) — derrotado por mutación en la review
+    // adversarial. Se sube el listón: la marca legacy no puede aparecer en NINGUNA
+    // de sus formas dentro del contador, ni en PostgREST ni en JS. Sigue sin ser
+    // una prueba de comportamiento; el comportamiento lo prueban los `it` de
+    // arriba sobre la función pura.
     const src = fuenteDashboard();
-    expect(src).toContain("minuteHasLegalSignature(");
-    // La marca legacy no puede volver a decidir quién está aprobada.
-    expect(src).not.toContain('.is("signed_at", null)');
+    const contador = src.slice(
+      src.indexOf("async function countActasAprobadas"),
+      src.indexOf("async function countActasAprobadas") + 1400,
+    );
+    expect(contador.length, "no se encuentra el contador de actas aprobadas").toBeGreaterThan(100);
+    expect(contador).toContain("minuteHasLegalSignature(");
+    for (const legacy of ['.is("signed_at", null)', "signed_at)", "signed_at !==", "signed_at ==", "!!row.signed_at"]) {
+      expect(
+        contador.includes(legacy),
+        `el contador vuelve a decidir por la marca legacy: «${legacy}»`,
+      ).toBe(false);
+    }
   });
 });
 

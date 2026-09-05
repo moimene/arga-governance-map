@@ -7,9 +7,20 @@
  */
 
 export const NO_MEDIDO = "no medido";
+export const CARGANDO = "cargando";
 
-/** Texto para una cifra del read model. `null`/`undefined` → «no medido». */
-export function formatMeasured(value: number | null | undefined): string {
+/**
+ * Texto para una cifra del read model.
+ *
+ * Tres estados, no dos: mientras la consulta está EN VUELO no se ha medido nada
+ * todavía, pero tampoco ha fallado — decir «no medido» ahí es tan impreciso como
+ * decir 0. `cargando` distingue el tercero.
+ */
+export function formatMeasured(
+  value: number | null | undefined,
+  cargando = false,
+): string {
+  if (cargando && value == null) return CARGANDO;
   return value == null ? NO_MEDIDO : String(value);
 }
 

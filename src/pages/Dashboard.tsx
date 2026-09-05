@@ -63,7 +63,7 @@ export default function Dashboard() {
   const { data: alerts = [] } = useDashboardAlerts();
   const { data: meetings = [] } = useUpcomingMeetings();
   const { tenantId } = useTenantContext();
-  const { data: moduleStatus } = useModuleStatus();
+  const { data: moduleStatus, isPending: moduleStatusPending } = useModuleStatus();
   const { data: readModel } = useConsoleReadModel();
 
   // Readiness DECLARADO por el owner + lo MEDIDO en Cloud. Lo medido acompaña,
@@ -125,7 +125,7 @@ export default function Dashboard() {
       id: "grc",
       tone: hasMeasuredItems(moduleStatus?.grc.notificacionesUrgentes) ? "Regulatorio" : "GRC",
       title: "Riesgo y plazos regulatorios",
-      body: `${formatMeasured(moduleStatus?.grc.incidentesAbiertos)} incidentes abiertos y ${formatMeasured(moduleStatus?.grc.notificacionesUrgentes)} notificaciones en plazo corto.`,
+      body: `${formatMeasured(moduleStatus?.grc.incidentesAbiertos, moduleStatusPending)} incidentes abiertos y ${formatMeasured(moduleStatus?.grc.notificacionesUrgentes, moduleStatusPending)} notificaciones en plazo corto.`,
       to: "/grc",
       icon: Compass,
     },
@@ -133,7 +133,7 @@ export default function Dashboard() {
       id: "ai",
       tone: hasMeasuredItems(moduleStatus?.aiGovernance.altosNoAprobados) ? "AI Act" : "AIMS",
       title: "Sistemas IA que necesitan criterio",
-      body: `${formatMeasured(moduleStatus?.aiGovernance.altosNoAprobados)} sistemas de riesgo alto sin evaluación resuelta.`,
+      body: `${formatMeasured(moduleStatus?.aiGovernance.altosNoAprobados, moduleStatusPending)} sistemas de riesgo alto sin evaluación resuelta.`,
       to: "/ai-governance",
       icon: Brain,
     },
@@ -141,7 +141,7 @@ export default function Dashboard() {
       id: "secretaria",
       tone: "Secretaría",
       title: "Actos societarios pendientes",
-      body: `${formatMeasured(moduleStatus?.secretaria.acuerdosPendientes)} acuerdos pendientes y ${formatMeasured(moduleStatus?.secretaria.convocatoriasEmitidas)} convocatorias emitidas.`,
+      body: `${formatMeasured(moduleStatus?.secretaria.acuerdosPendientes, moduleStatusPending)} acuerdos pendientes y ${formatMeasured(moduleStatus?.secretaria.convocatoriasEmitidas, moduleStatusPending)} convocatorias emitidas.`,
       to: "/secretaria",
       icon: ClipboardList,
     },

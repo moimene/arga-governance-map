@@ -80,7 +80,7 @@ export const tourSteps: TourStep[] = [
     route: "/organos/consejo-administracion",
     title: "El órgano de gobierno en tiempo real",
     description:
-      "La ficha de órgano centraliza composición, mandatos, calendario y el reglamento de régimen interno. Cada reunión tiene su propio expediente con agenda, materiales, votaciones y acta inmutable.",
+      "La ficha de órgano centraliza composición, mandatos, calendario y el reglamento de régimen interno. Cada reunión tiene su propio expediente con agenda, materiales, votaciones y acta con traza.",
     bullets: [
       "Banner ámbar: 4 mandatos vencidos o próximos a vencer — acción preventiva necesaria.",
       "Reunión 22/04/2026: PR-008 (DORA) en el punto 3 de la agenda — pendiente de aprobación del Consejo.",
@@ -99,7 +99,7 @@ export const tourSteps: TourStep[] = [
     route: "/organos/consejo-administracion/reuniones/cda-22-04-2026",
     title: "El expediente de reunión completo",
     description:
-      "Cada reunión tiene su ciclo de vida: desde la convocatoria hasta el acta aprobada, evidenciada e inmutable. El expediente incluye agenda, materiales, confirmaciones, votaciones y acuerdos.",
+      "Cada reunión tiene su ciclo de vida: desde la convocatoria hasta el acta aprobada, evidenciada con traza. El expediente incluye agenda, materiales, confirmaciones, votaciones y acuerdos.",
     bullets: [
       "Punto 3 de la agenda: PR-008 destaca en ámbar — es el punto crítico de esta sesión.",
       "Tab Participantes: 2 consejeros aún no han confirmado — quórum en riesgo si no confirman.",
@@ -108,7 +108,7 @@ export const tourSteps: TourStep[] = [
     badges: [
       { label: "PR-008 punto 3", tone: "warning" },
       { label: "2 pendientes", tone: "warning" },
-      { label: "Acta inmutable", tone: "neutral" },
+      { label: "Acta con traza", tone: "neutral" },
     ],
     available: true,
   },
@@ -161,7 +161,7 @@ export const tourSteps: TourStep[] = [
     bullets: [
       "Banner rojo: D. Carlos Vaz — delegación caducada sin revocación formal. Las 3 alertas previas fueron ignoradas.",
       "Columna de vencimiento: D. Rodrigo Almeida y D. Ignacio Fuentes vencen en <90 días — acción preventiva en curso.",
-      "Las delegaciones revocadas se conservan con su historial completo para el registro inmutable.",
+      "Las delegaciones revocadas se conservan con su historial completo para el registro con traza.",
     ],
     badges: [
       { label: "DEL-001 CADUCADA", tone: "critical" },

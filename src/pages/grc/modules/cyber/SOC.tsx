@@ -110,24 +110,30 @@ export default function SOC() {
       >
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="h-3 w-3 rounded-full bg-[var(--status-success)] animate-ping" />
+            {/* El panel anunciaba «Feed OTel / SIEM Microsoft Sentinel Activo»
+                con punto verde parpadeante, «retención de logs inmutable WORM»,
+                «180 ms» de latencia y «240 reglas activas» — presentados como
+                medición en vivo — cincuenta líneas debajo del aviso que dice que
+                NO hay ninguna integración activa con Sentinel. La pantalla se
+                contradecía a sí misma. Sin integración no hay nada que medir. */}
+            <div className="h-3 w-3 rounded-full bg-[var(--g-surface-muted)]" />
             <div>
               <h2 className="text-sm font-bold text-[var(--g-text-primary)]">
-                Feed OTel / SIEM Microsoft Sentinel Activo
+                Feed OTel / SIEM — arquitectura prevista
               </h2>
               <p className="text-xs text-[var(--g-text-secondary)]">
-                Ingesta de telemetría de red, firewalls perimetrales, WAF, EDR e identidad con retención de logs inmutable WORM conforme a DORA.
+                El diseño contempla ingesta de telemetría de red, firewalls perimetrales, WAF, EDR e identidad. No hay integración conectada, así que no se está midiendo ninguna ingesta.
               </p>
             </div>
           </div>
           <div className="flex items-center gap-4 text-xs">
             <div>
               <span className="text-[var(--g-text-secondary)]">Latencia de Ingesta:</span>{" "}
-              <span className="font-mono font-semibold text-[var(--g-brand-3308)]">180 ms</span>
+              <span className="font-mono font-semibold text-[var(--g-text-secondary)]">sin dato</span>
             </div>
             <div>
               <span className="text-[var(--g-text-secondary)]">Reglas de Detección:</span>{" "}
-              <span className="font-mono font-semibold text-[var(--g-text-primary)]">240 Activas</span>
+              <span className="font-mono font-semibold text-[var(--g-text-secondary)]">sin dato</span>
             </div>
           </div>
         </div>

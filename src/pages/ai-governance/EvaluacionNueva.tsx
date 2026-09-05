@@ -428,7 +428,13 @@ export default function EvaluacionNueva() {
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--g-border-subtle)] pb-3">
                   <div>
                     <span className="text-xs font-mono text-[var(--g-brand-3308)] font-bold bg-[var(--g-surface-subtle)] px-2 py-0.5" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                      {activeRequirement.articleRef} Reglamento (UE) 2024/1689
+                      {/* El marco depende del requisito: los del RIA citan un
+                          artículo del Reglamento (UE) 2024/1689; los de ISO 42001
+                          citan un anexo de la norma. Poner el Reglamento fijo
+                          producía «ISO 42001 A.5 Reglamento (UE) 2024/1689», que
+                          atribuye a la norma europea un anexo que no es suyo. */}
+                      {activeRequirement.articleRef}
+                      {activeRequirement.articleRef.startsWith("Art.") ? " Reglamento (UE) 2024/1689" : ""}
                     </span>
                     <h2 className="text-lg font-bold text-[var(--g-text-primary)] mt-1">
                       {activeRequirement.title}
