@@ -120,8 +120,10 @@ export const consoleDataContracts: ConsoleDataContract[] = [
     consumers: "Secretaría, GRC, AIMS, consola",
     mutation: "Pendiente de paridad Cloud/local/types antes de escribir.",
     evidence: "pending",
-    sourcePosture: "none",
-    parityRisk: "Contrato requerido, no visible aún en migraciones/tipos locales.",
+    // Verificado en Cloud: ambas tablas existen, tienen RLS *_tenant_isolation
+    // y filas. Lo pendiente son las escrituras, no la visibilidad de la fuente.
+    sourcePosture: "Cloud",
+    parityRisk: "Lectura Cloud disponible; las escrituras siguen prohibidas hasta paquete aprobado.",
   },
 ];
 

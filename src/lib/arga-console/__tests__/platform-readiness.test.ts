@@ -41,7 +41,10 @@ describe("platform-readiness", () => {
 
     expect(getPlatformReadinessLane("grc")?.contractIds).toContain("cross-module-contracts");
     expect(getPlatformReadinessLane("aims")?.contractIds).toContain("cross-module-contracts");
-    expect(getPlatformReadinessLane("integration")?.sourcePosture).toBe("none");
+    // governance_module_events/links EXISTEN en Cloud con RLS y filas: la postura
+    // es Cloud en solo lectura. Lo pendiente son las escrituras (status "pending").
+    expect(getPlatformReadinessLane("integration")?.sourcePosture).toBe("Cloud");
+    expect(getPlatformReadinessLane("integration")?.status).toBe("pending");
     expect(getPlatformReadinessLane("integration")?.migrationRequired).toBe(false);
   });
 

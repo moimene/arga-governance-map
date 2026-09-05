@@ -8,6 +8,9 @@ import { dashboardGreeting } from "@/lib/tenant-scopes";
 import { brandName, groupFullLabel } from "@/lib/tenant-brand-labels";
 import { useDashboardKpis, useDashboardAlerts, useUpcomingMeetings } from "@/hooks/useDashboardData";
 import { useModuleStatus } from "@/hooks/useModuleStatus";
+import { useConsoleReadModel } from "@/hooks/useConsoleReadModel";
+import { useTenantContext } from "@/context/TenantContext";
+import { formatMeasured, formatMeasuredShort, hasMeasuredItems } from "@/lib/arga-console/measured";
 import { DemoOperablePanel } from "@/components/arga-console/DemoOperablePanel";
 import { ErpConsolePanel } from "@/components/arga-console/ErpConsolePanel";
 import { ReadinessHeader } from "@/components/arga-console/ReadinessHeader";
@@ -59,7 +62,30 @@ export default function Dashboard() {
   const { data: kpis } = useDashboardKpis();
   const { data: alerts = [] } = useDashboardAlerts();
   const { data: meetings = [] } = useUpcomingMeetings();
+  const { tenantId } = useTenantContext();
   const { data: moduleStatus } = useModuleStatus();
+  const { data: readModel } = useConsoleReadModel();
+
+  // Readiness DECLARADO por el owner + lo MEDIDO en Cloud. Lo medido acompaña,
+  // no promociona: el bloque probatorio sigue en HOLD haya los bundles que haya.
+  const laneMeasurements = {
+    secretaria: [
+      { label: "Acuerdos inscribibles", value: moduleStatus?.secretaria.acuerdosPendientes ?? null, source: "agreements" },
+    ],
+    grc: [
+      { label: "Incidentes abiertos", value: moduleStatus?.grc.incidentesAbiertos ?? null, source: "incidents" },
+    ],
+    aims: [
+      { label: "IA alto riesgo sin evaluar", value: moduleStatus?.aiGovernance.altosNoAprobados ?? null, source: "ai_systems" },
+    ],
+    integration: [
+      { label: "Eventos", value: readModel?.integration.events ?? null, source: "governance_module_events" },
+      { label: "Links", value: readModel?.integration.links ?? null, source: "governance_module_links" },
+    ],
+    evidence: [
+      { label: "Bundles sellados", value: readModel?.evidence.sealed ?? null, source: "evidence_bundles" },
+    ],
+  };
 
   // Animate KPIs on scope change
   const [animKey, setAnimKey] = useState(0);
@@ -97,17 +123,17 @@ export default function Dashboard() {
         },
     {
       id: "grc",
-      tone: (moduleStatus?.grc.notificacionesUrgentes ?? 0) > 0 ? "Regulatorio" : "GRC",
+      tone: hasMeasuredItems(moduleStatus?.grc.notificacionesUrgentes) ? "Regulatorio" : "GRC",
       title: "Riesgo y plazos regulatorios",
-      body: `${moduleStatus?.grc.incidentesDoraAbiertos ?? 0} incidentes DORA abiertos y ${moduleStatus?.grc.notificacionesUrgentes ?? 0} notificaciones en plazo corto.`,
+      body: `${formatMeasured(moduleStatus?.grc.incidentesAbiertos)} incidentes abiertos y ${formatMeasured(moduleStatus?.grc.notificacionesUrgentes)} notificaciones en plazo corto.`,
       to: "/grc",
       icon: Compass,
     },
     {
       id: "ai",
-      tone: (moduleStatus?.aiGovernance.altosNoAprobados ?? 0) > 0 ? "AI Act" : "AIMS",
+      tone: hasMeasuredItems(moduleStatus?.aiGovernance.altosNoAprobados) ? "AI Act" : "AIMS",
       title: "Sistemas IA que necesitan criterio",
-      body: `${moduleStatus?.aiGovernance.altosNoAprobados ?? 0} sistemas de riesgo alto sin evaluación aprobada.`,
+      body: `${formatMeasured(moduleStatus?.aiGovernance.altosNoAprobados)} sistemas de riesgo alto sin evaluación resuelta.`,
       to: "/ai-governance",
       icon: Brain,
     },
@@ -115,7 +141,7 @@ export default function Dashboard() {
       id: "secretaria",
       tone: "Secretaría",
       title: "Actos societarios pendientes",
-      body: `${moduleStatus?.secretaria.acuerdosPendientes ?? 0} acuerdos pendientes y ${moduleStatus?.secretaria.convocatoriasEmitidas ?? 0} convocatorias emitidas.`,
+      body: `${formatMeasured(moduleStatus?.secretaria.acuerdosPendientes)} acuerdos pendientes y ${formatMeasured(moduleStatus?.secretaria.convocatoriasEmitidas)} convocatorias emitidas.`,
       to: "/secretaria",
       icon: ClipboardList,
     },
@@ -244,15 +270,18 @@ export default function Dashboard() {
       </div>
 
       <div className="mb-6">
-        <ReadinessHeader />
+        <ReadinessHeader measured={laneMeasurements} />
       </div>
 
       <div className="mb-6">
-        <ErpConsolePanel moduleStatus={moduleStatus} alerts={alerts} />
+        <ErpConsolePanel moduleStatus={moduleStatus} alerts={alerts} doraEnabled={isModuleEnabled(branding, "dora")} />
       </div>
 
       <div className="mb-6">
-        <DemoOperablePanel />
+        {/* Los escenarios demo-operables están cableados al tenant ARGA
+            (src/lib/demo-operable/runner.ts:136 hardcodea su UUID), así que a
+            cualquier otro tenant le mostrarían dato ajeno como si fuera suyo. */}
+        {tenantId === "00000000-0000-0000-0000-000000000001" && <DemoOperablePanel />}
       </div>
 
       {/* KPIs */}
@@ -471,16 +500,16 @@ export default function Dashboard() {
                 <div className="grid grid-cols-2 divide-x divide-border">
                   <div className="px-4 py-3">
                     <div className="text-lg font-bold tabular-nums text-foreground">
-                      {moduleStatus?.secretaria.convocatoriasEmitidas ?? "—"}
+                      {formatMeasuredShort(moduleStatus?.secretaria.convocatoriasEmitidas)}
                     </div>
                     <div className="text-[11px] text-muted-foreground">Convoc. emitidas</div>
                   </div>
                   <div className="px-4 py-3">
                     <div className={cn(
                       "text-lg font-bold tabular-nums",
-                      (moduleStatus?.secretaria.acuerdosPendientes ?? 0) > 0 ? "text-status-warning" : "text-foreground"
+                      hasMeasuredItems(moduleStatus?.secretaria.acuerdosPendientes) ? "text-status-warning" : "text-foreground"
                     )}>
-                      {moduleStatus?.secretaria.acuerdosPendientes ?? "—"}
+                      {formatMeasuredShort(moduleStatus?.secretaria.acuerdosPendientes)}
                     </div>
                     <div className="text-[11px] text-muted-foreground">Acuerdos pend.</div>
                   </div>
@@ -504,18 +533,18 @@ export default function Dashboard() {
                   <div className="px-4 py-3">
                     <div className={cn(
                       "text-lg font-bold tabular-nums",
-                      (moduleStatus?.grc.incidentesDoraAbiertos ?? 0) > 0 ? "text-destructive" : "text-foreground"
+                      hasMeasuredItems(moduleStatus?.grc.incidentesAbiertos) ? "text-destructive" : "text-foreground"
                     )}>
-                      {moduleStatus?.grc.incidentesDoraAbiertos ?? "—"}
+                      {formatMeasuredShort(moduleStatus?.grc.incidentesAbiertos)}
                     </div>
-                    <div className="text-[11px] text-muted-foreground">Incid. DORA abiert.</div>
+                    <div className="text-[11px] text-muted-foreground">Incid. abiertos</div>
                   </div>
                   <div className="px-4 py-3">
                     <div className={cn(
                       "text-lg font-bold tabular-nums",
-                      (moduleStatus?.grc.notificacionesUrgentes ?? 0) > 0 ? "text-status-warning" : "text-foreground"
+                      hasMeasuredItems(moduleStatus?.grc.notificacionesUrgentes) ? "text-status-warning" : "text-foreground"
                     )}>
-                      {moduleStatus?.grc.notificacionesUrgentes ?? "—"}
+                      {formatMeasuredShort(moduleStatus?.grc.notificacionesUrgentes)}
                     </div>
                     <div className="text-[11px] text-muted-foreground">Notif. &lt;72h</div>
                   </div>
@@ -539,18 +568,18 @@ export default function Dashboard() {
                   <div className="px-4 py-3">
                     <div className={cn(
                       "text-lg font-bold tabular-nums",
-                      (moduleStatus?.aiGovernance.altosNoAprobados ?? 0) > 0 ? "text-destructive" : "text-foreground"
+                      hasMeasuredItems(moduleStatus?.aiGovernance.altosNoAprobados) ? "text-destructive" : "text-foreground"
                     )}>
-                      {moduleStatus?.aiGovernance.altosNoAprobados ?? "—"}
+                      {formatMeasuredShort(moduleStatus?.aiGovernance.altosNoAprobados)}
                     </div>
                     <div className="text-[11px] text-muted-foreground">Alto sin eval.</div>
                   </div>
                   <div className="px-4 py-3">
                     <div className={cn(
                       "text-lg font-bold tabular-nums",
-                      (moduleStatus?.aiGovernance.incidentesAbiertos ?? 0) > 0 ? "text-status-warning" : "text-foreground"
+                      hasMeasuredItems(moduleStatus?.aiGovernance.incidentesAbiertos) ? "text-status-warning" : "text-foreground"
                     )}>
-                      {moduleStatus?.aiGovernance.incidentesAbiertos ?? "—"}
+                      {formatMeasuredShort(moduleStatus?.aiGovernance.incidentesAbiertos)}
                     </div>
                     <div className="text-[11px] text-muted-foreground">Incid. abiertos</div>
                   </div>
@@ -574,9 +603,9 @@ export default function Dashboard() {
                   <div className="px-4 py-3">
                     <div className={cn(
                       "text-lg font-bold tabular-nums",
-                      (moduleStatus?.sii.casosAbiertos ?? 0) > 0 ? "text-status-warning" : "text-foreground"
+                      hasMeasuredItems(moduleStatus?.sii.casosAbiertos) ? "text-status-warning" : "text-foreground"
                     )}>
-                      {moduleStatus?.sii.casosAbiertos ?? "—"}
+                      {formatMeasuredShort(moduleStatus?.sii.casosAbiertos)}
                     </div>
                     <div className="text-[11px] text-muted-foreground">Casos abiertos</div>
                   </div>
