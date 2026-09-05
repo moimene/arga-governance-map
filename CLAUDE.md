@@ -1298,6 +1298,12 @@ PLAYWRIGHT_PORT=5191 bunx playwright test e2e/05-secretaria-reuniones.spec.ts e2
 - **RLS/RPC/storage/policies:** pueden evolucionarse en `governance_OS` durante desarrollo-test-demo, siempre con `db:check-target`, migración versionada, pruebas y verificación Cloud proporcionada al riesgo.
 - **Tablas rules engine:** `rule_packs`, `rule_pack_versions`, `rule_param_overrides`, `rbac_roles`, `rbac_user_roles`, `sod_toxic_pairs`, `evidence_bundles`, `audit_worm_trail`
 
+## Despliegue online (Vercel) — 2026-09-05
+
+- **URL pública de producción:** https://arga-governance-map.vercel.app (proyecto Vercel `arga-governance-map`, enlazado a `moimene/arga-governance-map` con rama de producción `main`; `.vercel/project.json` en el repo; `vercel.json` fija `bun install --frozen-lockfile` + `vite build` y el rewrite SPA).
+- **No suponer que `main` está online.** Entre el 2026-06-15 y el 2026-09-05 la integración GitHub→Vercel no disparó ningún despliegue y producción se quedó 352 commits atrás (`9d7480a`), con el login antiguo. Comprobar siempre qué commit sirve producción: `vercel project inspect arga-governance-map` o MCP Vercel `get_project` → `latestDeployment`, y `list_deployments` para ver si el último push generó despliegue.
+- **Despliegue manual:** `git archive main` a un directorio limpio + copia de `.vercel/project.json` + `vercel deploy --prod --yes` desde ahí. Nunca desde el árbol de trabajo: subiría lo no versionado (repos anidados, atlas, PDFs). El MCP `deploy_to_vercel` exige el árbol de ficheros inline y no sirve para este repo.
+
 ## Skill routing
 
 When the user's request matches an available skill, invoke it via the Skill tool. The
