@@ -15,6 +15,8 @@ type TramitadorVista =
   | "subsanaciones"
   | "presentaciones"
   | "inscritas"
+  | "depositadas"
+  | "legalizadas"
   | "denegadas";
 
 const VISTA_CONFIG: Record<TramitadorVista, { label: string; estado?: string }> = {
@@ -24,6 +26,8 @@ const VISTA_CONFIG: Record<TramitadorVista, { label: string; estado?: string }> 
   subsanaciones: { label: "Subsanaciones", estado: "SUBSANACION" },
   presentaciones: { label: "Presentaciones", estado: "PRESENTADA" },
   inscritas: { label: "Inscritas", estado: "INSCRITA" },
+  depositadas: { label: "Depositadas", estado: "DEPOSITADA" },
+  legalizadas: { label: "Legalizadas", estado: "LEGALIZADA" },
   denegadas: { label: "Denegadas", estado: "DENEGADA" },
 };
 
@@ -33,6 +37,8 @@ const ESTADO_TO_VISTA: Record<string, TramitadorVista> = {
   SUBSANACION: "subsanaciones",
   PRESENTADA: "presentaciones",
   INSCRITA: "inscritas",
+  DEPOSITADA: "depositadas",
+  LEGALIZADA: "legalizadas",
   DENEGADA: "denegadas",
 };
 
@@ -43,6 +49,8 @@ const STATUS_TONE: Record<string, string> = {
   EN_TRAMITE:  "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
   SUBSANACION: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
   INSCRITA:    "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
+  DEPOSITADA:  "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
+  LEGALIZADA:  "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
   ELEVADA:     "bg-[var(--status-success)] text-[var(--g-text-inverse)]", // ITEM-102
   DENEGADA:    "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
 };

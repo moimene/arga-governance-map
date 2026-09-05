@@ -495,6 +495,8 @@ const statusTone: Record<string, { bg: string; text: string }> = {
   SUBSANACION:  { bg: "bg-[var(--status-warning)]", text: "text-[var(--g-text-inverse)]" },
   VOTING_OPEN:  { bg: "bg-[var(--status-warning)]", text: "text-[var(--g-text-inverse)]" },
   INSCRITA:     { bg: "bg-[var(--status-success)]", text: "text-[var(--g-text-inverse)]" },
+  DEPOSITADA:   { bg: "bg-[var(--status-success)]", text: "text-[var(--g-text-inverse)]" },
+  LEGALIZADA:   { bg: "bg-[var(--status-success)]", text: "text-[var(--g-text-inverse)]" },
   APROBADO:     { bg: "bg-[var(--status-success)]", text: "text-[var(--g-text-inverse)]" },
   FIRMADA:      { bg: "bg-[var(--status-success)]", text: "text-[var(--g-text-inverse)]" },
 };

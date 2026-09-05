@@ -10,7 +10,11 @@ import {
 } from "@/hooks/useRegistryLifecycle";
 import { useUploadRegistryEvidenceArtifact } from "@/hooks/useRegistryEvidenceUpload";
 import { useSecretariaDocumentArtifacts } from "@/hooks/useSecretariaDocumentArtifacts";
-import type { RegistryQualificationOutcome } from "@/lib/secretaria/registry-lifecycle";
+import {
+  isRegistryTerminal,
+  registryTerminal,
+  type RegistryQualificationOutcome,
+} from "@/lib/secretaria/registry-lifecycle";
 
 interface RegistryLifecycleActionsProps {
   filingId: string;
@@ -18,6 +22,7 @@ interface RegistryLifecycleActionsProps {
   status: string;
   filingVia?: string | null;
   qualificationOutcome?: string | null;
+  procedureProfileCode?: string | null;
 }
 
 const inputClass = "w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]";
@@ -33,7 +38,12 @@ export function RegistryLifecycleActions({
   status,
   filingVia,
   qualificationOutcome,
+  procedureProfileCode,
 }: RegistryLifecycleActionsProps) {
+  // El deposito de cuentas y la legalizacion de libros no causan inscripcion:
+  // el rotulo y el terminal los decide la via, igual que en el servidor.
+  const terminal = registryTerminal(procedureProfileCode);
+  const terminalNounCap = terminal.noun.charAt(0).toUpperCase() + terminal.noun.slice(1);
   const uploadEvidence = useUploadRegistryEvidenceArtifact();
   const recordPresentation = useRecordRegistryPresentation();
   const recordQualification = useRecordRegistryQualification();
@@ -174,9 +184,9 @@ export function RegistryLifecycleActions({
         registeredAt: new Date(`${inscriptionDate}T12:00:00`).toISOString(),
         evidenceArtifactId: inscriptionArtifactId,
       });
-      toast.success("Inscripción acreditada con evidencia verificada.");
+      toast.success(`${terminalNounCap} ${terminal.participle} con evidencia verificada.`);
     } catch (error) {
-      toast.error("No se pudo acreditar la inscripción", { description: error instanceof Error ? error.message : String(error) });
+      toast.error(`No se pudo acreditar ${terminal.article} ${terminal.noun}`, { description: error instanceof Error ? error.message : String(error) });
     }
   }
 
@@ -281,10 +291,10 @@ export function RegistryLifecycleActions({
 
       {status === "PRESENTADA" && qualificationOutcome === "POSITIVA" ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <label className="text-xs font-medium text-[var(--g-text-primary)]">Número de inscripción
+          <label className="text-xs font-medium text-[var(--g-text-primary)]">{`Número de ${terminal.noun}`}
             <input value={inscriptionNumber} onChange={(event) => setInscriptionNumber(event.target.value)} className={`${inputClass} mt-1`} style={{ borderRadius: "var(--g-radius-md)" }} />
           </label>
-          <label className="text-xs font-medium text-[var(--g-text-primary)]">Fecha de inscripción
+          <label className="text-xs font-medium text-[var(--g-text-primary)]">{`Fecha de ${terminal.noun}`}
             <input type="date" value={inscriptionDate} onChange={(event) => setInscriptionDate(event.target.value)} className={`${inputClass} mt-1`} style={{ borderRadius: "var(--g-radius-md)" }} />
           </label>
           <label className="text-xs font-medium text-[var(--g-text-primary)] sm:col-span-2">Evidencia verificada
@@ -293,14 +303,14 @@ export function RegistryLifecycleActions({
               {verifiedArtifacts.map((artifact) => <option key={artifact.id} value={artifact.id}>{artifact.title}</option>)}
             </select>
           </label>
-          {verifiedArtifacts.length === 0 ? <p className="text-xs text-[var(--status-warning)] sm:col-span-2">No hay evidencia EVIDENCE_VERIFIED disponible; la inscripción permanece bloqueada.</p> : null}
+          {verifiedArtifacts.length === 0 ? <p className="text-xs text-[var(--status-warning)] sm:col-span-2">No hay evidencia EVIDENCE_VERIFIED disponible; {`sin ella no puede acreditarse ${terminal.article} ${terminal.noun}.`}</p> : null}
           <button type="button" disabled={busy || !inscriptionNumber.trim() || !inscriptionDate || !inscriptionArtifactId} aria-busy={busy} onClick={handleInscription} className={primaryButton} style={{ borderRadius: "var(--g-radius-md)" }}>
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />} Acreditar inscripción
+            {busy && <Loader2 className="h-4 w-4 animate-spin" />} {`Acreditar ${terminal.noun}`}
           </button>
         </div>
       ) : null}
 
-      {status === "INSCRITA" ? (
+      {isRegistryTerminal(status) ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="text-xs font-medium text-[var(--g-text-primary)]">Referencia de publicación
             <input value={publicationReference} onChange={(event) => setPublicationReference(event.target.value)} className={`${inputClass} mt-1`} style={{ borderRadius: "var(--g-radius-md)" }} />

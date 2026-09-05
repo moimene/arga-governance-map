@@ -23,6 +23,8 @@ export const STATUS_LABEL: Record<string, string> = {
   EN_TRAMITE:   "En trámite",
   SUBSANACION:  "Subsanación",
   INSCRITA:     "Inscrita",
+  DEPOSITADA:   "Depositada",
+  LEGALIZADA:   "Legalizada",
   ELEVADA:      "Elevada a público",
   DENEGADA:     "Denegada",
   PUBLICADA:    "Publicada",

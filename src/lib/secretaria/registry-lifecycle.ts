@@ -12,7 +12,60 @@ export type RegistryLifecycleStatus =
   | "SUBSANACION"
   | "DENEGADA"
   | "INSCRITA"
+  | "DEPOSITADA"
+  | "LEGALIZADA"
   | "PUBLICADA";
+
+/**
+ * Terminal de exito por via registral. Un deposito de cuentas (arts. 279 y ss.
+ * LSC) y una legalizacion de libros (arts. 329 y ss. RRM) no causan
+ * inscripcion, asi que no pueden compartir terminal con el acto inscribible.
+ * El servidor decide lo mismo en fn_registry_record_inscription; aqui vive la
+ * copia que necesita la UI para rotular y para abrir la publicacion.
+ */
+export type RegistryTerminalStatus = Extract<
+  RegistryLifecycleStatus,
+  "INSCRITA" | "DEPOSITADA" | "LEGALIZADA"
+>;
+
+export interface RegistryTerminal {
+  status: RegistryTerminalStatus;
+  /** Nombre del tramite, en minuscula y sin articulo. */
+  noun: string;
+  /** Articulo que le corresponde, para redactar sin desacuerdos de genero. */
+  article: "el" | "la";
+  /** Participio concordado con el nombre. */
+  participle: "acreditado" | "acreditada";
+}
+
+const TERMINAL_BY_PROFILE = new Map<string, RegistryTerminal>([
+  [
+    "DEPOSITO_CUENTAS",
+    { status: "DEPOSITADA", noun: "depósito", article: "el", participle: "acreditado" },
+  ],
+  [
+    "LEGALIZACION_LIBROS",
+    { status: "LEGALIZADA", noun: "legalización", article: "la", participle: "acreditada" },
+  ],
+]);
+
+const TERMINAL_DEFAULT: RegistryTerminal = {
+  status: "INSCRITA",
+  noun: "inscripción",
+  article: "la",
+  participle: "acreditada",
+};
+
+export function registryTerminal(procedureProfileCode?: string | null): RegistryTerminal {
+  return (
+    TERMINAL_BY_PROFILE.get(String(procedureProfileCode ?? "").trim().toUpperCase()) ??
+    TERMINAL_DEFAULT
+  );
+}
+
+export function isRegistryTerminal(status: string): status is RegistryTerminalStatus {
+  return status === "INSCRITA" || status === "DEPOSITADA" || status === "LEGALIZADA";
+}
 
 export interface RegistryRpcResult {
   affected_count: number;
@@ -45,10 +98,10 @@ export function canRegistryTransition(
   }
   if (from === "ELEVADA") return to === "PRESENTADA";
   if (from === "PRESENTADA") {
-    return to === "SUBSANACION" || to === "DENEGADA" || to === "INSCRITA";
+    return to === "SUBSANACION" || to === "DENEGADA" || isRegistryTerminal(to);
   }
   if (from === "SUBSANACION") return to === "PRESENTADA";
-  if (from === "INSCRITA") return to === "PUBLICADA";
+  if (isRegistryTerminal(from)) return to === "PUBLICADA";
   return false;
 }
 

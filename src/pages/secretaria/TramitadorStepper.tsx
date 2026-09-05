@@ -120,6 +120,7 @@ type TramitacionDetalleRow = {
   base_document_kind?: string | null;
   base_document_artifact_id?: string | null;
   qualification_outcome?: string | null;
+  procedure_profile_code?: string | null;
   agreement_id?: string | null;
   filing_number?: string | null;
   filing_via?: string | null;
@@ -151,6 +152,8 @@ const REGISTRY_EVENT_LABEL: Record<string, string> = {
   SUBSANACION_PREPARADA: "Subsanación preparada",
   SUBSANACION_PRESENTADA: "Subsanación presentada",
   INSCRIPCION_ACREDITADA: "Inscripción acreditada",
+  DEPOSITO_ACREDITADO: "Depósito acreditado",
+  LEGALIZACION_ACREDITADA: "Legalización acreditada",
   PUBLICACION_ACREDITADA: "Publicación acreditada",
 };
 
@@ -499,6 +502,7 @@ function TramitacionDetalle({ id }: { id: string }) {
                   status={filing.status ?? "PREPARADA"}
                   filingVia={filing.filing_via}
                   qualificationOutcome={filing.qualification_outcome}
+                  procedureProfileCode={filing.procedure_profile_code}
                 />
               </div>
             ) : null}
