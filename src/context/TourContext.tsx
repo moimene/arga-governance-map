@@ -211,15 +211,15 @@ export const tourSteps: TourStep[] = [
     route: "/sii",
     title: "El canal de integridad: segregado por diseño",
     description:
-      "El Sistema Interno de Información no es una función dentro de TGMS — es un entorno técnico separado. El diseño visual diferenciado, el modal de acceso, los logs independientes y el cifrado de evidencias transmiten visualmente la segregación real que exige la Ley 2/2023.",
+      "El Sistema Interno de Información no es una función dentro de TGMS — es un entorno visualmente separado. El diseño diferenciado y el modal de acceso transmiten la segregación que exige la Ley 2/2023. En esta demo los expedientes son simulados y viven solo en este navegador: no hay registro de auditoría separado ni cifrado de evidencias.",
     bullets: [
       "Diseño diferenciado: fondo, header y colores propios — el usuario entiende que ha cambiado de entorno.",
-      "CASO-SII-001 correlacionado con HALL-008 — el sistema conecta investigaciones independientes sin exponer datos protegidos.",
-      "Log de auditoría independiente: cada acceso queda registrado en un sistema separado.",
+      "Expedientes simulados que ilustran la correlación con un hallazgo sin exponer datos protegidos.",
+      "Demo: el ciclo (alta, acuse, prórroga, cierre) se modela completo, pero no se persiste fuera del navegador.",
     ],
     badges: [
-      { label: "CASO-SII-001 activo", tone: "pending" },
-      { label: "Log independiente", tone: "neutral" },
+      { label: "Expediente simulado", tone: "pending" },
+      { label: "Sin persistencia", tone: "neutral" },
     ],
     highlightId: "tour-sii-header",
     available: true,
@@ -282,9 +282,10 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const goTo = (s: number) => {
     setStep(s);
     if (s > 0 && s <= tourSteps.length) {
-      if (tourSteps[s - 1].route.startsWith("/sii") && typeof window !== "undefined") {
-        sessionStorage.setItem("sii_access_confirmed", "true");
-      }
+      // El tour NO salta la puerta de acceso del SII. Antes escribía
+      // `sii_access_confirmed` en sessionStorage para entrar directo, con lo
+      // que el único control de entrada del módulo con el dato más sensible
+      // del producto se podía esquivar navegando por el tour.
       navigate(tourSteps[s - 1].route);
     }
   };

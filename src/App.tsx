@@ -11,6 +11,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { TenantProvider } from "@/context/TenantContext";
 import { TenantBrandProvider, useTenantBranding, useTenantBrandingLoading } from "@/context/TenantBrandContext";
 import { isModuleEnabled } from "@/lib/tenant-modules";
+import { RequireGrcModule, RequireModule } from "@/components/module-guards";
 import { ProtectedShell, RequireAuth } from "@/components/RequireAuth";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotFound from "@/pages/NotFound";
@@ -160,27 +161,6 @@ function ReglasToCatalogoMateriasRedirect() {
   return <Navigate to={`/secretaria/catalogo-materias${query ? `?${query}` : ""}`} replace />;
 }
 
-// D-5 — guard de ruta por módulo. Espera a que el branding cargue antes de
-// decidir: useTenantBranding() devuelve null tanto para ARGA como durante la
-// carga, y redirigir con esa ambigüedad produce parpadeo/falso negativo.
-function RequireModule({ moduleKey, children }: { moduleKey: string; children: React.ReactNode }) {
-  const branding = useTenantBranding();
-  const loading = useTenantBrandingLoading();
-  if (loading) return <ModuleFallback />;
-  if (!isModuleEnabled(branding, moduleKey)) return <Navigate to="/" replace />;
-  return <>{children}</>;
-}
-
-// Guard explícito y hardcodeado para el módulo DORA dentro de la ruta dinámica
-// /grc/m/:moduleId. NO se generaliza a `moduleKey={moduleId}`: eso evaluaría
-// la lista blanca de Garrigues contra cualquier moduleId (gdpr, cyber, audit,
-// ...) y los ocultaría todos — fuera del alcance de esta tarea (D-5 solo
-// decide dora/country-packs/board-pack).
-function RequireDoraModule({ children }: { children: React.ReactNode }) {
-  const { moduleId } = useParams();
-  if (moduleId !== "dora") return <>{children}</>;
-  return <RequireModule moduleKey="dora">{children}</RequireModule>;
-}
 
 const queryClient = new QueryClient();
 
@@ -330,7 +310,7 @@ const App = () => (
                   <Route path="/grc/excepciones"          element={<Suspense fallback={<ModuleFallback />}><Excepciones /></Suspense>} />
                   <Route path="/grc/tprm"                 element={<Suspense fallback={<ModuleFallback />}><TPRM /></Suspense>} />
                   <Route path="/grc/solvencia-ii"         element={<Suspense fallback={<ModuleFallback />}><SolvenciaII /></Suspense>} />
-                  <Route path="/grc/m/:moduleId" element={<RequireDoraModule><Suspense fallback={<ModuleFallback />}><ModuleShell /></Suspense></RequireDoraModule>}>
+                  <Route path="/grc/m/:moduleId" element={<RequireGrcModule><Suspense fallback={<ModuleFallback />}><ModuleShell /></Suspense></RequireGrcModule>}>
                     <Route index element={<Suspense fallback={<ModuleFallback />}><ModuleDashboard /></Suspense>} />
                     <Route path="dashboard" element={<Suspense fallback={<ModuleFallback />}><ModuleDashboard /></Suspense>} />
                     <Route path=":section/:viewKey" element={<Suspense fallback={<ModuleFallback />}><SectionRouter /></Suspense>} />

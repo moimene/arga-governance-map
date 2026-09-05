@@ -29,14 +29,25 @@ export default defineConfig({
     navigationTimeout: 30_000,
   },
   projects: [
+    // `channel: 'chrome'` usa el Chrome del sistema en vez del bundle que
+    // Playwright descarga aparte. Sin esto, una instalación limpia falla con
+    // «Executable doesn't exist … chrome-headless-shell» y NINGÚN spec llega a
+    // correr. Va en LOS DOS proyectos a propósito: `setup` no tenía bloque
+    // `use`, así que caía al chromium por defecto y tumbaba la cadena entera
+    // antes de que `chromium` (que depende de él) empezara.
     {
       name: 'setup',
       testMatch: /auth\.setup\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        channel: 'chrome',
+      },
     },
     {
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        channel: 'chrome',
         storageState: '.auth/session.json',
       },
       dependencies: ['setup'],
