@@ -20,6 +20,7 @@
 // de abajo se comprobó contra el código ANTERIOR a la corrección (cae) y contra
 // el actual (pasa).
 import { describe, expect, it } from "vitest";
+import { sinComentarios } from "../helpers/sin-comentarios";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
@@ -44,9 +45,24 @@ const RUTAS = [
   ...ficheros("src/lib/sii"),
   ...ficheros("scripts/garrigues/sii"),
   "src/hooks/useWhistleblowing.ts",
+  // PUERTAS DE ENTRADA desde fuera del módulo. `GovernanceMap` seguía diciendo
+  // «Al acceder se registrará en el log de auditoría independiente» —la misma
+  // afirmación que se retiró de SiiLayout y del tour— y sobrevivió a todo el
+  // cierre porque un guard que solo mira `src/pages/sii` no ve las puertas de
+  // al lado. Lo cazó la verificación viva sobre el bundle desplegado, no la
+  // suite. Quien afirme algo del canal entra aquí, esté donde esté.
+  "src/pages/GovernanceMap.tsx",
+  "src/context/TourContext.tsx",
+  "src/pages/Documentacion.tsx",
 ];
 
-const superficie: Array<readonly [string, string]> = RUTAS.map((f) => [f, leer(f)] as const);
+// Se juzga lo que se RENDERIZA, no la prosa que explica una retirada: el
+// comentario que documenta por qué se quitó una frase la contiene, y sin esto el
+// guard se dispara contra su propia justificación —lo que empuja a borrar el
+// comentario, que es justo lo que no se quiere—. Ocurrió tres veces el 2026-09-05.
+const superficie: Array<readonly [string, string]> = RUTAS.map(
+  (f) => [f, sinComentarios(leer(f))] as const,
+);
 
 describe("SII — la superficie escaneada cubre de verdad el módulo", () => {
   it("incluye el hook, los scripts de siembra y los subdirectorios", () => {

@@ -377,7 +377,12 @@ export default function GovernanceMap() {
                       {t === "sii" && (
                         <div className="flex items-start gap-2 rounded-md border border-[var(--t-status-warning)] bg-[var(--t-surface-subtle)] px-3 py-2 text-xs text-[var(--t-text-primary)]">
                           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--t-status-warning)]" />
-                          <span>Al acceder se registrará en el log de auditoría independiente.</span>
+                          {/* Decía «se registrará en el log de auditoría independiente». No existe:
+                              la puerta del SII solo escribe un flag en sessionStorage, y esa misma
+                              afirmación se retiró de SiiLayout y del tour en el cierre del
+                              2026-09-05. Este fichero quedó fuera del perímetro del carril y lo
+                              cazó la verificación viva sobre el bundle desplegado. */}
+                          <span>Va a entrar en la zona segregada del canal interno, con su propia puerta de acceso.</span>
                         </div>
                       )}
                       <Button asChild className="w-full gap-1.5 bg-[var(--t-brand)] text-[var(--t-text-inverse)] hover:bg-[var(--t-brand-hover)]">
