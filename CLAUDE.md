@@ -236,6 +236,32 @@ Landed (opciones A+B del análisis; **la opción C —fail-closed— queda fuera
 
 Deuda declarada y verificada sin impacto hoy: el rescate por materia (`TramitadorStepper.tsx`) resuelve el pack sin órgano, pero los dos packs de `AUTORIZACION_GARANTIA` enrutan ambos a MEETING. Contenido legal dudoso en el dato vivo (pendiente Comité): `NOMBRAMIENTO_CONSEJERO` cita `plazoInscripcion 30 días, art. 17 RRM` — el art. 17 RRM es competencia territorial, y el seed de cooptación no aplicado (`scripts/seed-nombramiento-consejero-rule-pack.ts`) arrastra la misma cita.
 
+### Cierre integral de gaps por módulo, consola y coherencia (2026-09-05)
+
+Ejecución del prompt `docs/superpowers/prompts/2026-09-05-goal-cierre-gaps-modulos.md` sobre el informe `docs/superpowers/reviews/2026-09-02-revision-profunda-carriles-garrigues.md` (215 hallazgos de la 1ª pasada + 181 de la 2ª, con 138 sin juzgar en GRC/AIMS/canal). **Ledger canónico: `docs/superpowers/plans/2026-09-05-ledger-cierre-gaps.md`** — ahí está cada decisión, cada refutación y cada deuda con dueño.
+
+**Tres decisiones del usuario que gobiernan todo el cierre:**
+- **SII → opción (b), honesto.** El canal NO se hace operable contra Cloud: sigue en localStorage y la pantalla lo dice. Cero migraciones sobre `sii.*`.
+- **Fixtures GRC → gatear por tenant + etiquetar demo** (no retirar). Solvencia II y las vistas de `/grc/m/:moduleId` se ocultan a Garrigues (sidebar **y URL**); ARGA las conserva con marca honesta.
+- **Cloud → solo código.** Ninguna migración ni escritura en `governance_OS`. **Todo hallazgo que solo se cierra en Cloud es deuda aceptada** (DA-1…DA-25 en el ledger), incluido el **P0 del bucket `matter-documents`**, que sigue ABIERTO: sus tres políticas de `storage.objects` discriminan por `bucket_id` y no por tenant (medido 2026-09-05), así que cualquier autenticado lee y escribe los documentos registrales de cualquier tenant.
+
+**Patrón sistémico encontrado — importa más que cualquier hallazgo suelto:** cinco gates del repo **fijaban como obligatorias las afirmaciones que el producto no sostiene**, de modo que retirarlas ponía el test en rojo y premiaba conservarlas. `e2e/grc-dora.spec.ts` asertaba «QSeal Custodia» y «PLAN DE SALIDA SELLADO EN LEDGER WORM»; `ead-interposition-product-policy.test.ts` exigía `toContain("PLAN DE SALIDA CUSTODIADO EN LEDGER WORM")` y `toContain("QSeal no personal")`; `15-demo-operable` pedía «QES_SANDBOX» y `/api/v1/private/signature-requests`; `10-grc` exigía un chip «No conectado ahora: TPRM» que era falso. Todos reescritos sobre la invariante, con control positivo para que una pantalla en blanco no los satisfaga. **Al escribir un guard, comprobar de qué lado está: si prohíbe una frase, que no la exija en otro sitio.**
+
+**Corolario y GOTCHA nuevo:** el comentario que EXPLICA una retirada contiene la frase que el gate prohíbe, así que el gate se dispara contra su propia justificación — y la salida fácil es borrar el comentario. Ocurrió **tres veces el mismo día**. Helper compartido: `src/test/helpers/sin-comentarios.ts`. Se juzga lo que se renderiza, no la prosa que lo justifica.
+
+**Otros GOTCHAs del cierre:**
+- **Playwright no podía correr**: «Executable doesn't exist … chrome-headless-shell», y como el proyecto `setup` no declaraba navegador, **ni un solo spec llegaba a ejecutarse**. `channel: 'chrome'` va en LOS DOS proyectos de `playwright.config.ts`.
+- `incidents` **no tiene columna `module_id`** en Cloud y sus estados son `Abierto | Cerrado | En investigación | Resuelto`. El KPI «Incidentes DORA abiertos» de la consola era un **0 falso desde su creación** porque `count ?? 0` se tragaba el error de PostgREST. Regla del read model: un error se propaga como `null` («no medido»), nunca como 0.
+- `capability_matrix` **no tiene `tenant_id`** (matriz global de roles, 40 filas): su queryKey sin tenant es correcta, no un defecto.
+- Un `git rm` staged por otro carril se cuela en el commit de un carril distinto: `git commit` commitea el índice entero. Commitear por rutas no basta si el índice ya trae algo.
+- `mock.module` de bun es global al proceso: dos tests mockeaban `@/context/AuthContext` sin restaurar y tumbaban el test de aislamiento de caché de otro fichero.
+
+**Lo que cambió en ARGA** (todo corrección de defecto probado, declarado carril por carril en el ledger): «Obligaciones Jurídicas» de Penal pasa de **12 inventado a 0 real**; actas pendientes de **4 a 12** (las 8 `DEMO_SIMULATION`/`LEGACY_REVIEW` dejan de contar como aprobadas); libros en alerta de **3 a 2**; «Convocatorias con plazo» de check verde a **«No medido»**; desaparece la atribución de Guía AESIA por requisito (10 de 12 eran incorrectas); tres fechas de vencimiento del SII que superaban el máximo legal del art. 9.2.d; y se retiran los claims de QSeal/WORM/custodia cualificada/EAD Trust de GRC y del canal.
+
+**Gate de aislamiento cross-tenant**: de 9 a **16 tablas**, con logins reales en ambas direcciones. Las cuatro direcciones vacuas van declaradas con motivo y fuente en `src/test/garrigues/aislamiento-declarado.ts` — no es exención: si dejan de estar vacías, el gate rompe.
+
+**Reservado al Comité Legal, NO decidido aquí:** plazos art. 17/19 RRM; art. 308 supresión vs exclusión; NULL=ANY en órgano/adopción/tipo social; `SOCIO_UNICO`≈Junta; extractor de mayoría anidada (`rule-pack-params.ts`); y —nuevo— el RDL 5/2023 sustituyó el derecho de oposición por «garantías adecuadas» (arts. 13 y 14) mientras `evaluateCreditorOpposition` sigue computando 30 días: solo se corrigió la **cita** (art. 44 → art. 13).
+
 ### Verificación última conocida (2026-07-21, cierre convocatoria integral)
 
 - `bun run db:check-target`: pass contra `governance_OS`.
