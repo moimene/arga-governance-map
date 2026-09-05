@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, ClipboardCheck, FileWarning, Route, Search, SlidersHorizontal, PlusCircle } from "lucide-react";
 import { useAllAssessments } from "@/hooks/useAiAssessments";
-import { isAimsTechnicalFileGapCandidate } from "@/lib/aims/readiness";
+import { assessmentAcreditaConformidad, isAimsTechnicalFileGapCandidate } from "@/lib/aims/readiness";
 import { cn } from "@/lib/utils";
 
 const ASSESSMENT_STATUS_CHIP: Record<string, string> = {
@@ -18,6 +18,9 @@ const FRAMEWORK_BADGE: Record<string, string> = {
 
 const ASSESSMENT_STATUS_LABEL: Record<string, string> = {
   APROBADO: "Aprobada",
+  CONFORME: "Conforme",
+  CON_GAPS: "Con brechas",
+  NO_CONFORME: "No conforme",
   EN_REVISION: "En revisión",
   BORRADOR: "Borrador",
 };
@@ -29,7 +32,9 @@ const FRAMEWORK_LABEL: Record<string, string> = {
 
 const STATUS_OPTIONS = [
   { value: "Todos", label: "Todas" },
-  { value: "APROBADO", label: "Aprobadas" },
+  { value: "CONFORME", label: "Conformes" },
+  { value: "CON_GAPS", label: "Con brechas" },
+  { value: "APROBADO", label: "Aprobadas (legado)" },
   { value: "EN_REVISION", label: "En revisión" },
   { value: "BORRADOR", label: "Borrador" },
 ];
@@ -120,7 +125,7 @@ export default function Evaluaciones() {
   const [actionFilter, setActionFilter] = useState("Todos");
   const { data: assessments = [], isLoading } = useAllAssessments();
 
-  const approvedCount = assessments.filter((ass) => ass.status === "APROBADO").length;
+  const approvedCount = assessments.filter((ass) => assessmentAcreditaConformidad(ass.status)).length;
   const gapCount = assessments.filter(isAimsTechnicalFileGapCandidate).length;
   const scoredAssessments = assessments.filter((ass) => typeof ass.score === "number");
   const averageScore = scoredAssessments.length > 0
@@ -191,7 +196,7 @@ export default function Evaluaciones() {
           </div>
           {[
             { label: "Evaluaciones", value: assessments.length, tone: "info" },
-            { label: "Aprobadas", value: approvedCount, tone: "success" },
+            { label: "Conformes o aprobadas", value: approvedCount, tone: "success" },
             { label: "Requieren GRC", value: gapCount, tone: gapCount > 0 ? "error" : "success" },
           ].map((stat) => (
             <div

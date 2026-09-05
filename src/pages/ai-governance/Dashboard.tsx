@@ -24,6 +24,7 @@ import { useAllAssessments, useAllComplianceChecks } from "@/hooks/useAiAssessme
 import {
   aimsReadOnlyHandoffs,
   aimsScreenPostures,
+  assessmentAcreditaConformidad,
   buildAimsReadiness,
   filterSystemsByScope,
   type AimsComplianceMonitorDomain,
@@ -73,21 +74,25 @@ function KpiCard({
   value: string | number;
   sub?: string;
   icon: React.ElementType;
-  tone?: "success" | "error" | "warning" | "info";
+  tone?: "success" | "error" | "warning" | "info" | "neutral";
   to?: string;
 }) {
   const navigate = useNavigate();
+  // `neutral` para el cero SIN dato: un 0 verde afirma «no hay ninguno» cuando
+  // en realidad no hay nada con que contarlo.
   const toneColor: Record<string, string> = {
     success: "text-[var(--status-success)]",
     error:   "text-[var(--status-error)]",
     warning: "text-[var(--status-warning)]",
     info:    "text-[var(--status-info)]",
+    neutral: "text-[var(--g-text-secondary)]",
   };
   const iconBg: Record<string, string> = {
     success: "bg-[var(--status-success)]/10",
     error:   "bg-[var(--status-error)]/10",
     warning: "bg-[var(--status-warning)]/10",
     info:    "bg-[var(--status-info)]/10",
+    neutral: "bg-[var(--g-surface-muted)]",
   };
   const t = tone ?? "info";
   return (
@@ -466,12 +471,16 @@ export default function AiDashboard() {
   const limitado = systems.filter((s) => s.risk_level === "Limitado").length;
   const minimo  = systems.filter((s) => s.risk_level === "Mínimo").length;
 
+  const sistemasClasificados = systems.filter((s) => (s.risk_level ?? "").trim() !== "").length;
+
   const incidentesAbiertos = incidents.filter(
     (i) => i.status === "ABIERTO" || i.status === "EN_INVESTIGACION"
   ).length;
 
+  // `APROBADO` es legado: el producto escribe `CONFORME`. Predicado único en
+  // `readiness.ts` para que escritura y lectura no vuelvan a divergir.
   const approvedSysIds = new Set(
-    assessments.filter((a) => a.status === "APROBADO").map((a) => a.system_id)
+    assessments.filter((a) => assessmentAcreditaConformidad(a.status)).map((a) => a.system_id)
   );
   const altosNoEvaluados = systems.filter(
     (s) => s.risk_level === "Alto" && !approvedSysIds.has(s.id)
@@ -521,10 +530,15 @@ export default function AiDashboard() {
     {
       label: "Inventario activo",
       value: activos,
-      body: `${systems.length} sistemas registrados en AIMS con clasificación de riesgo.`,
+      // Antes afirmaba que los N sistemas tenían clasificación de riesgo sin
+      // mirar `risk_level`. Se cuenta.
+      body:
+        systems.length === 0
+          ? "Sin sistemas registrados en el inventario."
+          : `${systems.length} sistemas registrados; ${sistemasClasificados} con nivel de riesgo declarado.`,
       to: "/ai-governance/sistemas",
       icon: Cpu,
-      tone: "text-[var(--status-info)]",
+      tone: systems.length === 0 ? "text-[var(--g-text-secondary)]" : "text-[var(--status-info)]",
     },
   ];
   const quickActions = [
@@ -667,26 +681,26 @@ export default function AiDashboard() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <KpiCard
               label="Sistemas IA activos"
-              value={activos}
-              sub={`${systems.length} total en inventario`}
+              value={systems.length === 0 ? "—" : activos}
+              sub={systems.length === 0 ? "Sin inventario registrado" : `${systems.length} total en inventario`}
               icon={Cpu}
-              tone="info"
+              tone={systems.length === 0 ? "neutral" : "info"}
               to="/ai-governance/sistemas"
             />
             <KpiCard
               label="Riesgo Alto sin eval. aprobada"
-              value={altosNoEvaluados}
-              sub="Requieren evaluación EU AI Act"
+              value={systems.length === 0 ? "—" : altosNoEvaluados}
+              sub={systems.length === 0 ? "Sin inventario registrado" : "Requieren evaluación EU AI Act"}
               icon={AlertTriangle}
-              tone={altosNoEvaluados > 0 ? "error" : "success"}
+              tone={systems.length === 0 ? "neutral" : altosNoEvaluados > 0 ? "error" : "success"}
               to="/ai-governance/evaluaciones"
             />
             <KpiCard
               label="Incidentes abiertos"
-              value={incidentesAbiertos}
-              sub="Abiertos o en investigación"
+              value={incidents.length === 0 ? "—" : incidentesAbiertos}
+              sub={incidents.length === 0 ? "Sin incidentes registrados" : "Abiertos o en investigación"}
               icon={AlertTriangle}
-              tone={incidentesAbiertos > 0 ? "warning" : "success"}
+              tone={incidents.length === 0 ? "neutral" : incidentesAbiertos > 0 ? "warning" : "success"}
               to="/ai-governance/incidentes"
             />
             <KpiCard
@@ -711,11 +725,17 @@ export default function AiDashboard() {
                   <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
                     Readiness de demo AIMS
                   </h2>
+                  {/* Era incondicional y contradecía al propio resumen: se
+                      pinta el veredicto que `buildAimsReadiness` calcula. */}
                   <span
-                    className="text-[10px] font-bold uppercase text-[var(--g-text-inverse)] bg-[var(--g-brand-3308)] px-2 py-0.5"
+                    className={`text-[10px] font-bold uppercase px-2 py-0.5 ${
+                      readiness.standaloneReady
+                        ? "text-[var(--g-text-inverse)] bg-[var(--g-brand-3308)]"
+                        : "text-[var(--g-text-secondary)] bg-[var(--g-surface-muted)] border border-[var(--g-border-subtle)]"
+                    }`}
                     style={{ borderRadius: "var(--g-radius-full)" }}
                   >
-                    Standalone-ready
+                    {readiness.standaloneReady ? "Standalone-ready" : "Standalone con gaps"}
                   </span>
                 </div>
                 <p className="mt-2 max-w-3xl text-xs text-[var(--g-text-secondary)] leading-relaxed">
@@ -738,7 +758,12 @@ export default function AiDashboard() {
                   </span>
                 </div>
                 <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">
-                  Estado de fuentes: datos demo conectados
+                  {/* «datos demo conectados» era incondicional: con las tres
+                      fuentes vacías seguía afirmando que había datos. */}
+                  Estado de fuentes:{" "}
+                  {systems.length + incidents.length + assessments.length === 0
+                    ? "sin datos en las tres fuentes"
+                    : `${systems.length} sistemas · ${assessments.length} evaluaciones · ${incidents.length} incidentes`}
                 </p>
                 <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">
                   Contrato: demostrador AIMS P0
@@ -773,11 +798,15 @@ export default function AiDashboard() {
                   </div>
                   <div>
                     <dt className="text-[11px] text-[var(--g-text-secondary)]">Migración</dt>
-                    <dd className="mt-1 text-xs font-medium text-[var(--g-text-primary)]">Pendiente, sin schema nuevo</dd>
+                    {/* «sin schema nuevo» era falso —las tablas `aims_*` existen
+                        desde abril— y además contradecía al dominio `migration`
+                        del propio resumen, que dice «No medido». */}
+                    <dd className="mt-1 text-xs font-medium text-[var(--g-text-primary)]">No medido en este resumen</dd>
                   </div>
                 </dl>
                 <p className="mt-3 text-xs text-[var(--g-text-secondary)] leading-relaxed">
-                  La compatibilidad técnica futura se mantiene como contrato, sin nuevas escrituras en esta rebanada.
+                  Este panel es de solo lectura sobre <code>ai_*</code>. El backbone <code>aims_*</code> existe y lo
+                  usan otras pantallas del módulo, pero su estado no se mide aquí.
                 </p>
               </div>
 

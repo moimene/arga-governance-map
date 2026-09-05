@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, skipToken } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 
@@ -19,12 +19,15 @@ export type AiSystem = {
   created_at: string;
 };
 
+// El guard del tenant va en la queryFn (`skipToken`), no en `enabled`:
+// TanStack v5 EJECUTA la queryFn de una query deshabilitada cuando alguien
+// llama a `refetch()` a mano. Con `enabled` a secas, ese refetch corría el
+// `.eq("tenant_id", null)` y consultaba con el tenant sin resolver.
 export function useAiSystemsList(riskFilter?: string) {
   const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: ["ai_systems", tenantId, riskFilter ?? "all"],
-    enabled: !!tenantId,
-    queryFn: async () => {
+    queryFn: tenantId ? async () => {
       let q = supabase
         .from("ai_systems")
         .select("*")
@@ -34,7 +37,7 @@ export function useAiSystemsList(riskFilter?: string) {
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as AiSystem[];
-    },
+    } : skipToken,
   });
 }
 
@@ -42,8 +45,7 @@ export function useAiSystemById(id: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: ["ai_systems", tenantId, id],
-    queryFn: async () => {
-      if (!id) return null;
+    queryFn: tenantId && id ? async () => {
       const { data, error } = await supabase
         .from("ai_systems")
         .select("*")
@@ -52,8 +54,7 @@ export function useAiSystemById(id: string | undefined) {
         .single();
       if (error) throw error;
       return data as AiSystem;
-    },
-    enabled: !!id && !!tenantId,
+    } : skipToken,
   });
 }
 

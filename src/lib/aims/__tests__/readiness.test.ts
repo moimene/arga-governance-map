@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   aimsReadOnlyHandoffs,
   aimsScreenPostures,
@@ -87,15 +88,21 @@ describe("buildAimsReadiness", () => {
   });
 
   it("declara postura pantalla por pantalla sin mezclar ai_* y aims_*", () => {
-    expect(aimsScreenPostures.map((screen) => screen.route)).toEqual([
-      "/ai-governance",
-      "/ai-governance/sistemas",
-      "/ai-governance/sistemas/nuevo",
-      "/ai-governance/sistemas/:id",
-      "/ai-governance/evaluaciones",
-      "/ai-governance/incidentes",
-      "/ai-governance/incidentes/nuevo",
-    ]);
+    // ANTES: una lista de 7 rutas fijada con `toEqual`. `App.tsx` monta DIEZ,
+    // así que el test bendecía las tres que faltaban —`/evaluaciones/nuevo`,
+    // `/evaluaciones/:id` e `/incidentes/:id`, las tres que ESCRIBEN o pintan
+    // el detalle— y además impedía notarlo. Ahora la referencia es el router:
+    // toda ruta montada tiene que tener postura declarada, y ninguna postura
+    // puede describir una ruta que no existe.
+    const app = readFileSync("src/App.tsx", "utf8");
+    const montadas = [
+      ...new Set(
+        (app.match(/path="\/ai-governance[^"]*"/g) ?? []).map((m) => m.slice(6, -1)),
+      ),
+    ].sort();
+    expect(montadas.length, "no se han encontrado rutas /ai-governance en App.tsx")
+      .toBeGreaterThan(0);
+    expect([...aimsScreenPostures.map((s) => s.route)].sort()).toEqual(montadas);
 
     // A5 (2026-08-29): este bucle exigía `migrationRequired: false` y que TODAS
     // las tablas empezaran por `ai_` para las 7 pantallas — y la ficha de

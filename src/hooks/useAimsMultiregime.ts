@@ -1,14 +1,6 @@
 import { useQuery, useMutation, useQueryClient, skipToken } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
-import {
-  evaluateMultiregimeIncident,
-  calculateRiaDeadline,
-  calculateGdprDeadline,
-  calculateDoraDeadlines,
-  formatRemainingTime,
-  MultiregimeClocks,
-} from "@/lib/aims/incident-clocks";
 
 export interface IncidentRegimeCase {
   id: string;
@@ -28,17 +20,10 @@ export interface IncidentRegimeCase {
   updated_at: string;
 }
 
-export interface RegulatoryClock {
-  id: string;
-  tenant_id: string;
-  incident_regime_id: string;
-  clock_type: string;
-  trigger_at: string;
-  deadline_at: string;
-  status: "RUNNING" | "SATISFIED" | "EXPIRED" | "PAUSED_JUSTIFIED";
-  delay_justification: string | null;
-  stopped_at: string | null;
-}
+// `RegulatoryClock` describía `aims_regulatory_clocks`, tabla que NINGUNA
+// superficie de `src/` lee ni escribe: los relojes se calculan en cliente en
+// `incident-clocks.ts` y no se persisten. El tipo se ha retirado para que no
+// sugiera una persistencia que no existe; la tabla sigue en Cloud.
 
 export interface IncidentReport {
   id: string;
@@ -52,8 +37,10 @@ export interface IncidentReport {
   is_complete: boolean;
   content_summary: string | null;
   manifest_hash: string | null;
-  qseal_token: string | null;
-  tsq_token: string | null;
+  // Igual que en la FRIA: `aims_incident_reports` no tiene `qseal_token` ni
+  // `tsq_token`. Con ellas en el tipo, `useCreateIncidentReport` —que hace
+  // spread del objeto entero— rompía con PGRST204 en cuanto alguien respetara
+  // el contrato. No se reintroducen: serían un claim de sello.
 }
 
 /**

@@ -194,6 +194,32 @@ export const aimsScreenPostures: AimsScreenPosture[] = [
     notes: "Los gaps se proponen a GRC; AIMS no crea controles GRC directamente.",
   },
   {
+    route: "/ai-governance/evaluaciones/nuevo",
+    screen: "Nuevo autodiagnóstico de conformidad",
+    owner: "AIMS 360",
+    hooks: ["useAiSystemsList", "useCreateAssessment", "useCreateComplianceChecks"],
+    tables: ["ai_risk_assessments", "ai_compliance_checks", "ai_systems"],
+    posture: "legacy_write",
+    sourceOfTruth: "ai_risk_assessments y ai_compliance_checks, scoped por ai_systems",
+    operation: "owner-write",
+    crossModuleHandoffs: ["No aplica; alta propietaria AIMS"],
+    migrationRequired: false,
+    notes: "INSERT plano sin hash, sello ni bundle: registra el autodiagnóstico, no lo precinta.",
+  },
+  {
+    route: "/ai-governance/evaluaciones/:id",
+    screen: "Informe de autodiagnóstico",
+    owner: "AIMS 360",
+    hooks: ["useAssessmentById"],
+    tables: ["ai_risk_assessments", "ai_systems"],
+    posture: "legacy_read",
+    sourceOfTruth: "ai_risk_assessments con join tenant-scoped a ai_systems",
+    operation: "read-only",
+    crossModuleHandoffs: ["AIMS_TECHNICAL_FILE_GAP -> /grc/risk-360 cuando consta brecha"],
+    migrationRequired: false,
+    notes: "El desglose sólo reconcilia findings cuyo código esté en el catálogo del marco.",
+  },
+  {
     route: "/ai-governance/incidentes",
     screen: "Incidentes IA",
     owner: "AIMS 360",
@@ -224,6 +250,22 @@ export const aimsScreenPostures: AimsScreenPosture[] = [
     ],
     migrationRequired: false,
     notes: "Probe de permisos alcanzo FK segura; no escribe GRC ni Secretaria.",
+  },
+  {
+    route: "/ai-governance/incidentes/:id",
+    screen: "Ficha de Incidente IA",
+    owner: "AIMS 360",
+    hooks: ["useAiIncidentById", "useUpdateAiIncident", "useIncidentRegimes", "useUpdateIncidentRegime"],
+    tables: ["ai_incidents", "ai_systems", "aims_incident_regimes"],
+    posture: "legacy_write",
+    sourceOfTruth: "ai_incidents como owner; subexpedientes por régimen en aims_incident_regimes",
+    operation: "owner-write",
+    crossModuleHandoffs: [
+      "AIMS_INCIDENT_MATERIAL -> /grc/incidentes",
+      "AIMS_INCIDENT_MATERIAL -> /secretaria/reuniones/nueva",
+    ],
+    migrationRequired: true,
+    notes: "Los relojes se calculan en cliente y no se persisten; el cierre de subexpediente no notifica a ninguna autoridad.",
   },
 ];
 
@@ -285,9 +327,56 @@ function domainStatus(value: number, watchAt: number, readyAt: number): AimsRead
   return "gap";
 }
 
+/**
+ * Normaliza un estado para compararlo: mayúsculas, sin tildes y con el espacio
+ * unificado al guion bajo.
+ *
+ * `ai_compliance_checks.status` convive en Cloud con SEIS grafías del mismo
+ * puñado de estados —`CONFORME` y `Conforme`, `NO_CONFORME` y `No conforme`,
+ * `EN_CURSO` y `En revisión`—, y las tablas `ai_*` no tienen CHECK que lo
+ * impida. Comparar contra literales en mayúsculas dejaba «No conforme» fuera de
+ * `GAP_STATUSES` y `statusFromChecks` devolvía «Vigilancia»: una no conformidad
+ * real pintada como amarilla.
+ */
+export function normalizeAimsStatus(status: string | null | undefined): string {
+  return (status ?? "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+/**
+ * Estados de evaluación que ACREDITAN conformidad.
+ *
+ * El vocabulario está partido entre escritura y lectura: el producto escribe
+ * `CONFORME | CON_GAPS | BORRADOR` (`evaluacion-payload.ts`) y la lectura sólo
+ * contaba `APROBADO`, un valor que NINGÚN camino del producto escribe — sólo
+ * está en las filas antiguas de Cloud. Consecuencia: una evaluación conforme
+ * recién creada no cubría a su sistema y el KPI seguía diciendo «alto riesgo
+ * sin evaluación aprobada». Se acepta el vocabulario que se escribe Y el
+ * legado, en un solo sitio, para que no vuelvan a divergir.
+ */
+const ASSESSMENT_COMPLIANT_STATUSES = new Set(["APROBADO", "CONFORME"]);
+
+export function assessmentAcreditaConformidad(status: string | null | undefined): boolean {
+  return ASSESSMENT_COMPLIANT_STATUSES.has(normalizeAimsStatus(status));
+}
+
+/**
+ * Severidad material de un incidente. El alta (`IncidenteNuevo`) y la lista
+ * escriben `CRITICO | ALTO | MEDIO | BAJO`; la ficha comparaba con `CRITICA` y
+ * `ALTA`, que nadie escribe, así que el banner de incidente material y el chip
+ * de severidad nunca se encendían. Único predicado para todos los llamadores.
+ */
+export function isMaterialSeverity(severity: string | null | undefined): boolean {
+  return ["CRITICO", "ALTO"].includes(normalizeAimsStatus(severity));
+}
+
 export function isAimsTechnicalFileGapCandidate(assessment: AimsAssessmentLike) {
   const status = assessment.status ?? "";
-  const hasUnapprovedStatus = status !== "" && status !== "APROBADO";
+  const hasUnapprovedStatus = status !== "" && !assessmentAcreditaConformidad(status);
   const hasWeakScore = typeof assessment.score === "number" && assessment.score < 80;
   const hasOpenFinding = (assessment.findings ?? []).some((finding) =>
     ["NO_CONFORME", "PENDIENTE", "EN_CURSO", "ABIERTO"].includes(finding.status ?? ""),
@@ -299,15 +388,18 @@ export function isAimsTechnicalFileGapCandidate(assessment: AimsAssessmentLike) 
 export function isAimsMaterialIncidentCandidate(incident: AimsIncidentLike) {
   const severity = incident.severity ?? "";
   const status = incident.status ?? "";
-  const materialSeverity = ["CRITICO", "CRÍTICO", "ALTO"].includes(severity);
-  const openStatus = ["ABIERTO", "EN_INVESTIGACION"].includes(status);
+  const materialSeverity = isMaterialSeverity(severity);
+  const openStatus = ["ABIERTO", "EN_INVESTIGACION"].includes(normalizeAimsStatus(status));
 
   return materialSeverity && openStatus;
 }
 
 const COMPLIANT_STATUSES = new Set(["CONFORME", "APROBADO", "OK", "CERRADO", "COMPLETO"]);
-const WATCH_STATUSES = new Set(["EN_CURSO", "EN_REVISION", "EN_REVISIÓN", "PENDIENTE", "PARCIAL", "BORRADOR"]);
-const GAP_STATUSES = new Set(["NO_CONFORME", "ABIERTO", "BLOQUEADO", "VENCIDO", "CRITICO", "CRÍTICO"]);
+// Los estados llegan por `normalizeAimsStatus`, así que estos conjuntos van en
+// la forma canónica (mayúsculas, sin tildes, con guion bajo): «En revisión» y
+// «EN_REVISION» son la misma clave, y no hace falta enumerar las dos.
+const WATCH_STATUSES = new Set(["EN_CURSO", "EN_REVISION", "PENDIENTE", "PARCIAL", "BORRADOR"]);
+const GAP_STATUSES = new Set(["NO_CONFORME", "ABIERTO", "BLOQUEADO", "VENCIDO", "CRITICO"]);
 
 type MonitorDefinition = Omit<AimsComplianceMonitorDomain, "status" | "metric"> & {
   keywords: string[];
@@ -474,7 +566,7 @@ function checksForDefinition(checks: AimsComplianceCheckLike[], definition: Moni
 
 function statusFromChecks(checks: AimsComplianceCheckLike[]): AimsReadinessStatus | null {
   if (checks.length === 0) return null;
-  const statuses = checks.map((check) => check.status ?? "");
+  const statuses = checks.map((check) => normalizeAimsStatus(check.status));
   if (statuses.some((status) => GAP_STATUSES.has(status))) return "gap";
   if (statuses.every((status) => COMPLIANT_STATUSES.has(status))) return "ready";
   if (statuses.some((status) => WATCH_STATUSES.has(status))) return "watch";
@@ -492,7 +584,7 @@ function fallbackMonitorStatus(
   const inacceptableSystems = systems.filter((system) => system.risk_level === "Inaceptable");
   const assessedSystemIds = new Set(
     assessments
-      .filter((assessment) => assessment.status === "APROBADO" && assessment.system_id)
+      .filter((assessment) => assessmentAcreditaConformidad(assessment.status) && assessment.system_id)
       .map((assessment) => assessment.system_id as string),
   );
   const highRiskAssessed = highRiskSystems.filter((system) => assessedSystemIds.has(system.id)).length;
@@ -505,7 +597,9 @@ function fallbackMonitorStatus(
   const isoAssessments = assessments.filter((assessment) =>
     normalizeSearchText((assessment as { framework?: string | null }).framework).includes("iso"),
   );
-  const approvedIsoAssessments = isoAssessments.filter((assessment) => assessment.status === "APROBADO").length;
+  const approvedIsoAssessments = isoAssessments.filter((assessment) =>
+    assessmentAcreditaConformidad(assessment.status),
+  ).length;
 
   switch (definition.id) {
     case "inventory-classification":
@@ -577,7 +671,7 @@ export function buildAimsComplianceMonitors(input: AimsReadinessInput): AimsComp
     const fallback = fallbackMonitorStatus(definition, base);
     const status = checkedStatus ?? fallback.status;
     const metric = matchingChecks.length > 0
-      ? `${matchingChecks.filter((check) => COMPLIANT_STATUSES.has(check.status ?? "")).length}/${matchingChecks.length} conformes`
+      ? `${matchingChecks.filter((check) => COMPLIANT_STATUSES.has(normalizeAimsStatus(check.status))).length}/${matchingChecks.length} conformes`
       : fallback.metric;
 
     return {
@@ -604,7 +698,7 @@ export function buildAimsReadiness({
   const activeSystems = systems.filter((system) => system.status === "ACTIVO").length;
   const assessedSystemIds = new Set(
     assessments
-      .filter((assessment) => assessment.status === "APROBADO" && assessment.system_id)
+      .filter((assessment) => assessmentAcreditaConformidad(assessment.status) && assessment.system_id)
       .map((assessment) => assessment.system_id as string),
   );
   const highRiskSystems = systems.filter((system) => system.risk_level === "Alto");
@@ -618,7 +712,7 @@ export function buildAimsReadiness({
   const findings = assessments.flatMap((assessment) => assessment.findings ?? []);
   const controlFindings = findings.filter((finding) => finding.code || finding.status);
   const closedControlFindings = controlFindings.filter(
-    (finding) => finding.status === "CERRADO" || finding.status === "APROBADO" || finding.status === "OK",
+    (finding) => ["CERRADO", "APROBADO", "CONFORME", "OK"].includes(normalizeAimsStatus(finding.status)),
   ).length;
 
   const inventoryCoverage = pct(activeSystems, totalSystems);

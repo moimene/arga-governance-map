@@ -1,14 +1,18 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAiIncidentById, useUpdateAiIncident } from "@/hooks/useAiIncidents";
-import { useIncidentRegimes, useUpdateIncidentRegime, useCreateIncidentReport } from "@/hooks/useAimsMultiregime";
+import { useIncidentRegimes, useUpdateIncidentRegime } from "@/hooks/useAimsMultiregime";
 import {
   evaluateMultiregimeIncident,
   formatDeadline,
   formatIncidentDate,
   formatRemainingTime,
+  altoRiesgoDeclarado,
   RiaIncidentSeverity,
 } from "@/lib/aims/incident-clocks";
+import { isMaterialSeverity } from "@/lib/aims/readiness";
+import { isModuleEnabled } from "@/lib/tenant-modules";
+import { useTenantBranding } from "@/context/TenantBrandContext";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -36,7 +40,7 @@ export default function AiIncidenteDetalle() {
   const updateMutation = useUpdateAiIncident();
   const { data: dbRegimes = [] } = useIncidentRegimes(id);
   const updateRegimeMutation = useUpdateIncidentRegime();
-  const createReportMutation = useCreateIncidentReport();
+  const branding = useTenantBranding();
 
   const [status, setStatus] = useState<string>("");
   const [severity, setSeverity] = useState<string>("");
@@ -45,9 +49,14 @@ export default function AiIncidenteDetalle() {
   // incidente de TODO tenant activaba el reloj del RGPD y el de DORA. Que un
   // incidente afecte a datos personales, y que la entidad esté sujeta a DORA,
   // son afirmaciones — y una afirmación no se presume: se declara.
-  const [affectsPii, setAffectsPii] = useState<boolean>(false);
-  const [highRiskPii, setHighRiskPii] = useState<boolean>(false);
-  const [isIctCritical, setIsIctCritical] = useState<boolean>(false);
+  //
+  // Siguen sin control y sin columna donde declararse, así que son constantes y
+  // no `useState`: un estado con `setX` que nadie llama hace creer que existe
+  // un interruptor. Los relojes del RGPD y de DORA NO se cuentan hoy, y la
+  // pantalla lo dice en vez de anunciarlos como activados.
+  const affectsPii = false;
+  const highRiskPii = false;
+  const isIctCritical = false;
   const [rootCause, setRootCause] = useState<string>("");
   const [correctiveAction, setCorrectiveAction] = useState<string>("");
   const [isEditing, setIsEditing] = useState(false);
@@ -148,10 +157,8 @@ export default function AiIncidenteDetalle() {
     knowledgeDate: incident.reported_at,
     isAiRelated: true,
     // El art. 73 alcanza a sistemas de alto riesgo: se toma del sistema
-    // asociado, no se presupone. Antes todo incidente activaba el plazo.
-    isAiHighRisk: /^(alto|high|inaceptable|unacceptable)$/i.test(
-      incident.ai_systems?.risk_level ?? "",
-    ),
+    // asociado, no se presupone. `undefined` cuando no consta clasificación.
+    isAiHighRisk: altoRiesgoDeclarado(incident.ai_systems?.risk_level),
     riaSeverity: riaSeverity,
     affectsPersonalData: affectsPii,
     isHighRiskToSubjects: highRiskPii,
@@ -163,7 +170,17 @@ export default function AiIncidenteDetalle() {
   const gdprRemaining = clocks.gdpr ? formatRemainingTime(clocks.gdpr.deadlineDate) : null;
   const doraRemaining = clocks.dora ? formatRemainingTime(clocks.dora.initialDeadlineDate) : null;
 
-  const isMaterial = currentSeverity === "CRITICA" || currentSeverity === "ALTA";
+  // El alta escribe CRITICO/ALTO/MEDIO/BAJO; comparar con CRITICA/ALTA (que no
+  // escribe nadie) dejaba este banner apagado para siempre.
+  const isMaterial = isMaterialSeverity(currentSeverity);
+  // Qué relojes se están contando DE VERDAD, para no anunciar de más.
+  const regimenesEnCurso = [
+    clocks.ria ? "RIA art. 73" : null,
+    clocks.gdpr ? "RGPD art. 33" : null,
+    clocks.dora ? "DORA art. 19" : null,
+  ].filter(Boolean) as string[];
+  // D-5: DORA no alcanza a todos los tenants y `branding.modules` lo oculta.
+  const doraVisible = isModuleEnabled(branding, "dora");
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-6">
@@ -265,7 +282,7 @@ export default function AiIncidenteDetalle() {
               }`}
               style={{ borderRadius: "var(--g-radius-full)" }}
             >
-              Severidad: {currentSeverity}
+              Severidad: {currentSeverity || "sin registrar"}
             </span>
           </div>
         </div>
@@ -280,10 +297,17 @@ export default function AiIncidenteDetalle() {
               <ShieldAlert className="w-5 h-5 text-[var(--status-error)] shrink-0" />
               <div>
                 <p className="text-xs font-bold text-[var(--g-text-primary)]">
-                  Incidente Material Multirrégimen (RIA Art. 73 / RGPD Art. 33 / DORA Art. 19)
+                  Incidente de severidad material
                 </p>
                 <p className="text-xs text-[var(--g-text-secondary)]">
-                  Relojes regulatorios independientes activados. Escalado recomendado a Secretaría y comités de control.
+                  {/* No se anuncian los tres regímenes: la afectación a datos
+                      personales y la sujeción a DORA no están declaradas en
+                      ninguna parte de esta ficha, así que sus relojes no se
+                      están contando. Se nombra sólo lo que sí se cuenta. */}
+                  {regimenesEnCurso.length > 0
+                    ? `Plazo en curso: ${regimenesEnCurso.join(" · ")}. Los demás regímenes no se cuentan porque su aplicabilidad no consta declarada.`
+                    : "No hay ningún plazo regulatorio en curso: la aplicabilidad de cada régimen no consta declarada."}{" "}
+                  Escalado recomendado a Secretaría y comités de control.
                 </p>
               </div>
             </div>
@@ -342,6 +366,11 @@ export default function AiIncidenteDetalle() {
             <p className="text-xs text-[var(--g-text-secondary)] leading-relaxed">
               {clocks.ria?.ruleDescription ??
                 "El sistema asociado consta clasificado fuera del alto riesgo, así que el art. 73 no le alcanza: no hay plazo que contar."}
+              {/* Este texto SÓLO se pinta cuando el motor ha omitido el reloj, y
+                  el motor lo omite únicamente con `isAiHighRisk === false`, es
+                  decir con clasificación registrada. Sin clasificación devuelve
+                  el reloj con `highRiskUnconfirmed`, y lo que se lee es el aviso
+                  de abajo. */}
             </p>
             {clocks.ria?.highRiskUnconfirmed && (
               <p className="text-[11px] text-[var(--status-warning)] leading-relaxed">
@@ -393,7 +422,8 @@ export default function AiIncidenteDetalle() {
             </div>
           </div>
 
-          {/* Reloj 3: DORA Art. 19 */}
+          {/* Reloj 3: DORA Art. 19 — sólo si el tenant tiene el módulo (D-5). */}
+          {doraVisible && (
           <div
             className="p-4 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] space-y-3"
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
@@ -432,6 +462,7 @@ export default function AiIncidenteDetalle() {
               </span>
             </div>
           </div>
+          )}
         </div>
       </div>
 
@@ -469,13 +500,19 @@ export default function AiIncidenteDetalle() {
               authority: "AEPD",
               role: "DPO",
             },
-            {
-              code: "DORA",
-              title: "Subexpediente DORA — DGSFP / BdE (Resiliencia Operativa TIC)",
-              desc: "Plantilla normalizada TIC, informe intermedio a 72h e informe final de causa raíz.",
-              authority: "DGSFP",
-              role: "CISO",
-            },
+            // D-5: el subexpediente DORA nombra a la DGSFP y al Banco de España.
+            // Un despacho no es entidad financiera y tiene DORA oculto por
+            // `branding.modules`: ofrecerle aquí el régimen contradice al resto
+            // del producto.
+            ...(doraVisible
+              ? [{
+                  code: "DORA",
+                  title: "Subexpediente DORA — DGSFP / BdE (Resiliencia Operativa TIC)",
+                  desc: "Plantilla normalizada TIC, informe intermedio a 72h e informe final de causa raíz.",
+                  authority: "DGSFP",
+                  role: "CISO",
+                }]
+              : []),
           ].map((reg) => (
             <div
               key={reg.code}
@@ -629,7 +666,7 @@ export default function AiIncidenteDetalle() {
 
                 <div>
                   <label className="block text-xs font-semibold text-[var(--g-text-primary)] mb-1">
-                    Tipología RIA Art. 73
+                    Tipología RIA Art. 73 (no se guarda)
                   </label>
                   <select
                     value={riaSeverity}
@@ -641,6 +678,15 @@ export default function AiIncidenteDetalle() {
                     <option value="WIDESPREAD_INFRINGEMENT">Infracción Generalizada / Urgente (2 días)</option>
                     <option value="DEATH_INCIDENT">Fallecimiento de persona (10 días)</option>
                   </select>
+                  {/* `ai_incidents` no tiene columna donde vivir esta tipología y
+                      `handleSave` no la envía. Recalcula el plazo del art. 73 en
+                      pantalla y se pierde al salir: decirlo es más honesto que
+                      retirar el control (que sí sirve para ver el plazo) o que
+                      fingir una persistencia que no existe. */}
+                  <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">
+                    Recalcula el plazo del art. 73 en esta pantalla. No se guarda con el
+                    incidente: al salir vuelve a «Grave Ordinario».
+                  </p>
                 </div>
               </div>
             ) : (
@@ -654,7 +700,7 @@ export default function AiIncidenteDetalle() {
                   <span className="font-semibold text-[var(--g-text-primary)]">{currentSeverity}</span>
                 </div>
                 <div className="flex justify-between py-1.5 border-b border-[var(--g-border-subtle)]">
-                  <span>Fecha Notificación:</span>
+                  <span>Fecha de conocimiento:</span>
                   <span className="font-semibold text-[var(--g-text-primary)]">
                     {formatIncidentDate(incident.reported_at)}
                   </span>

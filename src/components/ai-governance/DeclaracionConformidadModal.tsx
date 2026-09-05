@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { AiSystem } from "@/hooks/useAiSystems";
 import { useTenantBranding, useTenantBrandingLoading } from "@/context/TenantBrandContext";
 import { groupFullLabel } from "@/lib/tenant-brand-labels";
+import { isModuleEnabled } from "@/lib/tenant-modules";
 import {
   CheckCircle2,
   Download,
@@ -35,6 +36,12 @@ export default function DeclaracionConformidadModal({
   // Sin clasificación no se declara ninguna: un falso positivo regulatorio en un
   // papel con membrete del art. 47 es tan indefendible como un falso verde.
   const clasificacion = system.risk_level || "No clasificado";
+  // D-5: DORA no alcanza a todos los tenants y `branding.modules` lo oculta en
+  // el resto del producto; NIS2 tampoco es un régimen de todos. Enumerarlos como
+  // marco de referencia en un documento que el usuario DESCARGA los afirmaba
+  // para cualquiera. NIS2 va con DORA porque su aplicabilidad se declara junto
+  // a la de DORA y este documento no tiene ningún otro dato con que decidirla.
+  const marcoResilienciaVisible = isModuleEnabled(branding, "dora");
 
   if (!isOpen) return null;
 
@@ -73,10 +80,11 @@ DECLARACIÓN DE CONFORMIDAD UE (REGLAMENTO UE 2024/1689 - ARTÍCULO 47)
    - Real Decreto 817/2023 - Entorno Controlado de Pruebas (Sandbox IA España)
 
 6. INTEGRIDAD Y CUSTODIA PROBATORIA:
-   - Registro del manifiesto técnico: interno, con hash SHA-512
+   - Registro del manifiesto técnico: interno, sin hash de integridad
    - Estado del expediente técnico: no se determina desde esta vista
    - Sin sello ni preservación cualificada: no interviene prestador de confianza
 
+Lugar de Emisión: [por completar antes de la emisión]
 Fecha de Emisión: ${new Date().toLocaleDateString("es-ES")}
 Firmante: [sin firma; documento no firmado electrónicamente]
 
@@ -171,7 +179,9 @@ validación funcional y no constituye una declaración de conformidad emitida.
                 <li>Reglamento (UE) 2024/1689 (Artículos 9 a 17, 72 y 73).</li>
                 <li>Catálogo de 84 Medidas Guía (MG) del Manual de Checklists de la AESIA (Guía 16).</li>
                 <li>Estándar UNE-EN ISO/IEC 42001:2023 (Gestión de Inteligencia Artificial).</li>
-                <li>Marco de Ciberseguridad y Resiliencia Operativa Digital (DORA / NIS2).</li>
+                {marcoResilienciaVisible && (
+                  <li>Marco de Ciberseguridad y Resiliencia Operativa Digital (DORA / NIS2).</li>
+                )}
               </ul>
             </div>
 
@@ -189,10 +199,18 @@ validación funcional y no constituye una declaración de conformidad emitida.
             {/* Signature & Seal Block */}
             <div className="pt-4 border-t border-[var(--g-border-subtle)] grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <span className="font-semibold text-[var(--g-text-secondary)] block">Lugar y Fecha:</span>
-                <span>Madrid, a {new Date().toLocaleDateString("es-ES")}</span>
+                {/* El lugar de emisión era «Madrid» en duro. Ni `ai_systems` ni
+                    `tenants` tienen domicilio, así que no hay dato del que
+                    resolverlo: se retira en vez de inventarlo, y queda como
+                    hueco a completar antes de emitir, igual que el firmante. */}
+                <span className="font-semibold text-[var(--g-text-secondary)] block">Fecha:</span>
+                <span>{new Date().toLocaleDateString("es-ES")}</span>
+                <span className="font-semibold text-[var(--g-text-secondary)] block pt-2">Lugar de emisión:</span>
+                <span className="italic">[por completar antes de la emisión]</span>
                 <span className="font-semibold text-[var(--g-text-secondary)] block pt-2">Custodia:</span>
-                <span className="font-mono text-[10px] text-[var(--g-brand-3308)]">Registro interno · hash SHA-512</span>
+                {/* No hay hash: las tablas del expediente técnico no tienen
+                    columna donde guardarlo y esta pantalla no calcula ninguno. */}
+                <span className="text-[10px] text-[var(--g-text-secondary)]">Registro interno, sin hash de integridad</span>
               </div>
               <div className="border border-dashed border-[var(--g-border-default)] p-3 text-center space-y-1 flex flex-col justify-center" style={{ borderRadius: "var(--g-radius-md)" }}>
 <span className="font-bold text-[11px] text-[var(--g-text-primary)]">Espacio reservado para firma</span>

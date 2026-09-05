@@ -1,6 +1,8 @@
 /**
  * Motor de Relojes Regulatorios Paralelos y Coordinación Multirrégimen
- * AIMS 360: EU AI Act (Art. 73) + RGPD (Arts. 33-34) + DORA (Art. 19 / RD 2025/301)
+ * AIMS 360: EU AI Act (Art. 73) + RGPD (Arts. 33-34) + DORA (Art. 19 y Reglamento
+ * Delegado (UE) 2025/301 — NO es un Real Decreto español, como decía esta
+ * cabecera hasta 2026-09-05 contradiciendo al propio `DoraClockResult`.)
  * Conforme al dictamen de auditoría regulatoria de Harvey AI.
  */
 
@@ -59,6 +61,25 @@ export interface MultiregimeClocks {
   ria?: RiaClockResult;
   gdpr?: GdprClockResult;
   dora?: DoraClockResult;
+}
+
+/**
+ * ¿Consta el sistema asociado clasificado de alto riesgo? TRES estados.
+ *
+ * `undefined` NO es `false`: `evaluateMultiregimeIncident` los distingue —con
+ * `false` omite el reloj del art. 73, con `undefined` lo muestra marcado
+ * `highRiskUnconfirmed`— y la pantalla dice cosas distintas en cada caso.
+ *
+ * La ficha de incidente calculaba esto con `/…/.test(risk_level ?? "")`, y
+ * `RegExp.test` sólo devuelve booleanos: un sistema SIN clasificar producía
+ * `false`, el reloj desaparecía y la ficha afirmaba que el sistema «consta
+ * clasificado fuera del alto riesgo». Es la afirmación contraria a la verdad:
+ * lo que consta es que no consta.
+ */
+export function altoRiesgoDeclarado(riskLevel: string | null | undefined): boolean | undefined {
+  const v = (riskLevel ?? "").trim();
+  if (v === "") return undefined;
+  return /^(alto|high|inaceptable|unacceptable)$/i.test(v);
 }
 
 /**

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, skipToken } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 
@@ -17,12 +17,15 @@ export type AiIncident = {
   ai_systems?: { name: string; risk_level?: string | null } | null;
 };
 
+// El guard del tenant va en la queryFn (`skipToken`), no en `enabled`:
+// TanStack v5 EJECUTA la queryFn de una query deshabilitada cuando alguien
+// llama a `refetch()` a mano. Con `enabled` a secas, ese refetch corría el
+// `.eq("tenant_id", null)` y consultaba con el tenant sin resolver.
 export function useAiIncidentsList() {
   const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: ["ai_incidents", tenantId, "all"],
-    enabled: !!tenantId,
-    queryFn: async () => {
+    queryFn: tenantId ? async () => {
       const { data, error } = await supabase
         .from("ai_incidents")
         .select("*, ai_systems(name, risk_level)")
@@ -30,7 +33,7 @@ export function useAiIncidentsList() {
         .order("reported_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as AiIncident[];
-    },
+    } : skipToken,
   });
 }
 
@@ -38,8 +41,7 @@ export function useAiIncidentById(id: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: ["ai_incidents", tenantId, id],
-    queryFn: async () => {
-      if (!id) return null;
+    queryFn: tenantId && id ? async () => {
       const { data, error } = await supabase
         .from("ai_incidents")
         .select("*, ai_systems(name, risk_level)")
@@ -48,8 +50,7 @@ export function useAiIncidentById(id: string | undefined) {
         .single();
       if (error) throw error;
       return data as AiIncident;
-    },
-    enabled: !!id && !!tenantId,
+    } : skipToken,
   });
 }
 
@@ -57,8 +58,7 @@ export function useAiIncidentsBySystem(systemId: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: ["ai_incidents", tenantId, systemId],
-    queryFn: async () => {
-      if (!systemId) return [];
+    queryFn: tenantId && systemId ? async () => {
       const { data, error } = await supabase
         .from("ai_incidents")
         .select("*")
@@ -67,8 +67,7 @@ export function useAiIncidentsBySystem(systemId: string | undefined) {
         .order("reported_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as AiIncident[];
-    },
-    enabled: !!systemId && !!tenantId,
+    } : skipToken,
   });
 }
 

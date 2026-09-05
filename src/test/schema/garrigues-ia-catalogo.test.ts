@@ -1,5 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import { SISTEMAS_IA, type Procedencia } from "../../../scripts/garrigues/ia/catalogo-ia";
+import { aiGovernanceBodySlug } from "@/lib/aims/governing-body";
+
+const GARRIGUES = "00000000-0000-0000-0000-000000000002";
 
 /**
  * C1 — Catálogo del inventario de IA del tenant Garrigues.
@@ -83,9 +86,22 @@ describe("Catálogo de IA — restricciones y ownership", () => {
     expect(conProhibicion.length, "la prohibición de §3.2(d) no consta").toBeGreaterThan(0);
   });
 
-  it("todo sistema apunta al órgano rector por slug, no por UUID", () => {
+  it("el órgano del catálogo es el MISMO que el producto resuelve para el tenant", () => {
+    // ANTES: `toBe("garrigues-comite-gobernanza-ia")` contra el literal. Sólo
+    // comprobaba que una constante del catálogo era igual a sí misma escrita en
+    // el test, y presentaba como cubierta una arista que NO existe:
+    // `seed-garrigues-ia.ts` declara explícitamente que `owner_body_slug` no se
+    // siembra y ninguna pantalla lo lee.
+    //
+    // Lo que sí prueba algo: el catálogo y `governing-body.ts` —el módulo que el
+    // Dashboard SÍ usa para enlazar el comité— tienen que apuntar al mismo
+    // slug. Si alguien renombra el órgano en uno y no en el otro, el catálogo
+    // pasa a nombrar un órgano que el producto no resuelve, y esto cae.
+    const delProducto = aiGovernanceBodySlug(GARRIGUES);
+    expect(delProducto, "el producto no resuelve ningún órgano de IA para Garrigues").toBeTruthy();
     for (const s of SISTEMAS_IA) {
-      expect(s.owner_body_slug, `${s.name} sin órgano`).toBe("garrigues-comite-gobernanza-ia");
+      expect(s.owner_body_slug, `${s.name} apunta a un órgano distinto del que resuelve el producto`)
+        .toBe(delProducto);
     }
   });
 });

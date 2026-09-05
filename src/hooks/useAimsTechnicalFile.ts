@@ -218,7 +218,9 @@ export function useUpdateTechnicalFileSection() {
 }
 
 /**
- * Cerrar el expediente técnico (art. 11 RIA): registro interno con hash SHA-512.
+ * Cerrar el expediente técnico (art. 11 RIA): registro interno, sin hash de
+ * integridad — ni `aims_system_versions` ni `aims_technical_file_sections`
+ * tienen columna donde guardarlo (verificado en Cloud, 2026-09-05).
  * No interviene ningún prestador de confianza: la función no realiza llamada externa.
  */
 export function useCloseAimsTechnicalFile() {
