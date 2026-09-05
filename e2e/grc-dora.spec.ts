@@ -83,6 +83,9 @@ test.describe('GRC — afirmaciones retiradas y postura honesta', () => {
   test('Solvencia II se presenta como demo y no afirma remisión al supervisor', async ({ page }) => {
     await page.goto('/grc/solvencia-ii');
     await expect(page).not.toHaveURL('/login');
+    // La ruta va en Suspense: sin esperar, `innerText` devuelve «Cargando...» y
+    // las aserciones de ausencia pasarían sobre una pantalla vacía.
+    await expect(page.getByText(/Solvencia/i).first()).toBeVisible({ timeout: 15_000 });
 
     await sinAfirmacionesRetiradas(page);
 

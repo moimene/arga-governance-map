@@ -136,8 +136,15 @@ test.describe('Sanitization smoke — Secretaria', () => {
         /\/secretaria\/convocatorias\/[^/?]+/,
         'convocatorias',
       );
-      await expect(page.getByRole('button', { name: /Convocatoria(?: revisada)? DOCX|Convocatoria con plantilla/ })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Informe PRE' })).toBeVisible();
+      // El botón se llama «Borrador DEMO …»: el rótulo «Convocatoria DOCX» se
+      // retiró porque lo que se genera aquí es un borrador de demo, no la
+      // convocatoria emitida. El spec seguía pidiendo el nombre antiguo.
+      await expect(
+        page.getByRole('button', { name: /Borrador DEMO(?: revisado)?(?: DOCX| con plantilla)/ }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: /Informe PRE(?: con plantilla)?/ }),
+      ).toBeVisible();
     });
 
     await test.step('reunion detalle', async () => {
