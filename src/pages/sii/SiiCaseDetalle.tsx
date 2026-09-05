@@ -18,9 +18,13 @@ import {
 import {
   computeWhistleblowingDeadlines,
   validateCaseCloseoutGuard,
+  SII_AVISO_EXPEDIENTE_SIMULADO,
+  SII_ETIQUETA_SIMULADO,
   type WhistleblowingSubcase,
   type WhistleblowingRecusation,
 } from "@/lib/sii/whistleblowing-engine";
+import { siiRolesPara } from "@/lib/sii/roles-por-tenant";
+import { useTenantContext } from "@/context/TenantContext";
 import {
   ChevronRight,
   Lock,
@@ -46,6 +50,11 @@ import {
 export default function SiiCaseDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { tenantId } = useTenantContext();
+  // Mismo resolutor que usa el hook para estampar instructora y aprobador: la
+  // causa de recusación nombraba la «Comisión Auditoría», órgano que Garrigues
+  // no tiene.
+  const roles = siiRolesPara(tenantId);
   const { data: report, isLoading } = useWhistleblowingReportById(id);
 
   // Mutations
@@ -246,7 +255,17 @@ export default function SiiCaseDetalle() {
               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${report.severity === "MUY_GRAVE" || report.severity === "DELITO_FLAGRANTE" ? "bg-[var(--status-error)] text-white" : "bg-[var(--status-warning)] text-white"}`}>
                 {report.severity}
               </span>
+              {report.firmeza === "DEMO_PILOTO" && (
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[var(--status-warning)]/10 text-[var(--status-warning)] border border-[var(--status-warning)]">
+                  {SII_ETIQUETA_SIMULADO}
+                </span>
+              )}
             </div>
+            {report.firmeza === "DEMO_PILOTO" && (
+              <p className="text-[11px] leading-relaxed text-[var(--status-warning)]">
+                {SII_AVISO_EXPEDIENTE_SIMULADO}
+              </p>
+            )}
             <h1 className="text-xl font-bold text-[var(--t-text-primary)] mt-1">
               {report.category} — {report.entityName}
             </h1>
@@ -639,7 +658,7 @@ export default function SiiCaseDetalle() {
                   <option value="RELACION_JERARQUICA">Relación jerárquica con las personas afectadas</option>
                   <option value="INTERVENCION_PREVIA">Intervención previa en la operación objeto de comunicación</option>
                   <option value="BENEFICIO_DIRECTO">Interés personal o beneficio directo en el resultado</option>
-                  <option value="CONSEJO_ALTA_DIRECCION">Afectación a Alta Dirección o Consejo (Comisión Auditoría)</option>
+                  <option value="CONSEJO_ALTA_DIRECCION">{roles.causaCupulaLabel}</option>
                 </select>
               </div>
 

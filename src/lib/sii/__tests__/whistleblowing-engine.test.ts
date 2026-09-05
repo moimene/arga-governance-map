@@ -12,7 +12,7 @@ import {
 } from "../whistleblowing-engine";
 
 describe("Whistleblowing Engine — Ley 2/2023 & Harvey Mandate", () => {
-  describe("1. Statutory Clocks (Ley 2/2023 Arts. 9.2.c, 9.2.d, 34.2)", () => {
+  describe("1. Relojes legales (Ley 2/2023 arts. 9.2.c, 9.2.d y 26.2)", () => {
     it("computes 7 natural days acknowledgment deadline and 3 calendar months resolution", () => {
       const intakeDate = new Date("2026-03-01T10:00:00Z");
       const result = computeWhistleblowingDeadlines(intakeDate);
@@ -27,13 +27,51 @@ describe("Whistleblowing Engine — Ley 2/2023 & Harvey Mandate", () => {
       expect(result.libroRetention10y.toISOString().slice(0, 10)).toBe("2036-03-01");
     });
 
-    it("computes 3 months from actual acknowledgment date when sent earlier", () => {
+    it("los 3 meses arrancan en la RECEPCIÓN cuando se remitió acuse (art. 9.2.d)", () => {
+      // ESTE TEST FIJABA EL ERROR. Esperaba 2026-06-03 —tres meses desde la
+      // fecha del ACUSE—, y el art. 9.2.d dice, literal contra el consolidado
+      // del BOE (BOE-A-2023-4513, cotejado el 2026-09-05):
+      //
+      //   «…no podrá ser superior a tres meses a contar desde la recepción de
+      //   la comunicación o, si no se remitió un acuse de recibo al informante,
+      //   a tres meses a partir del vencimiento del plazo de siete días…»
+      //
+      // Es decir: si HAY acuse, se cuenta desde la recepción. Con el cálculo
+      // anterior el vencimiento mostrado quedaba hasta SIETE DÍAS por encima
+      // del máximo legal, y un expediente vencido se pintaba en plazo.
       const intakeDate = new Date("2026-03-01T10:00:00Z");
       const actualAckDate = new Date("2026-03-03T14:00:00Z");
       const result = computeWhistleblowingDeadlines(intakeDate, actualAckDate);
 
-      // Resolution deadline starts from actual ack date: 2026-06-03
-      expect(result.resolutionDeadline3m.toISOString().slice(0, 10)).toBe("2026-06-03");
+      expect(result.resolutionDeadline3m.toISOString().slice(0, 10)).toBe("2026-06-01");
+      // Y nunca puede pasarse del tope de la recepción + 3 meses.
+      const topeLegal = new Date("2026-06-01T10:00:00Z");
+      expect(result.resolutionDeadline3m.getTime()).toBeLessThanOrEqual(topeLegal.getTime());
+    });
+
+    it("sin acuse remitido, los 3 meses arrancan al vencer los 7 días (art. 9.2.d)", () => {
+      const result = computeWhistleblowingDeadlines(new Date("2026-03-01T10:00:00Z"));
+      expect(result.resolutionDeadline3m.toISOString().slice(0, 10)).toBe("2026-06-08");
+    });
+
+    it("un acuse tardío no alarga el plazo, y se marca como fuera de plazo", () => {
+      // `ackIsOverdue` mide contra HOY y vale true en todo expediente antiguo:
+      // no sirve para contar cumplimiento. `ackSentOnTime` sí.
+      const intake = new Date("2026-03-01T10:00:00Z");
+      const enPlazo = computeWhistleblowingDeadlines(intake, new Date("2026-03-05T10:00:00Z"));
+      const tarde = computeWhistleblowingDeadlines(intake, new Date("2026-03-20T10:00:00Z"));
+
+      expect(enPlazo.ackSentOnTime).toBe(true);
+      expect(tarde.ackSentOnTime).toBe(false);
+      expect(computeWhistleblowingDeadlines(intake).ackSentOnTime).toBeNull();
+
+      // El acuse tardío NO compra plazo: mismo vencimiento que el puntual.
+      expect(tarde.resolutionDeadline3m.toISOString()).toBe(enPlazo.resolutionDeadline3m.toISOString());
+
+      // Y el reloj no lo declara "COMPLETADO" por el mero hecho de existir.
+      const reloj = (r: typeof tarde) => r.clocks.find((c) => c.type === "ACUSE_7D")!;
+      expect(reloj(enPlazo).status).toBe("COMPLETADO");
+      expect(reloj(tarde).status).toBe("VENCIDO");
     });
 
     it("handles extension to 6 months for special complexity", () => {
@@ -96,14 +134,36 @@ describe("Whistleblowing Engine — Ley 2/2023 & Harvey Mandate", () => {
     });
   });
 
-  describe("3. Metadata Sanitization (Anti-Reidentification)", () => {
-    it("sanitizes filenames and purges local path references and author traces", () => {
-      const rawFilename = "C:\\Users\\JuanPerez\\Documents\\Contrato_Confidencial_JuanPerez_v1.docx";
-      const sanitized = sanitizeMetadata(rawFilename);
+  describe("3. Saneado del NOMBRE de archivo (no del contenido)", () => {
+    // `expect(removedMetadata.length).toBeGreaterThan(0)` se cumplía SIEMPRE:
+    // los dos `push` que lo llenaban estaban fuera de todo `if`, así que con la
+    // función ignorando por completo su entrada el test seguía verde. Ahora se
+    // compara el resultado con la entrada.
+    it("descarta la ruta local y sustituye el nombre original", () => {
+      const sanitized = sanitizeMetadata("C:\\Users\\JuanPerez\\Documents\\Contrato_JuanPerez_v1.docx");
 
       expect(sanitized.sanitizedFilename).toMatch(/^EVIDENCIA_SII_[A-Z0-9]+\.docx$/);
-      expect(sanitized.sanitized).toBe(true);
-      expect(sanitized.removedMetadata.length).toBeGreaterThan(0);
+      expect(sanitized.sanitizedFilename).not.toContain("JuanPerez");
+      expect(sanitized.removedMetadata.join(" ")).toMatch(/Ruta del sistema local/);
+    });
+
+    it("un nombre limpio NO produce descartes que no han ocurrido", () => {
+      // Aquí caía el guard de constantes: sin ruta ni caracteres raros no hay
+      // nada que descartar salvo el propio nombre.
+      const sanitized = sanitizeMetadata("informe.pdf");
+      expect(sanitized.removedMetadata).toEqual([
+        "Nombre original del archivo, sustituido por una referencia neutra",
+      ]);
+      expect(sanitized.removedMetadata.join(" ")).not.toMatch(/EXIF|software|autor/i);
+    });
+
+    it("no afirma haber tocado el contenido: solo describe el nombre", () => {
+      // El contenido ni se lee ni se sube. Si alguien vuelve a meter una línea
+      // sobre EXIF o huella de software, esto cae.
+      for (const n of ["a.jpg", "/tmp/x y z.png", "sin_extension", ""]) {
+        expect(sanitizeMetadata(n).removedMetadata.join(" ")).not.toMatch(/EXIF|huella de software|Autor del documento/i);
+      }
+      expect(sanitizeMetadata("").removedMetadata).toEqual([]);
     });
   });
 
@@ -236,7 +296,7 @@ describe("Whistleblowing Engine — Ley 2/2023 & Harvey Mandate", () => {
         id: "rep-101",
         code: "SII-2026-08-009",
         trackingToken: "SEC-9F8A-72B1-K82M",
-        trackingTokenHash: "hash-123",
+        trackingTokenReference: "REF-TOKEN-101",
         intakeDate: "2026-08-10T09:00:00Z",
         channel: "WEB_ANONIMO",
         anonymityMode: "ANONIMO_ESTRICTO",
@@ -272,6 +332,10 @@ describe("Whistleblowing Engine — Ley 2/2023 & Harvey Mandate", () => {
       expect(entry.referenciaAsiento).toContain("REF-SII-");
       expect(entry.referenciaAsiento).not.toMatch(/SHA/i);
       expect(entry.retentionLimitDate.slice(0, 4)).toBe("2036");
+      // Con cierre, el asiento se incorpora; sin cierre se calcula al vuelo y
+      // la pantalla del libro-registro tiene que decirlo.
+      expect(entry.incorporadoAlCierre).toBe(true);
+      expect(generateLibroRegistroEntry(mockReport).incorporadoAlCierre).toBe(false);
     });
   });
 });

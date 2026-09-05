@@ -19,13 +19,13 @@ import {
   type SubcaseRegime,
   computeWhistleblowingDeadlines,
   evaluateSubcasePerimeter,
-  ORGANOS_SII_POR_DEFECTO,
   sanitizeMetadata,
   validateCaseCloseoutGuard,
   generateLibroRegistroEntry,
   evaluateAntiRetaliationRisk,
 } from "@/lib/sii/whistleblowing-engine";
-import { SII_ORGANOS_GARRIGUES, SII_TENANT } from "../../scripts/garrigues/sii/canal-interno";
+import { siiRolesPara } from "@/lib/sii/roles-por-tenant";
+import { SII_TENANT } from "../../scripts/garrigues/sii/canal-interno";
 import { casosDemoGarrigues } from "../../scripts/garrigues/sii/casos-demo";
 
 
@@ -37,7 +37,8 @@ export const INITIAL_SII_REPORTS: WhistleblowingReport[] = [
     id: "rep-sii-001",
     code: "SII-2026-04-001",
     trackingToken: "SEC-9F8A-72B1-K82M",
-    trackingTokenHash: "SHA256:TOKEN:9F8A72B1K82M",
+    firmeza: "DEMO_PILOTO",
+    trackingTokenReference: "REF-TOKEN-9F8A72B1K82M",
     intakeDate: "2026-04-10T10:30:00Z",
     channel: "WEB_ANONIMO",
     anonymityMode: "ANONIMO_ESTRICTO",
@@ -51,7 +52,7 @@ export const INITIAL_SII_REPORTS: WhistleblowingReport[] = [
     summary: "Denuncia sobre posible conflicto de interés no declarado en decisión de inversión inmobiliaria internacional. Un directivo habría participado activamente en la aprobación sin formular abstención.",
     detailedDescription: "Se señala que en el Comité de Inversiones del primer trimestre se aprobó la adquisición de activos sin declarar la vinculación societaria previa del titular con la entidad vendedora.",
     acknowledgmentSentDate: "2026-04-11T12:00:00Z",
-    resolutionDeadline: "2026-07-11T12:00:00Z",
+    resolutionDeadline: "2026-07-10T10:30:00Z",
     extensionApproved: false,
     assignedInvestigatorId: "inv-001",
     assignedInvestigatorName: "Dña. Elena Navarro Pons",
@@ -98,7 +99,7 @@ export const INITIAL_SII_REPORTS: WhistleblowingReport[] = [
         reportId: "rep-sii-001",
         sender: "INSTRUCTOR",
         senderAlias: "Dña. Elena Navarro Pons (Investigadora SII)",
-        content: "Acuse de recibo formal emitido en plazo legal (Art. 9.2.c Ley 2/2023). La información ha sido admitida a trámite y se encuentra en fase de investigación reservada. Puede consultar este buzón para aportar aclaraciones.",
+        content: "Acuse de recibo emitido dentro de los siete días naturales siguientes a la recepción (art. 9.2.c Ley 2/2023). La comunicación está en instrucción reservada. Puede consultar este buzón para aportar aclaraciones.",
         sentAt: "2026-04-11T12:00:00Z",
         readAt: "2026-04-12T09:00:00Z",
       },
@@ -152,7 +153,8 @@ export const INITIAL_SII_REPORTS: WhistleblowingReport[] = [
     id: "rep-sii-002",
     code: "SII-2026-03-002",
     trackingToken: "SEC-3D4E-91A8-L19V",
-    trackingTokenHash: "SHA256:TOKEN:3D4E91A8L19V",
+    firmeza: "DEMO_PILOTO",
+    trackingTokenReference: "REF-TOKEN-3D4E91A8L19V",
     intakeDate: "2026-03-02T14:15:00Z",
     channel: "EMAIL_CONFIDENCIAL",
     anonymityMode: "CONFIDENCIAL_IDENTIFICADO",
@@ -169,7 +171,7 @@ export const INITIAL_SII_REPORTS: WhistleblowingReport[] = [
     summary: "Comunicación confidencial sobre presunto direccionamiento y favoritismo en la licitación de servicios Cloud de infraestructura TIC.",
     detailedDescription: "Se aportan correos donde un evaluador técnico habría facilitado los pliegos antes de la publicación oficial de la licitación a un licitador concreto.",
     acknowledgmentSentDate: "2026-03-03T10:00:00Z",
-    resolutionDeadline: "2026-06-03T10:00:00Z",
+    resolutionDeadline: "2026-09-02T14:15:00Z",
     extensionApproved: true,
     extensionReason: "Especial complejidad probatoria: solicitud de auditoría forense externa sobre servidores de correo y peritaje informático.",
     extensionApprovedAt: "2026-05-20T11:00:00Z",
@@ -217,7 +219,7 @@ export const INITIAL_SII_REPORTS: WhistleblowingReport[] = [
         reportId: "rep-sii-002",
         sender: "INSTRUCTOR",
         senderAlias: "Dña. Elena Navarro Pons",
-        content: "Notificación de Prórroga Motivada: Dada la necesidad de peritaje informático forense de correos, el plazo de resolución se amplía excepcionalmente en 3 meses adicionales (vencimiento: 03/09/2026).",
+        content: "Notificación de Prórroga Motivada: Dada la necesidad de peritaje informático forense de correos, el plazo de resolución se amplía excepcionalmente en 3 meses adicionales (vencimiento: 02/09/2026).",
         sentAt: "2026-05-20T11:05:00Z",
       },
     ],
@@ -255,7 +257,8 @@ export const INITIAL_SII_REPORTS: WhistleblowingReport[] = [
     id: "rep-sii-003",
     code: "SII-2026-05-003",
     trackingToken: "SEC-7A2B-55K1-P99X",
-    trackingTokenHash: "SHA256:TOKEN:7A2B55K1P99X",
+    firmeza: "DEMO_PILOTO",
+    trackingTokenReference: "REF-TOKEN-7A2B55K1P99X",
     intakeDate: "2026-05-08T16:40:00Z",
     channel: "REUNION_PRESENCIAL",
     anonymityMode: "CONFIDENCIAL_IDENTIFICADO",
@@ -272,7 +275,7 @@ export const INITIAL_SII_REPORTS: WhistleblowingReport[] = [
     summary: "Comunicación verbal formalizada en reunión presencial sobre inclusión no auditada de variables protegidas (salud y género) en el modelo de fijación dinámica de primas de decesos y vida.",
     detailedDescription: "En la reunión presencial con la investigadora se aportó transcripción revisada y firmada de la sesión técnica donde se forzó el uso de datos especiales para optimizar el ratio de conversión.",
     acknowledgmentSentDate: "2026-05-08T18:00:00Z",
-    resolutionDeadline: "2026-08-08T18:00:00Z",
+    resolutionDeadline: "2026-08-08T16:40:00Z",
     extensionApproved: false,
     assignedInvestigatorId: "inv-001",
     assignedInvestigatorName: "Dña. Elena Navarro Pons",
@@ -371,18 +374,24 @@ const ARGA_TENANT = "00000000-0000-0000-0000-000000000001";
  * Los expedientes demo de Garrigues (materia de despacho) los siembra la
  * Tarea 7; hasta entonces arranca vacío, que es honesto: no tiene ninguno.
  */
-function initialReportsFor(tenantId: string): WhistleblowingReport[] {
+/* Exportadas para poder PROBARLAS invocándolas. El guard anterior de aislamiento
+   recortaba el cuerpo de `getStoredReports` y lo comparaba como texto: un
+   `initialReportsFor` que devolviera siempre los casos de ARGA lo satisfacía.
+   Ver `src/test/sii/sii-tenant-scope.test.ts`. */
+export function initialReportsFor(tenantId: string): WhistleblowingReport[] {
   if (tenantId === ARGA_TENANT) return INITIAL_SII_REPORTS;
   // Los tres de Garrigues son SIMULADOS y se dice en pantalla; su materia sí
   // es la que la normativa del despacho contempla. Cualquier otro tenant
   // arranca vacío, que es lo honesto: no tiene ninguno.
   if (tenantId === SII_TENANT) {
-    return casosDemoGarrigues("J&A Garrigues, S.L.P.") as WhistleblowingReport[];
+    // Sin cast: `casosDemoGarrigues` ya devuelve `WhistleblowingReport[]`. El
+    // cast era lo que dejaba pasar estados fuera de la unión.
+    return casosDemoGarrigues("J&A Garrigues, S.L.P.");
   }
   return [];
 }
 
-function getStoredReports(tenantId: string): WhistleblowingReport[] {
+export function getStoredReports(tenantId: string): WhistleblowingReport[] {
   if (typeof window === "undefined") return initialReportsFor(tenantId);   // puerta 1
   const raw = localStorage.getItem(siiStorageKey(tenantId));
   if (!raw) {                                                              // puerta 2
@@ -482,11 +491,21 @@ export function useCreateWhistleblowingReport() {
       const reports = getStoredReports(tenantId!);
       const nextNum = reports.length + 1;
       const code = `SII-2026-08-${String(nextNum).padStart(3, "0")}`;
-      
-      // Token de alta entropía
-      const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const randomHex2 = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const trackingToken = `SEC-${randomHex}-${randomHex2}`;
+
+      // Identidad del circuito POR TENANT. Estaba cableada a una persona real
+      // del censo de ARGA y se estampaba en cualquier tenant.
+      const roles = siiRolesPara(tenantId);
+
+      // Código de seguimiento. Se generaba con Math.random(), que es
+      // predecible: para un código que da acceso a un expediente, el generador
+      // criptográfico del navegador cuesta lo mismo. Lo que NO cambia es que el
+      // expediente vive en localStorage, y eso lo dice la pantalla.
+      const bloque = () => {
+        const b = new Uint8Array(3);
+        globalThis.crypto.getRandomValues(b);
+        return Array.from(b, (n) => n.toString(16).padStart(2, "0")).join("").toUpperCase();
+      };
+      const trackingToken = `SEC-${bloque()}-${bloque()}`;
 
       const now = new Date();
       const deadlines = computeWhistleblowingDeadlines(now);
@@ -500,10 +519,11 @@ export function useCreateWhistleblowingReport() {
         affectsICT: payload.affectsICT,
         affectsPersonalData: payload.affectsPersonalData,
         isBoardOrExecutiveTarget: payload.isBoardOrExecutiveTarget,
-        // Los órganos por tenant. El defecto es lo que el motor tenía
-        // cableado, así que ARGA ve exactamente lo mismo que antes; Garrigues
-        // ve los suyos, que además no son colegiados.
-        organos: tenantId === SII_TENANT ? SII_ORGANOS_GARRIGUES : ORGANOS_SII_POR_DEFECTO,
+        // Los órganos por tenant, del mismo resolutor que la instructora.
+        // ARGA ve exactamente lo mismo que antes; Garrigues ve los suyos, que
+        // además no son colegiados; un tenant sin designación NO hereda los de
+        // ARGA.
+        organos: roles.organos,
       });
 
       const subcases = perimeter.subcasesToCreate.map((s, idx) => ({
@@ -513,7 +533,7 @@ export function useCreateWhistleblowingReport() {
         label: s.label,
         authorityTarget: s.authorityTarget,
         ownerRole: s.ownerRole,
-        ownerName: s.regime === "AIMS_AI" ? "Responsable AIMS 360" : s.regime === "DORA_ICT" ? "CISO" : "Dña. Elena Navarro Pons",
+        ownerName: s.regime === "AIMS_AI" ? "Responsable AIMS 360" : s.regime === "DORA_ICT" ? "CISO" : roles.ownerName,
         status: "ABIERTO" as const,
         createdAt: now.toISOString(),
         requiresIndependentClose: true,
@@ -544,7 +564,7 @@ export function useCreateWhistleblowingReport() {
         id: `rep-sii-${nextNum}`,
         code,
         trackingToken,
-        trackingTokenHash: `SHA256:${trackingToken}`,
+        trackingTokenReference: `REF-${trackingToken}`,
         intakeDate: now.toISOString(),
         channel: payload.channel,
         anonymityMode: payload.anonymityMode,
@@ -559,8 +579,8 @@ export function useCreateWhistleblowingReport() {
         detailedDescription: payload.detailedDescription,
         resolutionDeadline: deadlines.resolutionDeadline3m.toISOString(),
         extensionApproved: false,
-        assignedInvestigatorId: "inv-001",
-        assignedInvestigatorName: "Dña. Elena Navarro Pons",
+        assignedInvestigatorId: roles.instructorId,
+        assignedInvestigatorName: roles.instructorName,
         isEscalatedToBoardCommittee: perimeter.escalationRequired,
         subcases,
         messages: [
@@ -568,7 +588,7 @@ export function useCreateWhistleblowingReport() {
             id: `msg-${nextNum}-1`,
             reportId: `rep-sii-${nextNum}`,
             sender: "SISTEMA",
-            content: `Comunicación recibida y registrada con código oficial ${code}. Su credencial segura ha sido activada. Dispone de un plazo legal de acuse de 7 días naturales.`,
+            content: `Comunicación recibida y registrada con el código ${code}. Conserve el código de seguimiento para consultar este buzón. El acuse de recibo debe emitirse dentro de los siete días naturales siguientes a la recepción (art. 9.2.c Ley 2/2023).`,
             sentAt: now.toISOString(),
           },
         ],
@@ -658,12 +678,20 @@ export function useEmitAcknowledgment() {
       } else {
         rep.acknowledgmentSentDate = now.toISOString();
         rep.status = "ACUSE_EMITIDO";
+        // Dos afirmaciones falsas en una línea: se decía "en plazo legal" sin
+        // compararlo con nada, y se afirmaba una admisión formal que no existe
+        // —el estado que se escribe es ACUSE_EMITIDO—. El plazo lo calcula el
+        // motor; la admisión no se afirma porque no ocurre.
+        const { ackDeadline7d } = computeWhistleblowingDeadlines(rep.intakeDate, now);
+        const enPlazo = now.getTime() <= ackDeadline7d.getTime();
         rep.messages.push({
           id: `msg-ack-${Date.now()}`,
           reportId,
           sender: "INSTRUCTOR",
           senderAlias: rep.assignedInvestigatorName,
-          content: "Acuse de recibo formal emitido en plazo legal (Art. 9.2.c Ley 2/2023). El expediente se encuentra admitido a trámite.",
+          content: enPlazo
+            ? `Acuse de recibo emitido dentro de los siete días naturales siguientes a la recepción (art. 9.2.c Ley 2/2023; límite ${ackDeadline7d.toLocaleDateString("es-ES")}). La comunicación queda registrada; la decisión sobre su tramitación es posterior.`
+            : `Acuse de recibo emitido FUERA del plazo de siete días naturales del art. 9.2.c Ley 2/2023 (límite ${ackDeadline7d.toLocaleDateString("es-ES")}). La comunicación queda registrada; la decisión sobre su tramitación es posterior.`,
           sentAt: now.toISOString(),
         });
       }
@@ -746,7 +774,7 @@ export function useFormalizeRecusation() {
         details,
         substitutedById: `inv-${Date.now()}`,
         substitutedByName,
-        approvedBy: "Comité de Cumplimiento e Independencia",
+        approvedBy: siiRolesPara(tenantId).organoAprobadorRecusacion,
         recusedAt: new Date().toISOString(),
         status: "RECUSACION_FORMALIZADA",
       };

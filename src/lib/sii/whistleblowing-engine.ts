@@ -46,11 +46,16 @@ export type WhistleblowingStatus =
   | "RESUELTO_MEDIDAS"
   | "ARCHIVADO_MOTIVADO";
 
-export type WhistleblowingClockType = 
+// RETENCION_3M_NO_INVESTIGACION (art. 32.4: supresión a los 3 meses de la
+// recepción si no se iniciaron actuaciones) estaba DECLARADO aquí y no lo
+// calculaba nadie. Un miembro de la unión que ningún reloj produce sugiere una
+// capacidad que el módulo no tiene, así que se retira: cuando se calcule de
+// verdad —hace falta saber si se abrieron actuaciones, y eso hoy no se
+// registra— vuelve con su reloj.
+export type WhistleblowingClockType =
   | "ACUSE_7D"
   | "RESOLUCION_3M"
   | "PRORROGA_3M"
-  | "RETENCION_3M_NO_INVESTIGACION"
   | "RETENCION_10Y_LIBRO";
 
 export interface WhistleblowingClock {
@@ -157,13 +162,51 @@ export interface WhistleblowingLibroRegistroEntry {
   retentionLimitDate: string; // max 10 años
   /** Referencia del asiento. Ver `referenciaInterna`: no es prueba criptográfica. */
   referenciaAsiento: string;
+  /**
+   * `false` = el asiento se ha CALCULADO al mostrarlo, no está incorporado al
+   * libro. Solo se incorpora al cerrar el expediente, así que no hay número de
+   * entrada ni fecha de registro conservados desde la recepción. La pantalla lo
+   * dice; fingir lo contrario sería afirmar un libro-registro que no existe.
+   */
+  incorporadoAlCierre: boolean;
 }
+
+/**
+ * Procedencia del expediente. `DEMO_PILOTO` = los hechos NO han ocurrido; es
+ * un expediente sembrado para la demostración. Se pinta en pantalla: un
+ * expediente simulado que no se anuncia como tal es indistinguible de uno real
+ * en cuanto alguien hace una captura.
+ */
+export type WhistleblowingFirmeza = "DEMO_PILOTO";
+
+/** Rótulo del expediente sembrado. Corto, porque va en un badge de tabla. */
+export const SII_ETIQUETA_SIMULADO = "Simulado";
+
+export const SII_AVISO_EXPEDIENTE_SIMULADO =
+  "Expediente simulado: los hechos no han ocurrido. Está sembrado para la demostración del canal.";
+
+/**
+ * Lo que este módulo ES, dicho en la pantalla. Decisión de producto de
+ * 2026-09-05: el canal NO se conecta a base de datos; se queda con persistencia
+ * local y se dice.
+ */
+export const SII_AVISO_PERSISTENCIA_LOCAL =
+  "Entorno de validación funcional. Los expedientes de este canal se guardan únicamente en el " +
+  "navegador de este equipo: no hay base de datos, ni cifrado, ni custodia por un tercero, ni " +
+  "eficacia jurídica. Se borran al limpiar los datos del navegador.";
 
 export interface WhistleblowingReport {
   id: string;
   code: string; // ej: "SII-2026-08-001"
-  trackingToken: string; // token para Safe Inbox
-  trackingTokenHash: string;
+  trackingToken: string; // código de seguimiento del Safe Inbox
+  /**
+   * Referencia derivada del código de seguimiento. NO es un hash criptográfico
+   * y no prueba integridad: llevaba delante un prefijo con el nombre de un
+   * algoritmo de hash, seguido del propio token en claro. Peor que nada.
+   */
+  trackingTokenReference: string;
+  /** Ausente = expediente registrado por el usuario en esta sesión. */
+  firmeza?: WhistleblowingFirmeza;
   intakeDate: string;
   channel: WhistleblowingChannel;
   anonymityMode: AnonymityMode;
@@ -214,9 +257,23 @@ export interface WhistleblowingReport {
 /**
  * Calcula los plazos exactos de la Ley 2/2023:
  * - Acuse de recibo: 7 días naturales exactos desde la recepción (Art. 9.2.c).
- * - Plazo ordinario de respuesta: 3 meses de calendario desde el acuse o desde el día 7 tras la recepción (Art. 9.2.d).
+ * - Plazo ordinario de respuesta: 3 meses de calendario (Art. 9.2.d).
  * - Prórroga motivada: Hasta 3 meses adicionales (máximo 6 meses) por especial complejidad.
  * - Retención límite en Libro-Registro: 10 años (Art. 26.2).
+ *
+ * DE DÓNDE ARRANCAN LOS 3 MESES. Literal del art. 9.2.d, cotejado contra el
+ * consolidado del BOE (BOE-A-2023-4513) el 2026-09-05:
+ *
+ *   «…no podrá ser superior a tres meses a contar desde la recepción de la
+ *   comunicación o, si no se remitió un acuse de recibo al informante, a tres
+ *   meses a partir del vencimiento del plazo de siete días después de
+ *   efectuarse la comunicación…»
+ *
+ * O sea: la regla general cuenta desde la RECEPCIÓN. El día 7 solo entra en
+ * juego cuando NO se remitió acuse. Antes se hacía al revés —se contaba desde
+ * la fecha del acuse cuando este se había enviado dentro de los 7 días— y el
+ * vencimiento mostrado quedaba hasta SIETE DÍAS por encima del máximo legal.
+ * Haber enviado el acuse no alarga el plazo de respuesta: lo fija.
  */
 export function computeWhistleblowingDeadlines(
   intakeDateInput: Date | string,
@@ -229,6 +286,12 @@ export function computeWhistleblowingDeadlines(
   maxExtendedDeadline6m: Date;
   libroRetention10y: Date;
   ackIsOverdue: boolean;
+  /**
+   * Puntualidad del acuse YA emitido: `null` si no se ha emitido ninguno.
+   * `ackIsOverdue` mide contra HOY y por eso vale `true` en todo expediente
+   * antiguo, lo haya cumplido o no; para contar cumplimiento hace falta esto.
+   */
+  ackSentOnTime: boolean | null;
   ackDaysRemaining: number;
   resolutionDaysRemaining: number;
   clocks: WhistleblowingClock[];
@@ -240,16 +303,15 @@ export function computeWhistleblowingDeadlines(
   const ackDeadline7d = new Date(intakeDate.getTime());
   ackDeadline7d.setDate(ackDeadline7d.getDate() + 7);
 
-  // 2. Base para los 3 meses: fecha del acuse o vencimiento de los 7 días
-  let resolutionBaseDate = ackDeadline7d;
-  if (acknowledgmentSentDateInput) {
-    const ackDate = typeof acknowledgmentSentDateInput === "string" 
-      ? new Date(acknowledgmentSentDateInput) 
-      : new Date(acknowledgmentSentDateInput.getTime());
-    if (ackDate <= ackDeadline7d) {
-      resolutionBaseDate = ackDate;
-    }
-  }
+  // 2. Base para los 3 meses (art. 9.2.d): la recepción. Solo cuando NO se
+  //    remitió acuse se cuenta desde el vencimiento de los 7 días.
+  const ackDate = acknowledgmentSentDateInput
+    ? (typeof acknowledgmentSentDateInput === "string"
+        ? new Date(acknowledgmentSentDateInput)
+        : new Date(acknowledgmentSentDateInput.getTime()))
+    : null;
+  const resolutionBaseDate = ackDate ? intakeDate : ackDeadline7d;
+  const ackSentOnTime = ackDate ? ackDate.getTime() <= ackDeadline7d.getTime() : null;
 
   // 3. Plazo ordinario: 3 meses de calendario
   const resolutionDeadline3m = addCalendarMonths(resolutionBaseDate, 3);
@@ -276,8 +338,12 @@ export function computeWhistleblowingDeadlines(
       deadlineDate: ackDeadline7d.toISOString(),
       isOverdue: ackIsOverdue && !acknowledgmentSentDateInput,
       daysRemaining: ackDaysRemaining,
-      completedAt: acknowledgmentSentDateInput ? new Date(acknowledgmentSentDateInput).toISOString() : null,
-      status: acknowledgmentSentDateInput ? "COMPLETADO" : ackDaysRemaining <= 2 ? (ackIsOverdue ? "VENCIDO" : "PROXIMO_VENCIMIENTO") : "EN_PLAZO",
+      completedAt: ackDate ? ackDate.toISOString() : null,
+      // Un acuse emitido FUERA de los 7 días no es un plazo cumplido: se
+      // marcaba "COMPLETADO" por el mero hecho de existir.
+      status: ackDate
+        ? (ackSentOnTime ? "COMPLETADO" : "VENCIDO")
+        : ackDaysRemaining <= 2 ? (ackIsOverdue ? "VENCIDO" : "PROXIMO_VENCIMIENTO") : "EN_PLAZO",
     },
     {
       type: extensionApproved ? "PRORROGA_3M" : "RESOLUCION_3M",
@@ -297,6 +363,7 @@ export function computeWhistleblowingDeadlines(
     maxExtendedDeadline6m,
     libroRetention10y,
     ackIsOverdue,
+    ackSentOnTime,
     ackDaysRemaining,
     resolutionDaysRemaining,
     clocks,
@@ -504,35 +571,46 @@ export interface SanitizedFileInfo {
   sanitizedFilename: string;
   originalFilename: string;
   mimeType: string;
+  /** Solo transformaciones del NOMBRE. Vacío si el nombre no requería ninguna. */
   removedMetadata: string[];
+  /** El nombre ha sido sustituido. NO significa que el contenido se haya tratado. */
   sanitized: boolean;
 }
 
 /**
- * Sanea el nombre de archivo y elimina referencias a rutas locales, autores o marcas
- * de software para evitar la reidentificación involuntaria del informante.
+ * Sustituye el NOMBRE de archivo por una referencia neutra y describe lo que ha
+ * descartado de ese nombre.
+ *
+ * LO QUE NO HACE, y se decía que hacía: no abre el fichero. No lee, no
+ * inspecciona y no elimina los metadatos incrustados en el fichero (EXIF,
+ * autor, huella de software creador) — el
+ * contenido ni siquiera se sube. Las dos líneas que lo afirmaban estaban FUERA
+ * de todo `if`, así que se devolvían siempre, incluso para una entrada vacía:
+ * eran una constante disfrazada de resultado. `removedMetadata` describe ahora
+ * únicamente transformaciones del nombre que han ocurrido de verdad.
  */
 export function sanitizeMetadata(filename: string): SanitizedFileInfo {
   const extension = filename.includes(".") ? filename.split(".").pop() ?? "" : "";
   const baseName = filename.replace(/\.[^/.]+$/, "");
-  
-  const removed: string[] = [];
-  
-  // Limpieza de rutas locales o caracteres de sistema
-  const cleaned = baseName
-    .replace(/^.*[\\/]/, "")
-    .replace(/[^\w\s-]/gi, "")
-    .trim();
 
-  if (cleaned !== baseName) {
-    removed.push("Rutas del sistema local y caracteres especiales");
+  const removed: string[] = [];
+
+  const sinRuta = baseName.replace(/^.*[\\/]/, "");
+  if (sinRuta !== baseName) {
+    removed.push("Ruta del sistema local presente en el nombre del archivo");
   }
 
-  // Detección de patrones comunes de autor o usuario en el nombre (ej. "Informe_JuanPerez_v2")
-  removed.push("Metadatos EXIF / Autor del documento Office/PDF eliminados");
-  removed.push("Huella de software creador y fecha de guardado local purgada");
+  const cleaned = sinRuta.replace(/[^\w\s-]/gi, "").trim();
+  if (cleaned !== sinRuta.trim()) {
+    removed.push("Caracteres especiales del nombre del archivo");
+  }
 
+  // El nombre original desaparece SIEMPRE: es la única protección real que
+  // aporta esta función, y por eso sí se declara siempre.
   const sanitizedFilename = `EVIDENCIA_SII_${Date.now().toString(36).toUpperCase()}.${extension || "dat"}`;
+  if (cleaned.length > 0) {
+    removed.push("Nombre original del archivo, sustituido por una referencia neutra");
+  }
 
   return {
     sanitizedFilename,
@@ -745,5 +823,8 @@ export function generateLibroRegistroEntry(
     resultOutcome: closureDetails?.outcome ?? (report.closedAt ? "Expediente instruido y archivado con medidas" : "En tramitación"),
     retentionLimitDate: retentionLimitDate.toISOString(),
     referenciaAsiento,
+    // Solo hay incorporación cuando el asiento se genera al CERRAR: es la
+    // única llamada que aporta `closureDetails` y persiste el resultado.
+    incorporadoAlCierre: !!closureDetails,
   };
 }

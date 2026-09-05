@@ -6,6 +6,7 @@
 // dejaría rastro de que fue simulada en cuanto alguien hiciera una captura.
 import { beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { WhistleblowingReport } from "@/lib/sii/whistleblowing-engine";
 import { sesionDe, GARRIGUES_TENANT } from "../helpers/supabase-test-client";
 import {
   CASOS_DEMO_AVISO,
@@ -38,6 +39,39 @@ describe("SII — los casos demo son de despacho, y son simulados", () => {
     // comprueba entera y no por un «no» que no está.
     expect(CASOS_DEMO_AVISO).toMatch(/ni .*ni .*publican un registro de comunicaciones/);
     expect(CASOS_DEMO_AVISO).toContain("confidencialidad reforzada");
+  });
+
+  it("y la marca de simulado LLEGA a la forma que consume el módulo", () => {
+    // Este test medía la firmeza sobre el CATÁLOGO, que es donde nadie la
+    // pierde. `casosDemoGarrigues()` —la forma que se guarda y se pinta— la
+    // descartaba al construir el objeto, así que el catálogo estaba etiquetado
+    // y la pantalla no podía decir nada. Medir la forma que se consume.
+    const casos = casosDemoGarrigues("J&A Garrigues, S.L.P.");
+    expect(casos).toHaveLength(3);
+    expect(casos.every((c) => c.firmeza === CASOS_DEMO_FIRMEZA)).toBe(true);
+    expect(casos.filter((c) => c.firmeza !== CASOS_DEMO_FIRMEZA)).toEqual([]);
+  });
+
+  it("y sus estados, canal y modalidad existen en las uniones del motor", () => {
+    // `SII-GARR-2026-003` se sembraba con status "ADMITIDA", que no está en
+    // `WhistleblowingStatus`; el caso 002 traía "WEB_IDENTIFICADO" y
+    // "CONFIDENCIAL", que tampoco están en sus uniones. Colaban porque la
+    // función no estaba tipada y el consumidor la casteaba.
+    const ESTADOS: WhistleblowingReport["status"][] = [
+      "RECIBIDO", "ACUSE_EMITIDO", "EN_TRIAGE", "EN_INVESTIGACION",
+      "PRORROGA_ACTIVA", "REMITIDO_FISCALIA", "RESUELTO_MEDIDAS", "ARCHIVADO_MOTIVADO",
+    ];
+    const CANALES: WhistleblowingReport["channel"][] = [
+      "WEB_ANONIMO", "TELEFONO_VOZ", "REUNION_PRESENCIAL", "EMAIL_CONFIDENCIAL", "POSTAL",
+    ];
+    const MODOS: WhistleblowingReport["anonymityMode"][] = [
+      "ANONIMO_ESTRICTO", "CONFIDENCIAL_IDENTIFICADO",
+    ];
+    for (const c of casosDemoGarrigues("J&A Garrigues, S.L.P.")) {
+      expect(ESTADOS).toContain(c.status);
+      expect(CANALES).toContain(c.channel);
+      expect(MODOS).toContain(c.anonymityMode);
+    }
   });
 
   it("y NINGUNO nombra a nadie del censo real", async () => {

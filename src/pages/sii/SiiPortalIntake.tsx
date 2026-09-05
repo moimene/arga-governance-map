@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useEntitiesList } from "@/hooks/useEntities";
 import { useCreateWhistleblowingReport } from "@/hooks/useWhistleblowing";
-import { sanitizeMetadata, type WhistleblowingChannel, type AnonymityMode, type WhistleblowingSeverity } from "@/lib/sii/whistleblowing-engine";
+import { sanitizeMetadata, SII_AVISO_PERSISTENCIA_LOCAL, type WhistleblowingChannel, type AnonymityMode, type WhistleblowingSeverity } from "@/lib/sii/whistleblowing-engine";
 import {
   ShieldCheck,
   Lock,
@@ -76,7 +76,7 @@ export default function SiiPortalIntake() {
     if (!newFileName.trim()) return;
     setFiles([...files, { name: newFileName.trim(), size: 1024 * 45 }]);
     setNewFileName("");
-    toast.success("Evidencia adjuntada y preparada para saneamiento de metadatos.");
+    toast.success("Nombre de archivo registrado y saneado. El contenido no se sube.");
   };
 
   const handleRemoveFile = (idx: number) => {
@@ -89,7 +89,16 @@ export default function SiiPortalIntake() {
       return;
     }
 
-    const selectedEntity = entities.find((e) => e.id === entityId) ?? entities[0];
+    // Sin entidad NO se registra. Antes, si `useEntitiesList()` venía vacío o el
+    // usuario no elegía, la comunicación se atribuía a la entidad canónica de
+    // ARGA («6d7ed736-…» / «ARGA Seguros S.A.») fuese cual fuese el tenant, y
+    // `entities[0]` la elegía en silencio por él.
+    const selectedEntity = entities.find((e) => e.id === entityId);
+    if (!selectedEntity) {
+      toast.error("Seleccione la entidad a la que se refiere la comunicación antes de registrarla.");
+      setStep(2);
+      return;
+    }
 
     try {
       const res = await createMutation.mutateAsync({
@@ -99,9 +108,9 @@ export default function SiiPortalIntake() {
           pseudonym: pseudonym || "Informante Confidencial",
           emailNotificationOnly: notificationEmail || undefined,
         } : null,
-        entityId: selectedEntity?.id ?? "6d7ed736-f263-4531-a59d-c6ca0cd41602",
-        entityName: selectedEntity?.common_name ?? selectedEntity?.legal_name ?? "ARGA Seguros S.A.",
-        jurisdiction: selectedEntity?.jurisdiction ?? "ES",
+        entityId: selectedEntity.id,
+        entityName: selectedEntity.common_name ?? selectedEntity.legal_name,
+        jurisdiction: selectedEntity.jurisdiction ?? "ES",
         category,
         severity,
         summary,
@@ -116,7 +125,7 @@ export default function SiiPortalIntake() {
       setCreatedCode(res.code);
       setCreatedToken(res.trackingToken);
       setStep(4);
-      toast.success("Comunicación registrada con éxito conforme a la Ley 2/2023.");
+      toast.success("Comunicación registrada en este navegador. Conserve el código de seguimiento.");
     } catch (err) {
       toast.error("Error al registrar la comunicación.");
     }
@@ -124,7 +133,7 @@ export default function SiiPortalIntake() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success("Credencial copiada al portapapeles.");
+    toast.success("Código de seguimiento copiado al portapapeles.");
   };
 
 
@@ -259,10 +268,10 @@ export default function SiiPortalIntake() {
                 <h3 className="font-bold text-sm text-[var(--t-text-primary)]">Comunicación Anónima Estricta</h3>
               </div>
               <p className="text-xs text-[var(--t-text-secondary)] leading-relaxed mb-3">
-                No se registra IP, huella de dispositivo ni datos de contacto. Se le entregará una <strong>credencial de alta entropía</strong> para acceder al Safe Inbox y mantener diálogo bidireccional seguro.
+                No se piden datos de contacto y el expediente no los guarda. <strong>No garantiza el anonimato:</strong> esta pantalla se abre desde una sesión ya autenticada, así que la aplicación conoce a la persona usuaria. Se le entregará un <strong>código de seguimiento</strong> para consultar el Safe Inbox.
               </p>
               <span className="text-[11px] font-semibold text-[var(--status-success)] flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3" /> Máxima protección técnica
+                <CheckCircle2 className="h-3 w-3" /> Sin datos de contacto en el expediente
               </span>
             </div>
 
@@ -279,7 +288,7 @@ export default function SiiPortalIntake() {
                 <h3 className="font-bold text-sm text-[var(--t-text-primary)]">Confidencial con Identificación</h3>
               </div>
               <p className="text-xs text-[var(--t-text-secondary)] leading-relaxed mb-3">
-                Su identidad queda custodiada en una zona encriptada accesible únicamente por la Investigadora SII. No se comunica a RR.HH., evaluados ni terceros sin su autorización expresa.
+                Su identidad queda reservada a la persona instructora conforme al art. 33 de la Ley 2/2023. <strong>No hay cifrado:</strong> el expediente se guarda en claro en este navegador. No se comunica a RR.HH., personas afectadas ni terceros sin su autorización expresa.
               </p>
               <span className="text-[11px] font-semibold text-[var(--t-text-secondary)] flex items-center gap-1">
                 <ShieldCheck className="h-3 w-3" /> Protección legal Ley 2/2023
@@ -382,6 +391,7 @@ export default function SiiPortalIntake() {
                 onChange={(e) => setEntityId(e.target.value)}
                 className="w-full px-3 py-2 border border-[var(--t-border-default)] rounded bg-[var(--t-surface-card)] text-[var(--t-text-primary)]"
               >
+                <option value="">— Seleccione la entidad —</option>
                 {entities.map((ent) => (
                   <option key={ent.id} value={ent.id}>
                     {ent.common_name ?? ent.legal_name} ({ent.jurisdiction})
@@ -501,10 +511,10 @@ export default function SiiPortalIntake() {
         <Card className="border-[var(--t-border-default)] bg-[var(--t-surface-card)] p-6 space-y-6">
           <div>
             <h2 className="text-sm font-bold text-[var(--t-text-primary)] uppercase tracking-wider mb-2">
-              Paso 3: Aportación de evidencias y saneamiento de metadatos
+              Paso 3: Declaración de evidencias y saneado del nombre de archivo
             </h2>
             <p className="text-xs text-[var(--t-text-secondary)] leading-relaxed">
-              Todos los archivos adjuntados se someten a un proceso automático de <strong>eliminación de metadatos EXIF, autor y rutas locales</strong> para impedir la reidentificación técnica involuntaria.
+              De los archivos que declare aquí <strong>solo se sanea el NOMBRE</strong>: se sustituye por una referencia neutra y se descartan rutas locales y caracteres del sistema. <strong>El contenido no se sube y sus metadatos no se leen ni se eliminan</strong> — no hay purga de EXIF, autor ni huella de software. Antes de aportar el archivo por el cauce que le indique la persona instructora, elimine usted esos metadatos.
             </p>
           </div>
 
@@ -545,7 +555,7 @@ export default function SiiPortalIntake() {
                         <div>
                           <span className="font-bold text-[var(--t-text-primary)] block">{f.name}</span>
                           <span className="text-[11px] text-[var(--status-success)] flex items-center gap-1 font-mono">
-                            <CheckCircle2 className="h-3 w-3" /> Metadatos purgados → {sanitized.sanitizedFilename}
+                            <CheckCircle2 className="h-3 w-3" /> Nombre saneado → {sanitized.sanitizedFilename}
                           </span>
                         </div>
                       </div>
@@ -572,7 +582,7 @@ export default function SiiPortalIntake() {
               disabled={createMutation.isPending}
               className="bg-[var(--t-brand)] text-white hover:bg-[var(--t-brand)]/90"
             >
-              {createMutation.isPending ? "Registrando con sellado EAD..." : "Firmar y Registrar Comunicación"}
+              {createMutation.isPending ? "Registrando…" : "Registrar comunicación"}
             </Button>
           </div>
         </Card>
@@ -587,18 +597,23 @@ export default function SiiPortalIntake() {
 
           <div>
             <h2 className="text-xl font-bold text-[var(--t-text-primary)]">
-              Comunicación Registrada Oficialmente en el SII
+              Comunicación registrada en el canal
             </h2>
             <p className="text-xs text-[var(--t-text-secondary)] mt-1 max-w-lg mx-auto leading-relaxed">
-              Su comunicación queda <strong>registrada y pendiente de decisión sobre su admisión</strong>. Se ha activado el <strong>plazo de acuse de recibo de 7 días naturales</strong> (art. 9.2.c). La admisión a trámite es una decisión posterior de la persona instructora.
+              Su comunicación queda <strong>registrada y pendiente de decisión sobre su tramitación</strong>. Se ha activado el <strong>plazo de acuse de recibo de siete días naturales</strong> desde la recepción (art. 9.2.c Ley 2/2023).
+            </p>
+            {/* Ni firma, ni sello, ni intervención de un tercero de confianza:
+                esta pantalla lo decía y no ocurría nada de eso. */}
+            <p className="mx-auto mt-3 max-w-lg text-[11px] leading-relaxed text-[var(--t-text-secondary)]">
+              {SII_AVISO_PERSISTENCIA_LOCAL} El registro no lleva firma, ni sello de tiempo, ni intervención de un prestador de servicios de confianza.
             </p>
           </div>
 
-          {/* Box de Credencial Segura */}
+          {/* Código de seguimiento */}
           <div className="p-6 bg-[var(--t-surface-subtle)] border-2 border-[var(--t-brand)] rounded-lg max-w-md mx-auto space-y-4 text-left">
             <div>
               <span className="text-[10px] uppercase font-bold text-[var(--t-text-secondary)] block">
-                Código Oficial del Expediente:
+                Código del expediente:
               </span>
               <span className="font-mono text-base font-bold text-[var(--t-brand)]">
                 {createdCode}
@@ -607,7 +622,7 @@ export default function SiiPortalIntake() {
 
             <div>
               <span className="text-[10px] uppercase font-bold text-[var(--t-text-secondary)] block">
-                Token de Acceso Seguro (Safe Inbox):
+                Código de seguimiento (Safe Inbox):
               </span>
               <div className="flex items-center justify-between gap-2 mt-1">
                 <span className="font-mono text-lg font-bold text-[var(--t-text-primary)] bg-[var(--t-surface-card)] px-3 py-1.5 rounded border border-[var(--t-border-default)]">
@@ -622,7 +637,7 @@ export default function SiiPortalIntake() {
             <div className="text-[11px] text-[var(--status-warning)] bg-[var(--status-warning)]/10 p-2.5 rounded flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
               <span>
-                <strong>Guarde este token en un lugar seguro.</strong> Es la única forma de acceder al Safe Inbox para consultar requerimientos, aportar nuevas pruebas y comprobar el estado de su caso.
+                <strong>Guarde este código.</strong> Es la única forma de abrir el Safe Inbox de este expediente. Solo funciona en este navegador: el expediente no se guarda en ningún servidor.
               </span>
             </div>
           </div>

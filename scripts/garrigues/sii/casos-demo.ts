@@ -21,6 +21,7 @@
 //  3. Acoso — hay protocolo propio, el de medidas para la igualdad de las
 //     personas LGTBI, ya sembrado en G4.
 
+import type { WhistleblowingReport } from "@/lib/sii/whistleblowing-engine";
 import { SII_ORGANOS_GARRIGUES } from "./canal-interno";
 
 export const CASOS_DEMO_TENANT = "00000000-0000-0000-0002-000000000001";
@@ -39,10 +40,14 @@ type CasoDemo = {
   readonly materia: string;
   readonly fundamento: string;
   readonly category: string;
-  readonly severity: "LEVE" | "GRAVE" | "MUY_GRAVE";
-  readonly status: string;
-  readonly channel: string;
-  readonly anonymityMode: string;
+  // Las uniones REALES del motor, no `string`. Con `string` el catálogo
+  // declaraba estados que no existen —`ADMITIDA` no está en
+  // `WhistleblowingStatus`— y nadie se enteraba: la forma que consume el
+  // módulo no estaba tipada, así que el cast final se lo tragaba todo.
+  readonly severity: WhistleblowingReport["severity"];
+  readonly status: WhistleblowingReport["status"];
+  readonly channel: WhistleblowingReport["channel"];
+  readonly anonymityMode: WhistleblowingReport["anonymityMode"];
   readonly summary: string;
   readonly detailedDescription: string;
   /** Destinatario del subexpediente, de los órganos reales de PI-31. */
@@ -77,8 +82,8 @@ export const CASOS_DEMO_GARRIGUES: readonly CasoDemo[] = [
     category: "Conflicto de interés con cliente",
     severity: "GRAVE",
     status: "EN_INVESTIGACION",
-    channel: "WEB_IDENTIFICADO",
-    anonymityMode: "CONFIDENCIAL",
+    channel: "WEB_ANONIMO",
+    anonymityMode: "CONFIDENCIAL_IDENTIFICADO",
     summary:
       "Se comunica que un encargo se aceptó sin que constara el chequeo de conflictos, siendo " +
       "la contraparte cliente del despacho en otro asunto en curso.",
@@ -95,7 +100,7 @@ export const CASOS_DEMO_GARRIGUES: readonly CasoDemo[] = [
       "Protocolo de medidas para la igualdad de las personas LGTBI y prevención del acoso",
     category: "Conducta y clima laboral",
     severity: "MUY_GRAVE",
-    status: "ADMITIDA",
+    status: "EN_INVESTIGACION",
     channel: "WEB_ANONIMO",
     anonymityMode: "ANONIMO_ESTRICTO",
     summary:
@@ -123,7 +128,7 @@ export const CASOS_DEMO_GARRIGUES: readonly CasoDemo[] = [
  * instruye, y en un expediente simulado poner un nombre sería atribuirle a
  * alguien la instrucción de una denuncia que no existe.
  */
-export function casosDemoGarrigues(entityName: string) {
+export function casosDemoGarrigues(entityName: string): WhistleblowingReport[] {
   const INTAKE = "2026-08-14T09:00:00.000Z";
   const ACUSE = "2026-08-18T09:00:00.000Z";      // dentro de los 7 días naturales (art. 9.2.c)
   const LIMITE = "2026-11-14T09:00:00.000Z";     // 3 meses (art. 9.2.d)
@@ -132,7 +137,11 @@ export function casosDemoGarrigues(entityName: string) {
     id: `rep-garr-${String(i + 1).padStart(3, "0")}`,
     code: c.code,
     trackingToken: `SEC-GARR-${String(i + 1).padStart(4, "0")}`,
-    trackingTokenHash: `SHA256:DEMO:GARR:${String(i + 1).padStart(4, "0")}`,
+    trackingTokenReference: `REF-DEMO-GARR-${String(i + 1).padStart(4, "0")}`,
+    // La marca de simulado del catálogo VIAJA hasta la forma que se pinta. Si
+    // se queda en el catálogo, la pantalla no puede decirlo y el expediente es
+    // indistinguible de uno real en una captura.
+    firmeza: c.firmeza,
     intakeDate: INTAKE,
     channel: c.channel,
     anonymityMode: c.anonymityMode,

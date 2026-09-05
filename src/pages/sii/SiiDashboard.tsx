@@ -5,7 +5,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useWhistleblowingReports } from "@/hooks/useWhistleblowing";
-import { computeWhistleblowingDeadlines } from "@/lib/sii/whistleblowing-engine";
+import {
+  computeWhistleblowingDeadlines,
+  SII_AVISO_EXPEDIENTE_SIMULADO,
+  SII_AVISO_PERSISTENCIA_LOCAL,
+  SII_ETIQUETA_SIMULADO,
+} from "@/lib/sii/whistleblowing-engine";
 import {
   AlertOctagon,
   ShieldCheck,
@@ -33,7 +38,22 @@ export default function SiiDashboard() {
   const totalReports = reports.length;
   const activeReports = reports.filter((r) => r.status !== "RESUELTO_MEDIDAS" && r.status !== "ARCHIVADO_MOTIVADO").length;
   const totalSubcases = reports.reduce((acc, r) => acc + r.subcases.length, 0);
-  const ackComplied = reports.filter((r) => !!r.acknowledgmentSentDate || !!r.acknowledgmentExemptReason).length;
+  // Cumplimiento = acuse emitido DENTRO de los 7 días naturales (art. 9.2.c),
+  // o excepción registrada porque el acuse pondría en peligro la
+  // confidencialidad. Antes se contaba la mera PRESENCIA del acuse, así que un
+  // acuse tardío subía el porcentaje igual que uno en plazo.
+  const ackComplied = reports.filter((r) => {
+    if (r.acknowledgmentExemptReason) return true;
+    if (!r.acknowledgmentSentDate) return false;
+    return computeWhistleblowingDeadlines(r.intakeDate, r.acknowledgmentSentDate).ackSentOnTime === true;
+  }).length;
+  const ackFueraDePlazo = reports.filter(
+    (r) =>
+      !r.acknowledgmentExemptReason &&
+      !!r.acknowledgmentSentDate &&
+      computeWhistleblowingDeadlines(r.intakeDate, r.acknowledgmentSentDate).ackSentOnTime === false,
+  ).length;
+  const simulados = reports.filter((r) => r.firmeza === "DEMO_PILOTO").length;
   // Se cuenta, no se afirma: expedientes con al menos una medida de protección
   // frente a represalias registrada (art. 36 Ley 2/2023).
   const proteccionActiva = reports.filter((r) => !!r.retaliationRecord).length;
@@ -117,9 +137,11 @@ export default function SiiDashboard() {
             {totalReports > 0 ? `${Math.round((ackComplied / totalReports) * 100)}%` : "—"}
           </div>
           <div className="text-[11px] text-[var(--t-text-secondary)]">
-            {totalReports > 0
-              ? "Plazo legal art. 9.2.c Ley 2/2023"
-              : "Sin expedientes registrados: no hay cumplimiento que medir"}
+            {totalReports === 0
+              ? "Sin expedientes registrados: no hay cumplimiento que medir"
+              : ackFueraDePlazo > 0
+                ? `Acuses emitidos dentro de los 7 días naturales (art. 9.2.c) · ${ackFueraDePlazo} fuera de plazo`
+                : "Acuses emitidos dentro de los 7 días naturales (art. 9.2.c)"}
           </div>
         </Card>
 
@@ -145,6 +167,23 @@ export default function SiiDashboard() {
           </div>
         </Card>
       </div>
+
+      {/* Qué son estos expedientes y dónde viven. Sin esto, una captura de la
+          tabla es indistinguible de un canal en producción. */}
+      <Card className="border-[var(--status-warning)] bg-[var(--t-surface-card)] p-4 text-xs leading-relaxed text-[var(--t-text-secondary)]">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--status-warning)] mt-0.5" />
+          <div>
+            <span className="block font-bold text-[var(--t-text-primary)]">
+              {simulados > 0
+                ? `${simulados} de ${totalReports} expedientes están simulados`
+                : "Entorno de validación funcional"}
+            </span>
+            {simulados > 0 ? `${SII_AVISO_EXPEDIENTE_SIMULADO} ` : ""}
+            {SII_AVISO_PERSISTENCIA_LOCAL}
+          </div>
+        </div>
+      </Card>
 
       {/* Controles de Filtrado */}
       <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
@@ -198,7 +237,15 @@ export default function SiiDashboard() {
               return (
                 <TableRow key={r.id} className="hover:bg-[var(--t-surface-subtle)]/40 transition-colors">
                   <TableCell className="font-mono font-bold text-[var(--t-brand)]">
-                    {r.code}
+                    <div>{r.code}</div>
+                    {r.firmeza === "DEMO_PILOTO" && (
+                      <span
+                        className="mt-0.5 inline-block rounded px-1.5 py-0.5 font-sans text-[10px] font-semibold bg-[var(--status-warning)]/10 text-[var(--status-warning)]"
+                        title={SII_AVISO_EXPEDIENTE_SIMULADO}
+                      >
+                        {SII_ETIQUETA_SIMULADO}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="font-semibold text-[var(--t-text-primary)]">{r.category}</div>
