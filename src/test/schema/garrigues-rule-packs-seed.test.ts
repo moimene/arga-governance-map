@@ -85,8 +85,14 @@ describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant,
       // de login independientes del cliente Garrigues.
       arga = await sesionDe("ARGA");
       argaAuthed = true;
-    } catch {
+    } catch (error) {
       authed = false;
+      // UN LOGIN FALLIDO NO ES «NADA QUE COMPROBAR». Al tragarse la excepción,
+      // cada `it` de abajo caía en `if (!authed) { expect(true).toBe(true); return; }`
+      // y la sonda Cloud terminaba VERDE sin asertar nada: rotar una contraseña
+      // o caerse Cloud dejaba el gate en verde mudo. `sesionDe` ya lanza con el
+      // motivo; aquí se propaga para que el fichero se ponga ROJO.
+      throw error;
     }
   }, 30_000);
 

@@ -5,6 +5,7 @@ import {
   Brain, ExternalLink, Sliders, ChevronRight 
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { DemoFixtureNotice } from "@/components/grc/DemoFixtureNotice";
 
 interface DpiaItem {
   id: string;
@@ -76,6 +77,9 @@ export default function DPIAs() {
 
   return (
     <div className="p-6 space-y-6">
+      <DemoFixtureNotice>
+        Las evaluaciones de impacto de esta pantalla son un guion fijo del código. No proceden de ninguna tabla ni de un expediente real.
+      </DemoFixtureNotice>
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">

@@ -3,10 +3,13 @@ import { CheckCircle2, FileWarning, ShieldAlert } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
+  composePlatformReadiness,
   platformReadinessLanes,
+  type LaneMeasurement,
   type PlatformLaneStatus,
   type PlatformReadinessLane,
 } from "@/lib/arga-console/platform-readiness";
+import { formatMeasured } from "@/lib/arga-console/measured";
 
 const laneStatusLabel: Record<PlatformLaneStatus, string> = {
   operational: "Operativo",
@@ -35,7 +38,16 @@ function bodyLine(lane: PlatformReadinessLane): string {
   return lane.summary;
 }
 
-export function ReadinessHeader() {
+interface ReadinessHeaderProps {
+  /**
+   * Recuentos medidos por carril. Acompañan al readiness DECLARADO; no lo
+   * promocionan ni lo degradan. Un `null` se pinta «no medido», nunca 0.
+   */
+  measured?: Record<string, LaneMeasurement[]>;
+}
+
+export function ReadinessHeader({ measured = {} }: ReadinessHeaderProps) {
+  const lanes = composePlatformReadiness(platformReadinessLanes, measured);
   return (
     <Card className="overflow-hidden border-l-4 border-l-primary">
       <div className="flex flex-col gap-2 border-b border-border px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
@@ -59,7 +71,7 @@ export function ReadinessHeader() {
       </div>
 
       <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-y-0 sm:[&>*:nth-child(-n+2)]:border-b sm:[&>*:nth-child(-n+2)]:border-border xl:grid-cols-5 xl:divide-x xl:divide-y-0 xl:[&>*]:border-b-0">
-        {platformReadinessLanes.map((lane) => (
+        {lanes.map((lane) => (
           <Link
             key={lane.id}
             to={lane.route}
@@ -83,6 +95,18 @@ export function ReadinessHeader() {
               </p>
             </div>
             <div className="text-[11px] text-muted-foreground">
+              {lane.measured.length > 0 && (
+                <div className="mb-2 space-y-0.5">
+                  {lane.measured.map((m) => (
+                    <div key={m.label} className="flex items-baseline justify-between gap-2">
+                      <span className="truncate">{m.label}</span>
+                      <span className="shrink-0 font-medium tabular-nums text-foreground/80">
+                        {m.absentReason ?? formatMeasured(m.value)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <span className="block font-medium text-foreground/80">Próxima acción</span>
               <span className="line-clamp-2">{lane.nextAction}</span>
             </div>

@@ -19,6 +19,8 @@ import {
   Globe2, Layers, AlertTriangle, Scale, CheckSquare, ShieldCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { isModuleEnabled } from "@/lib/tenant-modules";
 
 const SELECT_CLASSES =
   "h-10 w-full px-3 text-sm bg-[var(--g-surface-card)] text-[var(--g-text-primary)] border border-[var(--g-border-subtle)] focus:border-[var(--g-brand-3308)] focus:outline-none transition-colors";
@@ -27,6 +29,10 @@ const INPUT_CLASSES =
   "h-10 w-full px-3 text-sm bg-[var(--g-surface-card)] text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)]/60 border border-[var(--g-border-subtle)] focus:border-[var(--g-brand-3308)] focus:outline-none transition-colors";
 
 const LABEL_CLASSES = "block text-xs font-semibold text-[var(--g-text-primary)] uppercase mb-1";
+
+// Lo que se pinta cuando no hay dato. Un valor verosímil por defecto es peor
+// que un hueco: es indistinguible de un dato real.
+const SIN_DATO = "sin dato";
 
 const EMPTY_CIFA_ASSESSMENT: CifaAssessment = {
   q1_core: false,
@@ -39,6 +45,7 @@ const EMPTY_CIFA_ASSESSMENT: CifaAssessment = {
 type TprmTab = "general" | "cifa" | "subcontracting" | "exit";
 
 export default function TPRM() {
+  const branding = useTenantBranding();
   const { data: providers = [], isLoading, refetch } = useThirdParties();
   const createMutation = useCreateThirdParty();
   const updateMutation = useUpdateThirdParty();
@@ -55,25 +62,36 @@ export default function TPRM() {
     provider: "",
     service: "",
     criticality: "Pendiente",
-    cloud_exposure: "Cloud Híbrido (UE)",
+    cloud_exposure: "",
     regulatory_basis: "DORA Arts. 28-30 · RTS Terceros",
-    due_diligence: "Completada",
-    contract_clauses: "Conforme DORA Art. 30",
-    exit_plan: "Documentado",
+    // Estos tres SE ESCRIBEN EN CLOUD aunque el modal no los exponga. Con
+    // "Completada" / "Conforme DORA Art. 30" / "Documentado" por defecto, dar
+    // de alta un proveedor declaraba una diligencia debida, una conformidad
+    // contractual y un plan de salida que nadie ha declarado.
+    due_diligence: "Pendiente",
+    contract_clauses: "Pendiente",
+    exit_plan: "Pendiente",
     next_review: new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString().slice(0, 10),
     legal_hold: false,
-    owner: "Compras y Riesgo Proveedor",
+    owner: "",
     payload: {
       lei_euid: "",
       provider_type: "Externo" as "Externo" | "Intragrupo" | "Subcontratista",
-      country_service: "España (ES)",
-      country_data_storage: "Alemania (DE) / Francia (FR)",
-      cloud_deployment_model: "Público" as const,
+      country_service: "",
+      country_data_storage: "",
       is_ctpp: false,
     },
   });
 
   const selected = providers.find((p) => p.id === selectedId);
+
+  // Se consulta de verdad en vez de afirmarlo: la caja del plan de salida
+  // pintaba «SEALED» sin mirar `evidence_bundles`.
+  const exitPlanArchived =
+    !!selected &&
+    allEvidenceBundles.some(
+      (e) => e.source_object_id === selected.id && isFinalSealedEvidence(e.status),
+    );
 
   // Filtered providers
   const filtered = providers.filter((p) => {
@@ -175,6 +193,20 @@ export default function TPRM() {
       toast.error("Error al crear tercero.");
     }
   };
+
+  // El registro DORA de terceros TIC no aplica a todo tenant. El item de menú
+  // ya va gateado; esto cierra además la URL directa. `isModuleEnabled` falla
+  // ABIERTO: un tenant sin `branding.modules` (ARGA) no ve ningún cambio.
+  if (!isModuleEnabled(branding, "tprm")) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto space-y-3">
+        <h1 className="text-2xl font-bold text-[var(--g-text-primary)]">Terceros (TPRM)</h1>
+        <p className="text-sm text-[var(--g-text-secondary)]">
+          El registro de terceros TIC del Reglamento DORA no está habilitado para este grupo.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -395,23 +427,23 @@ export default function TPRM() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                     <div className="space-y-1">
                       <span className="block font-bold text-[var(--g-text-secondary)] uppercase text-[10px]">Identificador Legal (LEI / EUID):</span>
-                      <span className="block font-mono font-medium text-[var(--g-text-primary)]">{selected.payload?.lei_euid || "5493006MHB84DD0ZWV18"}</span>
+                      <span className="block font-mono font-medium text-[var(--g-text-primary)]">{selected.payload?.lei_euid || SIN_DATO}</span>
                     </div>
                     <div className="space-y-1">
                       <span className="block font-bold text-[var(--g-text-secondary)] uppercase text-[10px]">Tipo de Proveedor:</span>
-                      <span className="block font-medium text-[var(--g-text-primary)]">{selected.payload?.provider_type || "Proveedor Externo"}</span>
+                      <span className="block font-medium text-[var(--g-text-primary)]">{selected.payload?.provider_type || SIN_DATO}</span>
                     </div>
                     <div className="space-y-1">
                       <span className="block font-bold text-[var(--g-text-secondary)] uppercase text-[10px]">País de Prestación del Servicio:</span>
-                      <span className="block font-medium text-[var(--g-text-primary)]">{selected.payload?.country_service || "España (ES) / Unión Europea"}</span>
+                      <span className="block font-medium text-[var(--g-text-primary)]">{selected.payload?.country_service || SIN_DATO}</span>
                     </div>
                     <div className="space-y-1">
                       <span className="block font-bold text-[var(--g-text-secondary)] uppercase text-[10px]">País de Almacenamiento y Procesamiento de Datos:</span>
-                      <span className="block font-medium text-[var(--g-text-primary)]">{selected.payload?.country_data_storage || "Alemania (DE) · Cumple RGPD"}</span>
+                      <span className="block font-medium text-[var(--g-text-primary)]">{selected.payload?.country_data_storage || SIN_DATO}</span>
                     </div>
                     <div className="space-y-1">
                       <span className="block font-bold text-[var(--g-text-secondary)] uppercase text-[10px]">Modelo de Despliegue Cloud:</span>
-                      <span className="block font-medium text-[var(--g-text-primary)]">{selected.payload?.cloud_deployment_model || "Cloud Híbrido"}</span>
+                      <span className="block font-medium text-[var(--g-text-primary)]">{selected.payload?.cloud_deployment_model || SIN_DATO}</span>
                     </div>
                     <div className="space-y-1">
                       <span className="block font-bold text-[var(--g-text-secondary)] uppercase text-[10px]">Base Regulatoria Aplicable:</span>
@@ -562,10 +594,18 @@ export default function TPRM() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--g-border-subtle)]">
-                          {(selected.payload?.subcontractors ?? [
-                            { id: "sub-1", name: "AWS Frankfurt (Datacenter Infra)", country: "Alemania (DE)", service: "Infraestructura IaaS y cómputo", dataAccess: true, priorApproval: true },
-                            { id: "sub-2", name: "Cloudflare (DDoS & WAF Protection)", country: "Irlanda (IE)", service: "Filtrado perimetral y DNS", dataAccess: false, priorApproval: true },
-                          ]).map((sub) => (
+                          {/* Sin la cascada AWS/Cloudflare de relleno: el payload de los
+                              proveedores no trae `subcontractors`, así que los cinco
+                              mostraban los mismos dos subcontratistas inventados, con
+                              «Cláusula Aprobada» incluida. */}
+                          {(selected.payload?.subcontractors ?? []).length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="px-4 py-6 text-center text-[var(--g-text-secondary)]">
+                                No consta ninguna subcontratación registrada para este proveedor.
+                              </td>
+                            </tr>
+                          )}
+                          {(selected.payload?.subcontractors ?? []).map((sub) => (
                             <tr key={sub.id} className="hover:bg-[var(--g-surface-subtle)]/50">
                               <td className="px-4 py-2.5 font-medium text-[var(--g-text-primary)]">{sub.name}</td>
                               <td className="px-4 py-2.5 text-[var(--g-text-secondary)]">{sub.service}</td>
@@ -576,9 +616,15 @@ export default function TPRM() {
                                 </span>
                               </td>
                               <td className="px-4 py-2.5">
-                                <span className="text-[var(--status-success)] font-semibold flex items-center gap-1">
-                                  <CheckCircle2 className="h-3 w-3" /> Cláusula Aprobada
-                                </span>
+                                {sub.priorApproval === undefined ? (
+                                  <span className="text-[var(--g-text-secondary)]">{SIN_DATO}</span>
+                                ) : sub.priorApproval ? (
+                                  <span className="text-[var(--status-success)] font-semibold flex items-center gap-1">
+                                    <CheckCircle2 className="h-3 w-3" /> Aprobación previa registrada
+                                  </span>
+                                ) : (
+                                  <span className="text-[var(--status-warning)] font-semibold">Sin aprobación previa</span>
+                                )}
                               </td>
                             </tr>
                           ))}
@@ -648,15 +694,14 @@ export default function TPRM() {
                           { key: "bcm_tested", label: "Planes de contingencia y resiliencia del proveedor probados periódicamente" },
                           { key: "incident_assistance", label: "Asistencia y notificación inmediata de incidentes de seguridad sin coste adicional" },
                         ].map((chk) => {
-                          const checks = selected.payload?.contract_checks ?? {
-                            audit_rights: true,
-                            supervisory_inspection: true,
-                            data_return_insolvency: true,
-                            exit_plan_tested: true,
-                            bcm_tested: true,
-                            incident_assistance: true,
-                          };
-                          const isChecked = checks[chk.key as keyof ContractualDoraChecks] === true;
+                          // Sin objeto por defecto con las seis a `true`: ninguno de los
+                          // proveedores tiene `contract_checks` en su payload, así que las
+                          // seis cláusulas se pintaban «Conforme» sin que nadie las hubiera
+                          // comprobado. Ausencia de dato = «sin dato», no conformidad.
+                          const checks = selected.payload?.contract_checks;
+                          const raw = checks?.[chk.key as keyof ContractualDoraChecks];
+                          const isChecked = raw === true;
+                          const sinDato = raw === undefined;
 
                           return (
                             <div
@@ -675,8 +720,15 @@ export default function TPRM() {
                                   {chk.label}
                                 </span>
                               </div>
-                              <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded", isChecked ? "bg-[var(--status-success)]/10 text-[var(--status-success)]" : "bg-[var(--status-error)]/10 text-[var(--status-error)]")}>
-                                {isChecked ? "Conforme" : "Pendiente"}
+                              <span className={cn(
+                                "text-[10px] font-bold px-2 py-0.5 rounded",
+                                sinDato
+                                  ? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
+                                  : isChecked
+                                  ? "bg-[var(--status-success)]/10 text-[var(--status-success)]"
+                                  : "bg-[var(--status-error)]/10 text-[var(--status-error)]"
+                              )}>
+                                {sinDato ? SIN_DATO : isChecked ? "Conforme" : "Pendiente"}
                               </span>
                             </div>
                           );
@@ -684,21 +736,26 @@ export default function TPRM() {
                       </div>
                     </div>
 
-                    {/* WORM Ledger Status Box */}
-                    <div className="p-4 bg-[var(--g-surface-subtle)] border border-[var(--status-success)]/30 rounded-lg flex items-center justify-between text-xs">
+                    {/* Antes afirmaba, sin consultar nada, «PLAN DE SALIDA CUSTODIADO
+                        EN LEDGER WORM … qualified timestamping · SEALED». Ahora mira
+                        `evidence_bundles` y no atribuye sello ni timestamping
+                        cualificado a ningún prestador. */}
+                    <div className="p-4 bg-[var(--g-surface-subtle)] border border-[var(--g-border-default)] rounded-lg flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
-                        <ShieldCheck className="h-4 w-4 text-[var(--status-success)]" />
+                        <ShieldCheck className="h-4 w-4 text-[var(--g-text-secondary)]" />
                         <div>
                           <span className="font-bold text-[var(--g-text-primary)] block">
-                            PLAN DE SALIDA CUSTODIADO EN LEDGER WORM
+                            Archivo del plan de salida
                           </span>
                           <span className="text-[10px] text-[var(--g-text-secondary)]">
-                            Evidencia inmutable archivada con hash SHA-512 y qualified timestamping.
+                            {exitPlanArchived
+                              ? "Registro archivado con hash SHA-512. Sin sello ni firma atribuidos."
+                              : "No consta ningún registro archivado para este proveedor."}
                           </span>
                         </div>
                       </div>
-                      <span className="px-2 py-0.5 text-[10px] font-bold bg-[var(--status-success)] text-[var(--g-text-inverse)] rounded-full">
-                        SEALED
+                      <span className="px-2 py-0.5 text-[10px] font-bold bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)] rounded-full">
+                        {exitPlanArchived ? "ARCHIVADO" : SIN_DATO.toUpperCase()}
                       </span>
                     </div>
                   </div>

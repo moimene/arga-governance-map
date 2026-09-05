@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, skipToken } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 
@@ -28,12 +28,15 @@ export type AiComplianceCheck = {
   created_at: string;
 };
 
+// El guard del tenant va en la queryFn (`skipToken`), no en `enabled`: TanStack
+// v5 EJECUTA la queryFn de una query deshabilitada cuando alguien llama a
+// `refetch()` a mano. Estas tablas NO tienen `tenant_id` propia — el scoping va
+// por el join `ai_systems!inner(tenant_id)`.
 export function useAssessmentsBySystem(systemId: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: ["ai_risk_assessments", tenantId, systemId],
-    queryFn: async () => {
-      if (!systemId) return [];
+    queryFn: tenantId && systemId ? async () => {
       const { data, error } = await supabase
         .from("ai_risk_assessments")
         .select("*, ai_systems!inner(tenant_id)")
@@ -42,8 +45,7 @@ export function useAssessmentsBySystem(systemId: string | undefined) {
         .order("assessment_date", { ascending: false });
       if (error) throw error;
       return (data ?? []) as AiRiskAssessment[];
-    },
-    enabled: !!systemId && !!tenantId,
+    } : skipToken,
   });
 }
 
@@ -51,8 +53,7 @@ export function useAssessmentById(id: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: ["ai_risk_assessments", tenantId, id],
-    queryFn: async () => {
-      if (!id) return null;
+    queryFn: tenantId && id ? async () => {
       const { data, error } = await supabase
         .from("ai_risk_assessments")
         .select("*, ai_systems!inner(id, name, risk_level, system_type, tenant_id)")
@@ -63,8 +64,7 @@ export function useAssessmentById(id: string | undefined) {
       return data as AiRiskAssessment & {
         ai_systems: { id: string; name: string; risk_level: string; system_type: string; tenant_id: string };
       };
-    },
-    enabled: !!id && !!tenantId,
+    } : skipToken,
   });
 }
 
@@ -72,7 +72,7 @@ export function useAllAssessments() {
   const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: ["ai_risk_assessments", tenantId, "all"],
-    queryFn: async () => {
+    queryFn: tenantId ? async () => {
       const { data, error } = await supabase
         .from("ai_risk_assessments")
         .select("*, ai_systems!inner(name, risk_level, tenant_id)")
@@ -82,8 +82,7 @@ export function useAllAssessments() {
       return (data ?? []) as (AiRiskAssessment & {
         ai_systems: { name: string; risk_level: string; tenant_id: string } | null;
       })[];
-    },
-    enabled: !!tenantId,
+    } : skipToken,
   });
 }
 
@@ -91,8 +90,7 @@ export function useComplianceChecksBySystem(systemId: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: ["ai_compliance_checks", tenantId, systemId],
-    queryFn: async () => {
-      if (!systemId) return [];
+    queryFn: tenantId && systemId ? async () => {
       const { data, error } = await supabase
         .from("ai_compliance_checks")
         .select("*, ai_systems!inner(tenant_id)")
@@ -101,8 +99,7 @@ export function useComplianceChecksBySystem(systemId: string | undefined) {
         .order("created_at", { ascending: true });
       if (error) throw error;
       return (data ?? []) as AiComplianceCheck[];
-    },
-    enabled: !!systemId && !!tenantId,
+    } : skipToken,
   });
 }
 
@@ -110,7 +107,7 @@ export function useAllComplianceChecks() {
   const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: ["ai_compliance_checks", tenantId, "all"],
-    queryFn: async () => {
+    queryFn: tenantId ? async () => {
       const { data, error } = await supabase
         .from("ai_compliance_checks")
         .select("*, ai_systems!inner(tenant_id)")
@@ -118,8 +115,7 @@ export function useAllComplianceChecks() {
         .order("created_at", { ascending: true });
       if (error) throw error;
       return (data ?? []) as (AiComplianceCheck & { ai_systems: { tenant_id: string } | null })[];
-    },
-    enabled: !!tenantId,
+    } : skipToken,
   });
 }
 
@@ -139,25 +135,13 @@ export function useCreateAssessment() {
   });
 }
 
-export function useUpdateAssessment() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<AiRiskAssessment> }) => {
-      const { data, error } = await supabase
-        .from("ai_risk_assessments")
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data as AiRiskAssessment;
-    },
-    onSuccess: (_, variables) => {
-      qc.invalidateQueries({ queryKey: ["ai_risk_assessments"] });
-      qc.invalidateQueries({ queryKey: ["ai_risk_assessments", variables.id] });
-    },
-  });
-}
+// `useUpdateAssessment` se ha retirado (2026-09-05): no tenía ni un importador
+// en `src/` y mutaba por `id` SIN ninguna condición de tenant, ni por columna ni
+// por join. Era una escritura cross-tenant esperando a que alguien la llamara.
+// Si vuelve a hacer falta, tiene que filtrar como las lecturas de este fichero:
+// `ai_risk_assessments` no tiene `tenant_id`, así que el scoping va por
+// `ai_systems!inner(tenant_id)`, que en un UPDATE exige comprobar antes la
+// pertenencia del `system_id`.
 
 export function useCreateComplianceChecks() {
   const qc = useQueryClient();

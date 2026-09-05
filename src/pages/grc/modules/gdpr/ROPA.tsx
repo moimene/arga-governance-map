@@ -4,6 +4,7 @@ import {
   FileText, Search, ShieldCheck, Database, Lock, 
   Globe2, Clock, CheckCircle2, ChevronRight 
 } from "lucide-react";
+import { DemoFixtureNotice } from "@/components/grc/DemoFixtureNotice";
 
 interface RopaRecord {
   id: string;
@@ -95,6 +96,9 @@ export default function ROPA() {
 
   return (
     <div className="p-6 space-y-6">
+      <DemoFixtureNotice>
+        Los registros de actividad de tratamiento de esta pantalla son un guion fijo del código. No proceden de ninguna tabla ni del registro real del grupo.
+      </DemoFixtureNotice>
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">

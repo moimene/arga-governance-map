@@ -5,13 +5,12 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { useWhistleblowingLibroRegistro } from "@/hooks/useWhistleblowing";
+import { SII_AVISO_PERSISTENCIA_LOCAL } from "@/lib/sii/whistleblowing-engine";
 import {
   Gavel,
-  ShieldCheck,
   Download,
   Search,
-  Filter,
-  CheckCircle2,
+  AlertTriangle,
   ChevronRight,
   FileLock2,
 } from "lucide-react";
@@ -32,16 +31,16 @@ export default function SiiLibroRegistro() {
     return matchesSearch && matchesCategory;
   });
 
-  const handleExportCertified = () => {
+  const handleExport = () => {
     const content = JSON.stringify(entries, null, 2);
     const blob = new Blob([content], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `LIBRO_REGISTRO_OFICIAL_SII_LEY2_2023_${Date.now()}.json`;
+    a.download = `libro-registro-sii-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Libro-Registro exportado. Entorno de validación funcional: la exportación no lleva firma ni manifiesto criptográfico.");
+    toast.success("Volcado JSON descargado. No lleva firma, ni sello, ni manifiesto, ni escritura inmutable.");
   };
 
   return (
@@ -63,10 +62,11 @@ export default function SiiLibroRegistro() {
         </div>
 
         <Button
-          onClick={handleExportCertified}
-          className="bg-[var(--t-brand)] text-white hover:bg-[var(--t-brand)]/90 text-xs gap-1.5"
+          onClick={handleExport}
+          variant="outline"
+          className="text-xs gap-1.5 text-[var(--t-text-primary)]"
         >
-          <Download className="h-4 w-4" /> Exportar Libro-Registro Certificado (WORM)
+          <Download className="h-4 w-4" /> Descargar volcado JSON (sin certificar)
         </Button>
       </div>
 
@@ -76,9 +76,27 @@ export default function SiiLibroRegistro() {
           <FileLock2 className="h-5 w-5 text-[var(--t-brand)] shrink-0 mt-0.5" />
           <div>
             <span className="font-bold text-[var(--t-text-primary)] block mb-1">
-              Registro Obligatorio de Informaciones y Conservación Limitada a 10 Años
+              Registro obligatorio de informaciones y conservación limitada a diez años
             </span>
-            Conforme al <strong>Artículo 34 de la Ley 2/2023</strong>, la entidad mantiene un libro-registro anonimizado de las comunicaciones recibidas y de las investigaciones a que hayan dado lugar. Los datos personales contenidos en el registro solo se conservarán durante el período imprescindible y, en ningún caso, por un plazo superior a diez años.
+            {/* La cita apuntaba al artículo equivocado —el que en la Ley
+                2/2023 regula el Delegado de protección de datos—. El registro de
+                informaciones es el art. 26 y la retención su apartado 2.
+                Cotejado contra el consolidado del BOE (BOE-A-2023-4513) el
+                2026-09-05. */}
+            El <strong>artículo 26.1 de la Ley 2/2023</strong> obliga a contar con un libro-registro de las informaciones recibidas y de las investigaciones internas a que hayan dado lugar, garantizando los requisitos de confidencialidad de la ley; el registro no es público y solo cabe acceder a él a petición razonada de la Autoridad judicial competente, mediante auto. El <strong>artículo 26.2</strong> limita la conservación de los datos personales al período necesario y proporcionado y, en ningún caso, a más de diez años.
+          </div>
+        </div>
+      </Card>
+
+      {/* Qué es realmente esta pantalla. Los asientos NO están incorporados. */}
+      <Card className="border-[var(--status-warning)] bg-[var(--t-surface-card)] p-5 text-xs text-[var(--t-text-secondary)] leading-relaxed">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-[var(--status-warning)] shrink-0 mt-0.5" />
+          <div>
+            <span className="font-bold text-[var(--t-text-primary)] block mb-1">
+              Asientos generados al vuelo — no hay libro-registro incorporado
+            </span>
+            Salvo los expedientes ya cerrados, los asientos de esta tabla se <strong>calculan al mostrarlos</strong> a partir del expediente: no hay número de entrada ni fecha de registro asignados y conservados en el momento de la recepción, ni orden de asiento estable. {SII_AVISO_PERSISTENCIA_LOCAL}
           </div>
         </div>
       </Card>
@@ -120,7 +138,8 @@ export default function SiiLibroRegistro() {
         <Table className="text-xs">
           <TableHeader>
             <TableRow className="bg-[var(--t-surface-subtle)]">
-              <TableHead className="font-bold">Nº Asiento Oficial</TableHead>
+              <TableHead className="font-bold">Nº Asiento</TableHead>
+              <TableHead className="font-bold">Asiento</TableHead>
               <TableHead className="font-bold">Código Expediente</TableHead>
               <TableHead className="font-bold">Fecha Entrada</TableHead>
               <TableHead className="font-bold">Canal</TableHead>
@@ -134,7 +153,7 @@ export default function SiiLibroRegistro() {
           <TableBody>
             {filteredEntries.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="py-8 text-center text-[var(--t-text-secondary)]">
+                <TableCell colSpan={10} className="py-8 text-center text-[var(--t-text-secondary)]">
                   No se encontraron asientos registrados en el Libro-Registro.
                 </TableCell>
               </TableRow>
@@ -143,6 +162,20 @@ export default function SiiLibroRegistro() {
                 <TableRow key={e.recordNumber} className="hover:bg-[var(--t-surface-subtle)]/40 transition-colors">
                   <TableCell className="font-mono font-bold text-[var(--t-brand)]">
                     {e.recordNumber}
+                  </TableCell>
+                  <TableCell>
+                    {e.incorporadoAlCierre ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[var(--status-success)]/10 text-[var(--status-success)]">
+                        Incorporado al cierre
+                      </span>
+                    ) : (
+                      <span
+                        className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[var(--status-warning)]/10 text-[var(--status-warning)]"
+                        title="Calculado al mostrar la tabla: no hay número de entrada ni fecha de registro conservados desde la recepción."
+                      >
+                        Generado al vuelo
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="font-mono">
                     <Link to={`/sii/${e.reportCode}`} className="hover:underline font-semibold">

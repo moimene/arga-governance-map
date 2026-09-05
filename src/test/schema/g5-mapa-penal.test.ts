@@ -183,9 +183,12 @@ describe("G5 — datos penales en Cloud (Supabase)", () => {
 
   it("un riesgo sin score NO se replica al backbone como 'Bajo'", async () => {
     if (!garr) return;
-    const { data: r } = await garr.from("risks")
+    // Anclado: `if (!r) return` dejaba el test en verde justo cuando su sujeto
+    // —el único riesgo en banda roja— no existía.
+    const { data: r, error: eR } = await garr.from("risks")
       .select("id, code").eq("assessed_band", "ROJO").maybeSingle();
-    if (!r) return;
+    expect(eR).toBeNull();
+    expect(r, "no existe el riesgo en banda ROJA: sin sujeto no hay prueba").not.toBeNull();
     const { data: b, error } = await garr.from("grc_risks")
       .select("id, inherent_severity, residual_severity").eq("id", r.id).maybeSingle();
     expect(error).toBeNull();
@@ -221,11 +224,17 @@ describe("G5 — datos penales en Cloud (Supabase)", () => {
 
   it("action_plans sigue vacío para Garrigues: la fuente no publica la lista", async () => {
     if (!garr) return;
-    const { data } = await garr.from("findings").select("id").like("code", "FND-GARR-PEN-%");
+    // Anclado: antes este test pasaba aunque la consulta fallase (`count ?? 0`
+    // sin mirar `error`) y aunque no hubiera ni un hallazgo (`return` mudo).
+    // Justo los dos escenarios que deberían ponerlo rojo.
+    const { data, error: eF } = await garr.from("findings").select("id").like("code", "FND-GARR-PEN-%");
+    expect(eF).toBeNull();
     const ids = ((data ?? []) as Array<{ id: string }>).map((r) => r.id);
-    if (ids.length === 0) return;
-    const { count } = await garr.from("action_plans")
+    expect(ids.length, "no hay hallazgos penales: el seed no está aplicado").toBe(8);
+    const { count, error } = await garr.from("action_plans")
       .select("id", { count: "exact", head: true }).in("finding_id", ids);
-    expect(count ?? 0).toBe(0);
+    expect(error).toBeNull();
+    expect(count, "la consulta de action_plans no devolvió recuento").not.toBeNull();
+    expect(count).toBe(0);
   });
 });

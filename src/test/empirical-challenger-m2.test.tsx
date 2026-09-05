@@ -1,4 +1,9 @@
 // @vitest-environment happy-dom
+import { afterAll as __afterAllRestore, mock as __bunMockRestore } from "bun:test";
+import * as __realAuthContext from "@/context/AuthContext";
+import * as __realTenantContext from "@/context/TenantContext";
+import * as __realTenantBrandContext from "@/context/TenantBrandContext";
+import * as __realUseNotifications from "@/hooks/useNotifications";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import React from "react";
 import fs from "node:fs";
@@ -38,6 +43,25 @@ let mockTenantBranding: TenantBranding | null = {
   scope_label: "Holding Corporativo",
 };
 const mockLogout = vi.fn();
+
+// Los mocks de `mock.module` de bun son GLOBALES al proceso de test: un stub
+// registrado aquí sobrevive a este fichero y lo heredan los que corren después,
+// que no lo conocen. Este fichero stubea `@/context/AuthContext`, así que sin
+// restauración tumbaba `src/context/__tests__/auth-cache-isolation.test.tsx`
+// (su `logout()` real dejaba de llamar a `signOut`). Se captura el módulo real
+// ANTES de mockear y se devuelve al terminar.
+const __realModulesForRestore: Array<[string, Record<string, unknown>]> = [
+  ["@/context/AuthContext", { ...__realAuthContext }],
+  ["@/context/TenantContext", { ...__realTenantContext }],
+  ["@/context/TenantBrandContext", { ...__realTenantBrandContext }],
+  ["@/hooks/useNotifications", { ...__realUseNotifications }],
+];
+
+__afterAllRestore(() => {
+  for (const [__specifier, __exports] of __realModulesForRestore) {
+    __bunMockRestore.module(__specifier, () => __exports);
+  }
+});
 
 vi.mock("@/context/AuthContext", () => ({
   useAuth: () => ({

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface ControlDetailRow {
   id: string;
@@ -36,14 +37,20 @@ export interface EvidenceFull extends EvidenceRow {
   owner_name: string | null;
 }
 
+// `controls.code` NO tiene unicidad por tenant, así que dos tenants con el
+// mismo código rompen el `.maybeSingle()`. Y la clave sin tenant hacía que los
+// dos compartieran entrada de caché: `TenantProvider` arranca en null, de ahí
+// también el `enabled`.
 export function useControlByCode(code: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["controls", "byCode", code],
-    enabled: !!code,
+    queryKey: ["controls", "byCode", tenantId, code],
+    enabled: !!code && !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("controls")
         .select("*, owner:owner_id(full_name), obligation:obligation_id(code, title, source)")
+        .eq("tenant_id", tenantId!)
         .eq("code", code!)
         .maybeSingle();
       if (error) throw error;

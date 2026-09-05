@@ -8,8 +8,24 @@ const scenarioCases = [
   { id: 'CONFLICTO_EXCLUSION_OK', label: 'Conflicto con exclusion', outcome: 'ADOPTADO' },
 ] as const;
 
+/**
+ * Lecturas del SHELL, no del escenario demo.
+ *
+ * La invariante que este spec protege es que un escenario demo se resuelve en
+ * local y no lee ni escribe su dato en Cloud. Identidad, rol y branding del
+ * usuario los pide el shell en cuanto hay sesión, en cualquier ruta, y no son
+ * dato del escenario: por eso `user_profiles` y `notifications` ya estaban
+ * exentos. Faltaban `tenants` (TenantBrandProvider) y `rbac_user_roles`
+ * (useCurrentUserRole), que hacen exactamente lo mismo y ponían el spec en rojo
+ * sin que ningún dato de demo saliera del navegador.
+ */
 function isShellSupabaseRead(url: string) {
-  return url.includes('/rest/v1/user_profiles?') || url.includes('/rest/v1/notifications?');
+  return (
+    url.includes('/rest/v1/user_profiles?') ||
+    url.includes('/rest/v1/notifications?') ||
+    url.includes('/rest/v1/tenants?') ||
+    url.includes('/rest/v1/rbac_user_roles?')
+  );
 }
 
 function isBlockedDemoExternalCall(url: string, blockSupabaseDomainReads = false) {
@@ -76,8 +92,13 @@ test.describe('Demo-Operable commercial shell', () => {
     await expect(page.getByText('Confianza demo')).toBeVisible();
     await expect(page.getByText('Integración QTSP API preparada')).toBeVisible();
     await expect(page.getByText('Proxy servidor requerido')).toBeVisible();
-    await expect(page.getByText('QES_SANDBOX')).toBeVisible();
-    await expect(page.getByText('/api/v1/private/signature-requests').first()).toBeVisible();
+    // El producto no emite QES: el modo del sandbox es de INTERPOSICIÓN. El spec
+    // pedía «QES_SANDBOX», literal que no existe en `src/` (ni existía) y que el
+    // contrato de producto prohíbe expresamente.
+    await expect(page.getByText('INTERPOSITION_SANDBOX').first()).toBeVisible();
+    // El contrato de API que la demo enseña es el de EVIDENCIAS, no el de
+    // solicitudes de firma: esa ruta se retiró con la firma genérica.
+    await expect(page.getByText('/api/v1/private/evidences').first()).toBeVisible();
     await expect(page.getByText('ARGA_DEMO_PACK_V1')).toBeVisible();
     await expect(page.getByText('source_of_truth=none')).toBeVisible();
     await expect(page.getByText('finalEvidence=false')).toBeVisible();
@@ -142,7 +163,9 @@ test.describe('Demo-Operable commercial shell', () => {
     await expect(page.getByText('Validación bloqueante').first()).toBeVisible();
     await expect(page.getByText('Veto aplicable')).toBeVisible();
     await expect(page.getByText(/veto/i).first()).toBeVisible();
-    await expect(page.getByText('Firma no procede por gate bloqueante')).toBeVisible();
+    // El producto dice «Custodia no procede…»: la redacción con «Firma» se retiró
+    // cuando el alcance pasó de firma a custodia/e-archiving.
+    await expect(page.getByText('Custodia no procede por gate bloqueante')).toBeVisible();
     await expect(page.getByText('finalEvidence=false')).toBeVisible();
   });
 

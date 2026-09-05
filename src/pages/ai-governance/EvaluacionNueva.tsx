@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft,
   Save,
@@ -27,6 +27,7 @@ import {
   calculateAdaptationPlan,
   deriveDiagnosisStatus,
   computeAssessmentStats,
+  subpartTitle,
   MATURITY_LEVELS,
   DIFFICULTY_LEVELS,
   ADAPTATION_PLANS,
@@ -65,12 +66,15 @@ type AdditionalMeasure = {
 
 export default function EvaluacionNueva() {
   const navigate = useNavigate();
+  // `SistemaDetalle` enlaza aquí con `?system_id=…`. Ignorarlo obligaba a
+  // reelegir a mano el sistema del que se venía.
+  const [params] = useSearchParams();
   const { data: systems = [], isLoading: loadingSystems } = useAiSystemsList();
   const createAssessment = useCreateAssessment();
   const createChecks = useCreateComplianceChecks();
 
   const [step, setStep] = useState(1);
-  const [systemId, setSystemId] = useState("");
+  const [systemId, setSystemId] = useState(params.get("system_id") ?? "");
   const [framework, setFramework] = useState<"EU_AI_ACT" | "ISO_42001">("EU_AI_ACT");
   const [activeReqCode, setActiveReqCode] = useState<string>("QUALITY_MGMT");
   const [overallStatus, setOverallStatus] = useState("COMPLETADA");
@@ -279,8 +283,9 @@ export default function EvaluacionNueva() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className={LABEL_CLASSES}>Sistema de IA Objetivo *</label>
+              <label className={LABEL_CLASSES} htmlFor="eval-system">Sistema de IA Objetivo *</label>
               <select
+                id="eval-system"
                 value={systemId}
                 onChange={(e) => setSystemId(e.target.value)}
                 className={SELECT_CLASSES}
@@ -296,8 +301,9 @@ export default function EvaluacionNueva() {
             </div>
 
             <div>
-              <label className={LABEL_CLASSES}>Marco Normativo *</label>
+              <label className={LABEL_CLASSES} htmlFor="eval-framework">Marco Normativo *</label>
               <select
+                id="eval-framework"
                 value={framework}
                 onChange={(e) => setFramework(e.target.value as "EU_AI_ACT" | "ISO_42001")}
                 className={SELECT_CLASSES}
@@ -422,7 +428,13 @@ export default function EvaluacionNueva() {
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--g-border-subtle)] pb-3">
                   <div>
                     <span className="text-xs font-mono text-[var(--g-brand-3308)] font-bold bg-[var(--g-surface-subtle)] px-2 py-0.5" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                      {activeRequirement.articleRef} • {activeRequirement.guideRef}
+                      {/* El marco depende del requisito: los del RIA citan un
+                          artículo del Reglamento (UE) 2024/1689; los de ISO 42001
+                          citan un anexo de la norma. Poner el Reglamento fijo
+                          producía «ISO 42001 A.5 Reglamento (UE) 2024/1689», que
+                          atribuye a la norma europea un anexo que no es suyo. */}
+                      {activeRequirement.articleRef}
+                      {activeRequirement.articleRef.startsWith("Art.") ? " Reglamento (UE) 2024/1689" : ""}
                     </span>
                     <h2 className="text-lg font-bold text-[var(--g-text-primary)] mt-1">
                       {activeRequirement.title}
@@ -469,8 +481,8 @@ export default function EvaluacionNueva() {
                             <span className="font-mono text-xs font-bold text-[var(--g-brand-3308)] bg-[var(--g-surface-subtle)] px-2 py-0.5" style={{ borderRadius: "var(--g-radius-sm)" }}>
                               {m.id}
                             </span>
-                            <span className="text-xs text-[var(--g-text-secondary)] font-mono">
-                              Subapartado: {m.subpartId}
+                            <span className="text-xs text-[var(--g-text-secondary)]">
+                              {subpartTitle(activeRequirement, m.subpartId)}
                             </span>
                           </div>
                           <h3 className="text-sm font-bold text-[var(--g-text-primary)]">{m.description}</h3>
@@ -569,7 +581,7 @@ export default function EvaluacionNueva() {
                             MEDIDA ADICIONAL • {ma.id}
                           </span>
                           <h4 className="text-sm font-bold text-[var(--g-text-primary)] mt-1">{ma.description}</h4>
-                          <span className="text-xs text-[var(--g-text-secondary)]">Subapartado asociado: {ma.subpartId}</span>
+                          <span className="text-xs text-[var(--g-text-secondary)]">Bloque: {subpartTitle(activeRequirement, ma.subpartId)}</span>
                         </div>
                         <button
                           type="button"
@@ -710,8 +722,8 @@ export default function EvaluacionNueva() {
                 <Save className="w-4 h-4" />
                 <span>
                   {createAssessment.isPending || createChecks.isPending
-                    ? "Registrando en Supabase..."
-                    : "Guardar y Precintar Autodiagnóstico"}
+                    ? "Registrando..."
+                    : "Guardar autodiagnóstico"}
                 </span>
               </button>
             </div>
@@ -733,8 +745,13 @@ export default function EvaluacionNueva() {
             <h2 className="text-2xl font-bold text-[var(--g-text-primary)]">
               Autodiagnóstico Registrado con Éxito
             </h2>
+            {/* No hay precinto: es un INSERT en `ai_risk_assessments` y otro en
+                `ai_compliance_checks`. Sin hash, sin sello y sin bundle de
+                evidencia. El rótulo anterior prometía un precinto, es decir una
+                integridad que el producto no calcula ni guarda. */}
             <p className="text-sm text-[var(--g-text-secondary)]">
-              La evaluación del sistema ha sido precintada y almacenada en la base de datos de gobernanza.
+              La evaluación queda registrada y es editable: no lleva hash de integridad,
+              sello ni bundle de evidencia, y su registro no acredita conformidad por sí solo.
             </p>
           </div>
 
@@ -792,7 +809,7 @@ export default function EvaluacionNueva() {
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-[var(--g-text-primary)] mb-1">
-                  Subapartado Legal Asociado
+                  Bloque del requisito
                 </label>
                 <select
                   value={newMaSubpart}
@@ -802,7 +819,7 @@ export default function EvaluacionNueva() {
                 >
                   {activeRequirement.subparts.map((sub) => (
                     <option key={sub.subpartId} value={sub.subpartId}>
-                      {sub.subpartId} — {sub.titleShort}
+                      {sub.titleShort}
                     </option>
                   ))}
                 </select>

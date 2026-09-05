@@ -20,6 +20,7 @@ import {
   consoleSourceNotes,
   type ConsoleSourcePosture,
 } from "@/lib/arga-console/contracts";
+import { formatMeasuredShort, hasMeasuredItems, isUnmeasured } from "@/lib/arga-console/measured";
 
 type WorkTone = "danger" | "warning" | "success" | "neutral";
 
@@ -30,13 +31,15 @@ interface ConsoleWorkItem {
   owner: string;
   source: string;
   route: string;
-  count: number | undefined;
+  count: number | null | undefined;
   tone: WorkTone;
 }
 
 interface ErpConsolePanelProps {
   moduleStatus: ModuleStatus | undefined;
   alerts: NotificationRow[];
+  /** D-5: el sub-rótulo DORA solo se muestra a los tenants con ese módulo. */
+  doraEnabled?: boolean;
 }
 
 const postureLabel: Record<ConsoleSourcePosture, string> = {
@@ -62,10 +65,20 @@ function toneClass(tone: WorkTone) {
   return "text-muted-foreground bg-secondary";
 }
 
-function buildWorkItems(moduleStatus: ModuleStatus | undefined, alerts: NotificationRow[]): ConsoleWorkItem[] {
+/** Tono de un recuento del read model: sin medición, neutro (nunca «éxito»). */
+function measuredTone(count: number | null | undefined, whenPositive: WorkTone): WorkTone {
+  if (isUnmeasured(count)) return "neutral";
+  return hasMeasuredItems(count) ? whenPositive : "success";
+}
+
+function buildWorkItems(
+  moduleStatus: ModuleStatus | undefined,
+  alerts: NotificationRow[],
+  doraEnabled = false,
+): ConsoleWorkItem[] {
   const unreadAlerts = alerts.length;
   const acuerdos = moduleStatus?.secretaria.acuerdosPendientes;
-  const dora = moduleStatus?.grc.incidentesDoraAbiertos;
+  const incidentesMayores = moduleStatus?.grc.incidentesMayoresAbiertos;
   const ai = moduleStatus?.aiGovernance.altosNoAprobados;
 
   return [
@@ -87,17 +100,21 @@ function buildWorkItems(moduleStatus: ModuleStatus | undefined, alerts: Notifica
       source: "agreements",
       route: "/secretaria/tramitador",
       count: acuerdos,
-      tone: (acuerdos ?? 0) > 0 ? "warning" : "success",
+      tone: measuredTone(acuerdos, "warning"),
     },
     {
+      // `incidents` no tiene columna de régimen en Cloud: el recuento es de
+      // incidentes mayores abiertos, no de incidentes DORA.
       id: "grc-dora",
-      label: "Incidentes DORA abiertos",
-      detail: "Lectura GRC legacy; escalada requiere contrato.",
+      label: "Incidentes mayores abiertos",
+      detail: doraEnabled
+        ? "Lectura GRC legacy (incluye DORA); escalada requiere contrato."
+        : "Lectura GRC legacy; escalada requiere contrato.",
       owner: "GRC Compass",
       source: "incidents",
       route: "/grc/incidentes",
-      count: dora,
-      tone: (dora ?? 0) > 0 ? "danger" : "success",
+      count: incidentesMayores,
+      tone: measuredTone(incidentesMayores, "danger"),
     },
     {
       id: "aims-high-risk",
@@ -107,13 +124,13 @@ function buildWorkItems(moduleStatus: ModuleStatus | undefined, alerts: Notifica
       source: "ai_systems + ai_risk_assessments",
       route: "/ai-governance/evaluaciones",
       count: ai,
-      tone: (ai ?? 0) > 0 ? "danger" : "success",
+      tone: measuredTone(ai, "danger"),
     },
   ];
 }
 
-export function ErpConsolePanel({ moduleStatus, alerts }: ErpConsolePanelProps) {
-  const workItems = buildWorkItems(moduleStatus, alerts);
+export function ErpConsolePanel({ moduleStatus, alerts, doraEnabled = false }: ErpConsolePanelProps) {
+  const workItems = buildWorkItems(moduleStatus, alerts, doraEnabled);
   const visibleContracts = consoleDataContracts.filter((contract) =>
     ["core-identity", "secretaria-agreements", "grc-incidents", "aims-systems", "cross-module-contracts"].includes(contract.id)
   );
@@ -164,7 +181,7 @@ export function ErpConsolePanel({ moduleStatus, alerts }: ErpConsolePanelProps) 
               </span>
               <span className="flex items-center gap-3">
                 <span className={cn("min-w-8 rounded-md px-2 py-1 text-center text-sm font-bold tabular-nums", toneClass(item.tone))}>
-                  {item.count ?? "—"}
+                  {formatMeasuredShort(item.count)}
                 </span>
                 <ArrowRight className="h-4 w-4 text-muted-foreground" />
               </span>

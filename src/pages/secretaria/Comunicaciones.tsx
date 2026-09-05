@@ -81,10 +81,32 @@ export default function Comunicaciones() {
         <div>
           <h1 className="text-2xl font-semibold text-[var(--g-text-primary)]">Comunicaciones</h1>
           <p className="text-sm text-[var(--g-text-secondary)] mt-1">
-            Envíos a miembros de órganos sociales: convocatorias, notificaciones, certificaciones.
+            Registro de comunicaciones a miembros de órganos sociales: convocatorias, notificaciones,
+            certificaciones.
           </p>
         </div>
       </header>
+
+      {/* La lista agrupaba ENVIADA/ENTREGADA_PARCIAL/ENTREGADA_TOTAL bajo
+          «Enviadas» y pintaba «Entregada» en verde de éxito, sin la postura de
+          interposición que sí lleva el detalle de cada comunicación. El estado
+          es lo que la sociedad ha anotado en su registro, no una acreditación
+          de entrega por un tercero. */}
+      <section
+        className="border border-[var(--status-info)] bg-[var(--g-surface-subtle)] p-4 text-sm"
+        style={{ borderRadius: 'var(--g-radius-md)' }}
+        role="status"
+      >
+        <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
+          Estados del registro interno, no acreditación de entrega
+        </h2>
+        <p className="mt-1 text-[var(--g-text-secondary)]">
+          Estos estados reflejan lo anotado en el expediente societario. En el alcance vigente no hay
+          envío, entrega ni servicio de entrega electrónica certificada acreditados: la capa de
+          interposición se limita a mensajería básica y custodia. Consulte cada comunicación para ver
+          su postura probatoria.
+        </p>
+      </section>
 
       {/* Tabs */}
       <nav
@@ -201,7 +223,9 @@ export default function Comunicaciones() {
                           : c.estado === 'ERROR'
                           ? 'text-[var(--status-error)]'
                           : c.estado === 'ENTREGADA_TOTAL'
-                          ? 'text-[var(--status-success)]'
+                          // Antes verde de éxito: el registro anota la entrega,
+                          // pero nadie la acredita. Tono informativo, no de logro.
+                          ? 'text-[var(--status-info)]'
                           : 'text-[var(--g-text-primary)]'
                       }
                     >

@@ -15,6 +15,14 @@ export interface CapabilityRow {
   created_at: string;
 }
 
+/**
+ * NO lleva `tenantId` en la queryKey, y es correcto: `capability_matrix` no
+ * tiene columna `tenant_id` en Cloud (verificado 2026-09-05: columnas
+ * id, role, action, enabled, reason, created_at; 40 filas). Es una matriz
+ * global del producto —qué puede hacer cada ROL—, no dato de tenant, así que
+ * añadir el tenant a la clave solo multiplicaría entradas de caché idénticas.
+ * Si algún día gana `tenant_id`, esta clave tiene que cambiar con él.
+ */
 export function useCapabilityMatrix() {
   return useQuery({
     queryKey: ["capability_matrix", "all"],

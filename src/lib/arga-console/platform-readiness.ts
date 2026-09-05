@@ -62,9 +62,12 @@ export const platformReadinessLanes: PlatformReadinessLane[] = [
     owner: "TGMS Core",
     route: "/",
     status: "pending",
-    sourcePosture: "none",
+    // Ambas tablas EXISTEN en Cloud con RLS *_tenant_isolation y filas. La postura
+    // correcta es Cloud en solo lectura; "none" afirmaba que no eran visibles.
+    // El status sigue "pending" porque lo pendiente son las escrituras, no la fuente.
+    sourcePosture: "Cloud",
     contractIds: ["cross-module-contracts"],
-    summary: "Eventos y links compartidos son contrato rector; writes quedan pendientes de paquete aprobado.",
+    summary: "Eventos y links compartidos son contrato rector; lectura Cloud, writes pendientes de paquete aprobado.",
     nextAction: "Probar read-only handoffs antes de cualquier write probe.",
     migrationRequired: false,
     finalEvidence: false,
@@ -107,4 +110,45 @@ export function getPlatformReadinessSummary(lanes: PlatformReadinessLane[] = pla
 
 export function getPlatformReadinessLane(id: string) {
   return platformReadinessLanes.find((lane) => lane.id === id);
+}
+
+
+/**
+ * Recuento medido de un carril, o `null` si no se pudo medir.
+ * `null` NUNCA se presenta como 0: un 0 afirma que se midió y no había nada.
+ */
+export interface LaneMeasurement {
+  label: string;
+  value: number | null;
+  /** Procedencia del número, para pintarla junto al valor. */
+  source: string;
+  /**
+   * Motivo por el que un carril no puede tener el número aunque la consulta
+   * funcione (p. ej. el owner no emite eventos porque no tiene trigger).
+   * Cuando está presente, no se pinta 0: se pinta este motivo.
+   */
+  absentReason?: string;
+}
+
+export interface ComposedLane extends PlatformReadinessLane {
+  measured: LaneMeasurement[];
+}
+
+/**
+ * Une el readiness DECLARADO (humano) con lo MEDIDO (filas de Cloud).
+ *
+ * Invariantes:
+ *  - No promociona ni degrada `status`: la declaración del owner manda. Medir
+ *    114 bundles no convierte un carril en HOLD en otra cosa.
+ *  - Una medición ausente (`null`) se conserva como `null`; nunca se rellena a 0.
+ *  - Un carril sin mediciones queda con `measured: []`, no con ceros inventados.
+ */
+export function composePlatformReadiness(
+  lanes: PlatformReadinessLane[],
+  measured: Record<string, LaneMeasurement[]> = {},
+): ComposedLane[] {
+  return lanes.map((lane) => ({
+    ...lane,
+    measured: (measured[lane.id] ?? []).map((m) => ({ ...m })),
+  }));
 }

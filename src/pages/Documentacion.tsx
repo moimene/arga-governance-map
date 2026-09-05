@@ -23,6 +23,12 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { isModuleEnabled } from "@/lib/tenant-modules";
+
+// D-5: los enlaces a un módulo solo se ofrecen a los tenants que lo tienen.
+// `isModuleEnabled` falla ABIERTO con branding NULL, así que ARGA no cambia.
+type ConMod = { moduleKey?: string };
 
 const sections = [
   { id: "que-es", label: "¿Qué es TGMS?" },
@@ -37,8 +43,8 @@ const principios = [
   { icon: Globe, title: "Federado por diseño", desc: "Corporativo define mínimos; las filiales gestionan particularidades locales." },
   { icon: LinkIcon, title: "Trazabilidad visible", desc: "Toda decisión es trazable hasta la norma, el control y la evidencia." },
   { icon: Lock, title: "Permisos granulares", desc: "RBAC + ABAC + scope = acceso solo a lo que necesitas." },
-  { icon: Eye, title: "Auditoría nativa", desc: "Todo cambio queda registrado de forma inmutable." },
-  { icon: ShieldAlert, title: "SII segregado", desc: "El canal interno tiene su propio entorno técnico y funcional." },
+  { icon: Eye, title: "Auditoría nativa", desc: "Los cambios de los flujos conectados quedan registrados con traza." },
+  { icon: ShieldAlert, title: "SII segregado", desc: "El canal interno se presenta en una zona separada, con su propia puerta de acceso." },
 ];
 
 const modulos = [
@@ -51,7 +57,7 @@ const modulos = [
   { icon: ShieldAlert, title: "Hallazgos y Acciones", desc: "Observaciones, severidades, planes de remediación.", to: "/hallazgos" },
   { icon: Scale, title: "Conflictos e Integridad", desc: "Attestations anuales y operaciones vinculadas.", to: "/conflictos" },
   { icon: Leaf, title: "ESG", desc: "Sostenibilidad, clima y métricas no financieras.", to: "/esg" },
-  { icon: AlertOctagon, title: "SII — Canal Interno", desc: "Canal de denuncias segregado (Ley 2/2023).", to: "/sii" },
+  { icon: AlertOctagon, title: "SII — Canal Interno", desc: "Canal de denuncias segregado (Ley 2/2023).", to: "/sii", moduleKey: "sii" },
 ];
 
 const frameworks = [
@@ -81,7 +87,7 @@ const glosario = [
   { term: "Obligación", def: "Requisito normativo interno o externo.", example: { label: "OBL-DORA-003", to: "/obligaciones/OBL-DORA-003" } },
   { term: "Órgano", def: "Consejo, comisión u órgano de gobierno.", example: { label: "Consejo", to: "/organos/consejo-administracion" } },
   { term: "Política", def: "Norma interna del grupo.", example: { label: "PR-008", to: "/politicas/PR-008" } },
-  { term: "SII", def: "Sistema Interno de Información (canal de denuncias).", example: { label: "Acceder", to: "/sii" } },
+  { term: "SII", def: "Sistema Interno de Información (canal de denuncias).", example: { label: "Acceder", to: "/sii" }, moduleKey: "sii" },
   { term: "Scope", def: "Ámbito de visión: Grupo, Región, País, Entidad.", example: { label: "Switcher arriba", to: "/" } },
 ];
 
@@ -95,8 +101,11 @@ const quickRoutes = [
   {
     icon: AlertOctagon,
     title: "Acceder al canal SII",
-    desc: "Entra por la zona segregada y revisa casos admitidos.",
+    // No existe fase de admisión en el módulo: el estado que se escribe al
+    // emitir el acuse es ACUSE_EMITIDO, no "admitida".
+    desc: "Entra por la zona segregada y revisa las comunicaciones recibidas.",
     to: "/sii",
+    moduleKey: "sii",
   },
   {
     icon: ShieldCheck,
@@ -154,6 +163,15 @@ function ModuleCard({ icon: Icon, title, desc, to }: { icon: LucideIcon; title: 
 }
 
 export default function Documentacion() {
+  const branding = useTenantBranding();
+  // Un enlace a un módulo que el tenant no tiene lleva a un redirect a "/".
+  // `isModuleEnabled` falla ABIERTO (branding NULL) → ARGA no cambia.
+  const visible = <T extends ConMod>(items: T[]) =>
+    items.filter((i) => !i.moduleKey || isModuleEnabled(branding, i.moduleKey));
+  const modulosVisibles = visible(modulos);
+  const glosarioVisible = visible(glosario);
+  const quickRoutesVisibles = visible(quickRoutes);
+
   const [active, setActive] = useState("que-es");
   const [showCompleted, setShowCompleted] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("tgms.tour.justFinished") === "true");
 
@@ -193,7 +211,7 @@ export default function Documentacion() {
       </header>
 
       <section className="mt-5 grid gap-3 md:grid-cols-3">
-        {quickRoutes.map((route) => {
+        {quickRoutesVisibles.map((route) => {
           const Icon = route.icon;
           return (
             <Link
@@ -288,7 +306,7 @@ export default function Documentacion() {
           <section id="modulos" className="scroll-mt-28">
             <h2 className="text-2xl font-semibold tracking-tight text-[var(--t-text-primary)]">Módulos</h2>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              {modulos.map((m) => (
+              {modulosVisibles.map((m) => (
                 <ModuleCard key={m.title} {...m} />
               ))}
             </div>
@@ -325,7 +343,7 @@ export default function Documentacion() {
                   </tr>
                 </thead>
                 <tbody>
-                  {glosario.map((g) => (
+                  {glosarioVisible.map((g) => (
                     <tr key={g.term} className="border-t border-[var(--t-border-subtle)]">
                       <td className="px-4 py-3 font-semibold text-[var(--t-text-primary)]">{g.term}</td>
                       <td className="px-4 py-3 leading-6 text-[var(--t-text-secondary)]">{g.def}</td>
@@ -339,7 +357,7 @@ export default function Documentacion() {
             </Card>
 
             <div className="mt-4 grid gap-3 md:hidden">
-              {glosario.map((g) => (
+              {glosarioVisible.map((g) => (
                 <Card key={g.term} className="border-[var(--t-border-default)] bg-[var(--t-surface-card)] p-4">
                   <h3 className="text-sm font-semibold text-[var(--t-text-primary)]">{g.term}</h3>
                   <p className="mt-1 text-sm leading-6 text-[var(--t-text-secondary)]">{g.def}</p>

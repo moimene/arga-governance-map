@@ -4,8 +4,11 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Lock, Shield } from "lucide-react";
 import { useTenantBranding } from "@/context/TenantBrandContext";
+import { useTenantContext } from "@/context/TenantContext";
 import { useAuth } from "@/context/AuthContext";
 import { siiOrgLabel } from "@/lib/tenant-brand-labels";
+import { siiRolesPara } from "@/lib/sii/roles-por-tenant";
+import { SII_AVISO_PERSISTENCIA_LOCAL } from "@/lib/sii/whistleblowing-engine";
 
 const STORAGE_KEY = "sii_access_confirmed";
 
@@ -18,6 +21,8 @@ export function SiiAccessGate({ children }: { children: React.ReactNode }) {
   // designan Responsable del Sistema e Instructor por cargo, y este módulo
   // todavía no lee esa designación.
   const { user } = useAuth();
+  const { tenantId } = useTenantContext();
+  const roles = siiRolesPara(tenantId);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -44,13 +49,26 @@ export function SiiAccessGate({ children }: { children: React.ReactNode }) {
               <Lock className="h-7 w-7 text-sii-border" />
             </div>
             <h2 className="mt-4 text-xl font-bold text-sii-foreground">Zona de acceso restringido</h2>
+            {/* «El acceso queda registrado en un log de auditoría
+                independiente» era falso: este aviso solo escribe una marca en
+                `sessionStorage` del propio navegador. No hay log, ni auditoría,
+                ni independencia. Se retira la afirmación. */}
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              El Sistema Interno de Información (SII) opera en un entorno técnico y funcional segregado del resto del sistema. El acceso queda registrado en un log de auditoría independiente. La identidad de los denunciantes está protegida por la Ley 2/2023.
+              El Sistema Interno de Información (SII) se presenta en una zona separada del resto de la aplicación. La identidad de los informantes está protegida por la Ley 2/2023.
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              {SII_AVISO_PERSISTENCIA_LOCAL} Esta confirmación no queda registrada en ningún log.
             </p>
             <div className="my-4 h-px w-full bg-border" />
             <div className="text-xs text-muted-foreground">Usted está accediendo como:</div>
             <div className="mt-1 text-sm font-bold text-foreground">{user?.email ?? "Sesión no identificada"}</div>
-            <div className="mt-1 text-xs text-muted-foreground">Rol en el Sistema Interno de Información pendiente de designación conforme a PI-31 §4.</div>
+            {/* La cita de PI-31 se daba a TODO tenant, y PI-31 es la política
+                del SII de Garrigues. Solo se cita donde consta. */}
+            <div className="mt-1 text-xs text-muted-foreground">
+              {roles.politicaDesignacion
+                ? `Rol en el Sistema Interno de Información pendiente de designación conforme a ${roles.politicaDesignacion}.`
+                : "Rol en el Sistema Interno de Información pendiente de designación."}
+            </div>
             <div className="my-4 h-px w-full bg-border" />
             <div className="flex w-full gap-2">
               <Button variant="outline" className="flex-1" onClick={cancel}>Cancelar</Button>
@@ -88,8 +106,11 @@ export function SiiHeader() {
         </Link>
       </nav>
 
+      {/* El badge afirmaba una traza de auditoría separada que no existe.
+          Lo que sí es cierto es que los expedientes viven en el navegador de
+          este equipo. */}
       <div className="ml-auto inline-flex items-center rounded-full border border-white/30 bg-white/10 px-3 py-1 text-[11px] font-semibold">
-        Entorno segregado · Log independiente
+        Zona separada · Datos solo en este navegador
       </div>
     </header>
   );

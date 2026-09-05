@@ -16,7 +16,12 @@ const SUPABASE_ANON_KEY =
   process.env.VITE_SUPABASE_ANON_KEY ??
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6cXdlZmt3c3hvcHdybXRrc2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0Mjc1MDMsImV4cCI6MjA5MjAwMzUwM30.IZ2FbhQLp2ljRcsvsvzpLWQ9cq9p5Lz4dJfVzY3whjQ";
 const DEMO_EMAIL = process.env.DEMO_EMAIL ?? "demo@arga-seguros.com";
-const REQUIRE_CLOUD_AUTH = process.env.REQUIRE_CLOUD_AUTH === "1";
+// EXIGIR LOGIN POR DEFECTO. Con el flag en opt-in (`=== "1"`), las cuatro
+// sondas autenticadas de este fichero caían en `expect(true).toBe(true)` en
+// cuanto el login fallaba —contraseña rotada, Cloud caído— y el gate salía
+// VERDE sin haber comprobado nada. Ahora hay que pedir explícitamente el modo
+// degradado con `REQUIRE_CLOUD_AUTH=0`.
+const REQUIRE_CLOUD_AUTH = process.env.REQUIRE_CLOUD_AUTH !== "0";
 
 const MISSING_TEMPLATE_ID = "00000000-0000-0000-0000-000000000000";
 

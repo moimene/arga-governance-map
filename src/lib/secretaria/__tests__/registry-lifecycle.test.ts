@@ -7,7 +7,7 @@ import {
   registryTerminal,
 } from "../registry-lifecycle";
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 describe("registry lifecycle v2", () => {
@@ -64,10 +64,32 @@ describe("registry lifecycle v2", () => {
   });
 
   it("mantiene el mapa de vías alineado con la migración que manda en el servidor", () => {
-    const sql = readFileSync(
-      resolve(process.cwd(), "supabase/migrations/20260901153450_registry_terminal_by_procedure.sql"),
-      "utf8",
-    );
+    // ANTES leía UNA ruta de migración fija. Eso ata el test a un nombre de
+    // fichero concreto: en cuanto una migración POSTERIOR redefiniese la RPC,
+    // el test seguiría verde comprobando el fichero viejo, y en un árbol donde
+    // ese fichero no exista el test revienta por una razón que no es la suya.
+    // Ahora se resuelve la migración VIGENTE: la última que redefine la RPC.
+    //
+    // Contra Cloud (governance_OS, medido 2026-09-05) la función desplegada es
+    // md5(prosrc) = cc0215249c2f50476078194f5f305c47, con DEPOSITO_CUENTAS y
+    // LEGALIZACION_LIBROS presentes en el cuerpo. `execute_sql` no está
+    // expuesto en este proyecto, así que ese hash se deja anotado como
+    // evidencia de la medición, no como aserción que nadie puede ejecutar.
+    const dir = resolve(process.cwd(), "supabase/migrations");
+    const definenLaRpc = readdirSync(dir)
+      .filter((name) => name.endsWith(".sql"))
+      .sort()
+      .filter((name) =>
+        /CREATE OR REPLACE FUNCTION public\.fn_registry_record_inscription/i.test(
+          readFileSync(resolve(dir, name), "utf8"),
+        ),
+      );
+    expect(
+      definenLaRpc.length,
+      "ninguna migración define fn_registry_record_inscription: el mapa de TS no tiene contraparte",
+    ).toBeGreaterThan(0);
+
+    const sql = readFileSync(resolve(dir, definenLaRpc[definenLaRpc.length - 1]), "utf8");
     // Si el cliente y el servidor divergen, este test cae. El servidor es la
     // autoridad; el mapa de TS solo existe para rotular y abrir la publicación.
     for (const [code, status] of [

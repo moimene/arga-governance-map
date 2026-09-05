@@ -30,7 +30,7 @@ import {
   FileCheck,
 } from "lucide-react";
 import { useAiSystemById, useUpdateAiSystem, AiSystem } from "@/hooks/useAiSystems";
-import { useAssessmentsBySystem, useComplianceChecksBySystem } from "@/hooks/useAiAssessments";
+import { useAssessmentsBySystem } from "@/hooks/useAiAssessments";
 import { useAiIncidentsBySystem } from "@/hooks/useAiIncidents";
 import {
   useAimsTechnicalFileSections,
@@ -44,6 +44,8 @@ import {
 import { useEvidenceBundlesForObject } from "@/hooks/useEvidenceBundles";
 import { useFriaBySystem, useFriaDetails } from "@/hooks/useAimsFria";
 import { isFinalSealedEvidence } from "@/lib/secretaria/evidence-sandbox-gate";
+import { assessmentAcreditaConformidad, isMaterialSeverity, normalizeAimsStatus } from "@/lib/aims/readiness";
+import { useBodiesList } from "@/hooks/useBodies";
 import { buildMeetingHandoffPath } from "@/lib/secretaria/cross-module-handoff";
 import DeclaracionConformidadModal from "@/components/ai-governance/DeclaracionConformidadModal";
 import { toast } from "sonner";
@@ -126,21 +128,26 @@ const RISK_COLORS: Record<string, string> = {
   MINIMAL: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
 };
 
-const CHECK_STATUS_CHIP: Record<string, string> = {
-  CONFORME: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-  EN_CURSO: "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
-  PENDIENTE: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  NO_CONFORME: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  NA: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
-};
-
+/**
+ * `aims_technical_file_sections.status` no tiene CHECK y en Cloud conviven dos
+ * vocabularios: el inglés del diseño (APPROVED/DRAFT/…) y el castellano que el
+ * seed escribió de verdad (4 filas «Conforme», 1 «Pendiente»). Se reconocen los
+ * dos, normalizados; lo desconocido cae a un chip NEUTRO —nunca al de borrador,
+ * que afirmaría un estado— y el literal crudo se sigue pintando tal cual.
+ */
 const SECTION_STATUS_CHIP: Record<string, string> = {
   APPROVED: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
+  CONFORME: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
   SEALED: "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]",
   IN_REVIEW: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
+  EN_REVISION: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
+  PENDIENTE: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
   DRAFT: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
   NON_CONFORMING: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
+  NO_CONFORME: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
 };
+const SECTION_STATUS_CHIP_NEUTRO =
+  "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
 
 export default function SistemaDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -149,7 +156,6 @@ export default function SistemaDetalle() {
 
   const { data: system, isLoading: loadSys } = useAiSystemById(id);
   const { data: assessments = [] } = useAssessmentsBySystem(id);
-  const { data: checks = [] } = useComplianceChecksBySystem(id);
   const { data: incidents = [] } = useAiIncidentsBySystem(id);
 
   // AIMS Technical File & Registries Hooks
@@ -193,9 +199,14 @@ export default function SistemaDetalle() {
   const [editDescription, setEditDescription] = useState("");
   const [editAimsCode, setEditAimsCode] = useState("");
 
-  // Escalation Form State
+  // Escalation Form State.
+  // El órgano destino sale de `governing_bodies` del tenant. Antes eran tres
+  // literales fijos —CDA / COM_EJEC / COM_AUDIT— que son los de la aseguradora
+  // demo: un despacho no tiene ninguno de los tres, y el handoff salía con un
+  // órgano inexistente. Sin órganos no se preselecciona ninguno.
+  const { data: bodies = [] } = useBodiesList();
   const [escalateMatter, setEscalateMatter] = useState("");
-  const [escalateCommittee, setEscalateCommittee] = useState("CDA");
+  const [escalateCommittee, setEscalateCommittee] = useState("");
   const [escalateRationale, setEscalateRationale] = useState("");
 
   const { data: declarations = [] } = useEvidenceBundlesForObject(
@@ -271,7 +282,7 @@ export default function SistemaDetalle() {
   const handleOpenEscalation = () => {
     setEscalateMatter(`Propuesta de aprobación del Expediente Técnico para el Sistema de IA: ${system.name}`);
     setEscalateRationale(`Se solicita al Consejo evaluar la conformidad del sistema ${system.name} bajo el marco RIA / AESIA.`);
-    setEscalateCommittee("CDA");
+    setEscalateCommittee(bodies[0]?.name ?? "");
     setShowEscalationModal(true);
   };
 
@@ -285,7 +296,7 @@ export default function SistemaDetalle() {
           source: "aims",
           event: "AIMS_SYSTEM_CONFORMITY",
           sourceId: system.id,
-          organ: escalateCommittee,
+          organ: escalateCommittee || null,
           matter: escalateMatter,
           rationale: escalateRationale,
         })
@@ -301,12 +312,13 @@ export default function SistemaDetalle() {
       await closeTechnicalFileMutation.mutateAsync({
         versionId,
         // Sin token: no interviene ningún prestador de confianza. El registro
-        // es interno y su integridad la da el hash SHA-512 del manifiesto.
+        // es interno y no lleva hash de integridad: la tabla no tiene columna
+        // donde guardarlo (verificado en Cloud, 2026-09-05).
         qsealToken: undefined,
         tsqToken: undefined,
         signedBy: user?.email ?? undefined,
       });
-      toast.success("Expediente técnico cerrado y registrado con hash SHA-512");
+      toast.success("Expediente técnico cerrado y registrado (registro interno, sin hash de integridad)");
       refetchVersions();
       refetchSections();
     } catch (err) {
@@ -346,7 +358,7 @@ export default function SistemaDetalle() {
             <span>Editar Ficha</span>
           </button>
           <button
-            onClick={() => navigate(`/ai-governance/evaluaciones/nueva?system_id=${system.id}`)}
+            onClick={() => navigate(`/ai-governance/evaluaciones/nuevo?system_id=${system.id}`)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-xs font-medium transition-colors"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
@@ -497,7 +509,7 @@ export default function SistemaDetalle() {
                   Estructura del Expediente Técnico (Anexo IV Reglamento UE)
                 </h2>
                 <p className="text-xs text-[var(--g-text-secondary)]">
-                  Control vivo de las secciones técnicas requeridas antes de la introducción en el mercado • Registro interno con hash SHA-512. El cierre registrado no está disponible: la custodia de evidencia sólo admite registros abiertos y sin firmar desde la consola.
+                  Control vivo de las secciones técnicas requeridas antes de la introducción en el mercado. Registro interno sin hash de integridad: ni <code>aims_technical_file_sections</code> ni <code>aims_system_versions</code> guardan ninguno. El cierre registrado no está disponible: la custodia de evidencia sólo admite registros abiertos y sin firmar desde la consola.
                 </p>
               </div>
 
@@ -536,7 +548,8 @@ export default function SistemaDetalle() {
                 </div>
               ) : (
                 technicalSections.map((sec) => {
-                  const statusCls = SECTION_STATUS_CHIP[sec.status] || SECTION_STATUS_CHIP.DRAFT;
+                  const statusCls =
+                    SECTION_STATUS_CHIP[normalizeAimsStatus(sec.status)] ?? SECTION_STATUS_CHIP_NEUTRO;
                   return (
                     <div
                       key={sec.id}
@@ -583,7 +596,7 @@ export default function SistemaDetalle() {
           <div className="flex justify-between items-center">
             <h2 className="text-base font-bold text-[var(--g-text-primary)]">Historial de Autodiagnósticos de Conformidad</h2>
             <button
-              onClick={() => navigate(`/ai-governance/evaluaciones/nueva?system_id=${system.id}`)}
+              onClick={() => navigate(`/ai-governance/evaluaciones/nuevo?system_id=${system.id}`)}
               className="px-3 py-1.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-xs font-medium transition-colors"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
@@ -612,15 +625,27 @@ export default function SistemaDetalle() {
                       </h3>
                     </div>
                     <div className="text-right">
-                      <span className="text-xl font-bold text-[var(--g-brand-3308)]">{ass.score ?? 0}%</span>
+                      <span className="text-xl font-bold text-[var(--g-brand-3308)]">
+                        {ass.score === null || ass.score === undefined ? "sin dato" : `${ass.score}%`}
+                      </span>
                       <span className="text-[10px] text-[var(--g-text-secondary)] block">Índice Madurez</span>
                     </div>
                   </div>
 
-                  <p className="text-xs text-[var(--g-text-secondary)] line-clamp-2">{ass.notes || "Sin notas registradas."}</p>
+                  {/* `notes` es texto libre que escribe quien crea la evaluación.
+                      Presentarlo sin rótulo lo hacía pasar por conclusión de la
+                      consola: hay filas en Cloud cuyo `notes` afirma
+                      «cumplimiento estricto de todos los artículos», y lo
+                      escribió un e2e, no una auditoría. */}
+                  <div className="text-xs text-[var(--g-text-secondary)] space-y-0.5">
+                    <span className="block text-[10px] uppercase tracking-wider text-[var(--g-text-secondary)]">
+                      Nota libre de quien registró la evaluación
+                    </span>
+                    <p className="line-clamp-2 italic">{ass.notes || "Sin notas registradas."}</p>
+                  </div>
 
                   <div className="pt-2 border-t border-[var(--g-border-subtle)] flex justify-between items-center text-xs">
-                    <span className={`px-2 py-0.5 font-semibold text-[11px] ${ass.status === "CONFORME" ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]" : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"}`} style={{ borderRadius: "var(--g-radius-full)" }}>
+                    <span className={`px-2 py-0.5 font-semibold text-[11px] ${assessmentAcreditaConformidad(ass.status) ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]" : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"}`} style={{ borderRadius: "var(--g-radius-full)" }}>
                       {ass.status}
                     </span>
                     <span className="text-[var(--g-brand-3308)] font-semibold inline-flex items-center gap-1">
@@ -641,7 +666,7 @@ export default function SistemaDetalle() {
           <div className="flex justify-between items-center">
             <h2 className="text-base font-bold text-[var(--g-text-primary)]">Registro de Incidentes de IA (Art. 73 RIA)</h2>
             <button
-              onClick={() => navigate(`/ai-governance/incidentes/nueva?system_id=${system.id}`)}
+              onClick={() => navigate(`/ai-governance/incidentes/nuevo?system_id=${system.id}`)}
               className="px-3 py-1.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-xs font-medium transition-colors"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
@@ -673,7 +698,7 @@ export default function SistemaDetalle() {
                   <div className="flex items-center gap-3">
                     <span
                       className={`px-2.5 py-1 text-xs font-semibold ${
-                        inc.severity === "CRITICA" || inc.severity === "ALTA"
+                        isMaterialSeverity(inc.severity)
                           ? "bg-[var(--status-error)] text-[var(--g-text-inverse)]"
                           : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
                       }`}
@@ -1215,22 +1240,36 @@ export default function SistemaDetalle() {
 
             <p className="text-xs text-[var(--g-text-secondary)]">
               Genera una propuesta formal para incorporar la aprobación del expediente técnico de este sistema de IA
-              en el orden del día del Consejo de Administración o Comité Ejecutivo.
+              en el orden del día del órgano que se indique. No convoca ni acuerda nada: abre el intake de Secretaría
+              con los datos precargados.
             </p>
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block font-semibold text-[var(--g-text-primary)] mb-1">Órgano de Gobierno Destino</label>
+                <label htmlFor="aims-escalate-body" className="block font-semibold text-[var(--g-text-primary)] mb-1">
+                  Órgano de Gobierno Destino
+                </label>
                 <select
+                  id="aims-escalate-body"
                   value={escalateCommittee}
                   onChange={(e) => setEscalateCommittee(e.target.value)}
-                  className="w-full h-9 px-3 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]"
+                  disabled={bodies.length === 0}
+                  className="w-full h-9 px-3 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] disabled:opacity-60"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
-                  <option value="CDA">Consejo de Administración</option>
-                  <option value="COM_EJEC">Comisión Ejecutiva</option>
-                  <option value="COM_AUDIT">Comisión de Auditoría y Control</option>
+                  <option value="">Sin órgano indicado</option>
+                  {bodies.map((b) => (
+                    <option key={b.id} value={b.name}>
+                      {b.name}
+                    </option>
+                  ))}
                 </select>
+                {bodies.length === 0 && (
+                  <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">
+                    Este entorno no tiene órganos de gobierno registrados: la propuesta
+                    se envía a Secretaría sin órgano destino.
+                  </p>
+                )}
               </div>
 
               <div>

@@ -162,13 +162,10 @@ export const GRC_P0_DOMAINS: GrcP0Domain[] = [
   },
 ];
 
-export const GRC_NOT_CONNECTED_BACKLOG = [
-  {
-    id: "tprm",
-    label: "TPRM",
-    reason: "No hay pantalla TPRM específica conectada en el frontend GRC actual.",
-  },
-];
+// TPRM salió de esta lista: `/grc/tprm` lee `grc_third_parties` con datos
+// reales del tenant. Declararlo "sin pantalla conectada" era una postura
+// desmentida por el propio producto.
+export const GRC_NOT_CONNECTED_BACKLOG: Array<{ id: string; label: string; reason: string }> = [];
 
 export const GRC_HANDOFF_CANDIDATES: GrcHandoffCandidate[] = [
   {
@@ -325,13 +322,13 @@ export const GRC_COMPLIANCE_MONITORS: GrcComplianceMonitorDomain[] = [
     id: "tprm-outsourcing",
     label: "TPRM / Outsourcing",
     area: "Riesgo y control",
-    readiness: "gap",
-    route: "/grc/packs",
-    executiveSignal: "Terceros, outsourcing crítico y due diligence no tienen workbench propio todavía.",
-    nextAction: "Definir tabla/contrato de terceros antes de prometer workflows owner-write.",
-    sourceTables: [],
-    sourcePosture: "backlog_placeholder",
-    sourceOfTruth: "Backlog; no dedicated TPRM table or screen is connected in this slice.",
+    readiness: "watch",
+    route: "/grc/tprm",
+    executiveSignal: "Registro de terceros TIC conectado sobre `grc_third_parties`, con CIFA y checklist contractual.",
+    nextAction: "Completar los campos del payload (LEI, países, cláusulas, subcontratación): hoy la mayoría llega vacía y la ficha lo dice.",
+    sourceTables: ["grc_third_parties"],
+    sourcePosture: "legacy_read",
+    sourceOfTruth: "TPRM reads grc_third_parties for the current tenant; missing payload fields are shown as absent, not filled in.",
     handoffCandidateIds: [],
   },
   {
@@ -479,6 +476,19 @@ export const GRC_SCREEN_POSTURES: GrcScreenPosture[] = [
     accessMode: "owner-write",
     handoffCandidateIds: [],
     notes: "Updates only GRC-owned risks; no AIMS or Secretaria mutation.",
+  },
+  {
+    id: "tprm",
+    route: "/grc/tprm",
+    label: "Terceros (TPRM)",
+    owner: "GRC Compass",
+    tables: ["grc_third_parties", "evidence_bundles"],
+    hooks: ["useThirdParties", "useCreateThirdParty", "useUpdateThirdParty"],
+    sourcePosture: "legacy_read",
+    sourceOfTruth: "grc_third_parties for the current tenant; absent payload fields are shown as absent.",
+    accessMode: "owner-write",
+    handoffCandidateIds: [],
+    notes: "Gated by the `tprm` module key; a tenant without it gets an explicit not-enabled panel.",
   },
   {
     id: "penal-anticorrupcion",

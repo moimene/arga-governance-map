@@ -3,6 +3,7 @@ import {
   ShieldCheck, FileText, CheckCircle2, Clock, AlertTriangle, 
   HelpCircle, UserCheck, Scale, Send, MessageSquare 
 } from "lucide-react";
+import { DemoFixtureNotice } from "@/components/grc/DemoFixtureNotice";
 
 interface DpoOpinionItem {
   id: string;
@@ -52,6 +53,9 @@ const DPO_OPINIONS: DpoOpinionItem[] = [
 export default function DPO() {
   return (
     <div className="p-6 space-y-6">
+      <DemoFixtureNotice>
+        Los dictámenes de esta pantalla son un guion fijo del código. Ninguno ha sido emitido por un delegado de protección de datos.
+      </DemoFixtureNotice>
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">

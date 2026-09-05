@@ -143,10 +143,34 @@ export const PRINCIPIOS_PACTO_MUNDIAL: readonly string[] = [
   "Las empresas deben trabajar en contra de la corrupción en todas sus formas, incluidas la extorsión y el soborno.",
 ] as const;
 
-/** Fila del módulo GRC. Autorizada nominalmente: una fila, un tenant. */
+/**
+ * A QUÉ tenant pertenece este catálogo. La pantalla lo compara con el suyo para
+ * no servírselo a otro grupo: ese es su único uso real.
+ *
+ * NO es una fila de `grc_modules`, y decía serlo. `grc_modules` del tenant
+ * Garrigues contiene aml, cyber, ethics y risk — comprobado en Cloud — y no hay
+ * ninguna migración que añada `esg`. Sembrarla exige una decisión sobre el
+ * schema que no corresponde a este carril, así que queda anotado como deuda en
+ * vez de afirmar una fila que no existe. Consecuencia hoy: `/grc/sostenibilidad`
+ * es además ruta huérfana, sin item de navegación que lleve a ella.
+ */
 export const ESG_MODULO = {
   id: "esg",
   tenant_id: "00000000-0000-0000-0000-000000000002",
   name: "Sostenibilidad y ESG",
   owner: "Comité de Sostenibilidad",
 } as const;
+
+/**
+ * Si `/grc/sostenibilidad` puede servir este catálogo al tenant que lo pide.
+ *
+ * Falla CERRADO, y por eso es una función y no una condición dentro de la
+ * pantalla: `TenantProvider` arranca en `null` y resuelve por red, así que el
+ * guard anterior —`if (tenantId && tenantId !== ESG_MODULO.tenant_id)`— dejaba
+ * pasar el primer render de CUALQUIER tenant, incluido ARGA, que veía la
+ * política y los comités de Garrigues. Un `null` no es «todavía no sé»: es
+ * «todavía no puedo decir que sí».
+ */
+export function esgVisibleParaTenant(tenantId: string | null | undefined): boolean {
+  return tenantId === ESG_MODULO.tenant_id;
+}

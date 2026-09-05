@@ -24,14 +24,25 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
   let garr: SupabaseClient | null = null;
   let arga: SupabaseClient | null = null;
   let authed = false, argaAuthed = false, seeded = false;
+  let seedError: string | null = null;
 
   beforeAll(async () => {
     // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
     [garr, arga] = await Promise.all([sesionDe("GARRIGUES"), sesionDe("ARGA")]);
     authed = true;
     argaAuthed = true;
-    const { count } = await garr.from("obligations").select("id", { count: "exact", head: true });
+    const { count, error } = await garr.from("obligations").select("id", { count: "exact", head: true });
+    seedError = error ? error.message : count == null ? "el recuento vino a null" : null;
     seeded = (count ?? 0) >= 12;
+  });
+
+  // La ausencia de seed era un SKIP silencioso en 8 de los 9 tests: menos de 12
+  // obligaciones —o un `count` a null por consulta fallida— pintaba el gate
+  // verde justo en el escenario que debería ponerlo rojo. Ahora falla aquí, una
+  // vez, con el motivo, y los demás siguen dando su detalle.
+  it("el seed de obligaciones del tenant Garrigues está aplicado", () => {
+    expect(seedError, `no se pudo contar obligaciones: ${seedError}`).toBeNull();
+    expect(seeded, "Garrigues tiene menos de 12 obligaciones: el seed no está aplicado").toBe(true);
   });
 
   it("Garrigues tiene al menos 12 obligaciones PBC/FT y todas citan artículo de Ley 10/2010", async () => {

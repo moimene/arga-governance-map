@@ -18,7 +18,13 @@ export interface EvidenceStatusDescriptor {
   tone: EvidenceTone;
   /** Disclaimer legal mostrado bajo la etiqueta cuando la evidencia no es cualificada. */
   disclaimer: string | null;
-  /** true solo cuando la evidencia es cualificada productiva (sellada o verificada). */
+  /**
+   * true solo cuando la evidencia es cualificada productiva. En el alcance
+   * vigente NINGÚN estado lo es: EAD Trust interviene como interposición,
+   * mensajería básica y custodia, sin firma, sello, envío ni entrega. El campo
+   * se conserva porque es el contrato del badge, no porque haya un estado que
+   * lo active.
+   */
   isQualified: boolean;
 }
 
@@ -31,32 +37,43 @@ const ENTORNO_VALIDACION_FUNCIONAL: EvidenceStatusDescriptor = {
 };
 
 export const EVIDENCE_STATUS: Record<string, EvidenceStatusDescriptor> = {
+  // Vocabulario REAL de la única tabla que alimenta el badge:
+  // `secretaria_document_artifacts.evidence_status` CHECK (verificado en Cloud
+  // 2026-09-05) = DEMO_OPERATIVA | EVIDENCE_OPEN | EVIDENCE_SEALED |
+  // EVIDENCE_VERIFIED | EVIDENCE_FAILED. Antes el mapa hablaba otro idioma
+  // (SEALED/VERIFIED/PENDING/FAILED), disjunto del CHECK: un EVIDENCE_FAILED
+  // caía al fallback y se rotulaba «Entorno de validación funcional», que es
+  // decir que todo va bien cuando la evidencia ha fallado.
   DEMO_OPERATIVA: ENTORNO_VALIDACION_FUNCIONAL,
-  OPEN: ENTORNO_VALIDACION_FUNCIONAL,
-  SANDBOX: ENTORNO_VALIDACION_FUNCIONAL,
-  PENDING: {
-    label: "Pendiente de evidencia",
+  EVIDENCE_OPEN: {
+    label: "Evidencia en curso",
     tone: "neutral",
-    disclaimer: "El documento existe, pero aún no tiene evidencia asociada.",
+    disclaimer:
+      "Captura abierta en el circuito de custodia. No acredita firma, sello, envío ni entrega.",
     isQualified: false,
   },
-  FAILED: {
+  EVIDENCE_SEALED: {
+    label: "Custodiada",
+    tone: "neutral",
+    // EAD Trust interviene como interposición, mensajería básica y custodia /
+    // e-archiving. No firma, no sella, no envía y no entrega: rotular esto
+    // «Sellada con QTSP productivo» afirmaba una capacidad fuera de alcance.
+    disclaimer:
+      "Artefacto cerrado y custodiado en el circuito de interposición. No equivale a firma, sello de tiempo ni certificación cualificada.",
+    isQualified: false,
+  },
+  EVIDENCE_VERIFIED: {
+    label: "Integridad verificada",
+    tone: "success",
+    disclaimer:
+      "Se ha verificado la integridad del artefacto custodiado. No acredita firma, sello cualificado, envío ni entrega.",
+    isQualified: false,
+  },
+  EVIDENCE_FAILED: {
     label: "Error de evidencia",
     tone: "error",
-    disclaimer: "No se pudo completar la evidencia. Reintenta o revisa el detalle técnico.",
+    disclaimer: "No se pudo completar la evidencia. Revise el detalle técnico antes de utilizar el documento.",
     isQualified: false,
-  },
-  SEALED: {
-    label: "Sellada",
-    tone: "success",
-    disclaimer: "Evidencia sellada con QTSP productivo (EAD Trust).",
-    isQualified: true,
-  },
-  VERIFIED: {
-    label: "Verificada",
-    tone: "success",
-    disclaimer: "Evidencia verificada frente al servicio cualificado correspondiente.",
-    isQualified: true,
   },
 };
 

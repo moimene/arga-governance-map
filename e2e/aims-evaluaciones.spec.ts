@@ -1,71 +1,113 @@
 import { test, expect } from './fixtures/base';
 
-test.describe('AIMS 360 AI Governance — Evaluaciones E2E Flow', () => {
-  test('Flujo completo de creación de evaluación de riesgo IA (EU AI Act - Conforme)', async ({ page }) => {
-    // 1. Ir a la lista de evaluaciones
+/**
+ * AIMS 360 — recorrido del autodiagnóstico de conformidad.
+ *
+ * ESTE SPEC NO PUEDE ESCRIBIR EN CLOUD, Y ESO SE VIGILA AQUÍ DENTRO.
+ * ---------------------------------------------------------------
+ * La versión anterior recorría el alta hasta el final y pulsaba «Guardar
+ * evaluación» contra `governance_OS`. El 2026-07-19 dejó CUATRO filas reales en
+ * `ai_risk_assessments` del tenant ARGA, todas con `status='APROBADO'`,
+ * `score=100` y una nota que sigue en producción afirmando «el cumplimiento
+ * estricto de todos los artículos de la Ley de Inteligencia Artificial de la
+ * Unión Europea». Ese texto lo escribió este fichero, no una auditoría, y desde
+ * entonces la ficha del sistema lo pinta como si fuera la conclusión.
+ *
+ * El e2e apunta al entorno activo de desarrollo (`governance_OS`): no hay base
+ * desechable contra la que correrlo. Así que el recorrido es de LECTURA, y un
+ * guard de red aborta —y hace fallar el test— cualquier método de escritura que
+ * salga hacia la API de datos. Mismo criterio que el cortafuegos de QTSP real
+ * en los specs de Secretaría: si el spec no puede escribir, no puede volver a
+ * fabricar el dato que luego el producto presenta como hecho.
+ *
+ * Sus selectores, además, estaban todos muertos: buscaban «Nueva evaluación
+ * AIMS», «Marcar todo como Conforme (Demo Quick-Pass)», `#overall-status` y
+ * «ledger WORM», rótulos que no existen en ninguna pantalla actual.
+ */
+
+/** Métodos que mutan. GET y HEAD pasan; el resto ni sale. */
+const METODOS_DE_ESCRITURA = ['POST', 'PATCH', 'PUT', 'DELETE'];
+
+test.describe('AIMS 360 — autodiagnóstico de conformidad (solo lectura)', () => {
+  let escriturasIntentadas: string[] = [];
+
+  test.beforeEach(async ({ page }) => {
+    escriturasIntentadas = [];
+    // Cortafuegos: ninguna escritura de datos sale de este spec. Se registra y
+    // se aborta, para que un fallo sea ruidoso en vez de silencioso.
+    await page.route('**/rest/v1/**', async (route) => {
+      const req = route.request();
+      if (METODOS_DE_ESCRITURA.includes(req.method())) {
+        escriturasIntentadas.push(`${req.method()} ${new URL(req.url()).pathname}`);
+        await route.abort();
+        return;
+      }
+      await route.fallback();
+    });
+    // Las RPC también escriben.
+    await page.route('**/rest/v1/rpc/**', async (route) => {
+      escriturasIntentadas.push(`RPC ${new URL(route.request().url()).pathname}`);
+      await route.abort();
+    });
+  });
+
+  test.afterEach(() => {
+    expect(
+      escriturasIntentadas,
+      'este spec ha intentado escribir en Cloud: es exactamente lo que dejó las 4 evaluaciones fabricadas de ARGA',
+    ).toEqual([]);
+  });
+
+  test('el listado enlaza al alta y el alta llega al paso de medidas sin escribir', async ({ page }) => {
     await page.goto('/ai-governance/evaluaciones');
-    await expect(page).not.toHaveURL('/login');
-    await expect(page.getByRole('heading', { name: 'Evaluaciones de riesgo IA' })).toBeVisible({ timeout: 10_000 });
+    await expect(page).not.toHaveURL(/\/login/);
+    await expect(page.getByRole('heading', { name: 'Evaluaciones de riesgo IA' })).toBeVisible({ timeout: 15_000 });
 
-    // 2. Click en el botón "Nueva evaluación"
-    const newEvalBtn = page.getByRole('button', { name: 'Nueva evaluación' });
-    await expect(newEvalBtn).toBeVisible();
-    await newEvalBtn.click();
+    await page.getByRole('button', { name: 'Nueva evaluación' }).click();
+    await expect(page).toHaveURL(/\/ai-governance\/evaluaciones\/nuevo$/);
+    await expect(
+      page.getByRole('heading', { name: /Nuevo Autodiagnóstico de Conformidad/i }),
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('1. Parámetros del Autodiagnóstico')).toBeVisible();
 
-    // 3. Verificar que estamos en el Stepper de alta
-    await expect(page).toHaveURL('/ai-governance/evaluaciones/nuevo');
-    await expect(page.getByRole('heading', { name: 'Nueva evaluación AIMS' })).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('Paso 1: Identificación del sistema e indicador normativo')).toBeVisible();
+    // Paso 1: sistema y marco. Los ids son los selectores estables.
+    const sistema = page.locator('#eval-system');
+    await expect(sistema).toBeVisible();
+    await sistema.selectOption({ index: 1 });
+    await page.locator('#eval-framework').selectOption('EU_AI_ACT');
 
-    // 4. Paso 1: Seleccionar sistema de IA y Marco de cumplimiento
-    const systemSelect = page.locator('#eval-system');
-    await expect(systemSelect).toBeVisible();
-    await systemSelect.selectOption({ index: 1 });
+    await page.getByRole('button', { name: 'Continuar a Evaluación de Medidas' }).click();
 
-    const frameworkSelect = page.locator('#eval-framework');
-    await expect(frameworkSelect).toBeVisible();
-    await frameworkSelect.selectOption('EU_AI_ACT');
+    // Paso 2: el catálogo de medidas guía se pinta con su artículo del
+    // Reglamento y SIN atribuir ninguna Guía AESIA (la atribución se retiró
+    // porque no se pudo cotejar contra fuente oficial).
+    await expect(page.getByText('Sistema de gestión de riesgos').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/Guía \d+ AESIA/)).toHaveCount(0);
+  });
 
-    // Click en Siguiente
-    await page.getByRole('button', { name: 'Siguiente' }).click();
+  test('el alta no promete precinto ni integridad que no calcula', async ({ page }) => {
+    await page.goto('/ai-governance/evaluaciones/nuevo');
+    await expect(page).not.toHaveURL(/\/login/);
+    await expect(
+      page.getByRole('heading', { name: /Nuevo Autodiagnóstico de Conformidad/i }),
+    ).toBeVisible({ timeout: 15_000 });
 
-    // 5. Paso 2: Checklist Operativo
-    await expect(page.getByText('Paso 2: Checklist Operativo de Requisitos')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('Sistema de gestión de riesgos (Art. 9)')).toBeVisible();
+    // El botón de guardar decía «Guardar y Precintar Autodiagnóstico» sobre dos
+    // INSERT planos: sin hash, sin sello y sin bundle de evidencia.
+    await expect(page.getByRole('button', { name: /Precintar/i })).toHaveCount(0);
+  });
 
-    // Usar el helper Demo Quick-Pass para marcar todos Conformes
-    const quickPassBtn = page.getByRole('button', { name: 'Marcar todo como Conforme (Demo Quick-Pass)' });
-    await expect(quickPassBtn).toBeVisible();
-    await quickPassBtn.click();
+  test('el enlace desde la ficha de sistema apunta a una ruta que existe y preselecciona el sistema', async ({ page }) => {
+    // Los tres botones de `SistemaDetalle` apuntaban a `/nueva`, que no está
+    // montada (`App.tsx` monta `/nuevo`), y el alta ignoraba `?system_id=`.
+    await page.goto('/ai-governance/sistemas');
+    await expect(page).not.toHaveURL(/\/login/);
+    const primerSistema = page.getByRole('link', { name: /./ }).first();
+    await expect(primerSistema).toBeVisible({ timeout: 15_000 });
 
-    // Click en Siguiente
-    await page.getByRole('button', { name: 'Siguiente' }).click();
-
-    // 6. Paso 3: Score y Notas
-    await expect(page.getByText('Paso 3: Análisis de readiness y dictamen general')).toBeVisible({ timeout: 5000 });
-    // El score debería ser 100% gracias al quick pass
-    await expect(page.getByText('100%')).toBeVisible();
-
-    const statusSelect = page.locator('#overall-status');
-    await expect(statusSelect).toBeVisible();
-    await statusSelect.selectOption('APROBADO');
-
-    const notesTextarea = page.locator('#assessment-notes');
-    await expect(notesTextarea).toBeVisible();
-    await notesTextarea.fill('La auditoría del sistema de IA Motor Auto confirma el cumplimiento estricto de todos los artículos de la Ley de Inteligencia Artificial de la Unión Europea.');
-
-    // Click en Guardar evaluación
-    const saveBtn = page.getByRole('button', { name: 'Guardar evaluación' });
-    await expect(saveBtn).toBeVisible();
-    await saveBtn.click();
-
-    // 7. Paso 4: Confirmación & Handoff
-    await expect(page.getByText('Paso 4: Evaluación consolidada en el ledger WORM')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('Evaluación de riesgo IA finalizada con éxito')).toBeVisible();
-    await expect(page.getByText('Sistema IA en postura de conformidad nominal')).toBeVisible();
-
-    // Click en Volver a evaluaciones
-    await page.getByRole('button', { name: 'Volver a evaluaciones' }).click();
-    await expect(page).toHaveURL('/ai-governance/evaluaciones');
+    await page.goto('/ai-governance/evaluaciones/nuevo?system_id=no-existe-a-proposito');
+    await expect(page).not.toHaveURL(/\/login/);
+    // La ruta responde (no es un 404 de router) y el select existe.
+    await expect(page.locator('#eval-system')).toBeVisible({ timeout: 10_000 });
   });
 });

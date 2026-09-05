@@ -27,6 +27,13 @@ const ARGA_EMAIL = process.env.DEMO_EMAIL || "demo@arga-seguros.com";
 const DOMAIN_TABLES = [
   "entities", "document_templates", "rule_packs", "agreements",
   "policies", "obligations", "controls", "risks", "findings",
+  // Carril CONSOLA (2026-09-05): el read model pasó a contarlas tenant-scoped.
+  // Una tabla que la consola cuenta y el gate no vigila es el hueco por el que
+  // un número cruza de tenant. Las direcciones vacuas van declaradas en
+  // aislamiento-declarado.ts con motivo y fuente, no silenciadas.
+  "delegations", "notifications", "condiciones_persona",
+  "incidents", "evidence_bundles",
+  "governance_module_events", "governance_module_links",
 ];
 
 function anonClient(): SupabaseClient {

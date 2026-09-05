@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { narrowRulePackCandidates } from "../rule-pack-candidates";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -80,21 +81,32 @@ describe("procedencia de la regla registral — avisar sin bloquear", () => {
 });
 
 describe("el simulador no deriva mayoría de un pack ambiguo", () => {
+  // La decisión se prueba POR COMPORTAMIENTO en
+  // `rule-pack-candidates.test.ts`. Aquí quedaba un guard que solo comprobaba
+  // que el fuente del hook contuviese dos literales: una llamada de señuelo lo
+  // satisfacía y rompía la regresión sin escribir ninguno de ellos.
   it("se niega a elegir entre packs de órganos distintos sin conocer el órgano", () => {
-    const hook = read(HOOK_SIMULADOR);
-    expect(hook).toContain("if (!organo && distintosOrganos.size > 1) return null;");
-    // Con órgano conocido sí filtra, conservando su desempate de siempre.
-    expect(hook).toContain("rulePackOrganoFamily(r.rule_packs?.organo_tipo) === organo");
-    expect(hook).toContain("pickFreshestRulePackVersion(candidatos)");
+    const filas = [
+      { organo_tipo: "JUNTA_GENERAL" },
+      { organo_tipo: "CONSEJO" },
+    ];
+    expect(narrowRulePackCandidates(filas, null, (r) => r.organo_tipo)).toBeNull();
   });
 
   it("NO cuela fail-closed por discrepancia de órgano: eso es la opción C", () => {
-    // Codex adversarial: filtrar por órgano y devolver null cuando no hay
-    // coincidencia es exactamente el comportamiento excluido de este lote.
-    // Preferir sí; dejar de servir, no.
-    const hook = read(HOOK_SIMULADOR);
-    expect(hook).toContain("const candidatos = delOrgano.length > 0 ? delOrgano : rows;");
-    expect(hook).toContain("post-demo y pendiente");
+    // Filtrar por órgano y devolver null cuando no hay coincidencia es
+    // exactamente el comportamiento EXCLUIDO de este lote (criterio del Comité
+    // Legal). Preferir sí; dejar de servir, no.
+    const soloJunta = [{ organo_tipo: "JUNTA_GENERAL" }];
+    const salida = narrowRulePackCandidates(soloJunta, "CONSEJO", (r) => r.organo_tipo);
+    expect(salida).not.toBeNull();
+    expect(salida).toEqual(soloJunta);
+  });
+
+  it("el hook usa esa decisión y no una copia inlineada", () => {
+    // Backstop de acoplamiento: sin esto, las dos aserciones anteriores podrían
+    // seguir verdes sobre código que el hook ya no llama.
+    expect(read(HOOK_SIMULADOR)).toContain("narrowRulePackCandidates(");
   });
 
   it("el órgano se propaga desde el input, que ya lo llevaba", () => {

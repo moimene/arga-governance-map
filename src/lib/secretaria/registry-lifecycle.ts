@@ -63,6 +63,19 @@ export function registryTerminal(procedureProfileCode?: string | null): Registry
   );
 }
 
+/**
+ * Estados «en curso» del ciclo. El vocabulario v1 solo tenía EN_TRAMITE y
+ * PRESENTADA, y varias superficies (Dashboard, agenda) copiaron esa lista a
+ * mano: un expediente v2 recién preparado o ya elevado a público quedaba
+ * invisible hasta avanzar. Vive aquí porque aquí vive el ciclo.
+ */
+export const REGISTRY_IN_PROGRESS_STATUSES = [
+  "PREPARADA",
+  "ELEVADA",
+  "EN_TRAMITE",
+  "PRESENTADA",
+] as const;
+
 export function isRegistryTerminal(status: string): status is RegistryTerminalStatus {
   return status === "INSCRITA" || status === "DEPOSITADA" || status === "LEGALIZADA";
 }

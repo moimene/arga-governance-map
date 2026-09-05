@@ -87,12 +87,15 @@ const mapRow = (row: DelegationRaw): DelegationFull => ({
 });
 
 export function useDelegationsList() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["delegations", "list"],
+    queryKey: ["delegations", "list", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("delegations")
         .select(SELECT)
+        .eq("tenant_id", tenantId!)
         .order("code");
       if (error) throw error;
       return ((data ?? []) as DelegationRaw[]).map(mapRow);
@@ -101,13 +104,17 @@ export function useDelegationsList() {
 }
 
 export function useDelegationBySlug(slug: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["delegations", "bySlug", slug],
-    enabled: !!slug,
+    // `slug` es clave natural: no hay unicidad global que impida que dos
+    // tenants usen el mismo. Cloud tiene delegaciones en ARGA y en Garrigues.
+    queryKey: ["delegations", "bySlug", tenantId, slug],
+    enabled: !!slug && !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("delegations")
         .select(SELECT)
+        .eq("tenant_id", tenantId!)
         .eq("slug", slug!)
         .maybeSingle();
       if (error) throw error;

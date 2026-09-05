@@ -25,12 +25,27 @@ const SYSTEM_STATUS_LABEL: Record<string, string> = {
   RETIRADO: "Retirado",
 };
 
-const SYSTEM_STATUS_OPTIONS = [
+// `ai_systems.status` no tiene CHECK y en Cloud hay valores fuera de esta lista
+// ('En revision', 'Pendiente', 'Conforme'). El chip y la etiqueta ya toleran lo
+// desconocido —se pinta el literal crudo con estilo neutro—, pero el FILTRO era
+// una lista fija: tres de los ocho sistemas del inventario no eran alcanzables
+// por ningún filtro. Las opciones se derivan del dato presente, sin renombrar
+// nada: un valor sin etiqueta conocida se ofrece tal cual está escrito.
+const SYSTEM_STATUS_BASE_OPTIONS = [
   { value: "Todos", label: "Todos" },
   { value: "ACTIVO", label: "Activos" },
   { value: "EN_EVALUACION", label: "En evaluación" },
   { value: "RETIRADO", label: "Retirados" },
 ];
+
+function systemStatusOptions(systems: { status: string | null }[]) {
+  const conocidos = new Set(SYSTEM_STATUS_BASE_OPTIONS.map((o) => o.value));
+  const extra = [...new Set(systems.map((s) => s.status).filter((v): v is string => !!v))]
+    .filter((v) => !conocidos.has(v))
+    .sort()
+    .map((v) => ({ value: v, label: v }));
+  return [...SYSTEM_STATUS_BASE_OPTIONS, ...extra];
+}
 
 const RISK_LEVELS = [
   { value: "Todos", label: "Todos" },
@@ -209,7 +224,7 @@ export default function Sistemas() {
           </div>
 
           <FilterGroup label="Riesgo" options={RISK_LEVELS} value={riskFilter} onChange={setRiskFilter} />
-          <FilterGroup label="Estado" options={SYSTEM_STATUS_OPTIONS} value={statusFilter} onChange={setStatusFilter} />
+          <FilterGroup label="Estado" options={systemStatusOptions(systems)} value={statusFilter} onChange={setStatusFilter} />
         </div>
       </section>
 

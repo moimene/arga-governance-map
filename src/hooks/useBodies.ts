@@ -146,9 +146,13 @@ export function useBodyBySlug(slug: string | undefined) {
 }
 
 export function useBodyMandates(bodyId: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!bodyId,
-    queryKey: ["condiciones_persona", "byBody", bodyId],
+    enabled: !!bodyId && !!tenantId,
+    // `bodyId` es UUID y hoy no colisiona entre tenants, pero sin `tenantId` en
+    // la clave el primer render de cualquier tenant comparte entrada de caché
+    // (TenantProvider arranca en null y resuelve por red).
+    queryKey: ["condiciones_persona", "byBody", tenantId, bodyId],
     queryFn: async (): Promise<MandateRow[]> => {
       // F6.1: leer de condiciones_persona, mapear al shape MandateRow
       // (contrato legacy) para que OrganoDetalle y demás consumidores
@@ -158,6 +162,7 @@ export function useBodyMandates(bodyId: string | undefined) {
         .select(
           "id, body_id, person_id, tipo_condicion, fecha_inicio, fecha_fin, estado, metadata, person:person_id(full_name, email)"
         )
+        .eq("tenant_id", tenantId!)
         .eq("body_id", bodyId!)
         .order("tipo_condicion", { ascending: true });
       if (error) throw error;

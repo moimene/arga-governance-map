@@ -80,7 +80,7 @@ export const tourSteps: TourStep[] = [
     route: "/organos/consejo-administracion",
     title: "El órgano de gobierno en tiempo real",
     description:
-      "La ficha de órgano centraliza composición, mandatos, calendario y el reglamento de régimen interno. Cada reunión tiene su propio expediente con agenda, materiales, votaciones y acta inmutable.",
+      "La ficha de órgano centraliza composición, mandatos, calendario y el reglamento de régimen interno. Cada reunión tiene su propio expediente con agenda, materiales, votaciones y acta con traza.",
     bullets: [
       "Banner ámbar: 4 mandatos vencidos o próximos a vencer — acción preventiva necesaria.",
       "Reunión 22/04/2026: PR-008 (DORA) en el punto 3 de la agenda — pendiente de aprobación del Consejo.",
@@ -99,7 +99,7 @@ export const tourSteps: TourStep[] = [
     route: "/organos/consejo-administracion/reuniones/cda-22-04-2026",
     title: "El expediente de reunión completo",
     description:
-      "Cada reunión tiene su ciclo de vida: desde la convocatoria hasta el acta aprobada, evidenciada e inmutable. El expediente incluye agenda, materiales, confirmaciones, votaciones y acuerdos.",
+      "Cada reunión tiene su ciclo de vida: desde la convocatoria hasta el acta aprobada, evidenciada con traza. El expediente incluye agenda, materiales, confirmaciones, votaciones y acuerdos.",
     bullets: [
       "Punto 3 de la agenda: PR-008 destaca en ámbar — es el punto crítico de esta sesión.",
       "Tab Participantes: 2 consejeros aún no han confirmado — quórum en riesgo si no confirman.",
@@ -108,7 +108,7 @@ export const tourSteps: TourStep[] = [
     badges: [
       { label: "PR-008 punto 3", tone: "warning" },
       { label: "2 pendientes", tone: "warning" },
-      { label: "Acta inmutable", tone: "neutral" },
+      { label: "Acta con traza", tone: "neutral" },
     ],
     available: true,
   },
@@ -161,7 +161,7 @@ export const tourSteps: TourStep[] = [
     bullets: [
       "Banner rojo: D. Carlos Vaz — delegación caducada sin revocación formal. Las 3 alertas previas fueron ignoradas.",
       "Columna de vencimiento: D. Rodrigo Almeida y D. Ignacio Fuentes vencen en <90 días — acción preventiva en curso.",
-      "Las delegaciones revocadas se conservan con su historial completo para el registro inmutable.",
+      "Las delegaciones revocadas se conservan con su historial completo para el registro con traza.",
     ],
     badges: [
       { label: "DEL-001 CADUCADA", tone: "critical" },
@@ -211,15 +211,15 @@ export const tourSteps: TourStep[] = [
     route: "/sii",
     title: "El canal de integridad: segregado por diseño",
     description:
-      "El Sistema Interno de Información no es una función dentro de TGMS — es un entorno técnico separado. El diseño visual diferenciado, el modal de acceso, los logs independientes y el cifrado de evidencias transmiten visualmente la segregación real que exige la Ley 2/2023.",
+      "El Sistema Interno de Información no es una función dentro de TGMS — es un entorno visualmente separado. El diseño diferenciado y el modal de acceso transmiten la segregación que exige la Ley 2/2023. En esta demo los expedientes son simulados y viven solo en este navegador: no hay registro de auditoría separado ni cifrado de evidencias.",
     bullets: [
       "Diseño diferenciado: fondo, header y colores propios — el usuario entiende que ha cambiado de entorno.",
-      "CASO-SII-001 correlacionado con HALL-008 — el sistema conecta investigaciones independientes sin exponer datos protegidos.",
-      "Log de auditoría independiente: cada acceso queda registrado en un sistema separado.",
+      "Expedientes simulados que ilustran la correlación con un hallazgo sin exponer datos protegidos.",
+      "Demo: el ciclo (alta, acuse, prórroga, cierre) se modela completo, pero no se persiste fuera del navegador.",
     ],
     badges: [
-      { label: "CASO-SII-001 activo", tone: "pending" },
-      { label: "Log independiente", tone: "neutral" },
+      { label: "Expediente simulado", tone: "pending" },
+      { label: "Sin persistencia", tone: "neutral" },
     ],
     highlightId: "tour-sii-header",
     available: true,
@@ -282,9 +282,10 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const goTo = (s: number) => {
     setStep(s);
     if (s > 0 && s <= tourSteps.length) {
-      if (tourSteps[s - 1].route.startsWith("/sii") && typeof window !== "undefined") {
-        sessionStorage.setItem("sii_access_confirmed", "true");
-      }
+      // El tour NO salta la puerta de acceso del SII. Antes escribía
+      // `sii_access_confirmed` en sessionStorage para entrar directo, con lo
+      // que el único control de entrada del módulo con el dato más sensible
+      // del producto se podía esquivar navegando por el tour.
       navigate(tourSteps[s - 1].route);
     }
   };

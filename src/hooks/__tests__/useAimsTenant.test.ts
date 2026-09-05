@@ -14,15 +14,55 @@ import { readFileSync, readdirSync } from "node:fs";
  */
 // Descubrimiento por glob, no lista fija: un `useAimsX.ts` nuevo queda cubierto
 // desde el primer día en vez de nacer sin gate.
+//
+// AMPLIADO (2026-09-05) a los `useAi*.ts`: leen las MISMAS tablas del módulo
+// (`ai_systems`, `ai_risk_assessments`, `ai_compliance_checks`, `ai_incidents`)
+// y quedaban fuera del contrato sólo por el prefijo del nombre. Se han pasado a
+// `skipToken` para que el invariante sea el mismo para todos.
 const HOOKS = readdirSync("src/hooks")
-  .filter((f) => /^useAims.*\.ts$/.test(f))
+  .filter((f) => /^useAi(ms)?[A-Z].*\.ts$/.test(f))
   .map((f) => `src/hooks/${f}`);
+
+/**
+ * ANCLA. Sin esto los seis `it` de abajo son bucles sobre una lista: si el glob
+ * dejara de encontrar ficheros —un `readdir` sobre otro cwd, un renombrado, un
+ * cambio en el patrón— los seis pasarían 6/6 sin asertar NADA. Se exige que la
+ * lista tenga contenido Y que contenga exactamente los hooks que hoy existen:
+ * un hook nuevo entra solo por el glob, pero uno que DESAPAREZCA de la lista
+ * tiene que romper el gate en vez de reducirlo en silencio.
+ */
+const HOOKS_ESPERADOS = [
+  "src/hooks/useAiAssessments.ts",
+  "src/hooks/useAiIncidents.ts",
+  "src/hooks/useAiSystems.ts",
+  "src/hooks/useAimsFria.ts",
+  "src/hooks/useAimsMultiregime.ts",
+  "src/hooks/useAimsTechnicalFile.ts",
+];
+
+/**
+ * `ai_risk_assessments` y `ai_compliance_checks` NO tienen columna `tenant_id`
+ * (verificado en Cloud, 2026-09-05): su aislamiento va por el join
+ * `ai_systems!inner(tenant_id)`, y sus altas no pueden escribir un `tenant_id`
+ * que la tabla no tiene. Por eso los dos invariantes que hablan de la COLUMNA
+ * aceptan también la forma del join, y el de las altas excluye este fichero —
+ * con el motivo escrito, no por omisión.
+ */
+const SCOPING_POR_JOIN = new Set(["src/hooks/useAiAssessments.ts"]);
 
 function read(f: string): string {
   return readFileSync(f, "utf8");
 }
 
 describe("A1 — hooks AIMS aislados por tenant", () => {
+  it("el descubrimiento por glob encuentra los hooks que se quieren cubrir", () => {
+    expect(HOOKS.length, "el glob no ha encontrado ningún hook: los demás tests serían vacuos")
+      .toBeGreaterThan(0);
+    for (const esperado of HOOKS_ESPERADOS) {
+      expect(HOOKS, `${esperado} ha salido del gate sin que nadie lo note`).toContain(esperado);
+    }
+  });
+
   it("ningún hook AIMS hardcodea un UUID de tenant", () => {
     for (const f of HOOKS) {
       expect(read(f), `${f} hardcodea un UUID de tenant`).not.toMatch(
@@ -65,7 +105,9 @@ describe("A1 — hooks AIMS aislados por tenant", () => {
       expect(queryFns.length, `${f} no declara queryFn`).toBeGreaterThan(0);
       for (const q of queryFns) {
         expect(q, `${f}: ${q.trim()} se ejecuta sin comprobar el tenant`).toMatch(
-          /tenantId\s*&&[^?]*\?/,
+          // `tenantId ? …` o `tenantId && algo ? …`: lo que se exige es que el
+          // tenant esté en la condición, no cuántas condiciones haya.
+          /tenantId\s*(?:&&[^?]*)?\?/,
         );
       }
       expect(
@@ -75,11 +117,16 @@ describe("A1 — hooks AIMS aislados por tenant", () => {
     }
   });
 
-  it("el tenant forma parte de toda queryKey", () => {
+  it("el tenant forma parte de toda queryKey de consulta", () => {
     for (const f of HOOKS) {
       const src = read(f);
-      const keys = src.match(/queryKey:\s*\[[^\]]*\]/g) ?? [];
-      expect(keys.length, `${f} no declara queryKey`).toBeGreaterThan(0);
+      // Sólo las claves de LECTURA (las que van seguidas de su `queryFn`). Las
+      // de `invalidateQueries` son prefijos a propósito: invalidan de más, que
+      // es la dirección segura, y exigirles el tenant las haría más estrechas.
+      const keys = (src.match(/queryKey:\s*\[[^\]]*\],\s*\n\s*queryFn:/g) ?? []).map((m) =>
+        m.slice(0, m.indexOf("]") + 1),
+      );
+      expect(keys.length, `${f} no declara queryKey de consulta`).toBeGreaterThan(0);
       for (const k of keys) {
         expect(k, `${f}: ${k} no lleva tenantId`).toMatch(/tenantId/);
       }
@@ -93,7 +140,7 @@ describe("A1 — hooks AIMS aislados por tenant", () => {
       const src = read(f);
       const accesos = (src.match(/\.from\(/g) ?? []).length;
       const altas = (src.match(/\.insert\(/g) ?? []).length;
-      const filtros = (src.match(/\.eq\("tenant_id", tenantId!?\)/g) ?? []).length;
+      const filtros = (src.match(/\.eq\("(?:[a-z_]+\.)?tenant_id", tenantId!?\)/g) ?? []).length;
       expect(
         filtros,
         `${f}: ${accesos} accesos (${altas} altas) y solo ${filtros} filtros por tenant_id`,
@@ -103,11 +150,13 @@ describe("A1 — hooks AIMS aislados por tenant", () => {
 
   it("toda alta escribe el tenant del contexto en el payload", () => {
     for (const f of HOOKS) {
+      // Excluido con motivo, no por olvido: la tabla no tiene la columna.
+      if (SCOPING_POR_JOIN.has(f)) continue;
       const src = read(f);
       const altas = (src.match(/\.insert\(/g) ?? []).length;
       if (altas === 0) continue;
       expect(
-        (src.match(/tenant_id: tenantId!?[,\n]/g) ?? []).length,
+        (src.match(/tenant_id: tenantId!?\s*[,}\n]/g) ?? []).length,
         `${f}: ${altas} altas sin tenant_id del contexto en el payload`,
       ).toBeGreaterThanOrEqual(altas);
     }

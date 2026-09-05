@@ -296,6 +296,16 @@ export default function MatrizJurisdiccional() {
                 {groupFullLabel(branding)} · {JURIS_ORDER.length} jurisdicciones ·
                 Formalización local de decisiones del grupo
               </p>
+              {/* La matriz por materia (`MATERIAS_GRUPO`) y las fichas por
+                  jurisdicción (`FILIALES`) son un cuadro estático redactado en
+                  el módulo: ni se leen de Cloud ni las evalúa el motor. Se
+                  presentaba como «cobertura multi-jurisdicción», que es
+                  afirmar una medición que nadie ha hecho. */}
+              <p className="text-xs text-[var(--g-text-secondary)] mt-1">
+                Cuadro de referencia redactado en el módulo: no medido contra el motor de reglas ni
+                contra los datos de las filiales. Solo el recuento de entidades y acuerdos por filial
+                procede de datos reales.
+              </p>
             </div>
           </div>
 
@@ -749,7 +759,9 @@ function MateriasCrossView({ activeCode }: { activeCode: JurisCode }) {
         <Info className="h-4 w-4 shrink-0" />
         <span>
           Por cada materia: quién decide (siempre España) y qué formalización local exige cada jurisdicción.
-          Las alertas regulatorias sectoriales (SUSEP, CNSF…) aparecen en rojo.
+          Las alertas regulatorias sectoriales (SUSEP, CNSF…) aparecen en rojo.{" "}
+          <strong className="font-semibold">Cuadro de referencia estático</strong>: no procede del motor de
+          reglas ni de una comprobación por sociedad, y no acredita cobertura normativa.
         </span>
       </div>
 

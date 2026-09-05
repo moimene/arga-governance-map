@@ -16,8 +16,11 @@ export interface FriaAssessment {
   fria_summary: string | null;
   market_surveillance_notified: boolean;
   notification_date: string | null;
-  qseal_token: string | null;
-  tsq_token: string | null;
+  // `qseal_token` / `tsq_token` NO existen en `aims_fria_assessments`: la
+  // migración las retiró a propósito (verificado en Cloud, 2026-09-05).
+  // Declararlas hacía dos daños: la UI las pintaba como `undefined`, y un sello
+  // cualificado y un sello de tiempo son exactamente el tipo de afirmación que
+  // este producto no puede sostener. No se reintroducen.
   created_at: string;
   updated_at: string;
 }

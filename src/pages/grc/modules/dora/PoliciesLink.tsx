@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { BookOpen, CheckCircle2, Clock, ExternalLink, ShieldCheck, AlertTriangle } from "lucide-react";
+import { DemoFixtureNotice } from "@/components/grc/DemoFixtureNotice";
 
 interface DoraPolicyItem {
   id: string;
@@ -92,6 +93,9 @@ const DORA_POLICIES: DoraPolicyItem[] = [
 export default function PoliciesLink() {
   return (
     <div className="p-6 space-y-6">
+      <DemoFixtureNotice>
+        Las políticas TIC de esta pantalla son un guion fijo del código. No proceden de la tabla de políticas ni consta su aprobación por ningún órgano.
+      </DemoFixtureNotice>
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">

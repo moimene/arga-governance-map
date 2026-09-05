@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { Route } from "lucide-react";
 import { severityChip } from "@/lib/grc/status-labels";
+import { useTenantContext } from "@/context/TenantContext";
 
 type AuditFindingActionPlan = {
   id: string;
@@ -22,13 +23,22 @@ type AuditFindingRow = {
   action_plans?: AuditFindingActionPlan[] | null;
 };
 
-function useAuditFindings() {
+// El tenant va en la clave Y `enabled` espera a que resuelva, igual que su
+// hermano ActionPlans. RLS filtra la consulta, pero la CACHÉ no: con la clave
+// anterior —["audit","findings"], sin tenant— los dos tenants compartían
+// entrada y el segundo en entrar veía los hallazgos del primero. Y
+// `TenantProvider` arranca en null, así que sin `enabled` el primer render de
+// todos los tenants comparte también la clave [...,null]. El `.eq("tenant_id")`
+// es defensa en profundidad sobre RLS.
+function useAuditFindings(tenantId: string | null) {
   return useQuery({
-    queryKey: ["audit", "findings"],
+    queryKey: ["audit", "findings", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("findings")
         .select("id, code, title, severity, status, origin, due_date, action_plans(id, title, status, progress_pct)")
+        .eq("tenant_id", tenantId!)
         .eq("origin", "AuditInterna")
         .order("code");
       if (error) throw error;
@@ -38,7 +48,8 @@ function useAuditFindings() {
 }
 
 export default function AuditFindings() {
-  const { data: findings = [], isLoading } = useAuditFindings();
+  const { tenantId } = useTenantContext();
+  const { data: findings = [], isLoading } = useAuditFindings(tenantId);
 
   return (
     <div className="p-6 space-y-5">

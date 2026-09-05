@@ -15,6 +15,19 @@ import { readFileSync, readdirSync } from "node:fs";
  */
 const read = (f: string) => readFileSync(f, "utf8");
 
+/**
+ * Quita comentarios (`//`, `/* *\/` y `{/* *\/}` de JSX) antes de comprobar lo
+ * que la pantalla DICE. Sin esto, el comentario que documenta la corrección
+ * satisface el gate que vigila la corrección: la prosa que explica por qué algo
+ * está mal contiene, por fuerza, las palabras del defecto.
+ */
+function sinComentarios(src: string): string {
+  return src
+    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, " ")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/^[ \t]*\/\/.*$/gm, " ");
+}
+
 /** Toda la superficie de AI Governance, descubierta, no enumerada. */
 function superficieAims(): string[] {
   const out: string[] = [];
@@ -112,9 +125,182 @@ describe("A3 — sin sellos fabricados", () => {
   });
 
   it("no se afirma precinto ni sellado, que es lo que no ocurre", () => {
-    const src = read(DETALLE);
-    expect(/Precintad|WORM Sealing|Precintar Expediente/i.test(src),
-      "sigue diciendo 'precintado/sellado' donde solo hay un registro interno").toBe(false);
+    // AMPLIADO (2026-09-05) de un fichero a toda la superficie. Vigilando sólo
+    // `SistemaDetalle`, el alta de autodiagnóstico ofrecía «Guardar y Precintar
+    // Autodiagnóstico» y confirmaba «ha sido precintada» sobre dos INSERT
+    // planos, sin hash, sin sello y sin bundle. El gate no podía verlo.
+    for (const f of superficieAims()) {
+      const src = read(f);
+      const hit = src.match(/Precintar|Precintad[oa]|WORM Sealing/i);
+      expect(hit, `${f}: afirma precinto/sellado donde sólo hay un registro interno → ${hit?.[0]}`)
+        .toBeNull();
+    }
+  });
+
+  it("no se afirma un hash de integridad sobre tablas que no lo guardan", () => {
+    // `aims_technical_file_sections` y `aims_system_versions` no tienen columna
+    // de hash (verificado en Cloud, 2026-09-05) y ninguna pantalla calcula uno.
+    // La ficha de sistema y la declaración de conformidad —que el usuario
+    // DESCARGA— anunciaban «Registro interno con hash SHA-512».
+    for (const f of superficieAims()) {
+      const src = read(f);
+      // Se permite nombrarlo para NEGARLO ("sin hash", "no lleva hash").
+      for (const m of src.match(/[^\n]*SHA-?512[^\n]*/gi) ?? []) {
+        expect(
+          /\bsin hash\b|no lleva hash|no calcula|no tienen? columna/i.test(m),
+          `${f}: afirma un hash que ninguna tabla guarda → ${m.trim()}`,
+        ).toBe(true);
+      }
+    }
+  });
+});
+
+describe("A3 — el texto libre del usuario no se presenta como dictamen", () => {
+  it("la nota de una evaluación se pinta rotulada como nota libre", () => {
+    // En Cloud hay CUATRO filas de `ai_risk_assessments` del tenant ARGA cuyo
+    // `notes` afirma «el cumplimiento estricto de todos los artículos de la Ley
+    // de Inteligencia Artificial de la Unión Europea». Lo escribió
+    // `e2e/aims-evaluaciones.spec.ts` el 2026-07-19, no una auditoría. La ficha
+    // de sistema lo pintaba a secas bajo el score, donde se lee como la
+    // conclusión de la consola. El texto no se puede borrar desde aquí; lo que
+    // sí se puede es dejar de presentarlo como lo que no es.
+    // Se mira el CÓDIGO SIN COMENTARIOS: con los comentarios dentro, el propio
+    // párrafo que explica por qué hay que rotular la nota satisfacía el gate
+    // aunque el rótulo de pantalla hubiera vuelto a decir «Conclusión» (medido
+    // con mutación, 2026-09-05).
+    const src = sinComentarios(read(DETALLE));
+    const render = src.match(/\{ass\.notes[^}]*\}/);
+    expect(render, "la ficha ya no pinta la nota de la evaluación").not.toBeNull();
+    const i = src.indexOf(render![0]);
+    const ventana = src.slice(Math.max(0, i - 700), i + 200);
+    expect(
+      /Nota libre de quien registr/i.test(ventana),
+      "la nota de la evaluación vuelve a pintarse sin rótulo, como si fuera la conclusión de la consola",
+    ).toBe(true);
+    // Y no se presenta como dictamen.
+    expect(
+      /Conclusi[óo]n de la (evaluaci[óo]n|auditor[íi]a)|Dictamen/i.test(ventana),
+      "la nota libre vuelve a rotularse como conclusión o dictamen",
+    ).toBe(false);
+  });
+});
+
+describe("A3 — un cero sin dato no se pinta como un cero bueno", () => {
+  const DASHBOARD = "src/pages/ai-governance/Dashboard.tsx";
+
+  it("las KPI de riesgo e incidentes distinguen «ninguno» de «no consta»", () => {
+    // Con Garrigues (0 sistemas, 0 incidentes) las tarjetas pintaban «0» en
+    // verde: «Riesgo Alto sin eval. aprobada: 0» leído como logro cuando lo que
+    // pasa es que no hay inventario con que contarlo.
+    const src = read(DASHBOARD);
+    expect(
+      /neutral:/.test(src),
+      "KpiCard ya no tiene tono neutro: el cero sin dato vuelve a ser verde",
+    ).toBe(true);
+
+    // …y el tono neutro tiene que PINTAR neutro. Comprobar solo que la clave
+    // `neutral:` existe no dice nada de su valor: mapearla a
+    // `var(--status-success)` devolvía el cero sin dato al verde y el gate
+    // seguía pasando (derrotado por mutación en la review adversarial).
+    for (const clave of ["neutral:"]) {
+      for (const bloque of src.split(clave).slice(1)) {
+        const valor = bloque.slice(0, 80);
+        expect(
+          /status-(success|active)/.test(valor),
+          `el tono neutro se pinta con un color de éxito: ${valor.split("\n")[0].trim()}`,
+        ).toBe(false);
+      }
+    }
+    for (const [etiqueta, coleccion] of [
+      ["Riesgo Alto sin eval. aprobada", "systems"],
+      ["Incidentes abiertos", "incidents"],
+    ] as const) {
+      const i = src.indexOf(etiqueta);
+      expect(i, `no se encuentra la KPI «${etiqueta}»`).toBeGreaterThan(0);
+      const tarjeta = src.slice(i, i + 500);
+      expect(
+        new RegExp(`${coleccion}\\.length === 0 \\? "neutral"`).test(tarjeta),
+        `la KPI «${etiqueta}» no pasa a tono neutro cuando ${coleccion} está vacío`,
+      ).toBe(true);
+    }
+  });
+
+  it("no se afirma «Standalone-ready» ni «datos demo conectados» sin comprobarlo", () => {
+    const src = read(DASHBOARD);
+    // Los dos eran literales incondicionales, y el primero contradecía al
+    // `standaloneReady` que el propio resumen calcula.
+    const ready = src.indexOf("Standalone-ready");
+    expect(ready, "ha desaparecido el rótulo de readiness").toBeGreaterThan(0);
+    expect(
+      /readiness\.standaloneReady \? "Standalone-ready"/.test(src),
+      "«Standalone-ready» vuelve a afirmarse sin mirar el resumen",
+    ).toBe(true);
+    expect(
+      /Estado de fuentes: datos demo conectados/.test(src),
+      "vuelve el literal «datos demo conectados» sin comprobar que haya datos",
+    ).toBe(false);
+    expect(
+      /Pendiente, sin schema nuevo/.test(src),
+      "vuelve «sin schema nuevo», que es falso y contradice al dominio migration",
+    ).toBe(false);
+  });
+});
+
+describe("A3 — no se cita lo que no se ha cotejado", () => {
+  it("no se atribuye ninguna Guía AESIA a ningún requisito", () => {
+    // El catálogo daba a cada requisito un número de Guía AESIA («Guía 12
+    // AESIA», «Guía 2 AESIA»…) y diez de los doce llevaban una guía distinta de
+    // la suya. Las guías existen (AESIA publica un catálogo numerado): el
+    // defecto era la ATRIBUCIÓN, y que una guía no vinculante no es la fuente
+    // de un requisito del Reglamento — la fuente es el artículo.
+    // Se retiró el campo entero. Este gate impide que vuelva por cualquiera de
+    // las dos puertas: el DATO del catálogo y el RÓTULO de pantalla.
+    for (const f of superficieAims()) {
+      const src = read(f);
+      const dato = src.match(/guideRef\s*[:?]/);
+      expect(dato, `${f}: el catálogo vuelve a declarar guideRef → ${dato?.[0]}`).toBeNull();
+      // El rótulo, aunque se construya sin el campo. Se vigila la forma que se
+      // comprobó falsa: una guía AESIA numerada atribuida a un requisito
+      // concreto («Guía 12 AESIA», «Guía 2 AESIA»…). La Guía 16 queda FUERA de
+      // este gate a propósito y con el motivo escrito: no es una atribución por
+      // requisito sino el nombre del manual de checklists del que sale el
+      // catálogo entero, es el encuadre declarado del módulo desde su origen y
+      // no formaba parte del defecto medido. Su propia verificación contra
+      // publicación oficial sigue siendo deuda abierta, distinta de ésta.
+      for (const m of src.matchAll(/Gu[íi]a\s+\d+\s*(?:AESIA|de\s+AESIA)/gi)) {
+        if (/Gu[íi]a\s+16\b/i.test(m[0])) continue;
+        // Sólo se permite nombrarlo para explicar la retirada, nunca como cita.
+        // El contexto se toma en una ventana, no en la línea: la justificación
+        // de un comentario largo cae en la línea siguiente y comprobar sólo la
+        // línea del hallazgo la dejaría fuera.
+        const ventana = src.slice(Math.max(0, m.index - 260), m.index + 260);
+        expect(
+          /retirad|no se ha podido cotejar|no verificable|SE HA RETIRADO/i.test(ventana),
+          `${f}: vuelve a atribuirse una Guía AESIA numerada a un requisito → ${m[0]}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("el identificador interno de bloque no se pinta como apartado del Reglamento", () => {
+    // `subpartId` («17.1.a», «9.2.a») es una clave de agrupación del catálogo,
+    // no una cita cotejada del apartado y la letra del artículo. Se pintaba en
+    // pantalla con el rótulo «Subapartado» y en `font-mono`, que es exactamente
+    // la forma de una referencia legal. Ahora se pinta `titleShort` vía
+    // `subpartTitle()`.
+    for (const f of superficieAims()) {
+      const src = read(f);
+      for (const m of src.match(/(?<![=\w])\{[^{}\n]*\.subpartId\}/g) ?? []) {
+        expect(
+          false,
+          `${f}: vuelve a renderizarse el identificador de bloque como si fuera una cita → ${m}`,
+        ).toBe(true);
+      }
+      expect(
+        /Subapartado\s+Legal/i.test(src),
+        `${f}: vuelve el rótulo «Subapartado Legal» sobre un identificador no cotejado`,
+      ).toBe(false);
+    }
   });
 });
 
@@ -421,15 +607,34 @@ describe("La puerta de entrada no promete lo que el producto oculta", () => {
     // que `branding.modules` le oculta por dentro desde D-5 y que, por el
     // análisis de G6, no le alcanza. Un producto no puede prometer en la
     // puerta lo que niega en el pasillo.
-    const { LOGIN_BRANDS } = await import("@/lib/login-brands");
-    const garrigues = LOGIN_BRANDS.garrigues;
-    expect(garrigues, "no existe la marca de Garrigues").toBeDefined();
+    const { LOGIN_BRANDS, resolveLoginBrand } = await import("@/lib/login-brands");
+    // Se resuelve por el camino del PRODUCTO, no leyendo el mapa a mano: si
+    // `resolveLoginBrand` cayera a su fallback (que es ARGA), el gate estaría
+    // mirando otra marca y aquí se ve.
+    const garrigues = resolveLoginBrand("?tenant=garrigues");
+    expect(garrigues.key, "resolveLoginBrand no devuelve la marca de Garrigues").toBe("garrigues");
+    expect(garrigues.tenantId, "la marca de Garrigues apunta a otro tenant")
+      .toBe("00000000-0000-0000-0000-000000000002");
+
     const texto = JSON.stringify(garrigues);
-    expect(/DORA/i.test(texto), `el acceso de Garrigues sigue anunciando DORA: ${texto}`).toBe(false);
-    // Control discriminante: ARGA es la aseguradora, y a ella DORA sí le
-    // alcanza. Si el gate estuviera mirando el tenant equivocado, esto lo
-    // delataría en vez de taparlo.
-    expect(LOGIN_BRANDS.arga, "no existe la marca de ARGA").toBeDefined();
+    expect(/\bDORA\b/i.test(texto), `el acceso de Garrigues sigue anunciando DORA: ${texto}`).toBe(false);
+
+    // CONTROL DISCRIMINANTE. El anterior era `expect(LOGIN_BRANDS.arga).toBeDefined()`:
+    // no discriminaba nada, pasaba con las dos marcas vacías y con las dos
+    // idénticas. Se comprueba (a) que el objeto bajo examen NO está vacío —una
+    // marca sin texto satisface trivialmente cualquier «no menciona X»— y (b)
+    // que las dos marcas son REALMENTE distintas y el detector separa una de
+    // otra: ARGA lleva su vocabulario asegurador y Garrigues no, así que un
+    // gate que estuviera leyendo la marca equivocada caería aquí.
+    expect(texto.length, "la marca de Garrigues está vacía: el gate sería vacuo").toBeGreaterThan(200);
+    expect(/AI Governance|Secretaría Societaria/i.test(texto),
+      "la marca de Garrigues no tiene su propio contenido").toBe(true);
+
+    const argaTexto = JSON.stringify(LOGIN_BRANDS.arga);
+    expect(/asegurador/i.test(argaTexto),
+      "la marca de ARGA no es la de la aseguradora: el control no discrimina").toBe(true);
+    expect(/asegurador/i.test(texto),
+      "la marca de Garrigues trae el vocabulario de ARGA: se está leyendo la marca equivocada").toBe(false);
   });
 });
 

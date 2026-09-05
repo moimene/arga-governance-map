@@ -3,6 +3,7 @@ import { dsarStatusChip } from "@/lib/grc/status-labels";
 import { computeDsarSla, type DsarSlaCalculation } from "@/lib/grc/regulatory-clocks";
 import { Clock, PlusCircle, AlertTriangle, CheckCircle2, User, FileText } from "lucide-react";
 import { toast } from "sonner";
+import { DemoFixtureNotice } from "@/components/grc/DemoFixtureNotice";
 
 interface DsarItem {
   id: string;
@@ -75,6 +76,9 @@ export default function DSARs() {
 
   return (
     <div className="p-6 space-y-6">
+      <DemoFixtureNotice>
+        Las solicitudes de derechos de esta pantalla son un guion fijo del código y sus interesados son ficticios. No proceden de ninguna tabla ni de una solicitud real.
+      </DemoFixtureNotice>
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">

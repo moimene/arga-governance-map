@@ -121,6 +121,85 @@ export const AISLAMIENTO_DECLARADO: readonly TablaDeclarada[] = [
     },
     marcadores: {},
   },
+  // ── Tablas añadidas por el carril CONSOLA (2026-09-05) ──────────────────
+  // El read model de la consola pasó a leerlas tenant-scoped, así que entran
+  // en el gate de aislamiento: una tabla que la consola cuenta y el gate no
+  // vigila es exactamente el hueco por el que un número cruza de tenant.
+  {
+    tabla: "delegations",
+    arga: "ALGUNA",
+    garrigues: "ALGUNA",
+    marcadores: {
+      garrigues: ["GARR-DEL-2026-01", "GARR-DEL-EAD-CD"],
+    },
+  },
+  {
+    tabla: "notifications",
+    arga: "ALGUNA",
+    garrigues: "ALGUNA",
+    marcadores: {},
+  },
+  {
+    tabla: "condiciones_persona",
+    arga: "ALGUNA",
+    garrigues: "ALGUNA",
+    marcadores: {},
+  },
+  {
+    tabla: "incidents",
+    arga: "ALGUNA",
+    garrigues: "NINGUNA",
+    motivo: {
+      texto:
+        "El carril GRC de este tenant se sembró con el mapa de riesgos penales, los hallazgos " +
+        "enlazados y los controles del PPD, pero NO con incidentes: el despacho no ha declarado " +
+        "ninguno y fabricar incidentes verosímiles los haría indistinguibles de los reales. La " +
+        "ausencia es la decisión, no un seed a medias.",
+      fuente: "carril C3, seeds de Garrigues sin incidentes (commit 22d0579)",
+    },
+    marcadores: {},
+  },
+  {
+    tabla: "evidence_bundles",
+    arga: "ALGUNA",
+    garrigues: "NINGUNA",
+    motivo: {
+      texto:
+        "Este tenant no ha producido todavía ningún artefacto documental propio (0 actas, 0 " +
+        "certificaciones, 0 artefactos), así que no hay nada de lo que emitir bundle. Y el " +
+        "backbone probatorio sigue en HOLD, de modo que tampoco se emitiría por conveniencia " +
+        "de la demo: la ausencia es coherente con la postura declarada del carril de evidencia.",
+      fuente: "migración 000049 en HOLD; informe de revisión 2026-09-02 §2.1 (commit 45809dd)",
+    },
+    marcadores: {},
+  },
+  {
+    tabla: "governance_module_events",
+    arga: "ALGUNA",
+    garrigues: "NINGUNA",
+    motivo: {
+      texto:
+        "Los handoffs cross-module son read-only por navegación y ninguna superficie escribe en " +
+        "esta tabla (0 inserts en src/). Las filas de ARGA son históricas. Que Garrigues tenga " +
+        "cero no es un seed roto: es que el producto no emite eventos, y esa prohibición es " +
+        "precisamente el contrato vigente.",
+      fuente: "contrato read-only de src/lib/secretaria/cross-module-handoff.ts (commit 45809dd)",
+    },
+    marcadores: {},
+  },
+  {
+    tabla: "governance_module_links",
+    arga: "ALGUNA",
+    garrigues: "NINGUNA",
+    motivo: {
+      texto:
+        "Mismo motivo que los eventos: la escritura en links está prohibida por el guardrail " +
+        "vigente y ninguna superficie del producto la ejerce. Las tres filas de ARGA son " +
+        "históricas y el tenant nuevo no puede generar ninguna sin romper ese contrato.",
+      fuente: "contrato read-only de src/lib/secretaria/cross-module-handoff.ts (commit 45809dd)",
+    },
+    marcadores: {},
+  },
 ] as const;
 
 /** Las tablas cuya ausencia está declarada, para poder afirmarlo en el gate. */

@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   HandshakeIcon,
   Repeat2,
+  HelpCircle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
@@ -29,6 +30,9 @@ import { useSecretariaScope } from "@/components/secretaria/shell";
 import { AgendaDraftInbox } from "@/components/secretaria/AgendaDraftInbox";
 import { getSecretariaScopedIds } from "@/lib/secretaria/scope-filters";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+import { minuteHasLegalSignature } from "@/lib/secretaria/authoritative-legal-state";
+import { classifyBookDeadline } from "@/lib/secretaria/libros-societarios";
+import { REGISTRY_IN_PROGRESS_STATUSES } from "@/lib/secretaria/registry-lifecycle";
 import { useSecretariaDocumentArtifacts } from "@/hooks/useSecretariaDocumentArtifacts";
 import { REVIEWABLE_STATUSES, artifactKindLabel } from "@/lib/secretaria/document-artifact-labels";
 import {
@@ -183,16 +187,31 @@ function useSecretariaKpis(entityId?: string | null) {
         return count ?? 0;
       }
 
-      async function countActasPendientesAprobacion() {
+      // APROBADA es lo que dice el gate autoritativo, no la marca legacy.
+      // `signed_at IS NULL` contaba como aprobadas 8 actas de ARGA en
+      // DEMO_SIMULATION/LEGACY_REVIEW (medido en Cloud 2026-09-05): actas que
+      // el propio motor se niega a aprobar. En vez de reescribir el criterio en
+      // forma de filtros, se traen las filas y se aplica `minuteHasLegalSignature`,
+      // que es el ÚNICO criterio canónico (authoritative-legal-state.ts). Así no
+      // pueden volver a divergir. El volumen es de decenas de filas por tenant.
+      async function countActasAprobadas() {
         let query = supabase
           .from("minutes")
-          .select("id", { count: "exact", head: true })
-          .eq("tenant_id", tenantId!)
-          .is("signed_at", null);
+          .select("id, legal_gate_status, approval_canonical_status, approval_evidence_mode, approval_signature_claim, signed_at, is_locked")
+          .eq("tenant_id", tenantId!);
         if (entityId) query = query.eq("entity_id", entityId);
-        const { count, error } = await query;
+        const { data, error } = await query;
         if (error) throw error;
-        return count ?? 0;
+        return (data ?? []).filter((row) =>
+          minuteHasLegalSignature({
+            legalGateStatus: row.legal_gate_status,
+            signedAt: row.signed_at,
+            isLocked: row.is_locked,
+            approvalEvidenceMode: row.approval_evidence_mode,
+            approvalSignatureClaim: row.approval_signature_claim,
+            approvalCanonicalStatus: row.approval_canonical_status,
+          }),
+        ).length;
       }
 
       // Sin el total, CERO actas es indistinguible de «todas aprobadas», y el
@@ -247,16 +266,24 @@ function useSecretariaKpis(entityId?: string | null) {
         return count ?? 0;
       }
 
+      // MISMO criterio que /secretaria/libros, y literalmente la misma función:
+      // `classifyBookDeadline`. El panel filtraba solo por fecha y contaba como
+      // alerta un libro YA LEGALIZADO, así que decía 3 donde la página decía 2
+      // con el mismo dato (Cloud 2026-09-05: 1 LEGALIZADO + 2 PENDIENTE al
+      // 26/07/2026). Se traen las candidatas por fecha y clasifica la función.
       async function countLibrosAlerta() {
         let query = supabase
           .from("mandatory_books")
-          .select("id", { count: "exact", head: true })
+          .select("id, legalization_deadline, legalization_status")
           .eq("tenant_id", tenantId!)
           .lte("legalization_deadline", en30);
         if (entityId) query = query.eq("entity_id", entityId);
-        const { count, error } = await query;
+        const { data, error } = await query;
         if (error) throw error;
-        return count ?? 0;
+        return (data ?? []).filter((row) => {
+          const estado = classifyBookDeadline(row.legalization_deadline, row.legalization_status);
+          return estado === "overdue" || estado === "due_soon";
+        }).length;
       }
 
       async function countCompliancePendiente() {
@@ -272,12 +299,15 @@ function useSecretariaKpis(entityId?: string | null) {
         return count ?? 0;
       }
 
-      const [conv, reun, actas, actasTotal, tram, tramSub, asoc, du, libros, compliancePending] = await Promise.all([
+      const [conv, reun, actasAprobadas, actasTotal, tram, tramSub, asoc, du, libros, compliancePending] = await Promise.all([
         countConvocatorias(),
         countReunionesSemana(),
-        countActasPendientesAprobacion(),
+        countActasAprobadas(),
         countActasTotal(),
-        countTramitaciones(["EN_TRAMITE", "PRESENTADA"]),
+        // Vocabulario del ciclo, no una lista copiada: PREPARADA y ELEVADA
+        // también están en curso, y sin ellas un expediente v2 era invisible en
+        // la Mesa hasta avanzar (4 de Garrigues en PREPARADA, Cloud 2026-09-05).
+        countTramitaciones([...REGISTRY_IN_PROGRESS_STATUSES]),
         countTramitaciones(["SUBSANACION"]),
         countAcuerdosSinSesion(),
         countDecisionesUnipersonales(),
@@ -288,7 +318,7 @@ function useSecretariaKpis(entityId?: string | null) {
       return {
         convocatorias_proximas: conv,
         reuniones_semana: reun,
-        actas_pendientes_aprobacion: actas,
+        actas_pendientes_aprobacion: Math.max(actasTotal - actasAprobadas, 0),
         actas_total: actasTotal,
         tramitaciones_curso: tram,
         tramitaciones_subsanacion: tramSub,
@@ -427,7 +457,7 @@ function useSecretariaAgenda(entityId?: string | null) {
           .from("registry_filings")
           .select("id, filing_number, filing_via, status, presentation_date")
           .eq("tenant_id", tenantId!)
-          .in("status", ["EN_TRAMITE", "PRESENTADA", "SUBSANACION"]);
+          .in("status", [...REGISTRY_IN_PROGRESS_STATUSES, "SUBSANACION"]);
         if (agreementIds) filingsQuery = filingsQuery.in("agreement_id", agreementIds);
         const { data: filings, error: filingsError } = await filingsQuery
           .order("presentation_date", { ascending: false })
@@ -748,13 +778,14 @@ export default function SecretariaDashboard() {
   const { data: docArtifacts, isLoading: docsLoading, error: docsError } = useSecretariaDocumentArtifacts();
   const pendingDocs = (docArtifacts ?? []).filter((doc) => REVIEWABLE_STATUSES.has(doc.status));
   const navigateSecretaria = (to: string) => navigate(scope.createScopedTo(to));
-  const flowSummary = summarizeSecretariaSanitizedFlows();
   // D-5 — Board Pack es el único flujo de este panel gateado por módulo;
   // filtra en el consumidor, el registro (sanitized-flow-contracts.ts) queda
   // intacto para no romper su test.
   const visibleFlowContracts = SECRETARIA_SANITIZED_FLOW_CONTRACTS.filter(
     (flow) => flow.id !== "board-pack" || isModuleEnabled(branding, "board-pack")
   );
+  // El resumen cuenta lo que se pinta, no el registro entero.
+  const flowSummary = summarizeSecretariaSanitizedFlows(visibleFlowContracts);
 
   const nextAgenda = agenda?.[0];
   const openAttention = attentionCount(kpis);
@@ -1093,8 +1124,12 @@ export default function SecretariaDashboard() {
             <h2 className="mt-1 text-base font-semibold text-[var(--g-text-primary)]">
               Contratos por flujo Secretaría
             </h2>
+            {/* El rótulo anterior decía «Cloud es fuente de verdad» justo encima
+                de tres cifras que salen de un array literal del repositorio
+                (`sanitized-flow-contracts.ts`), no de ninguna consulta. */}
             <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
-              Cloud es fuente de verdad. Sin migraciones, tipos, RLS, RPC ni storage en esta tanda.
+              Inventario declarado en el repositorio (<code>sanitized-flow-contracts.ts</code>): no medido
+              contra Cloud. Sin migraciones, tipos, RLS, RPC ni storage en esta tanda.
             </p>
           </div>
           <div className="grid grid-cols-3 gap-2 text-sm">
@@ -1200,10 +1235,15 @@ export default function SecretariaDashboard() {
             </h2>
           </div>
           <div className="space-y-3 p-5">
+            {/* «Todas cumplen plazos legales» era un literal JSX: status="OK" fijo
+                y la misma frase para cualquier tenant y cualquier dato, sin una
+                sola consulta detrás. El cumplimiento del plazo de convocatoria
+                depende del órgano, la materia y el rule pack, y este panel no lo
+                evalúa: mientras no lo evalúe, lo dice. */}
             <ComplianceRow
               label="Convocatorias con plazo"
-              status="OK"
-              note="Todas cumplen plazos legales"
+              status="UNKNOWN"
+              note="No medido en este panel — compruebe el plazo en cada convocatoria"
             />
             {/* «Última sesión: 9/9 presentes» era un LITERAL, no un dato: a un
                 tenant sin reuniones se le enseñaba una cifra fabricada. Sin una
@@ -1217,7 +1257,14 @@ export default function SecretariaDashboard() {
                 !kpis
                   ? "—"
                   : kpis.actas_pendientes_aprobacion > 0
-                    ? countLabel(kpis.actas_pendientes_aprobacion, "acta en borrador", "actas en borrador")
+                    // «en borrador» describía el criterio viejo (signed_at nulo).
+                    // Ahora la cifra es «no aprobada según el gate», que incluye
+                    // simulaciones demo y actas legacy firmadas.
+                    ? countLabel(
+                        kpis.actas_pendientes_aprobacion,
+                        "acta sin aprobación acreditada",
+                        "actas sin aprobación acreditada",
+                      )
                     : kpis.actas_total === 0
                       ? "Sin actas registradas"
                       : "Todas aprobadas"
@@ -1242,10 +1289,20 @@ export default function SecretariaDashboard() {
               }
             />
             <div className="my-2 border-t border-[var(--g-border-subtle)]" />
+            {/* `cond ? "OK" : "OK"` con la coletilla «evaluación activa»: check
+                verde con cero pactos y con cero evaluaciones. `pacto_evaluacion_results`
+                está vacía en los dos tenants (medido en Cloud 2026-09-05), así
+                que lo que hay es un inventario de pactos, no una evaluación. */}
             <ComplianceRow
               label="Pactos parasociales"
-              status={crossModule && crossModule.pactos_vigentes > 0 ? "OK" : "OK"}
-              note={`${countLabel(crossModule?.pactos_vigentes ?? 0, "pacto vigente", "pactos vigentes")} — evaluación activa`}
+              status={crossModule ? (crossModule.pactos_vigentes > 0 ? "OK" : "UNKNOWN") : "UNKNOWN"}
+              note={
+                !crossModule
+                  ? "No medido"
+                  : crossModule.pactos_vigentes > 0
+                    ? `${countLabel(crossModule.pactos_vigentes, "pacto vigente", "pactos vigentes")} inventariados — su evaluación no se ejecuta desde este panel`
+                    : "Sin pactos registrados para este ámbito"
+              }
             />
             <ComplianceRow
               label="Señales GRC read-only"
@@ -1278,16 +1335,20 @@ function ComplianceRow({
   note,
 }: {
   label: string;
-  status: "OK" | "WARNING" | "ERROR";
+  // UNKNOWN existe porque la alternativa era pintar un check verde sobre algo
+  // que el panel no ha comprobado. «No medido» es un estado, no un fallo.
+  status: "OK" | "WARNING" | "ERROR" | "UNKNOWN";
   note: string;
 }) {
   const Icon =
-    status === "OK" ? CheckCircle2 : status === "WARNING" ? AlertTriangle : AlertTriangle;
+    status === "OK" ? CheckCircle2 : status === "UNKNOWN" ? HelpCircle : AlertTriangle;
   const color =
     status === "OK"
       ? "text-[var(--status-success)]"
       : status === "WARNING"
       ? "text-[var(--status-warning)]"
+      : status === "UNKNOWN"
+      ? "text-[var(--g-text-secondary)]"
       : "text-[var(--status-error)]";
   return (
     <div className="flex items-start gap-2">

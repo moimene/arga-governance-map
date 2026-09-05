@@ -7,6 +7,7 @@ import {
   calculateAdaptationPlan,
   MATURITY_LEVELS,
   DIFFICULTY_LEVELS,
+  subpartTitle,
 } from "@/lib/aims/catalog-aesia";
 import {
   AlertTriangle,
@@ -101,6 +102,14 @@ export default function EvaluacionDetalle() {
     });
   });
 
+  // Cuántos findings hay persistidos frente a cuántos reconcilian con el
+  // catálogo del marco. En Cloud hay evaluaciones con códigos `VAL-01`, `ART_9`
+  // o `ISO-05` que no están en ningún catálogo: el desglose las pinta enteras
+  // como «Pendiente» mientras la cabecera muestra el `score` guardado. Sin
+  // decirlo, la pantalla se contradice a sí misma en silencio.
+  const findingsPersistidos = (assessment.findings || []).length;
+  const findingsSinReconciliar = findingsPersistidos > 0 && evaluatedCount === 0;
+
   const handlePrint = () => {
     window.print();
   };
@@ -189,7 +198,13 @@ export default function EvaluacionDetalle() {
 
           <div className="flex flex-col items-end gap-1">
             <div className="flex items-center gap-2">
-              <span className="text-3xl font-bold text-[var(--g-brand-3308)]">{assessment.score ?? 0}%</span>
+              {/* `score` nulo es ausencia de dato, no un cero. Un 0 % se lee
+                  como «evaluado y suspenso», que es una afirmación distinta. */}
+              <span className="text-3xl font-bold text-[var(--g-brand-3308)]">
+                {assessment.score === null || assessment.score === undefined
+                  ? "sin dato"
+                  : `${assessment.score}%`}
+              </span>
               <span
                 className={`px-2.5 py-1 text-xs font-semibold uppercase tracking-wider ${
                   assessment.status === "CONFORME"
@@ -298,6 +313,26 @@ export default function EvaluacionDetalle() {
           </span>
         </div>
 
+        {findingsSinReconciliar && (
+          <div
+            className="p-4 bg-[var(--g-surface-subtle)] border-l-4 border-[var(--status-warning)] flex items-start gap-3"
+            style={{ borderRadius: "var(--g-radius-sm)" }}
+          >
+            <AlertTriangle className="w-5 h-5 text-[var(--status-warning)] shrink-0" />
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-[var(--g-text-primary)]">
+                El desglose no corresponde a esta evaluación
+              </p>
+              <p className="text-xs text-[var(--g-text-secondary)]">
+                La evaluación tiene {findingsPersistidos} medida(s) registradas, pero ninguna
+                usa un código del catálogo de este marco: la tabla de abajo muestra el catálogo
+                completo como pendiente, no el contenido real de la evaluación. El porcentaje
+                de la cabecera es el valor guardado en su día, no un cálculo sobre este desglose.
+              </p>
+            </div>
+          </div>
+        )}
+
         {catalog.map((req) => {
           const isExpanded = expandedRequirements[req.code] ?? false;
           const reqMeasures = req.measures;
@@ -344,7 +379,7 @@ export default function EvaluacionDetalle() {
                       <tr className="border-b border-[var(--g-border-subtle)] text-[var(--g-text-secondary)]">
                         <th className="pb-2 font-semibold">Código</th>
                         <th className="pb-2 font-semibold">Descripción de la Medida (MG)</th>
-                        <th className="pb-2 font-semibold">Subapartado</th>
+                        <th className="pb-2 font-semibold">Bloque del requisito</th>
                         <th className="pb-2 font-semibold">Madurez (AESIA)</th>
                         <th className="pb-2 font-semibold">Plan de Adaptación</th>
                       </tr>
@@ -360,7 +395,7 @@ export default function EvaluacionDetalle() {
                           <tr key={m.id} className="hover:bg-[var(--g-surface-subtle)]/30 transition-colors">
                             <td className="py-2.5 font-mono text-[var(--g-brand-3308)] font-semibold">{m.id}</td>
                             <td className="py-2.5 pr-4 text-[var(--g-text-primary)]">{m.description}</td>
-                            <td className="py-2.5 font-mono text-[var(--g-text-secondary)]">{m.subpartId}</td>
+                            <td className="py-2.5 text-[var(--g-text-secondary)]">{subpartTitle(req, m.subpartId)}</td>
                             <td className="py-2.5">
                               {maturity ? (
                                 <span

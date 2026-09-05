@@ -4,6 +4,9 @@ import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useWhistleblowingReportByToken, useSendSafeInboxMessage } from "@/hooks/useWhistleblowing";
+import { SII_AVISO_PERSISTENCIA_LOCAL } from "@/lib/sii/whistleblowing-engine";
+import { siiRolesPara } from "@/lib/sii/roles-por-tenant";
+import { useTenantContext } from "@/context/TenantContext";
 import {
   ShieldCheck,
   Lock,
@@ -29,6 +32,8 @@ export default function SiiSafeInbox() {
   const [showRetaliationAlert, setShowRetaliationAlert] = useState(false);
   const [retaliationNote, setRetaliationNote] = useState("");
 
+  const { tenantId } = useTenantContext();
+  const roles = siiRolesPara(tenantId);
   const { data: report, isLoading } = useWhistleblowingReportByToken(activeToken);
   const sendMutation = useSendSafeInboxMessage();
 
@@ -56,7 +61,7 @@ export default function SiiSafeInbox() {
         sender: "INFORMANTE",
       });
       setNewMessage("");
-      toast.success("Mensaje enviado de forma cifrada al instructor del expediente.");
+      toast.success("Mensaje añadido al expediente. Se guarda en claro en este navegador, sin cifrar.");
     } catch (err) {
       toast.error("Error al enviar el mensaje.");
     }
@@ -93,7 +98,14 @@ export default function SiiSafeInbox() {
               Acceso al Safe Inbox del Informante
             </h1>
             <p className="text-xs text-[var(--t-text-secondary)] mt-1 leading-relaxed max-w-md mx-auto">
-              Introduzca su <strong>Token de Acceso Seguro</strong> proporcionado al registrar la comunicación. Este acceso se rige por <strong>confidencialidad reforzada</strong>: su identidad solo es conocida por el Responsable del Sistema y la persona instructora. No es anonimato — PI-31 Anexo 1 §3.c reserva esa vía a la comunicación postal.
+              Introduzca el <strong>código de seguimiento</strong> que se le entregó al registrar la comunicación. Este acceso se rige por <strong>confidencialidad reforzada</strong>: su identidad solo es conocida por el Responsable del Sistema y la persona instructora. No es anonimato{roles.politicaDesignacion === "PI-31 §4"
+                ? " — PI-31 Anexo 1 §3.c reserva esa vía a la comunicación postal."
+                : "."}
+            </p>
+            {/* El código son 12 hex del generador del navegador y el buzón vive
+                en localStorage: no se acredita fortaleza ni hay cifrado. */}
+            <p className="mx-auto mt-2 max-w-md text-[11px] leading-relaxed text-[var(--t-text-secondary)]">
+              {SII_AVISO_PERSISTENCIA_LOCAL} El código solo abre expedientes registrados en este mismo navegador.
             </p>
           </div>
 
@@ -104,12 +116,12 @@ export default function SiiSafeInbox() {
                 required
                 value={inputToken}
                 onChange={(e) => setInputToken(e.target.value)}
-                placeholder="Ej. SEC-9F8A-72B1-K82M"
+                placeholder="Ej. SEC-9F8A72-B1K82M"
                 className="w-full px-4 py-2.5 text-center font-mono font-bold text-sm border border-[var(--t-border-default)] rounded bg-[var(--t-surface-card)] text-[var(--t-text-primary)] focus:border-[var(--t-border-focus)] focus:outline-none"
               />
             </div>
             <Button type="submit" className="w-full bg-[var(--t-brand)] text-white hover:bg-[var(--t-brand)]/90">
-              Acceder al Buzón Seguro
+              Acceder al buzón
             </Button>
           </form>
 
@@ -127,7 +139,7 @@ export default function SiiSafeInbox() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-20 text-[var(--t-text-secondary)]">
-        <Loader2 className="h-6 w-6 animate-spin mr-2" /> Cargando buzón cifrado...
+        <Loader2 className="h-6 w-6 animate-spin mr-2" /> Cargando buzón...
       </div>
     );
   }
@@ -137,9 +149,9 @@ export default function SiiSafeInbox() {
       <div className="mx-auto max-w-[600px] p-6 my-12 text-center space-y-4">
         <Card className="border-[var(--status-error)] p-8 space-y-4">
           <AlertTriangle className="h-10 w-10 text-[var(--status-error)] mx-auto" />
-          <h2 className="text-lg font-bold text-[var(--t-text-primary)]">Token no encontrado o caducado</h2>
+          <h2 className="text-lg font-bold text-[var(--t-text-primary)]">Código no encontrado</h2>
           <p className="text-xs text-[var(--t-text-secondary)]">
-            No se ha localizado ningún expediente activo con la credencial <code>{activeToken}</code>. Verifique que no haya caracteres erróneos.
+            No se ha localizado ningún expediente con el código <code>{activeToken}</code> en este navegador. Verifique que no haya caracteres erróneos.
           </p>
           <Button variant="outline" onClick={() => setActiveToken("")}>
             Probar con otro Token

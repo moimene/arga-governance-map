@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Activity, ChevronLeft, Save, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useCreateRisk, useRiskById, useUpdateRisk, type RiskWriteInput } from "@/hooks/useRisks";
+import { useGrcModules } from "@/hooks/useGrcDashboard";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { RISK_STATUS_OPTIONS } from "@/lib/grc/status-labels";
 import { ETIQUETA_BANDA, NOTA_ESCALA, type Banda } from "@/lib/grc/assessed-band";
@@ -29,14 +30,19 @@ const SELECT_CLASSES =
 
 const LABEL_CLASSES = "block text-sm font-medium text-[var(--g-text-primary)] mb-1";
 
-const MODULE_OPTIONS = [
-  { value: "dora", label: "DORA" },
-  { value: "gdpr", label: "GDPR" },
-  { value: "cyber", label: "Cyber" },
-  { value: "audit", label: "Auditoría" },
-  { value: "penal", label: "Penal / Anticorrupción" },
-  { value: "risk", label: "Riesgos penales" },
-];
+// Etiquetas legibles de los módulos conocidos. NO es la lista de opciones: la
+// lista sale de `grc_modules` del tenant. Antes era estática y ofrecía
+// dora/gdpr/audit/penal a un tenant que solo tiene aml/cyber/ethics/risk.
+const MODULE_LABELS: Record<string, string> = {
+  dora: "DORA",
+  gdpr: "GDPR",
+  cyber: "Cyber",
+  audit: "Auditoría",
+  penal: "Penal / Anticorrupción",
+  risk: "Riesgos penales",
+  aml: "Prevención de blanqueo",
+  ethics: "Ética y conducta",
+};
 
 const emptyToNull = (value: string) => {
   const trimmed = value.trim();
@@ -60,7 +66,18 @@ export default function RiskEditor() {
   const navigate = useNavigate();
   const scope = useSecretariaScope();
   const [params] = useSearchParams();
-  const initialModule = params.get("module") ?? "gdpr";
+  const { data: tenantModules = [], isLoading: loadingModules } = useGrcModules();
+  // El nombre autoritativo es el que el tenant guarda en `grc_modules`;
+  // MODULE_LABELS solo cubre un módulo que llegue por `?module=` y no esté
+  // declarado para este grupo.
+  const moduleOptions = tenantModules.map((m) => ({
+    value: m.id,
+    label: m.name ?? MODULE_LABELS[m.id] ?? m.id,
+  }));
+  // Sin preselección inventada: `?? "gdpr"` daba de alta riesgos en un módulo
+  // que el tenant puede no tener. Si no viene por query, se deja vacío y el
+  // usuario elige.
+  const initialModule = params.get("module") ?? "";
   const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
   const riskListPath = scope.createScopedTo("/grc/risk-360");
   const { data: risk, isLoading } = useRiskById(id);
@@ -86,7 +103,7 @@ export default function RiskEditor() {
       code: risk.code,
       title: risk.title,
       description: risk.description ?? "",
-      module_id: risk.module_id ?? "gdpr",
+      module_id: risk.module_id ?? "",
       status: risk.status ?? "Abierto",
       probability: risk.probability != null ? risk.probability : 3,
       impact: risk.impact != null ? risk.impact : 3,
@@ -119,7 +136,7 @@ export default function RiskEditor() {
       code: form.code.trim(),
       title: form.title.trim(),
       description: emptyToNull(form.description),
-      module_id: form.module_id,
+      module_id: emptyToNull(form.module_id),
       status: form.status,
       entity_id: isEdit ? risk?.entity_id ?? null : scopedEntityId,
       ...(evaluadoPorBanda
@@ -235,7 +252,16 @@ export default function RiskEditor() {
               className={SELECT_CLASSES}
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
-              {MODULE_OPTIONS.map((option) => (
+              <option value="">{loadingModules ? "Cargando módulos…" : "— Selecciona un módulo —"}</option>
+              {/* Un módulo que venga por `?module=` y no esté en `grc_modules`
+                  se muestra igualmente, marcado, para no perder la selección
+                  del handoff en silencio. */}
+              {form.module_id && !moduleOptions.some((o) => o.value === form.module_id) && (
+                <option value={form.module_id}>
+                  {(MODULE_LABELS[form.module_id] ?? form.module_id)} (no declarado para este grupo)
+                </option>
+              )}
+              {moduleOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>

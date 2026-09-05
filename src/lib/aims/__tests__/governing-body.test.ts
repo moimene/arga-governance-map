@@ -51,7 +51,39 @@ describe("el Dashboard de AI Governance no lleva un tenant dentro", () => {
     expect(src, "el slug del comité está escrito en la página, no resuelto por tenant")
       .not.toContain("garrigues-comite-gobernanza-ia");
     expect(src, "hay un UUID de tenant en duro en la página").not.toMatch(/00000000-0000-0000-0000-0000000000\d\d/);
-    // Y la puerta está puesta: se resuelve por tenant, no se pinta siempre.
-    expect(src, "el panel no se resuelve por tenant").toContain("aiGovernanceBodySlug");
+  });
+
+  it("el panel se pinta sólo con el órgano que la función resuelve", () => {
+    // ANTES: `toContain("aiGovernanceBodySlug")`. Lo satisfacía la LÍNEA DE
+    // IMPORT: borrar la llamada real y dejar el import muerto dejaba el gate en
+    // verde con el panel pintándose siempre. Ahora se comprueba el
+    // COMPORTAMIENTO: que el render del panel está condicionado al valor que
+    // devuelve la función, y que ese valor es distinto por tenant.
+    const src = readFileSync(DASH, "utf8");
+
+    // 1. Hay una llamada de verdad, con argumento, no sólo el identificador.
+    const llamadas = src.match(/aiGovernanceBodySlug\s*\([^)]+\)/g) ?? [];
+    expect(llamadas.length, "no hay ninguna llamada a aiGovernanceBodySlug con argumento")
+      .toBeGreaterThan(0);
+
+    // 2. Su resultado ALIMENTA la consulta del órgano, y el panel se pinta
+    //    condicionado a lo que esa consulta devuelve. Se sigue la cadena
+    //    entera: si alguien deja la llamada como decorado y pinta el panel
+    //    incondicionalmente, esto cae.
+    const consulta = src.match(/const\s*\{\s*data:\s*(\w+)\s*\}\s*=\s*useBodyBySlug\(\s*aiGovernanceBodySlug\(/);
+    expect(
+      consulta,
+      "el slug resuelto no alimenta useBodyBySlug: el panel no depende del tenant",
+    ).not.toBeNull();
+    const organo = consulta![1];
+    expect(
+      new RegExp(`\\{\\s*${organo}\\s*&&`).test(src),
+      `el panel no está condicionado a ${organo}: se resuelve el órgano y se pinta igual`,
+    ).toBe(true);
+
+    // 3. Y la condición discrimina de verdad: la función devuelve valores
+    //    distintos por tenant, así que la puerta se abre para uno y no para otro.
+    expect(aiGovernanceBodySlug(GARRIGUES)).toBeTruthy();
+    expect(aiGovernanceBodySlug(ARGA)).toBeNull();
   });
 });

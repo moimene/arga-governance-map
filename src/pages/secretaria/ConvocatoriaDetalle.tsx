@@ -227,7 +227,10 @@ function buildConvocatoriaVariables(conv: ConvocatoriaDocContext) {
     lugar: conv.lugar ?? "domicilio social",
     lugar_junta: conv.lugar ?? "domicilio social",
     lugar_sesion: conv.lugar ?? "domicilio social",
-    ciudad: conv.lugar ?? "Madrid",
+    // No se fabrica plaza: si la convocatoria no informa lugar, la variable va
+    // vacía y el documento lo deja en blanco. «Madrid» era un domicilio
+    // inventado que acababa impreso en el cuerpo de la convocatoria.
+    ciudad: conv.lugar ?? "",
     modalidad: conv.modalidad ?? "—",
     // Semilla Capa 3: la plantilla CONVOCATORIA pide `modalidad_sesion` como
     // lista cerrada (PRESENCIAL/TELEMATICA/MIXTA). El dato ya existe en la
@@ -267,7 +270,16 @@ function buildConvocatoriaVariables(conv: ConvocatoriaDocContext) {
     comprobaciones,
     comprobaciones_texto: comprobaciones.join("\n"),
     resultado_gate: String(ruleEvaluation?.ok ?? ruleContext?.ok ?? "recordatorio"),
-    resultado_evaluacion: "Convocatoria generada con alertas no bloqueantes y trazabilidad operativa.",
+    // El literal anterior AFIRMABA el resultado («alertas no bloqueantes») sin
+    // haberlo evaluado: valía igual para una convocatoria limpia y para una con
+    // bloqueos. Se deriva de la evaluación real; sin evaluación, se dice que no
+    // consta.
+    resultado_evaluacion:
+      ruleEvaluation?.ok === true || ruleContext?.ok === true
+        ? "Evaluación de reglas superada sin incidencias bloqueantes registradas."
+        : ruleEvaluation?.ok === false || ruleContext?.ok === false
+          ? "Evaluación de reglas con incidencias registradas; revise el detalle del expediente."
+          : "Sin evaluación de reglas registrada para esta convocatoria.",
     snapshot_rule_pack_id: String(ruleContext?.rule_pack_id ?? ruleContext?.pack_id ?? "rule-pack-operativo-demo"),
     snapshot_rule_pack_version: String(ruleContext?.rule_pack_version ?? ruleContext?.version ?? "demo"),
     snapshot_hash: String(conv.rule_trace?.snapshot_hash ?? conv.rule_trace?.hash ?? "snapshot-operativo-demo"),
