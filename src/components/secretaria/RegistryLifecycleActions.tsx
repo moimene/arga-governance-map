@@ -85,6 +85,15 @@ export function RegistryLifecycleActions({
     Boolean(artifact.document_url) &&
     Boolean(artifact.hash_sha512 ?? artifact.content_hash ?? artifact.source_hash)
   );
+  // El terminal registral exige, en cliente y en servidor
+  // (fn_registry_record_inscription, p_require_verified), un artefacto con
+  // `evidence_status = 'EVIDENCE_VERIFIED'`. Hoy NINGÚN RPC, hook ni Edge
+  // Function escribe ese valor: los hooks crean artefactos en DEMO_OPERATIVA y
+  // en Cloud solo existen DEMO_OPERATIVA y EVIDENCE_OPEN (medido 2026-09-05).
+  // Es decir, el terminal es inalcanzable desde la aplicación. Mientras el
+  // camino de escritura no exista, la UI explica el bloqueo en vez de ofrecer
+  // un formulario que no puede completarse.
+  const sinEvidenciaVerificada = !artifacts.isLoading && verifiedArtifacts.length === 0;
 
   async function uploadForRole(
     file: File,
@@ -289,7 +298,25 @@ export function RegistryLifecycleActions({
         </div>
       ) : null}
 
-      {status === "PRESENTADA" && qualificationOutcome === "POSITIVA" ? (
+      {status === "PRESENTADA" && qualificationOutcome === "POSITIVA" && sinEvidenciaVerificada ? (
+        <div
+          className="mt-4 border border-[var(--status-warning)] bg-[var(--g-surface-subtle)] p-4"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+          role="status"
+        >
+          <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">
+            {`No se puede acreditar ${terminal.article} ${terminal.noun} todavía`}
+          </h3>
+          <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+            El servidor solo admite el cierre registral contra un documento cuya evidencia esté
+            verificada, y esta sociedad no tiene ninguno en ese estado. El circuito que marca un
+            documento como verificado no está disponible en esta versión, así que el paso queda
+            bloqueado: no se ofrece un formulario que no podría completarse.
+          </p>
+        </div>
+      ) : null}
+
+      {status === "PRESENTADA" && qualificationOutcome === "POSITIVA" && !sinEvidenciaVerificada ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="text-xs font-medium text-[var(--g-text-primary)]">{`Número de ${terminal.noun}`}
             <input value={inscriptionNumber} onChange={(event) => setInscriptionNumber(event.target.value)} className={`${inputClass} mt-1`} style={{ borderRadius: "var(--g-radius-md)" }} />
@@ -303,14 +330,29 @@ export function RegistryLifecycleActions({
               {verifiedArtifacts.map((artifact) => <option key={artifact.id} value={artifact.id}>{artifact.title}</option>)}
             </select>
           </label>
-          {verifiedArtifacts.length === 0 ? <p className="text-xs text-[var(--status-warning)] sm:col-span-2">No hay evidencia EVIDENCE_VERIFIED disponible; {`sin ella no puede acreditarse ${terminal.article} ${terminal.noun}.`}</p> : null}
           <button type="button" disabled={busy || !inscriptionNumber.trim() || !inscriptionDate || !inscriptionArtifactId} aria-busy={busy} onClick={handleInscription} className={primaryButton} style={{ borderRadius: "var(--g-radius-md)" }}>
             {busy && <Loader2 className="h-4 w-4 animate-spin" />} {`Acreditar ${terminal.noun}`}
           </button>
         </div>
       ) : null}
 
-      {isRegistryTerminal(status) ? (
+      {isRegistryTerminal(status) && sinEvidenciaVerificada ? (
+        <div
+          className="mt-4 border border-[var(--status-warning)] bg-[var(--g-surface-subtle)] p-4"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+          role="status"
+        >
+          <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">
+            No se puede acreditar la publicación todavía
+          </h3>
+          <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+            Igual que el cierre registral, la publicación exige un documento con evidencia verificada
+            y esta sociedad no tiene ninguno. El paso queda bloqueado hasta que exista.
+          </p>
+        </div>
+      ) : null}
+
+      {isRegistryTerminal(status) && !sinEvidenciaVerificada ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="text-xs font-medium text-[var(--g-text-primary)]">Referencia de publicación
             <input value={publicationReference} onChange={(event) => setPublicationReference(event.target.value)} className={`${inputClass} mt-1`} style={{ borderRadius: "var(--g-radius-md)" }} />

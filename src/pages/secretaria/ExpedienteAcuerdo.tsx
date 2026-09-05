@@ -43,6 +43,7 @@ import type { PactosEvalInput } from "@/lib/rules-engine/pactos-engine";
 import type { AdoptionMode, MateriaClase } from "@/lib/rules-engine";
 import type { AgreementNormativeSnapshot, NormativeFrameworkStatus } from "@/lib/secretaria/normative-framework";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+import { registryPendingNotice } from "@/lib/secretaria/agreement-registry-sync";
 import { evaluarDesfaseNormativo } from "@/lib/secretaria/desfase-normativo";
 import { supabase } from "@/integrations/supabase/client";
 import { PreviewGatePanel } from "@/components/secretaria/PreviewGatePanel";
@@ -825,7 +826,7 @@ export default function ExpedienteAcuerdo() {
             }}
           />
 
-          <LegalControlPanel status={a.status} compliance={compliance} />
+          <LegalControlPanel status={a.status} compliance={compliance} registryFiling={registryFiling} />
 
           <div
             className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
@@ -951,9 +952,11 @@ function Card({
 function LegalControlPanel({
   status,
   compliance,
+  registryFiling,
 }: {
   status: string | null | undefined;
   compliance: ComplianceResult | null | undefined;
+  registryFiling: AgreementRegistryFilingRow | null | undefined;
 }) {
   const blocking = compliance?.blocking_issues ?? [];
   const warnings = compliance?.warnings ?? [];
@@ -967,11 +970,23 @@ function LegalControlPanel({
           : status === "CERTIFIED"
             ? ["Preparar elevación a público", "Abrir tramitación registral si procede"]
             : ["Consultar expediente y evidencias"];
+  const registryPendingLabel = registryPendingNotice({
+    registryRequired: compliance?.registry_required,
+    filingStatus: registryFiling?.status,
+    inscriptionNumber: registryFiling?.inscription_number,
+    agreementStatus: status,
+  });
+
   const missing = [
     compliance?.convocation_compliant === false ? "Convocatoria pendiente de subsanar" : null,
     compliance?.quorum_compliant === false ? "Quórum pendiente de acreditar" : null,
     compliance?.majority_compliant === false ? "Resultado de votación pendiente de validar" : null,
-    compliance?.registry_required && status !== "REGISTERED" ? "Inscripción registral pendiente" : null,
+    // El timeline se calculaba solo desde `agreements.status` y nada promueve
+    // ese estado cuando el Registro practica el asiento: los 3 expedientes
+    // INSCRITA de Garrigues (asientos 960/960/961) tienen su acuerdo en
+    // ADOPTED, y el panel decía «Inscripción registral pendiente» sobre un
+    // acto ya inscrito. Manda el expediente registral, que es el dato real.
+    registryPendingLabel,
     compliance?.publication_required ? "Publicación pendiente cuando proceda" : null,
     ...warnings,
   ].filter(Boolean) as string[];

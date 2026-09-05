@@ -4,7 +4,23 @@ import { supabaseAdmin, hasAdminClient, DEMO_TENANT } from "@/test/helpers/supab
 
 const SNAPSHOT_DATE = "2026-05-12";
 
-describe.skipIf(!hasAdminClient())(`baseline plantillas (snapshot ${SNAPSHOT_DATE})`, () => {
+/**
+ * GOTCHA MEDIDO (2026-09-05). `hasAdminClient()` es SIEMPRE false en este repo:
+ * el helper lee `SUPABASE_SERVICE_ROLE_KEY` y `VITE_SUPABASE_URL`, y el `.env`
+ * define `SERVICE_ROLE_SECRET` y `PROJECT_URL`. Estos bloques llevan meses
+ * contándose entre los «skipped» sin que nadie pueda ejecutarlos: un skip
+ * permanente no es una sonda, es un hueco con forma de sonda. Con `it.todo` la
+ * ausencia de credenciales queda VISIBLE en el recuento, no en silencio.
+ */
+const ADMIN_DISPONIBLE = hasAdminClient();
+const FALTAN_CREDENCIALES =
+  "requiere SUPABASE_SERVICE_ROLE_KEY + VITE_SUPABASE_URL (el .env define SERVICE_ROLE_SECRET/PROJECT_URL)";
+
+describe.skipIf(ADMIN_DISPONIBLE)("baseline plantillas — sin credenciales", () => {
+  it.todo(`baseline de plantillas no ejecutado: ${FALTAN_CREDENCIALES}`);
+});
+
+describe.skipIf(!ADMIN_DISPONIBLE)(`baseline plantillas (snapshot ${SNAPSHOT_DATE})`, () => {
   it("catálogo ARGA mantiene 41+ ACTIVA con metadata", async () => {
     const { data, error } = await supabaseAdmin!
       .from("plantillas_protegidas")

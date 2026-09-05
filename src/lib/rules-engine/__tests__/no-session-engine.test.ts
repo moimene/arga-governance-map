@@ -765,6 +765,10 @@ describe('Gate 4: Decisión Socio Único', () => {
 describe('evaluarProcesoSinSesion — full flow', () => {
   it('Valid unanimidad SL → CERRADO_OK', () => {
     const input = createBaseInput({
+      // `totalDestinatarios` era 3 (del base) con solo 2 constancias, y el
+      // motor daba el gate por cumplido igualmente: el propio caso feliz
+      // corría sobre dato incoherente. Los tres números tienen que casar.
+      totalDestinatarios: 2,
       notificaciones: [
         { person_id: '1', canal: 'EMAIL', estado: 'ENTREGADA' },
         { person_id: '2', canal: 'EMAIL', estado: 'ENTREGADA' },
@@ -806,5 +810,60 @@ describe('evaluarProcesoSinSesion — full flow', () => {
     expect(result.ok).toBe(false);
     expect(result.estado).toBe('CERRADO_FAIL');
     expect(result.gates).toHaveLength(1);
+  });
+});
+
+// ============================================================
+// Gate 2 — la ausencia de constancia no es cumplimiento
+// ============================================================
+
+describe('notificación fehaciente — sin constancia no hay gate cumplido', () => {
+  it('lista vacía con destinatarios declarados BLOQUEA (antes decía «Todas (0) ENTREGADAS»)', () => {
+    const input = createBaseInput({ notificaciones: [], totalDestinatarios: 3 });
+    const result = evaluarProcesoSinSesion(input, createBasePack());
+    const gate = result.gates.find((g) => g.gate === 'notificacion');
+    expect(gate?.ok).toBe(false);
+    expect(gate?.severity).toBe('BLOCKING');
+    expect(gate?.explain[0].mensaje).toMatch(/Sin constancia de notificación/i);
+    expect(gate?.explain.some((n) => /ENTREGADAS fehacientemente/i.test(n.mensaje))).toBe(false);
+  });
+
+  it('constancias incompletas BLOQUEAN aunque las registradas estén ENTREGADAS', () => {
+    const input = createBaseInput({
+      totalDestinatarios: 3,
+      notificaciones: [
+        { person_id: '1', canal: 'EMAIL', estado: 'ENTREGADA' },
+        { person_id: '2', canal: 'EMAIL', estado: 'ENTREGADA' },
+      ],
+    });
+    const result = evaluarProcesoSinSesion(input, createBasePack());
+    const gate = result.gates.find((g) => g.gate === 'notificacion');
+    expect(gate?.ok).toBe(false);
+    expect(gate?.explain[0].mensaje).toMatch(/2 notificación\(es\) de 3 destinatario/i);
+  });
+
+  it('con constancia completa y entregada sí se cumple', () => {
+    const input = createBaseInput({
+      totalDestinatarios: 2,
+      notificaciones: [
+        { person_id: '1', canal: 'EMAIL', estado: 'ENTREGADA' },
+        { person_id: '2', canal: 'EMAIL', estado: 'ENTREGADA' },
+      ],
+    });
+    const result = evaluarProcesoSinSesion(input, createBasePack());
+    expect(result.gates.find((g) => g.gate === 'notificacion')?.ok).toBe(true);
+  });
+
+  it('una constancia no entregada sigue bloqueando', () => {
+    const input = createBaseInput({
+      totalDestinatarios: 2,
+      notificaciones: [
+        { person_id: '1', canal: 'EMAIL', estado: 'ENTREGADA' },
+        { person_id: '2', canal: 'EMAIL', estado: 'FALLIDA' },
+      ],
+    });
+    const gate = evaluarProcesoSinSesion(input, createBasePack()).gates.find((g) => g.gate === 'notificacion');
+    expect(gate?.ok).toBe(false);
+    expect(gate?.explain[0].mensaje).toMatch(/aún no ENTREGADA/i);
   });
 });

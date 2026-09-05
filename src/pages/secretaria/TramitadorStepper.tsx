@@ -37,7 +37,7 @@ import {
 } from "@/hooks/useRegistryLifecycle";
 import { useUploadRegistryEvidenceArtifact } from "@/hooks/useRegistryEvidenceUpload";
 import type { ProcessDocumentGenerationResult } from "@/lib/doc-gen/process-documents";
-import type { RegistryBaseDocumentKind } from "@/lib/secretaria/registry-lifecycle";
+import { registryTerminal, type RegistryBaseDocumentKind } from "@/lib/secretaria/registry-lifecycle";
 import { validateCapa3 } from "@/lib/secretaria/capa3-form-validation";
 import { capa3ValueHasContent, type Capa3Values } from "@/lib/secretaria/capa3-fields";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
@@ -132,6 +132,11 @@ type TramitacionDetalleRow = {
   protocol_number?: string | null;
   elevated_at?: string | null;
   inscription_number?: string | null;
+  registered_at?: string | null;
+  publication_reference?: string | null;
+  published_at?: string | null;
+  resolution_document_url?: string | null;
+  defect_details?: unknown;
   borme_ref?: string | null;
   psm_ref?: string | null;
   siger_ref?: string | null;
@@ -160,6 +165,24 @@ const REGISTRY_EVENT_LABEL: Record<string, string> = {
 function formatDetailDate(value?: string | null) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium" }).format(new Date(value));
+}
+
+/**
+ * `registry_filings.defect_details` es jsonb libre y la RPC de calificación
+ * escribe ahí el fundamento comunicado por el Registro. Ninguna superficie lo
+ * pintaba: el expediente decía «Subsanación» sin decir de qué. Se aplana a
+ * pares etiqueta/valor sin interpretar nada.
+ */
+function registryDefectEntries(value: unknown): [string, string][] {
+  if (!value || typeof value !== "object") return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((item, index): [string, string] => [`Defecto ${index + 1}`, typeof item === "string" ? item : JSON.stringify(item)])
+      .filter(([, v]) => v && v !== "null" && v !== "{}");
+  }
+  return Object.entries(value as Record<string, unknown>)
+    .filter(([, v]) => v !== null && v !== undefined && v !== "")
+    .map(([k, v]): [string, string] => [k, typeof v === "string" ? v : JSON.stringify(v)]);
 }
 
 function supportHash(row: DocumentAnnexLinkRow) {
@@ -286,14 +309,32 @@ function TramitacionDetalle({ id }: { id: string }) {
   const { data, isLoading, error } = useTramitacionById(id);
   const events = useRegistryFilingEvents(id);
   const filing = data as TramitacionDetalleRow | null | undefined;
+  // El número que guarda la RPC en `inscription_number` es el del terminal de
+  // la VÍA: un depósito de cuentas (arts. 279 y ss. LSC) y una legalización de
+  // libros (arts. 329 y ss. RRM) no causan inscripción, y el propio ciclo tiene
+  // terminales DEPOSITADA / LEGALIZADA. Rotularlo siempre «Inscripción» era
+  // afirmar un asiento que no existe. Mismo mapa que el servidor.
+  const terminal = registryTerminal(filing?.procedure_profile_code);
+  const terminalLabel = terminal.noun.charAt(0).toUpperCase() + terminal.noun.slice(1);
   const refs = [
-    filing?.inscription_number && ["Inscripción", filing.inscription_number],
+    filing?.inscription_number && [terminalLabel, filing.inscription_number],
+    // Columnas que la RPC persiste y que ninguna superficie pintaba: el
+    // expediente decía menos de lo que el sistema sabía.
+    filing?.registered_at && [`Fecha de ${terminal.noun}`, formatDetailDate(filing.registered_at)],
+    filing?.publication_reference && ["Referencia de publicación", filing.publication_reference],
+    filing?.published_at && ["Fecha de publicación", formatDetailDate(filing.published_at)],
     filing?.borme_ref && ["BORME", filing.borme_ref],
     filing?.psm_ref && ["PSM", filing.psm_ref],
     filing?.siger_ref && ["SIGER", filing.siger_ref],
     filing?.conservatoria_ref && ["Conservatoria", filing.conservatoria_ref],
     filing?.jucerja_ref && ["JUCERJA", filing.jucerja_ref],
   ].filter(Boolean) as [string, string][];
+  const defectos = registryDefectEntries(filing?.defect_details);
+  // Hay escritura cuando el documento de base lo es, o cuando el expediente ya
+  // trae datos notariales reales (legacy sin `base_document_kind`).
+  const tieneEscritura =
+    (filing?.base_document_kind ?? "").toUpperCase() === "ESCRITURA" ||
+    Boolean(filing?.notary_name || filing?.protocol_number || filing?.deed_date || filing?.deeds?.notary);
 
   return (
     <main
@@ -391,36 +432,67 @@ function TramitacionDetalle({ id }: { id: string }) {
               className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5"
               style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
             >
-              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">Instrumento</h2>
+              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">Documento de base</h2>
               <dl className="mt-4 space-y-3">
                 <div>
-                  <dt className="text-xs text-[var(--g-text-secondary)]">Notaría</dt>
-                  <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">
-                    {filing.notary_name ?? filing.deeds?.notary ?? "—"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-[var(--g-text-secondary)]">Fecha escritura</dt>
-                  <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">
-                    {formatDetailDate(filing.deed_date ?? filing.deeds?.deed_date)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-[var(--g-text-secondary)]">Protocolo</dt>
-                  <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">{filing.protocol_number ?? "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-[var(--g-text-secondary)]">Estado instrumento</dt>
-                  <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">
-                    {statusLabel(filing.deeds?.status ?? filing.status ?? "—")}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-[var(--g-text-secondary)]">Documento de base</dt>
+                  <dt className="text-xs text-[var(--g-text-secondary)]">Tipo</dt>
                   <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">
                     {filing.base_document_kind ?? "Legacy sin tipificar"}
                   </dd>
                 </div>
+                {/* La escritura solo se describe cuando la vía la lleva. En una
+                    certificación, una instancia o un depósito de cuentas no hay
+                    instrumento notarial, y la celda «Estado instrumento» caía a
+                    `statusLabel(filing.status)`: presentaba el estado REGISTRAL
+                    como si fuera el estado de una escritura inexistente. */}
+                {tieneEscritura ? (
+                  <>
+                    <div>
+                      <dt className="text-xs text-[var(--g-text-secondary)]">Notaría</dt>
+                      <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">
+                        {filing.notary_name ?? filing.deeds?.notary ?? "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-[var(--g-text-secondary)]">Fecha escritura</dt>
+                      <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">
+                        {formatDetailDate(filing.deed_date ?? filing.deeds?.deed_date)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-[var(--g-text-secondary)]">Protocolo</dt>
+                      <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">{filing.protocol_number ?? "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-[var(--g-text-secondary)]">Estado de la escritura</dt>
+                      <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">
+                        {filing.deeds?.status ? statusLabel(filing.deeds.status) : "No consta"}
+                      </dd>
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <dt className="text-xs text-[var(--g-text-secondary)]">Instrumento notarial</dt>
+                    <dd className="mt-1 text-sm text-[var(--g-text-secondary)]">
+                      Esta vía no se documenta en escritura pública.
+                    </dd>
+                  </div>
+                )}
+                {filing.resolution_document_url ? (
+                  <div>
+                    <dt className="text-xs text-[var(--g-text-secondary)]">Documento de resolución</dt>
+                    <dd className="mt-1 text-sm font-medium">
+                      <a
+                        href={filing.resolution_document_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[var(--g-link)] underline hover:text-[var(--g-link-hover)]"
+                      >
+                        Abrir documento archivado
+                      </a>
+                    </dd>
+                  </div>
+                ) : null}
               </dl>
             </section>
 
@@ -441,6 +513,24 @@ function TramitacionDetalle({ id }: { id: string }) {
               ) : (
                 <p className="mt-3 text-sm text-[var(--g-text-secondary)]">Sin referencias registrales informadas.</p>
               )}
+
+              {/* `defect_details` lo escribe la RPC de calificación con el
+                  fundamento comunicado por el Registro y nadie lo pintaba. */}
+              {defectos.length > 0 ? (
+                <div className="mt-5 border-t border-[var(--g-border-subtle)] pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
+                    Defectos comunicados por el Registro
+                  </h3>
+                  <dl className="mt-3 space-y-2">
+                    {defectos.map(([label, value]) => (
+                      <div key={label}>
+                        <dt className="text-xs text-[var(--g-text-secondary)]">{label}</dt>
+                        <dd className="mt-0.5 text-sm text-[var(--g-text-primary)]">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              ) : null}
             </section>
 
             <section

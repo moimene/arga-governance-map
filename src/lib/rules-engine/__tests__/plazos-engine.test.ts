@@ -246,3 +246,29 @@ describe("plazos-engine — registro y depósito demo", () => {
     expect(result.warnings).toContain("registry_closure_risk_art_282_lsc");
   });
 });
+
+describe("oposición de acreedores — la cita apunta al artículo correcto", () => {
+  it("fusión NO cita el art. 44 RDL 5/2023 (es «Verificación y aprobación del balance»)", () => {
+    // Cotejado contra el consolidado del BOE (BOE-A-2023-15135, última
+    // actualización publicada 27/06/2024): art. 44 = balance de fusión; la
+    // protección de acreedores vive en el art. 13 y las garantías en el 14.
+    const result = evaluateCreditorOpposition({
+      materia: "FUSION",
+      fechaPublicacion: "2026-01-01",
+      ahora: "2026-01-05",
+    });
+    const referencia = result.explain[0].referencia;
+    expect(referencia).not.toMatch(/art\.?\s*44\s+RDL\s*5\/2023/i);
+    expect(referencia).toBe("art. 13 RDL 5/2023");
+  });
+
+  it("reducción de capital sigue citando el art. 334 LSC", () => {
+    const result = evaluateCreditorOpposition({
+      materia: "REDUCCION_CAPITAL",
+      causa: "DEVOLUCION_APORTACIONES",
+      fechaPublicacion: "2026-01-01",
+      ahora: "2026-01-05",
+    });
+    expect(result.explain[0].referencia).toBe("art. 334 LSC");
+  });
+});

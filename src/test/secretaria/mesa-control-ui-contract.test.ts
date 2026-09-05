@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -184,31 +184,36 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     expect(expediente).toContain("Próximos pasos");
   });
 
+  // `RuleManagerPage.tsx` y `ReglasAplicables.tsx` se retiraron: ninguna tenía
+  // Route en App.tsx (`/secretaria/reglas` y `/secretaria/sociedades/:id/reglas`
+  // redirigen al catálogo de materias), así que eran inalcanzables desde la
+  // aplicación y lo único que las mantenía vivas eran las aserciones de texto
+  // de este fichero. Las aserciones sobre el resto de superficies —que sí están
+  // enrutadas— se conservan.
   it("corrige pre-votación, conflicto jurisdiccional y lenguaje operativo", () => {
-    const ruleManager = read("src/pages/secretaria/RuleManagerPage.tsx");
     const model = read("src/lib/secretaria/mesa-control-societaria.ts");
     const navigation = read("src/components/secretaria/shell/navigation.ts");
 
     expect(navigation).toContain("Materias y reglas");
     expect(navigation).not.toContain("Regla efectiva");
-    expect(ruleManager).toContain("Validación preliminar. No ejecutable");
-    expect(ruleManager).toContain("Posible conflicto de ley aplicable");
-    expect(ruleManager).toContain("Solicitar alta de materia");
     expect(model).toContain("conflict_of_laws_flag");
     expect(model).toContain("ff_ruleset_wizard");
   });
 
+  it("no resucita superficies sin ruta: las páginas retiradas no vuelven", () => {
+    for (const retirada of [
+      "src/pages/secretaria/RuleManagerPage.tsx",
+      "src/pages/secretaria/ReglasAplicables.tsx",
+    ]) {
+      expect(existsSync(resolve(process.cwd(), retirada))).toBe(false);
+    }
+  });
+
   it("expone gobierno operativo: permisos, historial, auditoría y rollout", () => {
-    const ruleManager = read("src/pages/secretaria/RuleManagerPage.tsx");
     const wizard = read("src/pages/secretaria/ActivarMarcoNormativo.tsx");
     const catalogo = read("src/pages/secretaria/CatalogoMaterias.tsx");
     const model = read("src/lib/secretaria/mesa-control-societaria.ts");
 
-    expect(ruleManager).toContain("Historial y trazabilidad");
-    expect(ruleManager).toContain("Evento preparado");
-    expect(ruleManager).toContain("usePublishNormativeOverride");
-    expect(ruleManager).toContain("Publicar override");
-    expect(ruleManager).toContain("Completa valor, fuente documental y justificación");
     expect(wizard).toContain("Evento de auditoría preparado");
     expect(wizard).toContain("Rollout");
     expect(wizard).toContain("Solicitar edición");
@@ -222,7 +227,6 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     expect(wizard).toContain("Criterios de salida");
     expect(wizard).toContain("Backfill legacy");
     expect(wizard).toContain("Telemetría preparada para la publicación del marco");
-    expect(ruleManager).toContain("Telemetría preparada para la consulta de regla efectiva");
   });
 
   it("conecta bindings de plantillas a la regla efectiva", () => {

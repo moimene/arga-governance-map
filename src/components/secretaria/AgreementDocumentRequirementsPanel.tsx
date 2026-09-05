@@ -1,4 +1,5 @@
 import { useStandaloneCertificationKinds } from "@/hooks/useStandaloneCertifications";
+import { filterCertificationKindsInScope } from "@/lib/secretaria/certification-kind-scope";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -134,7 +135,10 @@ export function AgreementDocumentRequirementsPanel({ agreement }: { agreement: A
   // El destino de estos CTA es el alta de certificaciones autonomas, que no
   // puede crear nada si el tenant no tiene tipos configurados.
   const { data: certificationKinds = [] } = useStandaloneCertificationKinds();
-  const certificacionDisponible = certificationKinds.length > 0;
+  // Solo cuentan los tipos que el alta de certificaciones va a ofrecer de
+  // verdad: si el tenant solo tuviera tipos fuera de alcance (ERDS, envío,
+  // firma cualificada), el CTA prometería un destino vacío.
+  const certificacionDisponible = filterCertificationKindsInScope(certificationKinds).length > 0;
 
   const certificationTo = scope.createScopedTo(
     `/secretaria/certificaciones?entity=${encodeURIComponent(agreement.entity_id ?? "")}`

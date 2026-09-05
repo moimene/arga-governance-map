@@ -564,8 +564,10 @@ describe("motor-plantillas composer smoke", () => {
         fecha: "2026-06-01",
         documentacion_texto: "Cuentas anuales\nInforme auditor",
         conclusion_documental: "Documentacion suficiente para continuar.",
-        canal_notificacion: "ERDS",
-        erds_delivery_ref: "ERDS-DEMO-1",
+        // El fixture ya no pide una «referencia ERDS»: en el alcance vigente
+        // no hay envío ni entrega electrónica certificada, solo custodia.
+        canal_notificacion: "Expediente electrónico de Secretaría",
+        referencia_custodia: "CUSTODIA-DEMO-1",
       },
     );
 

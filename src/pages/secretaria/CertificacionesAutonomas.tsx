@@ -20,6 +20,7 @@ import {
 } from "@/hooks/useStandaloneCertifications";
 import { legalEffectLabel, statusLabel } from "@/lib/secretaria/status-labels";
 import { EvidenceStatusBadge } from "@/components/secretaria/EvidenceStatusBadge";
+import { filterCertificationKindsInScope } from "@/lib/secretaria/certification-kind-scope";
 
 function pickDefaultKind(kinds: StandaloneCertificationKindRow[]) {
   return (
@@ -96,7 +97,13 @@ export default function CertificacionesAutonomas() {
   const { data: entities = [] } = useEntitiesList({ sociedadesOnly: true });
   const { primaryRole } = useCurrentUserRole();
   const canCertify = useHasCapability(primaryRole, "CERTIFICATION");
-  const { data: kinds = [], isLoading: kindsLoading, error: kindsError } = useStandaloneCertificationKinds();
+  const { data: allKinds = [], isLoading: kindsLoading, error: kindsError } = useStandaloneCertificationKinds();
+  // Cloud tiene tipos ACTIVOS que afirman ERDS, entrega o firma cualificada:
+  // capacidades que EAD Trust no presta en el alcance vigente. El dato no se
+  // toca desde aquí, así que el selector no las ofrece. Criterio y prueba en
+  // `certification-kind-scope.ts`.
+  const kinds = useMemo(() => filterCertificationKindsInScope(allKinds), [allKinds]);
+  const fueraDeAlcance = allKinds.length - kinds.length;
   const defaultKind = useMemo(() => pickDefaultKind(kinds), [kinds]);
   const [entityId, setEntityId] = useState(searchParams.get("entity") ?? scope.selectedEntity?.id ?? "");
   const effectiveEntityId = entityId || scope.selectedEntity?.id || entities[0]?.id || "";
@@ -318,6 +325,16 @@ export default function CertificacionesAutonomas() {
                 </option>
               ))}
             </select>
+
+            {fueraDeAlcance > 0 ? (
+              <p className="text-xs text-[var(--g-text-secondary)]" role="note">
+                {fueraDeAlcance === 1
+                  ? "1 tipo configurado no se ofrece"
+                  : `${fueraDeAlcance} tipos configurados no se ofrecen`}
+                : su enunciado atribuye a un tercero capacidades de firma, envío o entrega que no están
+                disponibles en el alcance vigente.
+              </p>
+            ) : null}
           </label>
           <label className="space-y-1 text-sm">
             <span className="font-medium text-[var(--g-text-primary)]">Rol certificante</span>

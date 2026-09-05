@@ -296,7 +296,20 @@ export function evaluateCreditorOpposition(input: {
     explain: [{
       regla: "Oposicion acreedores",
       fuente: "LEY",
-      referencia: input.materia === "FUSION" ? "art. 44 RDL 5/2023" : "art. 334 LSC",
+      // Cita corregida contra el consolidado del BOE (BOE-A-2023-15135, última
+      // actualización publicada 27/06/2024): el art. 44 RDL 5/2023 es
+      // «Verificación y aprobación del balance» de fusión, NO la protección de
+      // acreedores. La protección de acreedores vive en el art. 13
+      // («Protección de los acreedores») y su art. 14 («Adecuación y eficacia
+      // de las garantías»).
+      //
+      // DEUDA DECLARADA — COMITÉ LEGAL: el RDL 5/2023 SUSTITUYÓ el derecho de
+      // oposición del art. 44 de la Ley 3/2009 por un régimen de garantías
+      // adecuadas. Esta función sigue computando 30 días de «plazo de
+      // oposición» desde la publicación, plazo que es criterio jurídico y NO se
+      // toca aquí. La discrepancia (régimen y cómputo) queda señalada para el
+      // Comité Legal; lo único corregido es la referencia.
+      referencia: input.materia === "FUSION" ? "art. 13 RDL 5/2023" : "art. 334 LSC",
       resultado: ok ? "OK" : "BLOCKING",
       mensaje: exemptReduction
         ? "Reduccion exenta de derecho de oposicion por causa legal."

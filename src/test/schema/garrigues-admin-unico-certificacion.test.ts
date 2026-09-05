@@ -34,8 +34,14 @@ describe("G3 — contrato RPC de certificación del administrador único", () =>
       // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
       garr = await sesionDe("GARRIGUES");
       authed = true;
-    } catch {
+    } catch (error) {
       authed = false;
+      // UN LOGIN FALLIDO NO ES «NADA QUE COMPROBAR». Al tragarse la excepción,
+      // cada `it` de abajo caía en `if (!authed) { expect(true).toBe(true); return; }`
+      // y la sonda Cloud terminaba VERDE sin asertar nada: rotar una contraseña
+      // o caerse Cloud dejaba el gate en verde mudo. `sesionDe` ya lanza con el
+      // motivo; aquí se propaga para que el fichero se ponga ROJO.
+      throw error;
     }
   }, 30_000);
 

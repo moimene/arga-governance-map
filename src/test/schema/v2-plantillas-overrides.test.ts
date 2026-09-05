@@ -20,7 +20,49 @@ import {
   DEMO_ENTITY_ARGA,
 } from "../helpers/supabase-test-client";
 
-describe.skipIf(!hasAdminClient())(
+/**
+ * DOS PROBLEMAS, DOS GUARDAS.
+ *
+ * 1. SKIP PERMANENTE. `hasAdminClient()` es SIEMPRE false en este repo
+ *    (medido 2026-09-05): el helper lee `SUPABASE_SERVICE_ROLE_KEY` y
+ *    `VITE_SUPABASE_URL`, y el `.env` define `SERVICE_ROLE_SECRET` y
+ *    `PROJECT_URL`. Los cinco describes de este fichero llevan meses entre los
+ *    «skipped» sin que nadie pueda ejecutarlos. Ahora la ausencia de
+ *    credenciales aparece como `todo`, no como silencio.
+ *
+ * 2. ES DESTRUCTIVO. Hace INSERT y DELETE reales sobre
+ *    `entity_settings_catalog` y `entity_settings`. Si algún día alguien
+ *    exporta las variables con nombre correcto apuntando a governance_OS
+ *    —el entorno activo de desarrollo, demo y validación— este fichero
+ *    escribiría en el dato vivo. La guarda de proyecto lo impide, y lo hace
+ *    FALLANDO en vez de saltándose: un fichero destructivo apuntando al
+ *    entorno equivocado es un incidente, no una condición a ignorar.
+ */
+const GOVERNANCE_OS_REF = "hzqwefkwsxopwrmtksbg";
+const ADMIN_DISPONIBLE = hasAdminClient();
+const TARGET_URL = process.env.VITE_SUPABASE_URL ?? "";
+const APUNTA_A_GOVERNANCE_OS = TARGET_URL.includes(GOVERNANCE_OS_REF);
+const PUEDE_ESCRIBIR = ADMIN_DISPONIBLE && !APUNTA_A_GOVERNANCE_OS;
+
+describe.skipIf(ADMIN_DISPONIBLE)("v2 plantillas overrides — sin credenciales", () => {
+  it.todo(
+    "sondas destructivas no ejecutadas: requieren SUPABASE_SERVICE_ROLE_KEY + VITE_SUPABASE_URL (el .env define SERVICE_ROLE_SECRET/PROJECT_URL)",
+  );
+});
+
+// Sin skipIf: esta guarda debe correr SIEMPRE. Es la que impide que un día,
+// con las variables bien nombradas, este fichero destructivo escriba en el
+// entorno activo.
+describe("v2 plantillas overrides — destino de escritura", () => {
+  it("nunca puede escribir en governance_OS", () => {
+    expect(
+      ADMIN_DISPONIBLE && APUNTA_A_GOVERNANCE_OS,
+      `Este fichero hace INSERT/DELETE reales y VITE_SUPABASE_URL apunta a governance_OS (${GOVERNANCE_OS_REF}), el entorno activo de desarrollo/demo. Apunte a un proyecto desechable antes de ejecutarlo.`,
+    ).toBe(false);
+  });
+});
+
+describe.skipIf(!PUEDE_ESCRIBIR)(
   "v2 plantillas overrides — T1 entity_settings_catalog",
   () => {
     it("table exists with expected columns", async () => {
@@ -86,7 +128,7 @@ describe.skipIf(!hasAdminClient())(
   },
 );
 
-describe.skipIf(!hasAdminClient())(
+describe.skipIf(!PUEDE_ESCRIBIR)(
   "v2 plantillas overrides — T2 entity_settings",
   () => {
     const sentinelKey = "test_setting_value_validation";
@@ -206,7 +248,7 @@ describe.skipIf(!hasAdminClient())(
   },
 );
 
-describe.skipIf(!hasAdminClient())(
+describe.skipIf(!PUEDE_ESCRIBIR)(
   "v2 plantillas overrides — T3 plantilla_capa3_overrides_por_entidad",
   () => {
     // Captura de ids insertados por cada test. El cleanup borra SOLO esos ids,
@@ -416,7 +458,7 @@ describe.skipIf(!hasAdminClient())(
   },
 );
 
-describe.skipIf(!hasAdminClient())(
+describe.skipIf(!PUEDE_ESCRIBIR)(
   "v2 plantillas overrides — T4 bloques_sectoriales (soft-delete + immutability)",
   () => {
     const sentinelClave = "TEST_BLOQUE_SENTINEL_V2";
@@ -493,7 +535,7 @@ describe.skipIf(!hasAdminClient())(
   },
 );
 
-describe.skipIf(!hasAdminClient())(
+describe.skipIf(!PUEDE_ESCRIBIR)(
   "v2 plantillas overrides — T5/T6 WORM (bloque_insertions + plantilla_changelog)",
   () => {
     it("bloque_insertions rejects UPDATE", async () => {

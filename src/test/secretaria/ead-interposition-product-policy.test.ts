@@ -1,8 +1,11 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { sinComentarios } from "../helpers/sin-comentarios";
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
+
+
 
 const generator = read("src/pages/secretaria/GenerarDocumentoStepper.tsx");
 const agreement = read("src/pages/secretaria/ExpedienteAcuerdo.tsx");
@@ -68,26 +71,48 @@ describe("política de producto EAD Trust · interposición, mensajería y e-arc
   });
 
   it("retira la promesa de firma también de GRC y AI Governance", () => {
-    // A3 (2026-08-29) — ASERCIÓN ENDURECIDA, no relajada.
-    // Este test nació para degradar "firma" a "custodia documental (EAD Trust)"
-    // en AI Governance. Medido después: el módulo AIMS **no llama nunca** a EAD
-    // Trust — 0 imports de cliente QTSP, 0 `fetch`, 0 `functions.invoke` en
-    // `src/pages/ai-governance`, `src/components/ai-governance`, `src/lib/aims` y
-    // `src/hooks/useAims*`; y `fn_aims_close_technical_file` es PL/pgSQL puro sin
-    // llamada saliente. Atribuirle custodia era falso, aunque menos falso que
-    // prometer firma. Ahora se exige que no haya NI firma NI atribución.
-    // Solo se endurece `aiSystemDetail`, que es AI Governance. Secretaría y GRC,
-    // que no se han medido aquí, quedan como estaban.
-    // GRC (`src/pages/grc/IncidenteDetalle.tsx`) NO se toca: es superficie de otro
-    // carril y su relación con EAD Trust no se ha medido aquí.
-    expect(incidentDetail).toContain("Custodia documental (EAD Trust)");
-    expect(incidentDetail).not.toContain("El proveedor emite firma simple o avanzada");
-    expect(aiSystemDetail).not.toMatch(/EAD\s*Trust/i);
-    expect(aiSystemDetail).not.toContain("Confirmar y Firmar");
-    expect(tprm).toContain("PLAN DE SALIDA CUSTODIADO EN LEDGER WORM");
-    expect(tprm).not.toContain("LEDGER WORM (FIRMA ELECTRÓNICA)");
-    expect(penal).toContain("QSeal no personal");
-    expect(penal).not.toContain("selladas mediante firma electrónica");
+    // A3 (2026-08-29) endureció la mitad de AI Governance, pero dejaba tres
+    // aserciones POSITIVAS sobre GRC que exigían la presencia de afirmaciones
+    // que el producto no sostiene:
+    //
+    //   toContain("Custodia documental (EAD Trust)")          — GRC no llama a EAD
+    //   toContain("PLAN DE SALIDA CUSTODIADO EN LEDGER WORM") — no consultaba nada
+    //   toContain("QSeal no personal")                        — sin token de sello
+    //
+    // Con ellas, retirar la afirmación ponía el gate en ROJO: el test premiaba
+    // conservarla. Es la misma forma que tenía `e2e/grc-dora.spec.ts`, que
+    // asertaba «QSeal Custodia» como comportamiento esperado. Un gate que pina
+    // una afirmación sin respaldo no protege el producto: lo ata a ella.
+    //
+    // El motivo que las justificaba («GRC no se ha medido aquí») ya no vale:
+    // el carril GRC lo midió el 2026-09-05 —ninguna evidencia de esos módulos
+    // tiene token de sello y EAD Trust no es prestador de firma ni de sello en
+    // el alcance vigente— y retiró las tres. Las positivas pasan a negativas.
+    const incidentCode = sinComentarios(incidentDetail);
+    const aiCode = sinComentarios(aiSystemDetail);
+    const tprmCode = sinComentarios(tprm);
+    const penalCode = sinComentarios(penal);
+
+    expect(incidentCode).not.toMatch(/Custodia documental \(EAD\s*Trust\)/i);
+    expect(incidentCode).not.toContain("El proveedor emite firma simple o avanzada");
+    expect(aiCode).not.toMatch(/EAD\s*Trust/i);
+    expect(aiCode).not.toContain("Confirmar y Firmar");
+    expect(tprmCode).not.toContain("LEDGER WORM");
+    expect(tprmCode).not.toContain("qualified timestamping");
+    expect(penalCode).not.toMatch(/QSeal Custodia|Verificar QSeal|EAD Trust Custody ID/);
+    expect(penalCode).not.toContain("selladas mediante firma electrónica");
+
+    // Control positivo: los tres ficheros se han leído de verdad. Sin esto, una
+    // ruta equivocada daría cadena vacía y todas las negativas pasarían solas.
+    for (const [nombre, src] of [
+      ["IncidenteDetalle", incidentDetail],
+      ["SistemaDetalle", aiSystemDetail],
+      ["TPRM", tprm],
+      ["PenalAnticorrupcion", penal],
+    ] as const) {
+      expect(src.length, `${nombre}: fuente vacía, las negativas pasarían vacuas`)
+        .toBeGreaterThan(1000);
+    }
   });
 
   it("la demo modela interposición sandbox, nunca QES sandbox", () => {

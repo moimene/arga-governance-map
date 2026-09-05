@@ -220,8 +220,15 @@ export function getSecretariaSanitizedFlowContract(id: SecretariaSanitizedFlowId
   return SECRETARIA_SANITIZED_FLOW_CONTRACTS.find((flow) => flow.id === id) ?? null;
 }
 
-export function summarizeSecretariaSanitizedFlows() {
-  return SECRETARIA_SANITIZED_FLOW_CONTRACTS.reduce(
+/**
+ * Resumen del inventario. Acepta la lista que se va a PINTAR: el Dashboard
+ * oculta flujos gateados por módulo (Board Pack fuera del perfil despacho) y
+ * el contador «Listos N/M» contaba uno que el usuario no veía.
+ */
+export function summarizeSecretariaSanitizedFlows(
+  flows: readonly (typeof SECRETARIA_SANITIZED_FLOW_CONTRACTS)[number][] = SECRETARIA_SANITIZED_FLOW_CONTRACTS,
+) {
+  return flows.reduce(
     (acc, flow) => {
       acc.total += 1;
       acc[flow.demoStatus] += 1;

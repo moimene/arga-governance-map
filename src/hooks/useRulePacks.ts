@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantContext } from '@/context/TenantContext';
 import { rulePackOrganoFamily } from "@/lib/secretaria/rule-pack-organo";
+import { narrowRulePackCandidates } from "@/lib/secretaria/rule-pack-candidates";
 import { normalizeMateriaForRulePack } from '@/lib/rules-engine/rule-resolution';
 import {
   mapRulePackJoinRowToVersionRow,
@@ -170,27 +171,14 @@ export function useRulePackForMateria(materia?: string, organoTipo?: string | nu
 
       const rows = (data ?? []) as RulePackJoinRow[];
 
-      // Cuando se conoce el órgano se prefieren sus packs, con el mismo
-      // desempate de siempre ("la activación más reciente gana").
-      //
-      // Si ninguno es de ese órgano NO se devuelve null: eso sería fail-closed
-      // por discrepancia de órgano, que es la opción C — post-demo y pendiente
-      // del Comité Legal. Aquí solo se prefiere, nunca se deja de servir.
-      const delOrgano = organo
-        ? rows.filter((r) => rulePackOrganoFamily(r.rule_packs?.organo_tipo) === organo)
-        : [];
-      const candidatos = delOrgano.length > 0 ? delOrgano : rows;
-
-      // Sin órgano conocido y con varios packs de la misma materia, cualquier
-      // elección es arbitraria. El único consumidor de este hook deriva de aquí
-      // la MAYORÍA LEGAL que se muestra como "regla efectiva", y la de la Junta
-      // no es la del Consejo: servir una al azar es afirmar ante el abogado algo
-      // que nadie ha determinado. Se devuelve null y el contrato degrada a una
-      // inferencia explícitamente etiquetada como tal.
-      const distintosOrganos = new Set(
-        rows.map((r) => rulePackOrganoFamily(r.rule_packs?.organo_tipo) ?? "SIN_ORGANO"),
-      );
-      if (!organo && distintosOrganos.size > 1) return null;
+      // La decisión vive en `narrowRulePackCandidates` (función pura, en
+      // rule-pack-candidates.ts) para poder probarla POR COMPORTAMIENTO. El
+      // contrato que protege —preferir el órgano sin dejar de servir, y negarse
+      // a elegir al azar entre órganos distintos— estaba fijado solo por dos
+      // greps sobre este fichero, y una llamada de señuelo los satisfacía sin
+      // usar ninguno de los literales prohibidos.
+      const candidatos = narrowRulePackCandidates(rows, organo, (r) => r.rule_packs?.organo_tipo);
+      if (candidatos === null) return null;
 
       const row = pickFreshestRulePackVersion(candidatos);
       if (!row) return null;

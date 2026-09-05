@@ -1,3 +1,6 @@
+import { beforeAll } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { sesionDe } from "../helpers/supabase-test-client";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -125,6 +128,9 @@ describe("Secretaría — registry lifecycle v2", () => {
   });
 
   it("retira DML directo sólo en la migración de cierre", () => {
+    // Este pin sigue siendo TEXTO y solo dice qué ORDENA la migración. Que el
+    // corte esté VIVO en Cloud lo comprueba la sonda de comportamiento de más
+    // abajo, que es la que puede fallar si alguien reconcede el privilegio.
     expect(expand).not.toMatch(/REVOKE (INSERT|UPDATE|DELETE) ON public\.registry_filings/i);
     expect(lockdown).toMatch(
       /REVOKE INSERT, UPDATE, DELETE ON public\.registry_filings FROM anon, authenticated/i,
@@ -158,4 +164,48 @@ describe("Secretaría — registry lifecycle v2", () => {
       );
     }
   });
+});
+
+/**
+ * El corte de DML directo, comprobado CONTRA CLOUD y no contra el texto de la
+ * migración.
+ *
+ * POR QUÉ. El pin de arriba asierta con una regex que un fichero de migración
+ * contiene un REVOKE. Eso no prueba que el REVOKE esté aplicado: una migración
+ * puede no haberse ejecutado, o un `GRANT` posterior puede haberla deshecho, y
+ * el gate seguiría verde. `information_schema` no está expuesto por PostgREST y
+ * este proyecto no expone `execute_sql`, así que el privilegio se mide por su
+ * EFECTO: con el privilegio revocado PostgREST devuelve `42501` antes de tocar
+ * ninguna fila.
+ *
+ * NO ES DESTRUCTIVO por construcción: el filtro apunta a un id inexistente, y
+ * el error de privilegio se levanta antes de evaluarlo.
+ */
+describe("Secretaría — registry lifecycle v2: corte de DML vivo en Cloud", () => {
+  const ID_INEXISTENTE = "00000000-0000-4000-8000-00000000dead";
+  let cliente: SupabaseClient;
+
+  beforeAll(async () => {
+    // `sesionDe` lanza si no autentica: sin sesión no se mide nada.
+    cliente = await sesionDe("ARGA");
+  }, 60_000);
+
+  it.each(["registry_filings", "registry_filing_events"])(
+    "%s — un usuario autenticado no puede escribir directamente",
+    async (tabla) => {
+      const update = await cliente.from(tabla).update({ tenant_id: null }).eq("id", ID_INEXISTENTE).select();
+      expect(update.error?.code, `${tabla}: UPDATE directo no fue denegado por privilegio`).toBe("42501");
+      expect(update.error?.message ?? "").toMatch(/permission denied/i);
+
+      const del = await cliente.from(tabla).delete().eq("id", ID_INEXISTENTE).select();
+      expect(del.error?.code, `${tabla}: DELETE directo no fue denegado por privilegio`).toBe("42501");
+      expect(del.error?.message ?? "").toMatch(/permission denied/i);
+    },
+    30_000,
+  );
+
+  it("la lectura sí está permitida: la sonda mide privilegio, no conectividad", async () => {
+    const { error } = await cliente.from("registry_filings").select("id").limit(1);
+    expect(error).toBeNull();
+  }, 30_000);
 });

@@ -503,7 +503,11 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
       "{{conclusion_documental}}",
       "",
       "{{#if canal_notificacion}}Canal previsto: {{canal_notificacion}}{{/if}}",
-      "{{#if erds_delivery_ref}}Referencia ERDS: {{erds_delivery_ref}}{{/if}}",
+      // ERDS retirado: en el alcance vigente EAD Trust interviene como
+      // interposición, mensajería básica y custodia / e-archiving. No hay
+      // envío, entrega ni servicio de entrega electrónica certificada, así que
+      // el informe no puede pedir ni imprimir una «referencia ERDS».
+      "{{#if referencia_custodia}}Referencia de custodia documental: {{referencia_custodia}}{{/if}}",
     ].join("\n"),
     capa2_variables: [
       ...commonEntityVariables,
@@ -518,7 +522,7 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
       { campo: "documentacion_texto", obligatoriedad: "OBLIGATORIO", descripcion: "Documentos revisados, disponibles o pendientes, uno por línea." },
       { campo: "conclusion_documental", obligatoriedad: "OBLIGATORIO", descripcion: "Conclusión documental PRE." },
       { campo: "canal_notificacion", obligatoriedad: "RECOMENDADO", descripcion: "Canal previsto de notificación o publicación." },
-      { campo: "erds_delivery_ref", obligatoriedad: "RECOMENDADO", descripcion: "Referencia ERDS si existe." },
+      { campo: "referencia_custodia", obligatoriedad: "RECOMENDADO", descripcion: "Referencia del artefacto custodiado, si existe. No acredita firma, envío ni entrega." },
     ],
   }),
   fixture({

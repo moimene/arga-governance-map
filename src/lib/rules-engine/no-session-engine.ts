@@ -262,7 +262,31 @@ function evaluarMateria(
 function evaluarNotificacion(input: NoSessionInput): NoSessionOutput['gates'][0] {
   const explain: ExplainNode[] = [];
   let allDelivered = true;
-  const pendienteCount = input.notificaciones.filter(n => n.estado !== 'ENTREGADA').length;
+  const notificaciones = input.notificaciones ?? [];
+  const pendienteCount = notificaciones.filter(n => n.estado !== 'ENTREGADA').length;
+
+  // AUSENCIA DE CONSTANCIA ≠ CUMPLIMIENTO. Con la lista vacía —o con menos
+  // constancias que destinatarios— el filtro anterior daba `pendienteCount = 0`
+  // y el gate proclamaba «Todas (0) notificaciones ENTREGADAS fehacientemente»
+  // citando el art. 100 RRM. Un gate que no puede fallar por falta de dato no
+  // acredita nada: sin constancia, no hay notificación fehaciente acreditada.
+  const destinatarios = Math.max(Number(input.totalDestinatarios ?? 0), 0);
+  if (notificaciones.length === 0 || notificaciones.length < destinatarios) {
+    return {
+      gate: 'notificacion',
+      ok: false,
+      severity: 'BLOCKING',
+      explain: [{
+        regla: 'Notificación fehaciente',
+        fuente: 'LEY',
+        referencia: 'art. 100 RRM (notificación fehaciente del procedimiento por escrito)',
+        resultado: 'BLOCKING',
+        mensaje: notificaciones.length === 0
+          ? `Sin constancia de notificación registrada${destinatarios > 0 ? ` para ${destinatarios} destinatario(s)` : ''}: la notificación fehaciente no consta acreditada.`
+          : `Solo constan ${notificaciones.length} notificación(es) de ${destinatarios} destinatario(s): faltan constancias por acreditar.`,
+      }],
+    };
+  }
 
   if (pendienteCount > 0) {
     allDelivered = false;

@@ -24,6 +24,7 @@ import {
   type CoAprobacionConfig,
   type SolidarioConfig,
   type NoSessionInput,
+  type NoSessionNotificacion,
   type ComplianceGateResult,
   type EtapaEvaluacion,
 } from "@/lib/rules-engine";
@@ -168,6 +169,46 @@ type NoSessionRow = {
   voting_deadline?: string | null;
   proposal_text?: string | null;
 } | null;
+type CommunicationRecipientRow = {
+  id: string;
+  /** Columna real de `communication_recipients` (no existe `estado`). */
+  estado_entrega?: string | null;
+  canal_usado?: string | null;
+  canal_primario?: string | null;
+  person_id?: string | null;
+};
+type CommunicationRow = {
+  id: string;
+  estado: string | null;
+  tipo_comunicacion: string | null;
+  communication_recipients?: CommunicationRecipientRow[] | null;
+};
+
+/**
+ * Estado de destinatario del registro de comunicaciones -> estado que entiende
+ * el motor. Solo ENTREGADA_TOTAL/ENTREGADA acreditan recepción; todo lo demás
+ * queda por debajo, y lo desconocido cae en PENDIENTE (fail-closed).
+ */
+function estadoNotificacionMotor(estado?: string | null): NoSessionNotificacion["estado"] {
+  switch ((estado ?? "").trim().toUpperCase()) {
+    case "ENTREGADA":
+    case "ENTREGADA_TOTAL":
+    case "RESPONDIDA_TOTAL":
+      return "ENTREGADA";
+    case "ENVIADA":
+    case "ENTREGADA_PARCIAL":
+    case "RESPONDIDA_PARCIAL":
+      return "ENVIADA";
+    case "ERROR":
+      return "FALLIDA";
+    case "CANCELADA":
+    case "EXPIRADA":
+      return "RECHAZADA";
+    default:
+      return "PENDIENTE";
+  }
+}
+
 type UnipersonalRow = { status: string } | null;
 type AgendaItemBoundaryRow = {
   kind: string | null;
@@ -507,6 +548,39 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
           sentido: "SILENCIO" as const,
         })),
       ];
+
+      // Constancia REAL de notificación. Antes se fabricaba una notificación
+      // por miembro con estado "ENTREGADA" y canal "DEMO_OPERATIVO" sin leer
+      // nada: el gate del art. 100 RRM concluía «Todas (N) notificaciones
+      // ENTREGADAS fehacientemente» para cualquier acuerdo sin sesión, y no
+      // podía fallar nunca. Ahora se lee el registro de comunicaciones; si no
+      // hay constancia, el motor lo dice y el gate no se da por cumplido.
+      const { data: comms, error: commsError } = await supabase
+        .from("communications")
+        .select("id, estado, tipo_comunicacion, communication_recipients(id, estado_entrega, canal_usado, canal_primario, person_id)")
+        .eq("tenant_id", tenantId)
+        .eq("agreement_id", a.id);
+      // Un fallo de consulta NO es «cero notificaciones acreditadas» ni
+      // «todas entregadas»: es dato no medido, y el gate debe seguir sin poder
+      // afirmar cumplimiento. Se deja la lista vacía, que es lo que bloquea.
+      const notificacionesReales: NoSessionNotificacion[] = commsError
+        ? []
+        : ((comms ?? []) as CommunicationRow[]).flatMap((comm) => {
+            const destinatarios = comm.communication_recipients ?? [];
+            if (destinatarios.length === 0) {
+              return [{
+                person_id: comm.id,
+                canal: "NO_INFORMADO",
+                estado: estadoNotificacionMotor(comm.estado),
+              }];
+            }
+            return destinatarios.map((recipient) => ({
+              person_id: recipient.person_id ?? recipient.id,
+              canal: recipient.canal_usado ?? recipient.canal_primario ?? "NO_INFORMADO",
+              estado: estadoNotificacionMotor(recipient.estado_entrega ?? comm.estado),
+            }));
+          });
+
       noSessionInput = {
         tipoProceso: organoTipo === "CONSEJO" ? "CIRCULACION_CONSEJO" : "UNANIMIDAD_ESCRITA_SL",
         condicionAdopcion: n.requires_unanimity
@@ -515,11 +589,7 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
         organoTipo,
         tipoSocial,
         respuestas,
-        notificaciones: Array.from({ length: totalMembers }, (_, index) => ({
-          person_id: `destinatario-${index + 1}`,
-          canal: "DEMO_OPERATIVO",
-          estado: "ENTREGADA" as const,
-        })),
+        notificaciones: notificacionesReales,
         totalDestinatarios: totalMembers,
         totalCapitalSocial: 100,
         ventana: {

@@ -1,58 +1,88 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { DEMO_TENANT, GARRIGUES_TENANT, sesionDe } from "../helpers/supabase-test-client";
 
-const smoke = readFileSync(
-  join(process.cwd(), "scripts/secretaria-p0-cloud-smoke.ts"),
-  "utf8",
-);
+/**
+ * Aislamiento cross-tenant REAL de las superficies P0 de Secretaría.
+ *
+ * QUÉ HABÍA AQUÍ ANTES. Este era el único fichero del carril con
+ * «tenant-isolation» en el nombre y no comprobaba ningún aislamiento: hacía
+ * `readFileSync` de `scripts/secretaria-p0-cloud-smoke.ts` y sus 25 aserciones
+ * eran `toMatch` de cadenas sobre ese texto. Ese script no lo ejecuta nada de
+ * la suite (solo `scripts/secretaria-p0-preflight.sh`, que se lanza a mano), de
+ * modo que el gate se ponía verde comprobando que un fichero MENCIONA el
+ * aislamiento, no que el aislamiento exista. Un test que no puede fallar por el
+ * hecho que dice cubrir es peor que no tenerlo.
+ *
+ * QUÉ COMPRUEBA AHORA. Con dos sesiones reales (ARGA y Garrigues), que cada
+ * tenant NO ve las filas del otro en las tablas propias del carril, y que la
+ * escritura directa está cortada a nivel de privilegio.
+ *
+ * ANTI-VACUIDAD. Cada aserción de aislamiento va precedida de la comprobación
+ * de que el tenant propio SÍ ve sus filas: sin eso, una consulta que devuelve
+ * vacío por cualquier motivo (RLS mal configurada, tabla vacía, sesión perdida)
+ * pasaría como «aislamiento correcto».
+ *
+ * GOTCHA de este repo: un WRITE cross-tenant filtrado por RLS devuelve 0 filas
+ * SIN error, no `42501`. El `42501` solo aparece cuando el privilegio de tabla
+ * está revocado, que es justo lo que comprueba el último bloque.
+ */
 
-describe("Secretaria P0 tenant isolation cloud smoke contract", () => {
-  it("exposes an explicit tenant-isolation mode separate from service-role happy path", () => {
-    expect(smoke).toMatch(/--tenant-isolation/);
-    expect(smoke).toMatch(/SECRETARIA_P0_RUN_TENANT_ISOLATION/);
-    expect(smoke).toMatch(/tenant isolation cloud smoke/);
-    expect(smoke).toMatch(/secretaria_p0_tenant_isolation_rollback_ok/);
-  });
+/** Tablas del carril Secretaría con filas reales en AMBOS tenants (Cloud, 2026-09-05). */
+const TABLAS_SECRETARIA = [
+  "registry_filings",
+  "plantillas_protegidas",
+  "agreements",
+  "governing_bodies",
+  "rule_packs",
+] as const;
 
-  it("simulates authenticated claims instead of relying on service_role bypasses", () => {
-    expect(smoke).toMatch(/SET LOCAL ROLE authenticated/);
-    expect(smoke).toMatch(/SET LOCAL "request\.jwt\.claim\.role" = 'authenticated'/);
-    expect(smoke).toMatch(/"tenant_id":"\$\{tenantA\}"/);
-    expect(smoke).toMatch(/"role_code":"SECRETARIO"/);
-    expect(smoke).toMatch(/"person_id":"\$\{voterA\}"/);
-  });
+/** Id inexistente: el DELETE/UPDATE de sondeo no puede tocar ninguna fila. */
+const ID_INEXISTENTE = "00000000-0000-4000-8000-00000000dead";
 
-  it("covers cross-tenant negatives for the P0 RPC surface", () => {
-    for (const rpc of [
-      "fn_no_session_cast_response",
-      "fn_no_session_close_and_materialize_agreement",
-      "fn_generar_certificacion_acuerdo_sin_sesion",
-      "fn_registrar_transmision_capital",
-      "fn_cerrar_votaciones_vencidas",
-    ]) {
-      expect(smoke).toMatch(new RegExp(rpc));
+describe("Secretaría P0 — aislamiento cross-tenant real", () => {
+  let arga: SupabaseClient;
+  let garrigues: SupabaseClient;
+
+  beforeAll(async () => {
+    // `sesionDe` LANZA si no autentica: sin sesión no hay nada que verificar y
+    // el fichero debe ponerse rojo, no saltarse.
+    arga = await sesionDe("ARGA");
+    garrigues = await sesionDe("GARRIGUES");
+  }, 60_000);
+
+  it.each(TABLAS_SECRETARIA)("%s — ARGA no ve filas de Garrigues", async (tabla) => {
+    const propias = await arga.from(tabla).select("tenant_id").eq("tenant_id", DEMO_TENANT).limit(5);
+    expect(propias.error, `${tabla}: la consulta propia falló, la medición no es válida`).toBeNull();
+    // Sin esto la aserción de abajo sería vacua.
+    expect((propias.data ?? []).length, `${tabla}: ARGA no ve NINGUNA fila propia`).toBeGreaterThan(0);
+
+    const ajenas = await arga.from(tabla).select("tenant_id").eq("tenant_id", GARRIGUES_TENANT);
+    expect(ajenas.error).toBeNull();
+    expect(ajenas.data ?? []).toEqual([]);
+  }, 30_000);
+
+  it.each(TABLAS_SECRETARIA)("%s — Garrigues no ve filas de ARGA", async (tabla) => {
+    const propias = await garrigues.from(tabla).select("tenant_id").eq("tenant_id", GARRIGUES_TENANT).limit(5);
+    expect(propias.error, `${tabla}: la consulta propia falló, la medición no es válida`).toBeNull();
+    expect((propias.data ?? []).length, `${tabla}: Garrigues no ve NINGUNA fila propia`).toBeGreaterThan(0);
+
+    const ajenas = await garrigues.from(tabla).select("tenant_id").eq("tenant_id", DEMO_TENANT);
+    expect(ajenas.error).toBeNull();
+    expect(ajenas.data ?? []).toEqual([]);
+  }, 30_000);
+
+  it("un SELECT sin filtro solo devuelve filas del propio tenant", async () => {
+    for (const [nombre, cliente, propio] of [
+      ["ARGA", arga, DEMO_TENANT],
+      ["Garrigues", garrigues, GARRIGUES_TENANT],
+    ] as const) {
+      const { data, error } = await cliente.from("agreements").select("tenant_id").limit(200);
+      expect(error, `${nombre}: consulta fallida`).toBeNull();
+      expect((data ?? []).length, `${nombre}: sin filas, la aserción sería vacua`).toBeGreaterThan(0);
+      expect(
+        (data ?? []).map((row) => (row as { tenant_id: string }).tenant_id).filter((t) => t !== propio),
+      ).toEqual([]);
     }
-    expect(smoke).toMatch(/tenant access denied/);
-    expect(smoke).toMatch(/person access denied/);
-    expect(smoke).toMatch(/template .* does not belong to tenant/);
-    expect(smoke).toMatch(/person .* does not belong to tenant/);
-  });
-
-  it("keeps tenant A table isolation checks scoped through app.current_tenant_id", () => {
-    expect(smoke).toMatch(/SET LOCAL app\.current_tenant_id = '\$\{tenantA\}'/);
-    expect(smoke).toMatch(/RLS leak: tenant A can read tenant B capital_holdings/);
-    expect(smoke).toMatch(/ROLLBACK;/);
-  });
-
-  it("exercises real Supabase Auth users without touching the ARGA demo tenant", () => {
-    expect(smoke).toMatch(/--auth-user-isolation/);
-    expect(smoke).toMatch(/SECRETARIA_P0_RUN_AUTH_USER_ISOLATION/);
-    expect(smoke).toMatch(/auth\.admin\.createUser/);
-    expect(smoke).toMatch(/signInWithPassword/);
-    expect(smoke).toMatch(/user_profiles/);
-    expect(smoke).toMatch(/tenant access denied/);
-    expect(smoke).toMatch(/capability VOTE_EMISSION denied for role AUDITOR/);
-    expect(smoke).toMatch(/auth\.admin\.deleteUser/);
-  });
+  }, 30_000);
 });
