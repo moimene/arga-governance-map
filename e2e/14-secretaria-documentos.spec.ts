@@ -2,7 +2,10 @@ import { test, expect } from './fixtures/base';
 
 test.describe.configure({ timeout: 40_000 });
 
-const convocatoriaDocxButton = /Convocatoria(?: revisada)? DOCX|Convocatoria con plantilla/;
+// El botón se llama «Borrador DEMO …»: el rótulo «Convocatoria DOCX» se retiró
+// porque lo que genera es un borrador de demo, no la convocatoria emitida. El
+// literal antiguo no existe en `src/` desde antes de este cierre.
+const convocatoriaDocxButton = /Borrador DEMO(?: revisado)?(?: DOCX| con plantilla)/;
 
 async function expectDocxDownload(page, buttonName: string | RegExp, filenamePattern: RegExp) {
   const button = page.getByRole('button', { name: buttonName }).first();

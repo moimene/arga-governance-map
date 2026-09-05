@@ -7,7 +7,11 @@ test.describe('GRC Compass', () => {
       page.getByText('GRC').or(page.getByText('Riesgo').or(page.getByText('Incidente'))).first()
     ).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('Contexto técnico y contratos')).toBeVisible();
-    await expect(page.getByText(/No conectado ahora:/).first()).toBeVisible();
+    // El chip «No conectado ahora: TPRM» se retiró porque era FALSO: la postura
+    // declaraba que TPRM no tenía pantalla conectada mientras `/grc/tprm` lee
+    // `grc_third_parties`. Con el backlog vacío no hay nada que anunciar, y
+    // exigir el chip obligaría a reintroducir la afirmación incorrecta.
+    await expect(page.getByText(/No conectado ahora:/)).toHaveCount(0);
   });
 
   test('cambio Grupo/Sociedad en GRC conserva el scope al navegar', async ({ page }) => {
