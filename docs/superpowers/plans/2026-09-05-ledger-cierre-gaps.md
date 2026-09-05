@@ -574,3 +574,76 @@ módulo falla ABIERTO con `branding` NULL, con lista vacía y con lista malforma
 | DA-28 | `evaluateCreditorOpposition` no tiene ningún llamador fuera de su test: el arreglo de la cita corrige código muerto. La instancia VIVA del mismo error está en el contenido de una plantilla (`20260612214000_…sql:166`), que sí llega al papel. | Comité Legal + Secretaría |
 | DA-29 | `IncidenteDetalle.tsx:564` afirma una obligación concreta del Reglamento Delegado (UE) 2025/301 que **no se cotejó** en esta pasada. No verificada ≠ correcta. | GRC |
 | DA-30 | Tres `it.todo` nuevos sustituyen skips permanentes: son honestos (declaran que no corren) pero no ejercitan nada. Requieren `SUPABASE_SERVICE_ROLE_KEY` en `.env`. | Secretaría |
+
+---
+
+## 14. Verificación viva en producción (criterio de salida nº7)
+
+Despliegue `dpl_6MPxnRtMVnBi3aSrBPN5z5UR1hBx` → commit `2bab128`, y después `ac87e37`, ambos
+**READY** y aliasados a `arga-governance-map.vercel.app`. La integración GitHub→Vercel disparó sola.
+
+**Método:** se descargó el `index.html` de producción, su bundle principal y **los 249 chunks
+diferidos** que referencia, y se barrieron las afirmaciones retiradas sobre el código realmente
+servido. No es un grep del repo: es lo que llega al navegador.
+
+### 14.1 Lo que la verificación viva encontró — y la suite no
+
+`src/pages/GovernanceMap.tsx:380` seguía diciendo **«Al acceder se registrará en el log de auditoría
+independiente»**, la misma frase que este cierre retiró de `SiiLayout` y del tour, sobre una puerta
+que solo escribe un flag en `sessionStorage`.
+
+Sobrevivió a los seis carriles, a los gates y a las tres lentes adversariales por un motivo
+instructivo: **el guard de afirmaciones del SII escanea el módulo, y esta era una puerta de al
+lado**. La superficie del guard se amplía a `GovernanceMap`, `TourContext` y `Documentacion`, que
+son los tres sitios desde los que se entra al canal. Verificado con mutación: reintroducir la frase
+lo pone en rojo.
+
+Y al ampliarla apareció **por cuarta vez el mismo gotcha**: la única coincidencia restante era el
+comentario que explica la retirada. El guard aplica ya `sinComentarios`.
+
+### 14.2 Barrido final sobre producción
+
+**22 de 22 afirmaciones retiradas: AUSENTES.** QSeal Custodia · Verificar QSeal · EAD Trust Custody
+ID · Prueba forense inmutable · bundle WORM cualificado · Evidencias Forenses · CUSTODIADO EN LEDGER
+WORM · qualified timestamping · EAD Trust Qualified TSP · Cumple RGPD · Remitido formalmente a
+DGSFP · Registrando con sellado EAD · Firmar y Registrar · buzón cifrado · zona encriptada · log de
+auditoría independiente · Artículo 34 de la Ley 2/2023 · admitido a trámite · Guardar y Precintar ·
+ha sido precintada · Todas cumplen plazos legales · Microsoft Sentinel Activo.
+
+**Y la postura honesta que las sustituye, PRESENTE:** «no medido» · «No medido» · «sin dato» ·
+«Simulado» · «solo en este navegador» · «Custodia (no conectada)» · «Incidentes mayores abiertos».
+La fila del panel viaja literalmente como
+`{label:"Convocatorias con plazo", status:"UNKNOWN", note:"No medido en este panel…"}`.
+
+### 14.3 Trampa de método, para la próxima vez
+
+En el primer barrido saltaron cinco literales. **Cuatro de los cinco eran mi propio mensaje de
+commit**: Vercel inyecta `VITE_VERCEL_GIT_COMMIT_MESSAGE` y Vite lo inlinea en `import.meta.env`, así
+que el mensaje entero viaja en el bundle y un grep encuentra cualquier frase escrita en un commit.
+Solo el quinto —`GovernanceMap`— era una afirmación de pantalla. Hay que descontar ese campo antes
+de concluir nada de un barrido del bundle.
+
+### 14.4 Lo que NO se verificó, y por qué
+
+**No inicié sesión en producción.** Introducir contraseñas para autenticarme queda fuera de lo que
+puedo hacer, incluso con las credenciales a mano. La comprobación autenticada con los **dos**
+tenants sí se ejecutó, pero contra el servidor local: `e2e/01-auth` (7/7, incluido «una cuenta ARGA
+no entra por el entorno Garrigues») y las sondas Cloud con logins reales de ARGA y Garrigues.
+
+Queda por hacer, y es del usuario: entrar en producción con cada tenant y mirar el Dashboard, `/grc`
+y `/sii`. El bundle desplegado ya está verificado; lo que falta es la sesión.
+
+---
+
+## 15. Criterios de salida
+
+| # | Criterio | Estado |
+|---|---|---|
+| 1 | Tabla por módulo: superficie → REAL / HONESTO / RETIRADO con evidencia, ninguna «no verificada» | **Cumplido** — §3, §4, §6, §7, §9, §11 |
+| 2 | Todos los hallazgos con estado final; los 23 P0 sin juzgar, primero | **Cumplido** — 123 hallazgos juzgados en los seis carriles: corregidos, refutados con evidencia, o deuda aceptada con dueño (DA-1…DA-30). Ninguno queda sin veredicto. |
+| 3 | Gates verdes en `main`; `bun test` sin bajar de 3870 ni añadir skips; e2e `01-auth` y los del cierre | **Cumplido con una excepción declarada** — 4020 pass / 152 skip / 0 fail (línea base 3871, **skips idénticos**); typecheck, lint y build verdes; `01-auth` 7/7. **Excepción:** tres e2e siguen rojos y son **pre-existentes, medido** (el literal que piden no existía tampoco en `main`): descarga DOCX de convocatoria, preservación de scope en GRC y pipeline de certificación en el detalle de acta. Ningún fichero de esas rutas cambió en este cierre. |
+| 4 | Aislamiento cross-tenant con logins reales en cada tabla nueva o tocada, en ambas direcciones y sin aserción vacua | **Cumplido** — de 9 a 16 tablas, 48 pass / 241 aserciones; las cuatro direcciones vacuas, declaradas con motivo y fuente. |
+| 5 | Arnés de mutación en cada corrección release-crítica | **Cumplido** — 21 mutaciones en AIMS, 7 en Secretaría, 6 en GRC, 3 en SII, 5 en consola/coherencia, más las 5 de la review y las 2 de la verificación viva. Todas en rojo; todas restauradas. |
+| 6 | Review adversarial de ≥3 lentes, 0 P0 abiertos antes de mergear | **Cumplido** — tres lentes; 6 defectos de producto y 4 gates derrotados por mutación, **todos cerrados antes del merge**. |
+| 7 | Verificación viva en producción tras el push | **Cumplido en la parte que puedo hacer** — 22/22 afirmaciones ausentes y la postura honesta presente en el bundle servido, con los 249 chunks diferidos incluidos. La comprobación **con sesión iniciada** queda para el usuario (§14.4). |
+| 8 | `CLAUDE.md` actualizado y ledger con cada decisión, refutación y deuda | **Cumplido** — este fichero y la sección nueva de `CLAUDE.md`. |
