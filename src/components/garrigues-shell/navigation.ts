@@ -88,8 +88,11 @@ export interface GarriguesSimpleNavItem {
 export const GRC_NAV_ITEMS: GarriguesSimpleNavItem[] = [
   { label: "Dashboard",       to: "/grc",                     icon: LayoutDashboard, end: true },
   { label: "Risk 360",        to: "/grc/risk-360",            icon: Activity },
-  { label: "Solvencia II",    to: "/grc/solvencia-ii",        icon: ShieldCheck },
-  { label: "Terceros (TPRM)", to: "/grc/tprm",                icon: Layers },
+  // Régimen sectorial asegurador y registro DORA de terceros TIC: ninguno de
+  // los dos aplica a un despacho. `isModuleEnabled` falla ABIERTO, así que un
+  // tenant sin `branding.modules` (ARGA) los sigue viendo sin cambio alguno.
+  { label: "Solvencia II",    to: "/grc/solvencia-ii",        icon: ShieldCheck, moduleKey: "solvencia-ii" },
+  { label: "Terceros (TPRM)", to: "/grc/tprm",                icon: Layers, moduleKey: "tprm" },
   { label: "Penal / Anticorr.", to: "/grc/penal-anticorrupcion", icon: Scale },
   { label: "Packs por País",  to: "/grc/packs",               icon: Globe2, moduleKey: "country-packs" },
   { label: "Incidentes",      to: "/grc/incidentes",          icon: AlertTriangle },

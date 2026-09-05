@@ -3,6 +3,7 @@ import {
   ShieldCheck, AlertTriangle, CheckCircle2, Clock, 
   Terminal, Flame, FileCheck, Layers, ExternalLink 
 } from "lucide-react";
+import { DemoFixtureNotice } from "@/components/grc/DemoFixtureNotice";
 
 interface ResilienceTestItem {
   id: string;
@@ -92,6 +93,9 @@ export default function TestingProgram() {
 
   return (
     <div className="p-6 space-y-6">
+      <DemoFixtureNotice>
+        El programa de pruebas de resiliencia de esta pantalla es un guion fijo del código. Ninguna de estas pruebas se ha ejecutado ni consta en ninguna tabla.
+      </DemoFixtureNotice>
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">

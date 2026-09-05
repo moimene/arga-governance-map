@@ -41,9 +41,8 @@ describe("grc dashboard readiness contract", () => {
 
   it("keeps non-connected domains out of the primary readiness panel", () => {
     expect(GRC_P0_DOMAINS.map((domain) => domain.id)).not.toContain("tprm");
-    expect(GRC_NOT_CONNECTED_BACKLOG.map((domain) => domain.id)).toEqual([
-      "tprm",
-    ]);
+    // TPRM salió del backlog: `/grc/tprm` lee `grc_third_parties` de verdad.
+    expect(GRC_NOT_CONNECTED_BACKLOG).toEqual([]);
   });
 
   it("summarizes readiness without fetching data", () => {
@@ -85,22 +84,25 @@ describe("grc dashboard readiness contract", () => {
       "aims-intake",
     ]);
 
+    // `/grc/tprm` lee `grc_third_parties` con filas reales del tenant: la
+    // postura declarada tiene que decirlo, o el propio producto la desmiente.
     const tprm = GRC_COMPLIANCE_MONITORS.find((monitor) => monitor.id === "tprm-outsourcing");
-    expect(tprm?.readiness).toBe("gap");
-    expect(tprm?.sourcePosture).toBe("backlog_placeholder");
-    expect(tprm?.sourceTables).toEqual([]);
+    expect(tprm?.readiness).toBe("watch");
+    expect(tprm?.route).toBe("/grc/tprm");
+    expect(tprm?.sourcePosture).toBe("legacy_read");
+    expect(tprm?.sourceTables).toEqual(["grc_third_parties"]);
   });
 
   it("summarizes compliance monitoring posture without database access", () => {
     expect(getGrcComplianceMonitorSummary()).toEqual({
       total: 16,
-      withSourceTables: 15,
+      withSourceTables: 16,
       withHandoffs: 8,
-      backlog: 1,
+      backlog: 0,
       byReadiness: {
         ready: 6,
-        watch: 9,
-        gap: 1,
+        watch: 10,
+        gap: 0,
       },
       byArea: {
         "Riesgo y control": 5,
@@ -126,7 +128,7 @@ describe("grc dashboard readiness contract", () => {
   });
 
   it("maps every connected GRC frontend screen with owner, source posture and access mode", () => {
-    expect(GRC_SCREEN_POSTURES).toHaveLength(30);
+    expect(GRC_SCREEN_POSTURES).toHaveLength(31);
 
     for (const screen of GRC_SCREEN_POSTURES) {
       expect(screen.owner).toBe("GRC Compass");
@@ -146,14 +148,20 @@ describe("grc dashboard readiness contract", () => {
     expect(ownerWriteScreens.map((screen) => screen.route)).toEqual([
       "/grc/risk-360/nuevo",
       "/grc/risk-360/:id/editar",
+      "/grc/tprm",
       "/grc/incidentes/nuevo",
     ]);
     expect(ownerWriteScreens.map((screen) => screen.tables.join(","))).toEqual([
       "risks",
       "risks",
+      "grc_third_parties,evidence_bundles",
       "incidents",
     ]);
-    expect(ownerWriteScreens.every((screen) => screen.sourcePosture === "legacy_write")).toBe(true);
+    // TPRM escribe `grc_third_parties` pero LEE el resto: su postura declarada
+    // es legacy_read, no legacy_write, y el mapa lo distingue.
+    expect(
+      ownerWriteScreens.every((screen) => ["legacy_write", "legacy_read"].includes(screen.sourcePosture)),
+    ).toBe(true);
   });
 
   it("keeps TPRM out while penal anticorruption is connected as a legacy read view", () => {
@@ -163,23 +171,23 @@ describe("grc dashboard readiness contract", () => {
       screen.label,
     ]).join(" ").toLowerCase();
 
-    expect(connectedIdsAndRoutes).not.toContain("tprm");
+    expect(connectedIdsAndRoutes).toContain("tprm");
     expect(connectedIdsAndRoutes).toContain("anticorrup");
-    expect(GRC_NOT_CONNECTED_BACKLOG.map((domain) => domain.id)).toEqual(["tprm"]);
+    expect(GRC_NOT_CONNECTED_BACKLOG).toEqual([]);
   });
 
   it("summarizes screen posture without database access", () => {
     expect(getGrcScreenPostureSummary()).toEqual({
-      total: 30,
-      withTables: 23,
+      total: 31,
+      withTables: 24,
       withHandoffCandidates: 11,
       byAccessMode: {
         "read-only": 23,
-        "owner-write": 3,
+        "owner-write": 4,
         backlog: 4,
       },
       bySourcePosture: {
-        legacy_read: 19,
+        legacy_read: 20,
         legacy_write: 3,
         tgms_handoff: 1,
         local_demo_read: 3,

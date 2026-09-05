@@ -6,79 +6,89 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { buildMeetingHandoffPath } from "@/lib/secretaria/cross-module-handoff";
 import { toast } from "sonner";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { isModuleEnabled } from "@/lib/tenant-modules";
+import { DemoFixtureNotice } from "@/components/grc/DemoFixtureNotice";
 
 interface KeyFunctionData {
   id: string;
   name: string;
   solvencyArticle: string;
   responsible: string;
-  fitAndProperStatus: "Acreditado y Vigente" | "En Renovación" | "Pendiente";
-  annualReportStatus: "Emitido y Aprobado por CdA" | "En Elaboración" | "Planificado";
+  fitAndProperStatus: "No medido" | "En Renovación" | "Pendiente";
+  annualReportStatus: "No medido" | "En Elaboración" | "Planificado";
   opinionsMandatory: string[];
-  currentHealth: "Óptimo" | "Atención Requerida" | "Crítico";
+  currentHealth: "No medido" | "Atención Requerida" | "Crítico";
 }
 
+// Esta pantalla NO lee Cloud: los cuatro registros y los cuatro KPI son
+// literales del código. Se conserva por decisión del usuario y se etiqueta como
+// demo no medida; lo que desaparece son las afirmaciones que un lector podría
+// tomar por hechos: idoneidad «Acreditada y Vigente», informes «Emitidos y
+// Aprobados por CdA», salud «Óptimo», y sobre todo el ORSA «Remitido
+// formalmente a DGSFP», que afirma una remisión a la autoridad supervisora.
 const KEY_FUNCTIONS: KeyFunctionData[] = [
   {
     id: "kf-01",
     name: "1. Función de Gestión de Riesgos",
     solvencyArticle: "Solvencia II Art. 44 · Reg. Delegado 2015/35",
     responsible: "Chief Risk Officer (CRO)",
-    fitAndProperStatus: "Acreditado y Vigente",
-    annualReportStatus: "Emitido y Aprobado por CdA",
+    fitAndProperStatus: "No medido",
+    annualReportStatus: "No medido",
     opinionsMandatory: [
       "Informe Anual de Riesgos e Idoneidad de Modelos",
       "Coordinación del Informe ORSA y Stress Testing",
       "Supervisión del Marco de Apetito al Riesgo (RAF)",
     ],
-    currentHealth: "Óptimo",
+    currentHealth: "No medido",
   },
   {
     id: "kf-02",
     name: "2. Función de Cumplimiento Normativo",
     solvencyArticle: "Solvencia II Art. 46 · ROSSP",
     responsible: "Director de Cumplimiento (CCO)",
-    fitAndProperStatus: "Acreditado y Vigente",
-    annualReportStatus: "Emitido y Aprobado por CdA",
+    fitAndProperStatus: "No medido",
+    annualReportStatus: "No medido",
     opinionsMandatory: [
       "Evaluación del impacto de modificaciones legislativas",
       "Dictamen de idoneidad y honorabilidad (Fit & Proper)",
       "Supervisión del Canal Interno de Denuncias (Ley 2/2023)",
     ],
-    currentHealth: "Óptimo",
+    currentHealth: "No medido",
   },
   {
     id: "kf-03",
     name: "3. Función de Auditoría Interna",
     solvencyArticle: "Solvencia II Art. 47 · IIA 2024",
     responsible: "Director de Auditoría Interna (CAE)",
-    fitAndProperStatus: "Acreditado y Vigente",
-    annualReportStatus: "Emitido y Aprobado por CdA",
+    fitAndProperStatus: "No medido",
+    annualReportStatus: "No medido",
     opinionsMandatory: [
       "Informe Anual de Eficacia del Control Interno",
       "Seguimiento de Recomendaciones y Planes de Acción",
       "Garantía de Independencia ante Comisión de Auditoría",
     ],
-    currentHealth: "Óptimo",
+    currentHealth: "No medido",
   },
   {
     id: "kf-04",
     name: "4. Función Actuarial",
     solvencyArticle: "Solvencia II Art. 48 · Directrices EIOPA",
     responsible: "Actuario Jefe Responsable",
-    fitAndProperStatus: "Acreditado y Vigente",
-    annualReportStatus: "Emitido y Aprobado por CdA",
+    fitAndProperStatus: "No medido",
+    annualReportStatus: "No medido",
     opinionsMandatory: [
       "Coordinación del cálculo de Provisiones Técnicas",
       "Opinión preceptiva sobre la Política Global de Suscripción",
       "Opinión preceptiva sobre los Convenios y Programa de Reaseguro",
     ],
-    currentHealth: "Óptimo",
+    currentHealth: "No medido",
   },
 ];
 
 export default function SolvenciaII() {
   const navigate = useNavigate();
+  const branding = useTenantBranding();
   const [activeTab, setActiveTab] = useState<"functions" | "orsa">("functions");
   const [extraordinaryOrsaTriggered, setExtraordinaryOrsaTriggered] = useState(false);
 
@@ -93,6 +103,20 @@ export default function SolvenciaII() {
       rationale: "El Comité de Riesgos eleva al Consejo de Administración los resultados del ORSA Extraordinario tras el impacto material simulado y la validación de la ratio de solvencia proyectada.",
     }));
   };
+
+  // El régimen de Solvencia II es sectorial asegurador. El item de menú ya va
+  // gateado; esto cierra además la URL directa. Falla ABIERTO: ARGA, sin
+  // `branding.modules`, no ve ningún cambio.
+  if (!isModuleEnabled(branding, "solvencia-ii")) {
+    return (
+      <div className="p-6 space-y-3">
+        <h1 className="text-2xl font-bold text-[var(--g-text-primary)]">Gobernanza Solvencia II</h1>
+        <p className="text-sm text-[var(--g-text-secondary)]">
+          El régimen de Solvencia II no está habilitado para este grupo.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -110,13 +134,19 @@ export default function SolvenciaII() {
         </div>
       </header>
 
+      <DemoFixtureNotice>
+        Esta pantalla no lee ninguna tabla: las cuatro funciones clave, sus estados y los indicadores
+        son un guion fijo de demostración. Ninguna cifra está medida y no consta ninguna remisión a
+        la Dirección General de Seguros y Fondos de Pensiones.
+      </DemoFixtureNotice>
+
       {/* KPI Solvencia Global */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         {[
-          { label: "Ratio de Solvencia (SCR)", val: "214%", sub: "Mínimo regulatorio: 100% | Target: ≥180%", color: "text-[var(--status-success)]" },
-          { label: "Ratio de Cobertura MCR", val: "482%", sub: "Capital Mínimo Obligatorio holgado", color: "text-[var(--status-success)]" },
-          { label: "4 Funciones Clave", val: "100% Conformes", sub: "Idoneidad Fit & Proper vigente", color: "text-[var(--g-brand-3308)]" },
-          { label: "Ciclo ORSA 2026", val: "Aprobado CdA", sub: "Remitido formalmente a DGSFP", color: "text-[var(--g-brand-3308)]" },
+          { label: "Ratio de Solvencia (SCR)", val: "sin dato", sub: "Mínimo regulatorio: 100%. No se calcula en este entorno.", color: "text-[var(--g-text-secondary)]" },
+          { label: "Ratio de Cobertura MCR", val: "sin dato", sub: "No se calcula en este entorno.", color: "text-[var(--g-text-secondary)]" },
+          { label: "Funciones clave catalogadas", val: String(KEY_FUNCTIONS.length), sub: "Idoneidad Fit & Proper: no medida.", color: "text-[var(--g-text-primary)]" },
+          { label: "Ciclo ORSA 2026", val: "sin dato", sub: "No consta remisión a la autoridad supervisora.", color: "text-[var(--g-text-secondary)]" },
         ].map((k) => (
           <div
             key={k.label}
@@ -171,10 +201,9 @@ export default function SolvenciaII() {
                     {kf.solvencyArticle}
                   </span>
                   <span
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 bg-[var(--status-success)] text-[var(--g-text-inverse)]"
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
                     style={{ borderRadius: "var(--g-radius-full)" }}
                   >
-                    <CheckCircle2 className="h-3 w-3" />
                     {kf.currentHealth}
                   </span>
                 </div>
@@ -200,7 +229,7 @@ export default function SolvenciaII() {
               <div className="border-t border-[var(--g-border-subtle)] pt-3 grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <span className="text-[10px] uppercase font-bold text-[var(--g-text-secondary)] block">Idoneidad Fit & Proper:</span>
-                  <span className="text-[var(--status-success)] font-semibold">{kf.fitAndProperStatus}</span>
+                  <span className="text-[var(--g-text-secondary)] font-semibold">{kf.fitAndProperStatus}</span>
                 </div>
                 <div>
                   <span className="text-[10px] uppercase font-bold text-[var(--g-text-secondary)] block">Informe al Consejo:</span>
@@ -254,7 +283,7 @@ export default function SolvenciaII() {
                 <div className="pt-2 text-xs space-y-1">
                   <div>• Escenarios base y de estrés macroeconómico / tipos de interés</div>
                   <div>• Cumplimiento continuado de provisiones técnicas y SCR</div>
-                  <div>• Aprobación por CdA: <strong>Completada (Q1)</strong></div>
+                  <div>• Aprobación por CdA: <strong>no consta</strong></div>
                 </div>
               </div>
 

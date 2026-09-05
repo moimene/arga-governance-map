@@ -349,8 +349,14 @@ export default function GrcDashboard() {
   const priorityItems = [
     {
       label: "Riesgos críticos",
-      value: kpis?.criticalRisks ?? 0,
-      body: "Priorizar mitigación o escalado al órgano correspondiente.",
+      // `?? 0` convertía "todavía no hay dato" y "la consulta falló" en un cero
+      // afirmativo. Ahora el hueco se ve como hueco.
+      value: kpis?.criticalRisks ?? "sin dato",
+      body:
+        kpis?.risksSinScore
+          ? `Por residual ≥ 15. ${kpis.risksSinScore} riesgos no tienen residual y quedan fuera de este recuento` +
+            (kpis.risksBandaAlta ? `; ${kpis.risksBandaAlta} están en banda alta del mapa evaluado.` : ".")
+          : "Priorizar mitigación o escalado al órgano correspondiente.",
       to: scope.createScopedTo("/grc/risk-360"),
       tone: "danger" as const,
       icon: Activity,
@@ -612,7 +618,7 @@ export default function GrcDashboard() {
           </Link>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2" hidden={GRC_NOT_CONNECTED_BACKLOG.length === 0}>
           {GRC_NOT_CONNECTED_BACKLOG.map((item) => (
             <span
               key={item.id}
@@ -759,6 +765,11 @@ export default function GrcDashboard() {
               Backlog visible, no conectado
             </h3>
             <div className="mt-2 flex flex-wrap gap-2">
+              {GRC_NOT_CONNECTED_BACKLOG.length === 0 && (
+                <span className="text-[11px] text-[var(--g-text-secondary)]">
+                  Ningún dominio queda hoy sin pantalla conectada.
+                </span>
+              )}
               {GRC_NOT_CONNECTED_BACKLOG.map((item) => (
                 <span
                   key={item.id}
@@ -837,10 +848,14 @@ export default function GrcDashboard() {
           </h2>
           <div className="grid grid-cols-2 gap-2">
             {[
-              { label: "DORA / Resiliencia",   to: "/grc/m/dora",  sub: "4 ítems de compliance" },
-              { label: "GDPR / Datos",         to: "/grc/m/gdpr",  sub: "3 ítems activos" },
-              { label: "Ciberseguridad",       to: "/grc/m/cyber", sub: "3 CVEs abiertos" },
-              { label: "Auditoría Interna",    to: "/grc/m/audit", sub: "Hallazgos vinculados" },
+              // Los subtítulos eran cifras literales («4 ítems de compliance»,
+              // «3 ítems activos», «3 CVEs abiertos») que ningún tenant medía:
+              // Garrigues las veía con 0 filas detrás. Se sustituyen por el
+              // ámbito del módulo, que sí es cierto y no es un recuento.
+              { label: "DORA / Resiliencia",   to: "/grc/m/dora",  sub: "Resiliencia operativa digital" },
+              { label: "GDPR / Datos",         to: "/grc/m/gdpr",  sub: "Protección de datos personales" },
+              { label: "Ciberseguridad",       to: "/grc/m/cyber", sub: "Vulnerabilidades e incidentes" },
+              { label: "Auditoría Interna",    to: "/grc/m/audit", sub: "Hallazgos y planes de acción" },
             ]
               .filter((mod) => isGrcRouteVisible(branding, mod.to))
               .map((mod) => (

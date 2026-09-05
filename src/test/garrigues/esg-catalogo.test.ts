@@ -14,6 +14,7 @@ import {
   COMPROMISOS_ESG,
   PRINCIPIOS_PACTO_MUNDIAL,
   ESG_MODULO,
+  esgVisibleParaTenant,
 } from "../../../scripts/garrigues/esg/plan-sostenibilidad";
 
 describe("ESG Garrigues — gobernanza acreditada", () => {
@@ -31,10 +32,22 @@ describe("ESG Garrigues — gobernanza acreditada", () => {
     expect(ESG_POLITICA).toBe("PI-22");
   });
 
-  it("el módulo se declara sólo para el tenant Garrigues", () => {
-    expect(ESG_MODULO.id).toBe("esg");
-    expect(ESG_MODULO.tenant_id).toBe("00000000-0000-0000-0000-000000000002");
+  // Antes esto comprobaba que un objeto TS declarase `id: "esg"`, que no prueba
+  // nada del sistema: la constante no llega a ninguna parte y la fila `esg` NO
+  // existe en `grc_modules`. Lo que sí es comportamiento —y lo único para lo que
+  // se usa el catálogo— es a quién se le sirve y a quién no.
+  it("el catálogo ESG solo se sirve al tenant al que pertenece, y falla CERRADO", () => {
+    expect(esgVisibleParaTenant(ESG_MODULO.tenant_id)).toBe(true);
+    // ARGA jamás ve la política ni los comités de Garrigues.
+    expect(esgVisibleParaTenant("00000000-0000-0000-0000-000000000001")).toBe(false);
+    // Y sobre todo: `TenantProvider` arranca en `null` y resuelve por red. El
+    // guard anterior (`tenantId && tenantId !== …`) dejaba pasar ese primer
+    // render para CUALQUIER tenant. Si alguien lo revierte, cae aquí.
+    expect(esgVisibleParaTenant(null)).toBe(false);
+    expect(esgVisibleParaTenant(undefined)).toBe(false);
+    expect(esgVisibleParaTenant("")).toBe(false);
   });
+
 });
 
 describe("ESG Garrigues — el Plan se nombra, no se rellena", () => {

@@ -4,6 +4,7 @@ import {
   CheckCircle2, AlertTriangle, ExternalLink, Play, ArrowUpRight 
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { DemoFixtureNotice } from "@/components/grc/DemoFixtureNotice";
 
 interface ThreatDetection {
   id: string;
@@ -58,6 +59,9 @@ export default function SOC() {
 
   return (
     <div className="p-6 space-y-6">
+      <DemoFixtureNotice>
+        Las detecciones de este panel son un guion fijo del código, no un feed del SIEM ni del EDR. No hay ninguna integración activa con Microsoft Sentinel ni con ningún otro origen.
+      </DemoFixtureNotice>
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">

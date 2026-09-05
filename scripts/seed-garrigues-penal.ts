@@ -7,6 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 import { MAPA_PENAL, CELDAS_BANDA_ALTA } from "./garrigues/penal/mapa-penal";
 import { CONTROLES_SEGUIMIENTO, SEGUIMIENTO_DESCRIPCION } from "./garrigues/penal/seguimiento-ppd";
 import { codigoHallazgo } from "./garrigues/hallazgos/hallazgos-penales";
+import { descripcionArticulo } from "./garrigues/penal/descripcion-articulo";
 
 const TENANT = "00000000-0000-0000-0000-000000000002";
 const APPLY = process.argv.includes("--apply");
@@ -49,7 +50,7 @@ for (const d of MAPA_PENAL) {
     tenant_id: TENANT,
     code: d.codigo,
     title: d.delito,
-    description: d.articulo ? `Artículos del Código Penal: ${d.articulo}` : null,
+    description: descripcionArticulo(d.articulo),
     module_id: "risk",
     status: "Abierto",
     // probability / impact / residual_score se dejan sin tocar: la fuente da un
@@ -93,6 +94,12 @@ for (const c of CELDAS_BANDA_ALTA) {
     // y la escala de la fuente no tiene nombres.
     status: "Abierto",
     origin: `${ORIGEN} — celda ${c.celda} en ${c.columna}`,
+    // `findings.opened_at` tiene DEFAULT CURRENT_DATE, así que omitirlo hacía
+    // que los ocho hallazgos quedaran «Detectados» el día en que se ejecutó el
+    // script. La fuente es un mapa evaluado en 2025 y NO publica fecha de
+    // detección de cada celda: se escribe NULL explícito en vez de la fecha del
+    // seed, que es un dato del proceso disfrazado de dato del expediente.
+    opened_at: null,
     // due_date y owner_id en NULL: la fuente no los da.
   };
   const { data: ya } = await db.from("findings")

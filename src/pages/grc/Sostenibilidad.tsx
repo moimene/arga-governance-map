@@ -6,7 +6,7 @@ import { groupFullLabel } from "@/lib/tenant-brand-labels";
 import {
   ESG_ORGANOS,
   ESG_POLITICA,
-  ESG_MODULO,
+  esgVisibleParaTenant,
   PLAN_SOSTENIBILIDAD,
   COMPROMISOS_ESG,
   PRINCIPIOS_PACTO_MUNDIAL,
@@ -68,7 +68,8 @@ export default function Sostenibilidad() {
   // política y los comités de Garrigues — que es exactamente la contaminación
   // cruzada que este carril lleva el día cerrando. El día que otro tenant tenga
   // su propio catálogo ESG, esto sigue siendo correcto sin tocarlo.
-  if (tenantId && tenantId !== ESG_MODULO.tenant_id) {
+  // Falla CERRADO — la regla vive en el catálogo y está probada allí.
+  if (!esgVisibleParaTenant(tenantId)) {
     return (
       <div className="min-w-0 space-y-3 p-4 sm:p-6">
         <h1 className="text-2xl font-bold text-[var(--g-text-primary)]">Sostenibilidad y ESG</h1>

@@ -17,7 +17,7 @@ import { useEvidenceBundlesForObject } from "@/hooks/useEvidenceBundles";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { isFinalSealedEvidence } from "@/lib/secretaria/evidence-sandbox-gate";
 import { buildMeetingHandoffPath } from "@/lib/secretaria/cross-module-handoff";
-import { computeDoraDeadlines, computeNis2Deadlines, computeGdprBreachDeadlines } from "@/lib/grc/regulatory-clocks";
+import { computeDoraDeadlines } from "@/lib/grc/regulatory-clocks";
 import { toast } from "sonner";
 
 /** Countdown component that re-renders every minute */
@@ -158,12 +158,17 @@ export default function IncidenteDetalle() {
       return;
     }
     setShowDelayModal(false);
-    toast.success("Notificación de retraso motivado registrada y transmitida formalmente a la autoridad.");
+    // Este handler NO escribe en `regulatory_notifications` ni contacta con
+    // ninguna autoridad: no existe write path hacia esa tabla en todo el repo.
+    // Decir "transmitida formalmente a la autoridad" era afirmar un acto que no
+    // ocurre.
+    toast.info("Justificación anotada solo en esta pantalla. No se ha transmitido nada a la autoridad supervisora.");
   };
 
   const handleSendClientCommunication = () => {
     setClientCommSent(true);
-    toast.success("Comunicación preceptiva remitida a clientes conforme a DORA Art. 19.");
+    // Igual que el retraso motivado: solo cambia estado local. No hay envío.
+    toast.info("Marcado solo en esta pantalla. No se ha remitido ninguna comunicación a clientes.");
   };
 
   const regNots: RegulatoryNotificationLite[] = incident.regulatory_notifications ?? [];
@@ -176,14 +181,14 @@ export default function IncidenteDetalle() {
   const isMajor = incident.is_major_incident;
 
   // Calculo de hitos exactos
+  // Los tres countdowns se calculaban SIEMPRE con `computeDoraDeadlines`
+  // aunque la cabecera rotulase «NIS2 Art. 23» o «RGPD Art. 33»: `nis2Clocks` y
+  // `gdprClocks` se calculaban y no se usaban, así que un incidente NIS2 mostraba
+  // plazos DORA bajo un rótulo NIS2. El bloque solo se pinta para DORA, que es
+  // el único régimen cuyos tres hitos sabe calcular esta pantalla.
   const doraClocks = computeDoraDeadlines(
     incident.detection_date || new Date(),
     incident.containment_date || incident.detection_date || new Date()
-  );
-  const nis2Clocks = computeNis2Deadlines(incident.detection_date || new Date());
-  const gdprClocks = computeGdprBreachDeadlines(
-    incident.detection_date || new Date(),
-    Boolean(incident.payload?.high_risk_data_subjects)
   );
 
   const initialDeadline = doraClocks.initialNotificationDeadline.toISOString();
@@ -296,8 +301,24 @@ export default function IncidenteDetalle() {
         </div>
       )}
 
-      {/* Relojes Regulatorios Multi-Fase DORA / NIS2 / RGPD */}
-      {isMajor && (
+      {/* Relojes regulatorios DORA. NIS2 y RGPD tienen otros hitos y esta
+          pantalla no los calcula: en vez de pintar los de DORA bajo su rótulo,
+          se dice que no están. */}
+      {isMajor && !isDora && (
+        <div
+          className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-5 text-xs leading-relaxed text-[var(--g-text-primary)]"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <strong>Plazos regulatorios no calculados para este incidente.</strong>{" "}
+          El cómputo multi-fase disponible es el de DORA (art. 19 y Reglamento Delegado 2025/301).
+          {isNis2
+            ? " Los hitos de NIS2 (art. 23) no se calculan en esta pantalla."
+            : isGdpr
+            ? " Los hitos del RGPD (art. 33) no se calculan en esta pantalla."
+            : ""}
+        </div>
+      )}
+      {isMajor && isDora && (
         <div
           className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-5 space-y-4"
           style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
@@ -306,7 +327,7 @@ export default function IncidenteDetalle() {
             <div>
               <h2 className="text-sm font-bold text-[var(--g-text-primary)] uppercase flex items-center gap-2">
                 <Clock className="h-4 w-4 text-[var(--status-error)]" />
-                Reloj Regulatorio Multi-Fase ({isDora ? "DORA Art. 19 / Delegado 2025/301" : isNis2 ? "NIS2 Art. 23" : "RGPD Art. 33"})
+                Reloj Regulatorio Multi-Fase (DORA Art. 19 / Delegado 2025/301)
               </h2>
               <p className="text-xs text-[var(--g-text-secondary)] mt-0.5">
                 Plazos perentorios de comunicación con la autoridad supervisora competente.
@@ -398,7 +419,7 @@ export default function IncidenteDetalle() {
                 </h2>
               </div>
               <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${clientCommSent ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]" : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"}`}>
-                {clientCommSent ? "Emitida y Notificada" : "Pendiente de Envío"}
+                {clientCommSent ? "Marcada en pantalla (sin envío)" : "Pendiente"}
               </span>
             </div>
 
@@ -487,20 +508,33 @@ export default function IncidenteDetalle() {
             className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-5"
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
           >
+            {/* Se pintaba sin condición y con 0 evidencias: «Custodia documental
+                (EAD Trust) — Cadena de custodia WORM preservada · Expedientes
+                probatorios con hash SHA-512 inmutable». EAD Trust no es
+                prestador de firma ni de sello en el alcance vigente, y no había
+                nada archivado que custodiar. */}
             <div className="flex items-center gap-2 mb-3">
-              <ShieldCheck className="h-5 w-5 text-[var(--status-success)]" />
+              <ShieldCheck className="h-5 w-5 text-[var(--g-text-secondary)]" />
               <h2 className="text-sm font-bold text-[var(--g-text-primary)]">
-                Custodia documental (EAD Trust)
+                Archivo documental del incidente
               </h2>
             </div>
-            
-            <p className="text-xs text-[var(--g-text-secondary)] mb-3 leading-relaxed">
-              Expedientes probatorios con hash SHA-512 inmutable para defensa de cumplimiento y auditorías regulatorias.
-            </p>
 
             <div className="p-2.5 bg-[var(--g-surface-subtle)] border border-[var(--g-border-subtle)] rounded text-xs">
-              <span className="font-semibold text-[var(--g-text-primary)] block">Actas archivadas ({finalDeclarations.length})</span>
-              <span className="text-[10px] text-[var(--g-text-secondary)]">Cadena de custodia WORM preservada</span>
+              {finalDeclarations.length > 0 ? (
+                <>
+                  <span className="font-semibold text-[var(--g-text-primary)] block">
+                    Declaraciones archivadas ({finalDeclarations.length})
+                  </span>
+                  <span className="text-[10px] text-[var(--g-text-secondary)]">
+                    Registro con hash. Sin sello ni firma atribuidos a ningún prestador.
+                  </span>
+                </>
+              ) : (
+                <span className="text-[var(--g-text-secondary)]">
+                  No consta ninguna declaración archivada para este incidente.
+                </span>
+              )}
             </div>
           </div>
         </div>

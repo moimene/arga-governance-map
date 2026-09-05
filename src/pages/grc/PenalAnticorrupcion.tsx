@@ -5,6 +5,10 @@ import {
   ChevronDown, ChevronUp, ChevronRight, AlertTriangle, PenTool, ExternalLink, HelpCircle, Loader2, CheckCircle2, Lock
 } from "lucide-react";
 import { useRisks, type RiskRow } from "@/hooks/useRisks";
+import { ETIQUETA_BANDA } from "@/lib/grc/assessed-band";
+import { esRiesgoPenal, nivelRiesgo } from "@/lib/grc/penal-scope";
+import { DemoFixtureNotice } from "@/components/grc/DemoFixtureNotice";
+import { CONTROLES_PPD } from "../../../scripts/garrigues/normativo/obligaciones-pbcft";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { useTenantBranding } from "@/context/TenantBrandContext";
@@ -30,6 +34,15 @@ const TEXTAREA_CLASSES =
   "w-full px-3 py-2 text-sm bg-[var(--g-surface-card)] text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)]/60 border border-[var(--g-border-subtle)] focus:border-[var(--g-brand-3308)] focus:outline-none transition-colors resize-none";
 
 const LABEL_CLASSES = "block text-xs font-semibold text-[var(--g-text-primary)] uppercase mb-1";
+
+// Lo que se pinta cuando la consulta falla. Un error NO es un cero: un cero
+// afirma que se midió y salió cero.
+const SIN_DATO = "sin dato";
+
+// El catálogo del que salen estos controles declara por escrito que su `status`
+// es «SIMULADO para la demo» y no una evaluación de la eficacia real. La
+// pantalla lo dice donde se pintan, en vez de rotular «Estado Evaluado» encima.
+const CONTROLES_ESTADO_SIMULADO = new Set(CONTROLES_PPD.map((c) => c.code));
 
 const TAXONOMY_TERMS = [
   "penal",
@@ -59,18 +72,7 @@ function matchesTaxonomy(keywords: string[], ...values: Array<string | null | un
   return keywords.some((term) => text.includes(normalize(term)));
 }
 
-type PenalRisk = Pick<
-  RiskRow,
-  | "id"
-  | "code"
-  | "title"
-  | "description"
-  | "status"
-  | "probability"
-  | "impact"
-  | "inherent_score"
-  | "residual_score"
->;
+type PenalRiskLike = RiskRow;
 
 type PenalControl = Pick<ControlRow, "id" | "code" | "name" | "status" | "last_test_date">;
 type PenalSubTab = "risks" | "controls" | "evidences";
@@ -81,55 +83,35 @@ interface DelitoCategory {
   lawRef: string;
   description: string;
   keywords: string[];
-  fallbackRisks: PenalRisk[];
-  fallbackControls: PenalControl[];
 }
 
+// Las cinco categorías NO traen ya riesgos ni controles de relleno. Los tenían:
+// `fallbackRisks` / `fallbackControls` con pólizas, primas y reaseguro de una
+// aseguradora, que se pintaban cuando la categoría no casaba nada del tenant —y
+// el chip de cumplimiento se calculaba SOBRE ELLOS, así que un despacho veía
+// «4. Fraude · CONFORME» sostenido por controles que no existen en ninguna
+// tabla. Sin dato, estado vacío honesto y sin veredicto.
 const DELITOS_TAXONOMY: DelitoCategory[] = [
   {
     id: "cohecho-corrupcion",
     title: "1. Cohecho y Corrupción en los Negocios",
     lawRef: "Art. 286 bis, 419 CP | ISO 37001",
     description: "Previene sobornos, dádivas o favores a funcionarios públicos o entre particulares en relaciones comerciales.",
-    keywords: ["cohecho", "corrupcion", "corrupción", "soborno", "regalo", "hospitalidad", "penal", "anticorrup"],
-    fallbackRisks: [
-      { id: "RSK-PEN-001", code: "RSK-PEN-001", title: "Pagos de facilitación y sobornos a intermediarios comerciales", description: "Riesgo de que agentes o socios comerciales realicen pagos ilícitos en nombre de la entidad para retener cuentas corporativas.", status: "Abierto", probability: 3, impact: 4, inherent_score: 12, residual_score: 6 },
-      { id: "RSK-PEN-002", code: "RSK-PEN-002", title: "Aceptación de regalos y hospitalidades fuera de política", description: "Riesgo de que empleados clave acepten invitaciones, viajes o obsequios de proveedores críticos comprometiendo la imparcialidad.", status: "En Tratamiento", probability: 2, impact: 3, inherent_score: 6, residual_score: 2 }
-    ],
-    fallbackControls: [
-      { id: "CTL-PEN-001", code: "CTL-PEN-001", name: "Política General de Regalos y Hospitalidades", status: "Efectivo", last_test_date: "2026-04-10" },
-      { id: "CTL-PEN-002", code: "CTL-PEN-002", name: "Due Diligence Penal en Contratación de Terceros", status: "Parcial", last_test_date: "2026-03-15" }
-    ]
+    keywords: ["cohecho", "corrupcion", "corrupción", "soborno", "regalo", "hospitalidad", "anticorrup"],
   },
   {
     id: "blanqueo-capitales",
     title: "2. Blanqueo de Capitales y Financiación de Terrorismo",
     lawRef: "Art. 301 CP | Ley 10/2010 SEPBLAC",
     description: "Previene la introducción en el tráfico financiero de fondos procedentes de actividades delictivas.",
-    keywords: ["blanqueo", "aml", "terrorismo", "capitales", "sancion", "kyc", "sepblac"],
-    fallbackRisks: [
-      { id: "RSK-PEN-003", code: "RSK-PEN-003", title: "Uso de pólizas de seguro de vida para blanqueo de capitales", description: "Riesgo de que se contraten pólizas de prima única elevada para su cancelación y reembolso anticipado utilizando fondos de origen dudoso.", status: "Abierto", probability: 2, impact: 5, inherent_score: 10, residual_score: 5 },
-      { id: "RSK-PEN-004", code: "RSK-PEN-004", title: "Omisión de identificación en Clientes PEP (Personas Expuestas)", description: "Riesgo de no identificar a un tomador como persona de alta exposición política o sometido a sanciones internacionales.", status: "Abierto", probability: 2, impact: 4, inherent_score: 8, residual_score: 4 }
-    ],
-    fallbackControls: [
-      { id: "CTL-PEN-003", code: "CTL-PEN-003", name: "Procedimiento Integrado Conozca a su Cliente (KYC/CDD)", status: "Efectivo", last_test_date: "2026-05-01" },
-      { id: "CTL-PEN-004", code: "CTL-PEN-004", name: "Monitoreo y Filtrado de Listas de Sanciones Internacionales", status: "Efectivo", last_test_date: "2026-05-18" }
-    ]
+    keywords: ["blanqueo", "aml", "terrorismo", "capitales", "sancion", "sanción", "kyc", "sepblac"],
   },
   {
     id: "delitos-informaticos",
     title: "3. Delitos Informáticos y Revelación de Secretos",
     lawRef: "Art. 197 bis, 264 CP | DORA RTS / GDPR",
-    description: "Previene accesos no autorizados, daños en sistemas informáticos y la revelación indebida de datos confidenciales de clientes.",
-    keywords: ["cyber", "seguridad", "ciber", "informatico", "tecnolog", "acceso", "dora", "datos", "secreto", "revelacion", "intrusiones"],
-    fallbackRisks: [
-      { id: "RSK-PEN-005", code: "RSK-PEN-005", title: "Acceso ilícito a censo y datos personales de asegurados", description: "Riesgo de intrusión externa o fuga interna de bases de datos que contienen información de salud o financiera protegida de asegurados.", status: "En Tratamiento", probability: 3, impact: 5, inherent_score: 15, residual_score: 5 },
-      { id: "RSK-PEN-006", code: "RSK-PEN-006", title: "Alteración maliciosa de servidores de producción (Sabotaje)", description: "Riesgo de inyección de malware en plataformas cloud que alteren los datos transaccionales de cobro de primas.", status: "Abierto", probability: 2, impact: 4, inherent_score: 8, residual_score: 4 }
-    ],
-    fallbackControls: [
-      { id: "CTL-PEN-005", code: "CTL-PEN-005", name: "Cifrado Homomórfico en Reposo para Datos de Salud", status: "Efectivo", last_test_date: "2026-04-20" },
-      { id: "CTL-PEN-006", code: "CTL-PEN-006", name: "Auditoría de Accesos Privilegiados (PAM) y Doble Factor", status: "Parcial", last_test_date: "2026-02-10" }
-    ]
+    description: "Previene accesos no autorizados, daños en sistemas informáticos y la revelación indebida de datos confidenciales.",
+    keywords: ["cyber", "ciber", "informatico", "informático", "acceso", "secreto", "revelacion", "revelación", "intrusion", "intrusión"],
   },
   {
     id: "fraude-hacienda",
@@ -137,29 +119,17 @@ const DELITOS_TAXONOMY: DelitoCategory[] = [
     lawRef: "Art. 248, 305 CP | LSC / Prevención de Fraude",
     description: "Previene el fraude en el reporte fiscal, la manipulación de balances contables y las declaraciones incorrectas ante Hacienda.",
     keywords: ["fraude", "estafa", "fiscal", "impuesto", "hacienda", "contabil", "balance", "tributario", "seguridad social"],
-    fallbackRisks: [
-      { id: "RSK-PEN-007", code: "RSK-PEN-007", title: "Defectos en el cálculo o liquidación de Impuestos de Primas", description: "Riesgo de errores u omisiones conscientes en las liquidaciones fiscales mensuales que conlleven multas administrativas y penales.", status: "Abierto", probability: 2, impact: 4, inherent_score: 8, residual_score: 4 },
-      { id: "RSK-PEN-008", code: "RSK-PEN-008", title: "Fraude y colusión en pagos de reaseguro internacional", description: "Riesgo de manipulación de partes de siniestros para canalizar reembolsos ilícitos a entidades instrumentales.", status: "Abierto", probability: 1, impact: 5, inherent_score: 5, residual_score: 2 }
-    ],
-    fallbackControls: [
-      { id: "MOCK-CTL-007", code: "CTL-PEN-007", name: "Procedimiento de Conciliación Fiscal de Doble Firma", status: "Efectivo", last_test_date: "2026-05-05" },
-      { id: "MOCK-CTL-008", code: "CTL-PEN-008", name: "Canal de Denuncias para Alertas de Fraude Financiero", status: "Efectivo", last_test_date: "2026-05-15" }
-    ]
   },
   {
     id: "propiedad-intelectual",
     title: "5. Delitos contra la Propiedad Intelectual e Industrial",
     lawRef: "Art. 270 CP | Ley de Patentes",
-    description: "Previene la utilización o exploitation no autorizada de obras protegidas, patentes o secretos industriales.",
+    description: "Previene la utilización o explotación no autorizada de obras protegidas, patentes o secretos industriales.",
     keywords: ["propiedad", "intelectual", "patente", "licencia", "software", "industrial", "marca", "copyright"],
-    fallbackRisks: [
-      { id: "RSK-PEN-009", code: "RSK-PEN-009", title: "Uso no autorizado de librerías propietarias y software sin licencia", description: "Riesgo de que equipos de desarrollo utilicen recursos informáticos con licencias restringidas en productos comerciales.", status: "Abierto", probability: 2, impact: 3, inherent_score: 6, residual_score: 3 }
-    ],
-    fallbackControls: [
-      { id: "CTL-PEN-009", code: "CTL-PEN-009", name: "Auditorías de Licenciamiento SAM (Software Asset Management)", status: "Efectivo", last_test_date: "2026-01-20" }
-    ]
-  }
+  },
 ];
+
+
 
 export default function PenalAnticorrupcion() {
   const { user } = useCurrentUser();
@@ -172,8 +142,8 @@ export default function PenalAnticorrupcion() {
       : groupFullLabel(branding);
 
   // Data queries
-  const { data: risks = [], isLoading: loadingRisks, refetch: refetchRisks } = useRisks({ entityId: scopedEntityId });
-  const { data: obligations = [], isLoading: loadingObligations } = useObligationsList();
+  const { data: risks = [], isLoading: loadingRisks, error: risksError, refetch: refetchRisks } = useRisks({ entityId: scopedEntityId });
+  const { data: obligations = [], isLoading: loadingObligations, error: obligationsError } = useObligationsList();
   
   const penalObligations = obligations.filter((obligation) =>
     TAXONOMY_TERMS.some((term) => matchesTaxonomy([term], obligation.code, obligation.title, obligation.source, obligation.policy_title))
@@ -183,12 +153,20 @@ export default function PenalAnticorrupcion() {
   const { data: controls = [], isLoading: loadingControls, refetch: refetchControls } = useAllControlsByObligationIds(obligationIds);
   const { data: evidences = [], refetch: refetchEvidences } = useEvidenceBundlesList();
 
+  const penalRisks = risks.filter(esRiesgoPenal);
+  // Un riesgo penal que no case con ninguna de las cinco categorías ya no se
+  // reparte por todas: se cuenta aparte y se dice en pantalla, para que su
+  // desaparición del acordeón no se lea como que no existe.
+  const riesgosSinCategoria = penalRisks.filter(
+    (r) => !DELITOS_TAXONOMY.some((d) => matchesTaxonomy(d.keywords, r.code, r.title, r.description, r.obligations?.title)),
+  );
+
 
   // Accordion State
   const [expandedDelito, setExpandedDelito] = useState<string | null>("cohecho-corrupcion");
   const [activeSubTab, setActiveSubTab] = useState<PenalSubTab>("risks");
 
-  // QSeal/e-archiving preparation state (no personal signature)
+  // Estado del formulario de preparación de custodia. Fail-closed: no firma.
   const [sealingObject, setSealingObject] = useState<{
     type: "RISK" | "CONTROL";
     id: string;
@@ -197,8 +175,8 @@ export default function PenalAnticorrupcion() {
     delitoId: string;
   } | null>(null);
 
-  const [auditorName, setAuditorName] = useState("Auditor de Cumplimiento");
-  const [auditorEmail, setAuditorEmail] = useState(() => user?.email || "auditor@empresa.com");
+  const [auditorName, setAuditorName] = useState("");
+  const [auditorEmail, setAuditorEmail] = useState(() => user?.email ?? "");
   const [evidenceDocName, setEvidenceDocName] = useState("");
   const [signingProgress, setSigningProgress] = useState<string | null>(null);
 
@@ -206,14 +184,16 @@ export default function PenalAnticorrupcion() {
     setExpandedDelito(expandedDelito === id ? null : id);
   };
 
-  // Helper function to map risks & controls based on keywords fuzzy match + fallback
+  // Pertenencia a categoría SOLO por palabras clave. Antes bastaba con
+  // `module_id === "penal"` para entrar en TODAS las categorías, así que los 18
+  // riesgos penales de ARGA se repetían en los cinco acordeones y el contador
+  // «N Riesgos» no medía nada. Sin fallback: una categoría sin nada del tenant
+  // se queda vacía y lo dice.
+  const perteneceACategoria = (delito: DelitoCategory, r: PenalRiskLike) =>
+    matchesTaxonomy(delito.keywords, r.code, r.title, r.description, r.obligations?.title);
+
   const getMappedItems = (delito: DelitoCategory) => {
-    // Risks
-    const matchedRisks = risks.filter((r) =>
-      r.module_id === "penal" ||
-      matchesTaxonomy(delito.keywords, r.code, r.title, r.description, r.obligations?.title)
-    );
-    const finalRisks = matchedRisks.length > 0 ? matchedRisks : delito.fallbackRisks;
+    const finalRisks = penalRisks.filter((r) => perteneceACategoria(delito, r));
 
     // Obligations linked
     const matchedObs = penalObligations.filter((o) =>
@@ -222,8 +202,7 @@ export default function PenalAnticorrupcion() {
     const matchedObIds = matchedObs.map((o) => o.id);
 
     // Controls
-    const matchedControls = controls.filter((c) => matchedObIds.includes(c.obligation_id || ""));
-    const finalControls = matchedControls.length > 0 ? matchedControls : delito.fallbackControls;
+    const finalControls = controls.filter((c) => matchedObIds.includes(c.obligation_id || ""));
 
     // Gather Evidence associated with these risks or controls
     const allIds = [
@@ -241,39 +220,42 @@ export default function PenalAnticorrupcion() {
     };
   };
 
-  // Calculate high-level compliance label dynamically based on controls statuses
+  // Resume el ESTADO REGISTRADO de los controles del tenant. No dice
+  // «CONFORME»: ese era un veredicto de cumplimiento derivado de un `status`
+  // que la propia fuente declara postura simulada de demo, y que además se
+  // calculaba sobre los controles de relleno cuando no había ninguno real.
   const getDelitoCompliance = (controlsList: PenalControl[]) => {
     if (controlsList.length === 0) {
-      return { 
-        label: "SIN EVALUAR", 
-        color: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]" 
+      return {
+        label: "SIN CONTROLES REGISTRADOS",
+        color: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
       };
     }
-    const statuses = controlsList.map((c) => c.status);
-    if (statuses.every((s) => s === "Efectivo" || s === "EFECTIVO")) {
-      return { 
-        label: "CONFORME", 
-        color: "bg-[var(--status-success)] text-[var(--g-text-inverse)]" 
+    const statuses = controlsList.map((c) => (c.status ?? "").toUpperCase());
+    if (statuses.includes("DEFICIENTE") || statuses.includes("INEFECTIVO")) {
+      return {
+        label: "ALGÚN CONTROL DEFICIENTE",
+        color: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
       };
     }
-    if (statuses.includes("Deficiente") || statuses.includes("DEFICIENTE")) {
-      return { 
-        label: "DEFICIENTE", 
-        color: "bg-[var(--status-error)] text-[var(--g-text-inverse)]" 
+    if (statuses.every((st) => st === "EFECTIVO")) {
+      return {
+        label: "TODOS EFECTIVOS (ESTADO REGISTRADO)",
+        color: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
       };
     }
-    return { 
-      label: "REQUERIMIENTO", 
-      color: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]" 
-      };
+    return {
+      label: "CONTROLES PARCIALES",
+      color: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
+    };
   };
 
-  // QSeal has its own future endpoint; this flow remains fail-closed.
+  // La custodia tendría su propio endpoint source-bound; este flujo es fail-closed.
   const handlePerformSeal = async (e: React.FormEvent) => {
     e.preventDefault();
     setSigningProgress(null);
-    toast.info("QSeal no conectado en este flujo", {
-      description: "La ruta genérica de firma está retirada. Un futuro QSeal deberá usar su servicio propio y no atribuir firma personal.",
+    toast.info("Custodia electrónica no conectada en este flujo", {
+      description: "La ruta genérica de firma está retirada. No se emite sello ni firma, ni se atribuye custodia a ningún prestador.",
     });
   };
 
@@ -291,8 +273,9 @@ export default function PenalAnticorrupcion() {
             </h1>
           </div>
           <p className="max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
-            Supervisión interactiva del Modelo de Prevención de Delitos (Art. 31 bis CP) y Antisoborno (ISO 37001). 
-            Vincule riesgos y controles mitigantes, y prepare su custodia inmutable mediante e-archiving y, cuando proceda, QSeal no personal.
+            Supervisión interactiva del Modelo de Prevención de Delitos (Art. 31 bis CP) y Antisoborno (ISO 37001).
+            Vincula riesgos y controles mitigantes registrados para este grupo. La custodia electrónica de evidencia
+            no está conectada en este entorno: no se emite firma, sello ni acuse.
           </p>
         </div>
         <Link
@@ -309,9 +292,11 @@ export default function PenalAnticorrupcion() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         {[
           { label: "Delitos Catalogados", value: DELITOS_TAXONOMY.length, icon: Activity },
-          { label: "Riesgos Penales Activos", value: risks.filter(r => r.module_id === "penal" || r.code.startsWith("RSK-PEN")).length || 9, icon: AlertTriangle },
-          { label: "Obligaciones Jurídicas", value: penalObligations.length || 12, icon: FileText },
-          { label: "Evidencias WORM Selladas", value: evidences.filter(e => e.source_module === "GRC_PENAL" && isFinalSealedEvidence(e.status)).length, icon: ShieldCheck },
+          // Sin `|| 9` ni `|| 12`. Un 0 real se pinta 0; un error de consulta se
+          // pinta «sin dato», que es lo que un fallback literal escondía.
+          { label: "Riesgos penales registrados", value: risksError ? SIN_DATO : penalRisks.length, icon: AlertTriangle },
+          { label: "Obligaciones jurídicas", value: obligationsError ? SIN_DATO : penalObligations.length, icon: FileText },
+          { label: "Evidencias archivadas", value: evidences.filter(e => e.source_module === "GRC_PENAL" && isFinalSealedEvidence(e.status)).length, icon: ShieldCheck },
         ].map((item) => {
           const Icon = item.icon;
           return (
@@ -373,6 +358,23 @@ export default function PenalAnticorrupcion() {
         </Link>
       </div>
 
+      {/* Riesgos penales del tenant que no encajan en ninguna de las cinco
+          categorías. Se dicen en voz alta: antes entraban en TODAS por el
+          atajo `module_id === "penal"`, y al quitarlo desaparecerían sin
+          rastro, que es otra forma de mentir. */}
+      {riesgosSinCategoria.length > 0 && (
+        <div
+          className="border border-[var(--g-border-default)] bg-[var(--g-surface-muted)] p-4 text-xs leading-relaxed text-[var(--g-text-primary)]"
+          style={{ borderRadius: "var(--g-radius-lg)" }}
+        >
+          <strong>{riesgosSinCategoria.length} riesgos penales registrados fuera de estas cinco categorías.</strong>{" "}
+          La taxonomía de esta pantalla no cubre todo el catálogo penal del grupo. Consúltalos en{" "}
+          <Link to={scope.createScopedTo("/grc/risk-360")} className="text-[var(--g-link)] hover:text-[var(--g-link-hover)] underline">
+            Risk 360
+          </Link>.
+        </div>
+      )}
+
       {/* Interactive Compliance Matrix */}
       <div className="space-y-4">
         {DELITOS_TAXONOMY.map((delito) => {
@@ -420,10 +422,10 @@ export default function PenalAnticorrupcion() {
                 <div className="flex items-center gap-2">
                   {delitoEvidences.some(e => isFinalSealedEvidence(e.status)) ? (
                     <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-[var(--status-success)] font-semibold font-mono bg-[var(--status-success)]/10 px-2 py-1 border border-[var(--status-success)]/20" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                      <CheckCircle2 className="h-3 w-3" /> WORM Sealed
+                      <CheckCircle2 className="h-3 w-3" /> ARCHIVADA
                     </span>
                   ) : delitoEvidences.length > 0 ? (
-                    <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-[var(--status-warning)] font-semibold font-mono bg-[var(--status-warning)]/10 px-2 py-1 border border-[var(--status-warning)]/20" style={{ borderRadius: "var(--g-radius-sm)" }} title="Evidencia sandbox de demo: no sellada como final">
+                    <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-[var(--status-warning)] font-semibold font-mono bg-[var(--status-warning)]/10 px-2 py-1 border border-[var(--status-warning)]/20" style={{ borderRadius: "var(--g-radius-sm)" }} title="Registro de demo en sandbox: sin sello">
                       SANDBOX
                     </span>
                   ) : null}
@@ -448,7 +450,7 @@ export default function PenalAnticorrupcion() {
                     {([
                       { id: "risks", label: `Riesgos Penales (${delitoRisks.length})` },
                       { id: "controls", label: `Controles Mitigantes (${delitoControls.length})` },
-                      { id: "evidences", label: `Evidencias Forenses (${delitoEvidences.length})` },
+                      { id: "evidences", label: `Evidencias registradas (${delitoEvidences.length})` },
                     ] satisfies Array<{ id: PenalSubTab; label: string }>).map((tab) => (
                       <button
                         key={tab.id}
@@ -476,16 +478,17 @@ export default function PenalAnticorrupcion() {
                             <tr className="bg-[var(--g-surface-subtle)] text-[var(--g-text-primary)] font-semibold border-b border-[var(--g-border-subtle)]">
                               <th className="px-4 py-3">Código</th>
                               <th className="px-4 py-3">Riesgo Penal Identificado</th>
-                              <th className="px-4 py-3 text-center">Score Inh / Res</th>
+                              <th className="px-4 py-3 text-center">Inherente / Residual o banda</th>
                               <th className="px-4 py-3">Estado</th>
                               <th className="px-4 py-3 text-right">Acciones</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-[var(--g-border-subtle)]">
                             {delitoRisks.map((risk) => {
-                              const inherent = risk.inherent_score || (risk.probability && risk.impact ? risk.probability * risk.impact : 6);
-                              const residual = risk.residual_score || Math.ceil(inherent / 2);
-                              const isHigh = inherent >= 12;
+                              // El nivel lo decide `nivelRiesgo`, que nunca
+                              // devuelve un número que no esté en la fila.
+                              const nivel = nivelRiesgo(risk);
+                              const isHigh = nivel.tipo === "SCORE" && (nivel.inherente ?? 0) >= 12;
 
                               return (
                                 <tr key={risk.id} className="hover:bg-[var(--g-surface-subtle)]/20 transition-colors">
@@ -497,16 +500,26 @@ export default function PenalAnticorrupcion() {
                                     <span className="text-[var(--g-text-secondary)] line-clamp-1 mt-0.5">{risk.description}</span>
                                   </td>
                                   <td className="px-4 py-3.5 text-center font-mono">
-                                    <span className={cn(
-                                      "font-bold", 
-                                      isHigh ? "text-[var(--status-error)]" : "text-[var(--g-text-primary)]"
-                                    )}>
-                                      {inherent}
-                                    </span>
-                                    <span className="text-[var(--g-text-secondary)]/50 mx-1">/</span>
-                                    <span className="font-semibold text-[var(--status-success)]">
-                                      {residual}
-                                    </span>
+                                    {nivel.tipo === "BANDA" ? (
+                                      <span className="font-semibold text-[var(--g-text-primary)]">
+                                        {ETIQUETA_BANDA[nivel.banda] ?? nivel.banda}
+                                      </span>
+                                    ) : nivel.tipo === "SIN_DATO" ? (
+                                      <span className="text-[var(--g-text-secondary)]">{SIN_DATO}</span>
+                                    ) : (
+                                      <>
+                                        <span className={cn(
+                                          "font-bold",
+                                          isHigh ? "text-[var(--status-error)]" : "text-[var(--g-text-primary)]"
+                                        )}>
+                                          {nivel.inherente ?? SIN_DATO}
+                                        </span>
+                                        <span className="text-[var(--g-text-secondary)]/50 mx-1">/</span>
+                                        <span className="font-semibold text-[var(--g-text-primary)]">
+                                          {nivel.residual ?? SIN_DATO}
+                                        </span>
+                                      </>
+                                    )}
                                   </td>
                                   <td className="px-4 py-3.5">
                                     <span className="px-2 py-0.5 text-[9px] font-bold bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]" style={{ borderRadius: "var(--g-radius-sm)" }}>
@@ -525,7 +538,7 @@ export default function PenalAnticorrupcion() {
                                       })}
                                       className="inline-flex items-center gap-1 text-[var(--g-brand-3308)] hover:underline font-semibold"
                                     >
-                                      <PenTool className="h-3 w-3" /> Preparar QSeal
+                                      <PenTool className="h-3 w-3" /> Custodia (no conectada)
                                     </button>
                                   </td>
                                 </tr>
@@ -538,15 +551,23 @@ export default function PenalAnticorrupcion() {
 
                     {/* Tab: Controls */}
                     {activeSubTab === "controls" && (
+                      <div className="space-y-3">
+                      {delitoControls.some((c) => CONTROLES_ESTADO_SIMULADO.has(c.code)) && (
+                        <DemoFixtureNotice>
+                          El estado de estos controles procede del catálogo de seguimiento del programa,
+                          que lo declara <strong>postura simulada para la demo</strong>. No es el resultado
+                          de una prueba de eficacia realizada en este entorno.
+                        </DemoFixtureNotice>
+                      )}
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
                           <thead>
                             <tr className="bg-[var(--g-surface-subtle)] text-[var(--g-text-primary)] font-semibold border-b border-[var(--g-border-subtle)]">
                               <th className="px-4 py-3">Código</th>
                               <th className="px-4 py-3">Medida de Control / Salvaguarda</th>
-                              <th className="px-4 py-3">Estado Evaluado</th>
-                              <th className="px-4 py-3">Prueba de Control</th>
-                              <th className="px-4 py-3 text-right">Firma Evidencia</th>
+                              <th className="px-4 py-3">Estado registrado</th>
+                              <th className="px-4 py-3">Última prueba registrada</th>
+                              <th className="px-4 py-3 text-right">Custodia</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-[var(--g-border-subtle)]">
@@ -554,7 +575,7 @@ export default function PenalAnticorrupcion() {
                               const isEffective = control.status === "Efectivo" || control.status === "EFECTIVO";
                               const statusLabel = controlStatusLabel(control.status);
                               
-                              // Check if there is already a QSeal evidence bundle
+                              // ¿Hay ya un bundle de evidencia archivado?
                               const controlEvidence = delitoEvidences.filter(e => e.source_object_id === control.id);
                               // Codex #2-UI: solo cuenta como "Firmado" la evidencia final (SEALED/VERIFIED);
                               // los bundles sandbox quedan en OPEN y no deben presentarse como firmados.
@@ -593,7 +614,7 @@ export default function PenalAnticorrupcion() {
                                     ) : (
                                       <div className="inline-flex items-center gap-1.5 justify-end">
                                         {controlHasSandbox && (
-                                          <span className="text-[9px] text-[var(--status-warning)] font-semibold" title="Existe evidencia sandbox de demo (no sellada como final)">sandbox</span>
+                                          <span className="text-[9px] text-[var(--status-warning)] font-semibold" title="Existe un registro de demo en sandbox, sin sello">sandbox</span>
                                         )}
                                         <button
                                           type="button"
@@ -607,7 +628,7 @@ export default function PenalAnticorrupcion() {
                                           className="inline-flex items-center gap-1 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] px-2.5 py-1 font-semibold transition-colors"
                                           style={{ borderRadius: "var(--g-radius-sm)" }}
                                         >
-                                          <PenTool className="h-3 w-3" /> Preparar QSeal
+                                          <PenTool className="h-3 w-3" /> Custodia (no conectada)
                                         </button>
                                       </div>
                                     )}
@@ -618,6 +639,7 @@ export default function PenalAnticorrupcion() {
                           </tbody>
                         </table>
                       </div>
+                      </div>
                     )}
 
                     {/* Tab: Evidence WORM */}
@@ -626,8 +648,8 @@ export default function PenalAnticorrupcion() {
                         {delitoEvidences.length === 0 ? (
                           <div className="p-6 text-center text-xs text-[var(--g-text-secondary)] bg-[var(--g-surface-subtle)]/20 border border-dashed border-[var(--g-border-subtle)]" style={{ borderRadius: "var(--g-radius-md)" }}>
                             <HelpCircle className="h-6 w-6 text-[var(--g-text-secondary)]/40 mx-auto mb-2" />
-                            <span className="block font-semibold">Sin sellos electrónicos forenses</span>
-                            <span className="block mt-0.5">Utilice el botón de Sellar en las pestañas de Riesgos o Controles para emitir un bundle WORM cualificado.</span>
+                            <span className="block font-semibold">Sin registros archivados</span>
+                            <span className="block mt-0.5">La custodia electrónica no está conectada en este entorno: no se emite ningún sello ni firma.</span>
                           </div>
                         ) : (
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -647,41 +669,49 @@ export default function PenalAnticorrupcion() {
                               >
                                 <div className="flex items-center justify-between gap-2">
                                   <span className={cn("font-mono text-[9px] font-bold", isFinalSeal ? "text-[var(--status-success)]" : "text-[var(--status-warning)]")}>
-                                    {evidence.reference_code || `WORM-${evidence.id.slice(0, 8).toUpperCase()}`}
+                                    {/* Sin `|| \`WORM-${id}\``: fabricaba una referencia de custodia
+                                        WORM para toda evidencia sin `reference_code`. La referencia
+                                        se muestra si existe; si no, se dice que no la hay. */}
+                                    {evidence.reference_code || "sin referencia registrada"}
                                   </span>
                                   {isFinalSeal ? (
-                                    <span className="inline-flex items-center gap-0.5 text-[9px] text-[var(--status-success)] font-bold">
-                                      <CheckCircle2 className="h-3 w-3" /> QSeal Custodia
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] text-[var(--g-text-secondary)] font-bold">
+                                      <CheckCircle2 className="h-3 w-3" /> Archivada
                                     </span>
                                   ) : (
-                                    <span className="inline-flex items-center gap-0.5 text-[9px] text-[var(--status-warning)] font-bold" title="Evidencia sandbox de demo: NO sellada como final (no es una transacción EAD Trust real)">
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] text-[var(--status-warning)] font-bold" title="Registro de demo en sandbox: sin sello ni custodia cualificada">
                                       SANDBOX
                                     </span>
                                   )}
                                 </div>
                                 <div className="text-[11px] text-[var(--g-text-secondary)] font-mono space-y-1">
-                                  <div><strong>Responsable registrado:</strong> {evidence.signed_by || "Apoderado de Cumplimiento"}</div>
-                                  <div><strong>Fecha Sellado:</strong> {evidence.created_at ? new Date(evidence.created_at).toLocaleString("es-ES") : "—"}</div>
+                                  {/* Sin `|| "Apoderado de Cumplimiento"`: inventaba un responsable para toda evidencia sin `signed_by`. */}
+                                  <div><strong>Responsable registrado:</strong> {evidence.signed_by || "sin responsable registrado"}</div>
+                                  <div><strong>Fecha de archivo:</strong> {evidence.created_at ? new Date(evidence.created_at).toLocaleString("es-ES") : "—"}</div>
                                   <div className="line-clamp-1"><strong>Hash SHA-512:</strong> <span className="break-all font-mono text-[9px]">{evidence.hash_sha512 || "Pendiente"}</span></div>
                                   <div className="line-clamp-1"><strong>Audit ID:</strong> {evidence.id}</div>
                                 </div>
                                 <div className="pt-2 border-t border-[var(--g-border-subtle)] flex items-center justify-between text-[10px]">
                                   {isFinalSeal ? (
                                     <>
-                                      <span className="text-[var(--g-text-secondary)]">Prueba forense inmutable</span>
+                                      {/* Ninguna evidencia de este módulo tiene token de sello, y EAD
+                                          Trust no es prestador de firma ni de sello en el alcance
+                                          vigente: se retiran «Prueba forense inmutable», «Verificar
+                                          QSeal» y el «EAD Trust Custody ID». */}
+                                      <span className="text-[var(--g-text-secondary)]">Registro archivado con hash — sin sello ni firma atribuidos</span>
                                       <a
                                         href="#"
                                         onClick={(e) => {
                                           e.preventDefault();
-                                          toast.info(`EAD Trust Custody ID: ${evidence.id}\nHash: ${evidence.hash_sha512}`);
+                                          toast.info(`Identificador del registro: ${evidence.id}\nHash: ${evidence.hash_sha512 ?? "sin hash registrado"}`);
                                         }}
                                         className="text-[var(--g-brand-3308)] hover:underline inline-flex items-center gap-0.5"
                                       >
-                                        Verificar QSeal <ExternalLink className="h-3 w-3" />
+                                        Ver identificador y hash <ExternalLink className="h-3 w-3" />
                                       </a>
                                     </>
                                   ) : (
-                                    <span className="text-[var(--status-warning)]">Evidencia sandbox de demo — sin custodia QSeal verificable (no es una transacción EAD Trust real).</span>
+                                    <span className="text-[var(--status-warning)]">Registro de demo en sandbox — sin sello ni custodia cualificada.</span>
                                   )}
                                 </div>
                               </div>
@@ -701,7 +731,7 @@ export default function PenalAnticorrupcion() {
       </div>
 
       {/* ============================================================ */}
-      {/* Modal: Certificación Forense QSeal                           */}
+      {/* Modal: preparación de custodia (fail-closed, sin sello)       */}
       {/* ============================================================ */}
       {sealingObject && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in">
@@ -712,7 +742,7 @@ export default function PenalAnticorrupcion() {
             <div className="px-6 py-4 border-b border-[var(--g-border-subtle)] flex items-center justify-between bg-[var(--g-surface-subtle)]">
               <h3 className="text-base font-bold text-[var(--g-text-primary)] flex items-center gap-1.5">
                 <Lock className="h-4 w-4 text-[var(--g-brand-3308)]" />
-                Certificación Forense QSeal (EAD Trust)
+                Preparar custodia de evidencia
               </h3>
               <button 
                 type="button" 
@@ -725,12 +755,15 @@ export default function PenalAnticorrupcion() {
             
             <form onSubmit={handlePerformSeal} className="p-6 space-y-4">
               <div className="p-3 bg-[var(--g-surface-subtle)]/50 border border-[var(--g-border-subtle)] text-xs text-[var(--g-text-secondary)]" style={{ borderRadius: "var(--g-radius-md)" }}>
-                <span>QSeal es un servicio distinto de la firma personal y todavía no está conectado en este flujo. Puede revisar los datos, pero no se emitirá ningún sello:</span>
+                <span>
+                  La custodia electrónica no está conectada en este flujo. Puede revisar los datos, pero
+                  no se emitirá sello, firma ni acuse, ni se contactará con ningún prestador:
+                </span>
                 <strong className="block mt-1 text-[var(--g-text-primary)] font-mono">{sealingObject.code} — {sealingObject.title}</strong>
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="auditor-name-input" className={LABEL_CLASSES}>Nombre Auditor Apoderado *</label>
+                <label htmlFor="auditor-name-input" className={LABEL_CLASSES}>Nombre del responsable *</label>
                 <input
                   id="auditor-name-input"
                   type="text"
@@ -743,7 +776,7 @@ export default function PenalAnticorrupcion() {
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="auditor-email-input" className={LABEL_CLASSES}>Email del Apoderado *</label>
+                <label htmlFor="auditor-email-input" className={LABEL_CLASSES}>Email del responsable *</label>
                 <input
                   id="auditor-email-input"
                   type="email"
@@ -778,7 +811,10 @@ export default function PenalAnticorrupcion() {
                   value={JSON.stringify({
                     standard: "UNE 19601 / ISO 37001",
                     compliance_reference: "Spanish Penal Code Art 31 bis",
-                    custody_provider: "EAD Trust Qualified TSP",
+                    // Sin `custody_provider: "EAD Trust Qualified TSP"`: atribuía
+                    // custodia cualificada a un prestador que en el alcance
+                    // vigente solo hace interposición, mensajería y e-archiving.
+                    custody_provider: null,
                     evidence_scope: scopeLabel,
                     object_code: sealingObject.code
                   }, null, 2)}
@@ -805,12 +841,12 @@ export default function PenalAnticorrupcion() {
                   <button
                     type="button"
                     disabled
-                    title="QSeal requiere su integración source-bound propia; la ruta genérica de firma no se reutiliza."
+                    title="La custodia electrónica requiere su propia integración source-bound; la ruta genérica de firma no se reutiliza."
                     className="flex-1 h-10 bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] text-sm font-semibold cursor-not-allowed opacity-70 flex items-center justify-center gap-1.5"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
                     <PenTool className="h-4 w-4" />
-                    QSeal no conectado
+                    Custodia no conectada
                   </button>
                 </div>
               )}

@@ -14,6 +14,7 @@ import {
   DEFAULT_SCOPE_LABEL,
 } from "@/lib/tenant-brand-labels";
 import type { TenantBranding } from "@/context/TenantBrandContext";
+import { sinComentarios } from "./helpers/sin-comentarios";
 
 describe("Milestone 1 — Empirical Challenger Verification Suite", () => {
   describe("1. Static Scan: Zero literal ARGA / TGMS in JSX and UI views of Secretaria and GRC", () => {
@@ -160,22 +161,52 @@ describe("Milestone 1 — Empirical Challenger Verification Suite", () => {
   });
 
   describe("5. PenalAnticorrupcion & IncidenteDetalle Neutral Fallbacks", () => {
-    it("uses generic fallback for delito taxonomy risk descriptions", () => {
-      const file = fs.readFileSync("src/pages/grc/PenalAnticorrupcion.tsx", "utf8");
-      expect(file).toContain("en nombre de la entidad");
-      expect(file).not.toContain("en nombre de ARGA Seguros");
+    // La invariante que estos dos protegen es que NINGUNA identidad concreta
+    // se filtre a la pantalla. Las aserciones positivas originales
+    // —`toContain("en nombre de la entidad")`, `toContain('useState("Auditor de
+    // Cumplimiento")')`— eran proxies de esa invariante, y en 2026-09-05 se
+    // volvieron en contra: el carril GRC borró los riesgos y controles fixture
+    // de aseguradora (de donde salía «en nombre de la entidad») y dejó el campo
+    // del responsable VACÍO en vez de prerrellenarlo con un cargo inventado.
+    // Las dos cosas son mejores que lo que el test exigía, y aun así lo ponían
+    // en rojo. Se conserva la invariante —cero identidad fabricada— y se
+    // sustituyen los proxies por la comprobación directa.
+    const IDENTIDADES_PROHIBIDAS = [
+      "Lucía Martín",
+      "lucia@arga-seguros.com",
+      "arga-seguros.com",
+      "ARGA Seguros",
+      "Apoderado de Cumplimiento",
+    ];
+
+    it("no filtra ninguna identidad concreta en Penal/Anticorrupción", () => {
+      const file = sinComentarios(fs.readFileSync("src/pages/grc/PenalAnticorrupcion.tsx", "utf8"));
+      // Control positivo: el fichero se leyó de verdad.
+      expect(file.length).toBeGreaterThan(1000);
+      for (const identidad of IDENTIDADES_PROHIBIDAS) {
+        expect(file, `identidad filtrada: ${identidad}`).not.toContain(identidad);
+      }
     });
 
-    it("uses generic compliance roles and dynamic user email", () => {
-      const filePenal = fs.readFileSync("src/pages/grc/PenalAnticorrupcion.tsx", "utf8");
-      expect(filePenal).toContain('useState("Auditor de Cumplimiento")');
-      expect(filePenal).not.toContain('useState("Lucía Martín")');
-      expect(filePenal).not.toContain("lucia@arga-seguros.com");
+    it("no prerrellena responsables ni filtra identidades en el detalle de incidente", () => {
+      const filePenal = sinComentarios(fs.readFileSync("src/pages/grc/PenalAnticorrupcion.tsx", "utf8"));
+      const fileIncidente = sinComentarios(fs.readFileSync("src/pages/grc/IncidenteDetalle.tsx", "utf8"));
+      expect(filePenal.length).toBeGreaterThan(1000);
+      expect(fileIncidente.length).toBeGreaterThan(1000);
 
-      const fileIncidente = fs.readFileSync("src/pages/grc/IncidenteDetalle.tsx", "utf8");
-      expect(fileIncidente).toContain('useState("Responsable de Cumplimiento")');
-      expect(fileIncidente).not.toContain('useState("Lucía Martín")');
-      expect(fileIncidente).not.toContain("lucia@arga-seguros.com");
+      for (const identidad of IDENTIDADES_PROHIBIDAS) {
+        expect(filePenal, `Penal: ${identidad}`).not.toContain(identidad);
+        expect(fileIncidente, `Incidente: ${identidad}`).not.toContain(identidad);
+      }
+
+      // El campo del responsable arranca vacío o con un cargo genérico; lo que
+      // no puede es traer el nombre de una persona.
+      const arranquePenal = filePenal.match(/const \[auditorName, setAuditorName\] = useState\((.*?)\);/);
+      expect(arranquePenal, "no se encontró el estado del responsable en Penal").toBeTruthy();
+      expect(
+        /^""$|Cumplimiento/.test(arranquePenal![1]),
+        `el responsable arranca con ${arranquePenal![1]}, que no es ni vacío ni un cargo genérico`,
+      ).toBe(true);
     });
   });
 
