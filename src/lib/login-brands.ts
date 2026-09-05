@@ -1,41 +1,49 @@
 // Marca del Login por query param (?tenant=) o selector interactivo.
 // Login es PRE-AUTH: no hay sesión ni tenant resuelto, así que no puede leer tenants.branding.
 // Mapa estático mínimo y consciente; tras el login manda TenantBrandProvider.
-// Emails demo SIEMPRE en dominio ficticio o demo.
+//
+// SIN CREDENCIALES (rotación 2026-09-05): esta pantalla no conoce ninguna contraseña.
+// Las cuentas demo viven en Auth y su contraseña solo en `.env` (DEMO_PASSWORD_*),
+// nunca en el repo ni en la UI. La selección de entorno se contrasta con
+// `user_profiles.tenant_id` después de autenticar (loginTenantMismatch).
 export interface LoginBrandFeature {
   icon: "network" | "shield" | "eye" | "scale" | "compass" | "brain";
   title: string;
   description?: string;
 }
 
+export type LoginBrandKey = "arga" | "garrigues";
+
 export interface LoginBrand {
-  key: "arga" | "garrigues";
+  key: LoginBrandKey;
+  tenantId: string; // tenants.id al que da acceso este entorno
   nombre: string;
   sufijo: string;
+  entorno: string; // subtítulo bajo el H1 de acceso
   tagline: string;
   badge: string;
   footer: string;
   panelBg?: string; // fondo inline del panel izquierdo (sin provider aún)
   accentColor: string;
   defaultPath: string; // ruta destino tras autenticación
-  demoEmail: string;
-  demoPassword: string;
+  emailPlaceholder: string;
   features: LoginBrandFeature[];
 }
 
 export const LOGIN_BRANDS: Record<string, LoginBrand> = {
   arga: {
     key: "arga",
+    tenantId: "00000000-0000-0000-0000-000000000001",
     nombre: "ARGA",
     sufijo: "Seguros",
+    entorno: "Consola corporativa del grupo asegurador",
     tagline: "Sistema de Gobernanza Corporativa de Grupo",
     badge: "Consola Corporativa TGMS",
     footer: "TGMS v1.0 · Entorno seguro asegurador",
     panelBg: "linear-gradient(180deg, #1e293b 0%, #0f172a 100%)",
     accentColor: "#E8112D",
     defaultPath: "/",
-    demoEmail: "demo@arga-seguros.com",
-    demoPassword: "TGMSdemo2026!",
+    emailPlaceholder: "usuario@argaseguros.com",
     features: [
       {
         icon: "network",
@@ -56,16 +64,17 @@ export const LOGIN_BRANDS: Record<string, LoginBrand> = {
   },
   garrigues: {
     key: "garrigues",
+    tenantId: "00000000-0000-0000-0000-000000000002",
     nombre: "Garrigues",
     sufijo: "Corporate Solutions",
+    entorno: "Gobernanza del despacho y de las sociedades gestionadas",
     tagline: "Sistema de Gobernanza Corporativa & Despacho",
     badge: "Consola Corporativa Garrigues",
     footer: "g-digital · Demo sin efecto jurídico",
     panelBg: "#004438",
     accentColor: "#009a77",
     defaultPath: "/",
-    demoEmail: "demo@garrigues-demo.dev",
-    demoPassword: "TGMSdemo2026!",
+    emailPlaceholder: "usuario@garrigues-demo.dev",
     features: [
       {
         icon: "network",
@@ -98,4 +107,31 @@ export function resolveLoginBrand(searchOrKey: string): LoginBrand {
   return Object.prototype.hasOwnProperty.call(LOGIN_BRANDS, t)
     ? LOGIN_BRANDS[t]
     : LOGIN_BRANDS.arga;
+}
+
+/** Ruta de /login con el entorno preseleccionado. */
+export function loginPathFor(key: LoginBrandKey): string {
+  return `/login?tenant=${key}`;
+}
+
+/** Entorno al que pertenece un tenant, o null si no está en esta pantalla. */
+export function brandForTenant(tenantId: string | null | undefined): LoginBrand | null {
+  if (!tenantId) return null;
+  return Object.values(LOGIN_BRANDS).find((b) => b.tenantId === tenantId) ?? null;
+}
+
+/**
+ * Motivo por el que una sesión recién autenticada NO puede entrar en el entorno
+ * elegido; null si encaja. Una cuenta sin perfil (autoalta huérfana) tampoco entra.
+ */
+export function loginTenantMismatch(
+  selected: LoginBrand,
+  tenantId: string | null | undefined,
+): string | null {
+  if (!tenantId) return "Esta cuenta no tiene perfil en ningún entorno. Solicita el alta al administrador.";
+  if (tenantId === selected.tenantId) return null;
+  const real = brandForTenant(tenantId);
+  return real
+    ? `Esta cuenta pertenece al entorno ${real.nombre}, no a ${selected.nombre}. Selecciona el entorno correcto.`
+    : "Esta cuenta pertenece a un entorno que no está disponible en esta pantalla.";
 }

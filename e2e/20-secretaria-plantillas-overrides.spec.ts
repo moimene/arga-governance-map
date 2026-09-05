@@ -9,17 +9,7 @@
  * Si esto falla, hay regresión introducida por v2 — bloquea el merge.
  */
 import { test, expect } from "@playwright/test";
-
-const DEMO_USER = "demo@arga-seguros.com";
-const DEMO_PASS = "TGMSdemo2026!";
-
-async function login(page: import("@playwright/test").Page) {
-  await page.goto("/auth");
-  await page.getByLabel(/email/i).fill(DEMO_USER);
-  await page.getByLabel(/password/i).fill(DEMO_PASS);
-  await page.getByRole("button", { name: /sign in|entrar|login/i }).click();
-  await page.waitForURL((u) => !u.pathname.startsWith("/auth"));
-}
+import { loginAsDemo as login } from "./fixtures/demo-credentials";
 
 test.describe("v2 plantillas overrides — regresión sin overrides activos", () => {
   test("listado de plantillas: render funcional sin errores ni regresión visible", async ({ page }) => {

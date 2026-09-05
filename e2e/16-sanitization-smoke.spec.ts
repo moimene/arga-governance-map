@@ -1,3 +1,4 @@
+import { loginAsDemo } from './fixtures/demo-credentials';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/base';
 
@@ -39,13 +40,14 @@ async function expectNoFatalUi(page: Page) {
 
 async function restoreDemoSessionIfNeeded(page: Page, path: string) {
   const isLoginUrl = /\/login/.test(page.url());
-  const loginButton = page.getByRole('button', { name: 'Acceder como demo' });
-  const isLoginScreen = await loginButton.isVisible().catch(() => false);
+  const isLoginScreen = await page
+    .getByRole('button', { name: /^Acceder a / })
+    .isVisible()
+    .catch(() => false);
 
   if (!isLoginUrl && !isLoginScreen) return;
 
-  await loginButton.click();
-  await page.waitForURL('/', { timeout: 20_000 });
+  await loginAsDemo(page, 'arga');
   await page.goto(path);
   await page.waitForLoadState('networkidle').catch(() => undefined);
 }

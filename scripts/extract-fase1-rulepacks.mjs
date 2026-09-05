@@ -7,7 +7,11 @@ const DEFAULT_OUTPUT_DIR = path.join(ROOT, "docs/superpowers/specs/2026-05-20-fa
 const EXPECTED_REF = "hzqwefkwsxopwrmtksbg";
 const TENANT_ID = "00000000-0000-0000-0000-000000000001";
 const DEMO_EMAIL = process.env.TGMS_DEMO_EMAIL ?? "demo@arga-seguros.com";
-const DEMO_PASSWORD = process.env.TGMS_DEMO_PASSWORD ?? "TGMSdemo2026!";
+const DEMO_PASSWORD = process.env.TGMS_DEMO_PASSWORD ?? process.env.DEMO_PASSWORD_ARGA;
+if (!DEMO_PASSWORD) {
+  console.error("falta TGMS_DEMO_PASSWORD o DEMO_PASSWORD_ARGA en el entorno (rotación 2026-09-05)");
+  process.exit(1);
+}
 
 const CSV_HEADERS = {
   normalized: [

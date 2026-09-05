@@ -35,7 +35,8 @@ const COMMIT = process.argv.includes("--commit");
 const ARGA_TENANT = "00000000-0000-0000-0000-000000000001";
 export const GARRIGUES_TENANT = "00000000-0000-0000-0000-000000000002";
 
-const DEMO_PASSWORD = "TGMSdemo2026!";
+// Rotación 2026-09-05: solo desde .env, nunca literal. Se exige al crear usuarios.
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD_GARRIGUES ?? "";
 const USERS = [
   { email: "demo@garrigues-demo.dev", role: "SECRETARIO" },
   { email: "admin@garrigues-demo.dev", role: "ADMIN_TENANT" },
@@ -184,6 +185,7 @@ async function main() {
   for (const u of USERS) {
     let userId = await findUserByEmail(u.email);
     if (!userId) {
+      if (!DEMO_PASSWORD) fail("falta DEMO_PASSWORD_GARRIGUES en .env para crear usuarios demo");
       const { data, error } = await admin.auth.admin.createUser({
         email: u.email,
         password: DEMO_PASSWORD,

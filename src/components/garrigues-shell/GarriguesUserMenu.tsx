@@ -13,7 +13,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useTenantContext } from "@/context/TenantContext";
 import { useTenantBranding } from "@/context/TenantBrandContext";
 import { brandName } from "@/lib/tenant-brand-labels";
-import { resolveLoginBrand } from "@/lib/login-brands";
+import { loginPathFor, resolveLoginBrand } from "@/lib/login-brands";
 import { toast } from "sonner";
 
 function getInitials(nameOrEmail: string): string {
@@ -35,7 +35,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export const GarriguesUserMenu = forwardRef<HTMLButtonElement>((_props, ref) => {
-  const { user, logout, signIn } = useAuth();
+  const { user, logout } = useAuth();
   const { roleCode } = useTenantContext();
   const branding = useTenantBranding();
 
@@ -109,20 +109,11 @@ export const GarriguesUserMenu = forwardRef<HTMLButtonElement>((_props, ref) => 
 
         <DropdownMenuItem
           onClick={async () => {
-            try {
-              const target = resolveLoginBrand("");
-              toast.info(`Cambiando a entorno ${target.nombre}...`);
-              await logout();
-              const { error } = await signIn(target.demoEmail, target.demoPassword);
-              if (error) {
-                toast.error(`Error al cambiar: ${error.message}`);
-                return;
-              }
-              toast.success(`Conectado a ${target.nombre}`);
-              window.location.href = target.defaultPath;
-            } catch (e) {
-              console.error(e);
-            }
+            // Sin credenciales embebidas: se cierra la sesión y se vuelve al login
+            // con el entorno preseleccionado. Recarga completa = caché limpia.
+            const target = resolveLoginBrand(""); // entorno corporativo por defecto
+            await logout();
+            window.location.href = loginPathFor(target.key);
           }}
           className="flex cursor-pointer items-center gap-2 px-2.5 py-2 text-[13px] text-[var(--g-text-primary)] font-medium transition-colors hover:bg-[var(--g-surface-subtle)] focus:bg-[var(--g-surface-subtle)]"
           style={{ borderRadius: "var(--g-radius-md)" }}

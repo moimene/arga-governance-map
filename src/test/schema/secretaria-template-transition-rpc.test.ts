@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { demoPassword } from "@/test/helpers/supabase-test-client";
 
 /**
  * Oleada 3A — contrato Cloud de la transición atómica de plantillas.
@@ -15,7 +16,6 @@ const SUPABASE_ANON_KEY =
   process.env.VITE_SUPABASE_ANON_KEY ??
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6cXdlZmt3c3hvcHdybXRrc2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0Mjc1MDMsImV4cCI6MjA5MjAwMzUwM30.IZ2FbhQLp2ljRcsvsvzpLWQ9cq9p5Lz4dJfVzY3whjQ";
 const DEMO_EMAIL = process.env.DEMO_EMAIL ?? "demo@arga-seguros.com";
-const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? "TGMSdemo2026!";
 const REQUIRE_CLOUD_AUTH = process.env.REQUIRE_CLOUD_AUTH === "1";
 
 const MISSING_TEMPLATE_ID = "00000000-0000-0000-0000-000000000000";
@@ -98,7 +98,7 @@ describe("Oleada 3A — RBAC servidor de la transición atómica", () => {
       });
       const { error } = await client.auth.signInWithPassword({
         email: DEMO_EMAIL,
-        password: DEMO_PASSWORD,
+        password: demoPassword("ARGA"),
       });
       authenticated = !error;
       authenticationError = error?.message ?? null;

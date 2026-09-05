@@ -290,7 +290,7 @@ Then rerun script.
 
 Tenant Garrigues (`00000000-0000-0000-0000-000000000002`) + branding + 2 usuarios
 demo (`demo@garrigues-demo.dev` SECRETARIO, `admin@garrigues-demo.dev` ADMIN_TENANT,
-password demo TGMS). Service-role, dry-run por defecto, idempotente. Requiere
+contraseña `DEMO_PASSWORD_GARRIGUES` de `.env`). Service-role, dry-run por defecto, idempotente. Requiere
 `SUPABASE_SERVICE_ROLE_KEY`. Verificado contra Cloud: `rbac_roles` usa `role_code`
 (no `code`), ARGA `tenant_type='group'`.
 

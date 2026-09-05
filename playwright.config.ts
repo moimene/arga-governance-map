@@ -1,4 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
+import fs from 'node:fs';
+
+// Carga .env sin dependencia nueva: la contraseña demo ya no vive en el repo
+// (rotación 2026-09-05) y los specs la leen de DEMO_PASSWORD_ARGA / _GARRIGUES.
+if (fs.existsSync('.env')) {
+  for (const line of fs.readFileSync('.env', 'utf8').split('\n')) {
+    const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
+    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
+  }
+}
 
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 5173);
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${port}`;

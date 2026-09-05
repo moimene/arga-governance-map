@@ -17,6 +17,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { useTenantBranding } from "@/context/TenantBrandContext";
 import { brandName } from "@/lib/tenant-brand-labels";
+import { loginPathFor } from "@/lib/login-brands";
 import { toast } from "sonner";
 
 function getInitials(nameOrEmail: string): string {
@@ -46,7 +47,7 @@ const DEMO_ROLES = [
 ];
 
 export function UserMenu() {
-  const { user, logout, signIn } = useAuth();
+  const { user, logout } = useAuth();
   const { primaryRole, displayName } = useCurrentUserRole();
   const branding = useTenantBranding();
   const [simulatedRole, setSimulatedRole] = useState<string | null>(null);
@@ -142,19 +143,10 @@ export function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={async () => {
-            try {
-              toast.info("Cambiando al entorno Garrigues Demo...");
-              await logout();
-              const { error } = await signIn("demo@garrigues-demo.dev", "TGMSdemo2026!");
-              if (error) {
-                toast.error(`Error al cambiar: ${error.message}`);
-                return;
-              }
-              toast.success("Conectado a Garrigues Corporate Solutions");
-              window.location.href = "/secretaria";
-            } catch (e) {
-              console.error(e);
-            }
+            // Sin credenciales embebidas: se cierra la sesión y se vuelve al login
+            // con el entorno preseleccionado. Recarga completa = caché limpia.
+            await logout();
+            window.location.href = loginPathFor("garrigues");
           }}
           className="cursor-pointer text-xs text-[var(--g-brand-3308, #004438)] font-medium hover:bg-muted"
         >

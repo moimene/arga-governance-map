@@ -83,7 +83,18 @@ const ANON_KEY_TEST =
   process.env.ANON_PUBLIC ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6cXdlZmt3c3hvcHdybXRrc2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0Mjc1MDMsImV4cCI6MjA5MjAwMzUwM30.IZ2FbhQLp2ljRcsvsvzpLWQ9cq9p5Lz4dJfVzY3whjQ";
 
-const PASSWORD_DEMO = process.env.DEMO_PASSWORD || "TGMSdemo2026!";
+// Rotación 2026-09-05: la contraseña demo ya NO vive en el repo. Solo .env.
+const PASSWORD_DE: Record<CuentaDemo, string | undefined> = {
+  ARGA: process.env.DEMO_PASSWORD_ARGA || process.env.DEMO_PASSWORD,
+  GARRIGUES: process.env.DEMO_PASSWORD_GARRIGUES || process.env.DEMO_PASSWORD,
+};
+
+/** Contraseña de la cuenta demo. LANZA si falta: una sonda sin contraseña debe ponerse roja, no saltarse en verde. */
+export function demoPassword(cuenta: CuentaDemo): string {
+  const p = PASSWORD_DE[cuenta];
+  if (!p) throw new Error(`falta DEMO_PASSWORD_${cuenta} en .env (rotación de credenciales 2026-09-05)`);
+  return p;
+}
 
 const EMAIL_DE: Record<CuentaDemo, string> = {
   ARGA: process.env.DEMO_EMAIL || "demo@arga-seguros.com",
@@ -114,7 +125,7 @@ async function abrirSesion(cuenta: CuentaDemo): Promise<SupabaseClient> {
   for (let intento = 0; intento <= esperas.length; intento++) {
     const { error } = await cliente.auth.signInWithPassword({
       email: EMAIL_DE[cuenta],
-      password: PASSWORD_DEMO,
+      password: demoPassword(cuenta),
     });
     if (!error) return cliente;
     if (error.status !== 429) {

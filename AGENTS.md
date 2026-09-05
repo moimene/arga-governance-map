@@ -99,7 +99,7 @@ En código, ambos modos están en este repo. La segregación a repos independien
 - Propósito: prototipo operativo avanzado para validar filosofía, flujos reales y separación de ownership antes de desarrollo productivo completo.
 
 **Supabase:** proyecto `governance_OS`, ID `hzqwefkwsxopwrmtksbg`, región eu-central-1
-**Auth demo:** `demo@arga-seguros.com` / `TGMSdemo2026!`
+**Auth demo:** `demo@arga-seguros.com` (contraseña rotada el 2026-09-05: vive solo en `.env` como `DEMO_PASSWORD_ARGA`; `DEMO_PASSWORD_GARRIGUES` para `demo@`/`admin@garrigues-demo.dev`. Nunca en el repo ni en la pantalla de login; rotación con `scripts/rotate-demo-passwords.ts`)
 **Tenant demo:** `tenant_id = "00000000-0000-0000-0000-000000000001"`
 **Entidad canónica Cloud:** `entity_id = "6d7ed736-f263-4531-a59d-c6ca0cd41602"` (ARGA Seguros S.A.). El UUID `00000000-0000-0000-0000-000000000010` aparece en seeds/planes legacy y no debe tratarse como fuente canónica sin verificar.
 
@@ -1007,7 +1007,7 @@ bun run build
 ## Supabase Cloud
 
 - **Proyecto:** `hzqwefkwsxopwrmtksbg` (governance_OS, eu-central-1)
-- **Auth demo:** `demo@arga-seguros.com` / `TGMSdemo2026!`
+- **Auth demo:** `demo@arga-seguros.com` (contraseña rotada el 2026-09-05: vive solo en `.env` como `DEMO_PASSWORD_ARGA`; `DEMO_PASSWORD_GARRIGUES` para `demo@`/`admin@garrigues-demo.dev`. Nunca en el repo ni en la pantalla de login; rotación con `scripts/rotate-demo-passwords.ts`)
 - **Tenant:** `00000000-0000-0000-0000-000000000001`
 - **Entidad ARGA Seguros canónica Cloud:** `6d7ed736-f263-4531-a59d-c6ca0cd41602`
 - **Entidad legacy en planes/seeds antiguos:** `00000000-0000-0000-0000-000000000010` (no usar como fuente canónica sin probe)

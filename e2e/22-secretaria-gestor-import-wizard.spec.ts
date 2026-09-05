@@ -23,6 +23,7 @@
  */
 
 import { test, expect } from "./fixtures/base";
+import { fillLogin, loginAsDemo } from "./fixtures/demo-credentials";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -32,11 +33,7 @@ const FIXTURE_PATH = resolve(__dirname, "../src/test/fixtures/template-import-va
 
 test.describe("Gestor de Plantillas — Wizard de importación", () => {
   test("SECRETARIO no puede acceder al wizard (RBAC denial)", async ({ page }) => {
-    await page.goto("/login");
-    await page.getByPlaceholder("usuario@argaseguros.com").fill("demo@arga-seguros.com");
-    await page.getByPlaceholder("••••••••").fill("TGMSdemo2026!");
-    await page.getByRole("button", { name: "Acceder", exact: true }).click();
-    await page.waitForURL("/", { timeout: 20_000 });
+    await loginAsDemo(page, "arga");
 
     // El usuario demo es SECRETARIO. Al navegar a `?tab=importar` la
     // tab debe estar filtrada por el RBAC del shell.
@@ -60,10 +57,9 @@ test.describe("Gestor de Plantillas — Wizard de importación", () => {
     // SKIPPED por defecto — depende de un usuario ADMIN_TENANT en Cloud
     // que no existe en el seed demo actual. Se desbloquea cuando el
     // sprint de auth real cree el rol y permisos correspondientes.
-    await page.goto("/login");
-    await page.fill('input[name="email"]', "admin@arga-seguros.com");
-    await page.fill('input[name="password"]', "TGMSdemo2026!");
-    await page.click('button[type="submit"]');
+    // Cuenta ADMIN_TENANT de ARGA: no existe en Cloud; su contraseña, si algún día
+    // existe, llega por E2E_ADMIN_PASSWORD (nunca literal en el repo).
+    await fillLogin(page, "arga", "admin@arga-seguros.com", process.env.E2E_ADMIN_PASSWORD ?? "");
     await page.waitForURL("**/", { timeout: 15_000 });
 
     await page.goto("/secretaria/gestor-plantillas?tab=importar");
