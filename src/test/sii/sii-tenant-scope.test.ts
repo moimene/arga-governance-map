@@ -129,6 +129,27 @@ describe("SII — la identidad del circuito se resuelve por tenant", () => {
     expect(otro.politicaDesignacion).toBeNull();
   });
 
+  it("la fase de admisión a trámite solo se enuncia donde la política la impone", () => {
+    // PI-31, Anexo §5.b (cotejado contra el PDF fuente el 2026-09-06: el §5 es
+    // «Admisión a trámite de la comunicación»; el §4 es el acuse y el registro).
+    // Es la política de UN tenant: enunciarla en los demás sería atribuirles una
+    // obligación que nadie ha acreditado.
+    const garr = siiRolesPara(GARR).admisionATramite;
+    expect(garr, "Garrigues deja de declarar su fase de admisión").not.toBeNull();
+    expect(garr!.apartado).toContain("PI-31");
+    expect(garr!.plazoDecision).toContain("10 días naturales");
+    // El cómputo arranca en la entrada en el Libro-registro, no en la recepción.
+    expect(garr!.plazoDecision).toContain("Libro-registro");
+    expect(garr!.plazoComunicacion).toContain("5 días naturales");
+    // Y se dice que NO se mide. Declarar el plazo sin esto insinuaría que el
+    // producto lo controla, y no hay ni decisión de admisión ni reloj.
+    expect(garr!.noModelado).toMatch(/no modela|no hay .*reloj/i);
+
+    expect(siiRolesPara(ARGA).admisionATramite).toBeNull();
+    expect(siiRolesPara(OTRO).admisionATramite).toBeNull();
+    expect(siiRolesPara(null).admisionATramite).toBeNull();
+  });
+
   it("solo se cita PI-31 en el tenant cuya política es", () => {
     expect(siiRolesPara(GARR).politicaDesignacion).toBe("PI-31 §4");
     expect(siiRolesPara(ARGA).politicaDesignacion).toBeNull();
@@ -154,6 +175,37 @@ describe("SII — el gate de módulo de las rutas", () => {
     for (const linea of rutas) {
       expect(linea).toContain('RequireModule moduleKey="sii"');
     }
+  });
+
+  it("la lista blanca que SIEMBRA el tenant Garrigues declara 'sii'", () => {
+    // El gate de rutas y el filtro del tour son inútiles si el tenant que debe
+    // tener el canal no lo declara: Garrigues se quedaría fuera de su propio
+    // SII y nadie lo notaría, porque «no aparece» es indistinguible de «está
+    // oculto a propósito».
+    //
+    // Se lee la lista DEL SEED, no un literal copiado aquí: un literal
+    // duplicado deja de cuadrar en silencio el día que el seed cambie, que es
+    // exactamente el fallo que este test tiene que ver. No se importa el
+    // módulo porque `scripts/seed-garrigues-tenant.ts` ejecuta `main()` y sale
+    // por `process.exit` sin service-role key: se extrae la constante del
+    // fuente.
+    const seed = read("scripts/seed-garrigues-tenant.ts");
+    const bloque = seed.match(/\bmodules:\s*\[([^\]]*)\]/);
+    expect(bloque, "no se encuentra `modules` en el seed de Garrigues").not.toBeNull();
+    const modules = [...bloque![1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+
+    // Control positivo del instrumento: si el regex dejara de casar y devolviera
+    // una lista vacía, `includes("sii")` sería falso y esto ya rompería — pero
+    // se dice explícitamente, porque una extracción muda es la forma más fácil
+    // de que un test de este tipo mienta.
+    expect(modules.length, "la extracción del seed no ha devuelto módulos").toBeGreaterThan(5);
+    expect(modules).toContain("secretaria");
+
+    expect(modules, "el seed de Garrigues ya no declara el módulo 'sii'").toContain("sii");
+    // Y lo que importa de verdad: esa lista, pasada por el gate real, abre.
+    expect(isModuleEnabled({ modules }, "sii")).toBe(true);
+    // Discriminante: el mismo gate con la misma lista niega lo que NO declara.
+    expect(isModuleEnabled({ modules }, "dora")).toBe(false);
   });
 
   it("el gate que consumen esas rutas cierra de verdad ante una whitelist sin 'sii'", () => {

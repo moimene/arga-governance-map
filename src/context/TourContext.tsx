@@ -1,6 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { isModuleEnabled } from "@/lib/tenant-modules";
 
 export interface TourBadge {
   label: string;
@@ -16,6 +18,17 @@ export interface TourStep {
   badges?: TourBadge[];
   highlightId?: string;
   available: boolean;
+  /**
+   * Clave de módulo con la que `RequireModule` gatea la ruta de este paso.
+   * Sin ella, el paso es del producto y todo tenant lo ve.
+   *
+   * Existe porque el tour llevaba al usuario a `/sii` sin mirar la lista
+   * blanca `branding.modules`: en un tenant sin `sii`, `RequireModule` redirige
+   * a `/`, y el panel se quedaba describiendo el canal de integridad encima del
+   * Dashboard. Peor que un paso de más: el texto afirma que el usuario está
+   * viendo un módulo que el producto le acaba de ocultar.
+   */
+  moduleKey?: string;
 }
 
 export const tourSteps: TourStep[] = [
@@ -223,6 +236,10 @@ export const tourSteps: TourStep[] = [
     ],
     highlightId: "tour-sii-header",
     available: true,
+    // Las 5 rutas /sii/* van envueltas en <RequireModule moduleKey="sii"> en
+    // App.tsx. El tour usa la MISMA clave: si un día se renombra allí, este
+    // paso deja de coincidir y el test lo dice.
+    moduleKey: "sii",
   },
   {
     module: "ESG",
@@ -245,6 +262,16 @@ export const tourSteps: TourStep[] = [
 ];
 
 interface TourContextValue {
+  /**
+   * Los pasos que este tenant PUEDE recorrer. `tourSteps` sigue siendo el
+   * catálogo completo; esto es lo que se numera, se navega y se pinta.
+   *
+   * Va por el contexto y no por el import del catálogo porque la lista depende
+   * del tenant: quien consuma `tourSteps` directamente numeraría los puntos de
+   * progreso con una longitud distinta de la que recorre el provider, y el paso
+   * N del panel dejaría de ser el paso N que se navega.
+   */
+  steps: TourStep[];
   step: number;
   start: () => void;
   next: () => void;
@@ -274,6 +301,24 @@ export function TourProvider({ children }: { children: ReactNode }) {
     return typeof window !== "undefined" && window.localStorage.getItem(COMPLETED_KEY) === "true";
   });
   const navigate = useNavigate();
+  const branding = useTenantBranding();
+
+  // El mismo predicado que gatea las rutas en App.tsx. Falla ABIERTO —branding
+  // nulo, en vuelo o sin lista blanca = todo visible—, que es el contrato D-5
+  // del que depende el cero-cambio de ARGA: un paso NO desaparece por no haber
+  // cargado todavía el branding.
+  const steps = useMemo(
+    () => tourSteps.filter((s) => !s.moduleKey || isModuleEnabled(branding, s.moduleKey)),
+    [branding],
+  );
+
+  // El paso vive en localStorage. Si la lista encoge —o el usuario cambia a un
+  // tenant con menos módulos— el índice guardado puede caer fuera, y el panel
+  // leería `undefined`. Se cierra el tour en vez de aterrizar en un paso que ya
+  // no existe.
+  useEffect(() => {
+    if (step > steps.length) setStep(0);
+  }, [step, steps.length]);
 
   useEffect(() => {
     if (typeof window !== "undefined") window.localStorage.setItem(STORAGE_KEY, String(step));
@@ -281,12 +326,12 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
   const goTo = (s: number) => {
     setStep(s);
-    if (s > 0 && s <= tourSteps.length) {
+    if (s > 0 && s <= steps.length) {
       // El tour NO salta la puerta de acceso del SII. Antes escribía
       // `sii_access_confirmed` en sessionStorage para entrar directo, con lo
       // que el único control de entrada del módulo con el dato más sensible
       // del producto se podía esquivar navegando por el tour.
-      navigate(tourSteps[s - 1].route);
+      navigate(steps[s - 1].route);
     }
   };
 
@@ -307,24 +352,25 @@ export function TourProvider({ children }: { children: ReactNode }) {
   };
 
   const stepForPath = (path: string) => {
-    const idx = tourSteps.findIndex((s) => s.route === path);
+    const idx = steps.findIndex((s) => s.route === path);
     return idx >= 0 ? idx + 1 : 0;
   };
 
   const isFreelyExploring = (currentPath: string) => {
     if (step === 0) return false;
-    const expected = tourSteps[step - 1]?.route;
+    const expected = steps[step - 1]?.route;
     return expected !== currentPath;
   };
 
   return (
     <TourContext.Provider
       value={{
+        steps,
         step,
-        total: tourSteps.length,
+        total: steps.length,
         completed,
         start,
-        next: () => goTo(Math.min(step + 1, tourSteps.length)),
+        next: () => goTo(Math.min(step + 1, steps.length)),
         prev: () => goTo(Math.max(step - 1, 1)),
         goTo,
         close: () => setStep(0),

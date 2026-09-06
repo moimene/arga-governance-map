@@ -2,6 +2,28 @@ import { useQuery, useMutation, useQueryClient, skipToken } from "@tanstack/reac
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 
+/**
+ * NOTA SOBRE EL TIPADO DE ESTAS TABLAS (2026-09-06).
+ *
+ * Los `.from("aims_…" as never)` que había aquí se han retirado: no hacían
+ * nada. `supabase.from()` en esta app NO está tipado por tabla, y la causa no
+ * es que falten las tablas en los tipos generados —que faltan: ninguna de las
+ * `aims_fria_*` ni `aims_incident_*` está en `supabase/functions/_types/
+ * database.ts`—, sino que `createClient` se construye SIN el genérico
+ * `Database` (`src/integrations/supabase/client.ts`, y no hay ni un
+ * `createClient<…>` en todo el repo). Con el cliente sin genérico, `from()`
+ * acepta cualquier `string` y devuelve filas `any`.
+ *
+ * Consecuencia práctica: regenerar los tipos NO tiparía estos accesos, y el
+ * `as never` solo servía para aparentar que había una razón de tipos detrás.
+ * Comprobado: `bun run typecheck` pasa igual sin los casts.
+ *
+ * Lo que de verdad protege el shape de estas consultas son las sondas de
+ * `src/test/aims/no-fabricated-claims.test.ts`, que comparan las columnas
+ * declaradas con las que existen en Cloud. El día que el cliente reciba su
+ * genérico, este comentario sobra.
+ */
+
 export interface IncidentRegimeCase {
   id: string;
   tenant_id: string;
@@ -53,7 +75,7 @@ export function useIncidentRegimes(incidentId: string | undefined) {
     queryKey: ["aims_incident_regimes", tenantId, incidentId],
     queryFn: tenantId && incidentId ? async () => {
       const { data, error } = await supabase
-        .from("aims_incident_regimes" as never)
+        .from("aims_incident_regimes")
         .select("*")
         .eq("tenant_id", tenantId)
         .eq("incident_id", incidentId)
@@ -81,7 +103,7 @@ export function useUpdateIncidentRegime() {
       updates: Partial<IncidentRegimeCase>;
     }) => {
       const { data, error } = await supabase
-        .from("aims_incident_regimes" as never)
+        .from("aims_incident_regimes")
         .update({
           ...updates,
           updated_at: new Date().toISOString(),
@@ -110,7 +132,7 @@ export function useCreateIncidentReport() {
   return useMutation({
     mutationFn: async (report: Omit<IncidentReport, "id" | "tenant_id">) => {
       const { data, error } = await supabase
-        .from("aims_incident_reports" as never)
+        .from("aims_incident_reports")
         .insert({
           ...report,
           tenant_id: tenantId!,

@@ -4,25 +4,13 @@ import { ArrowRight, Cpu, PlusCircle, Search, ShieldCheck, SlidersHorizontal } f
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { cn } from "@/lib/utils";
 import { useScope } from "@/context/ScopeContext";
-import { filterSystemsByScope } from "@/lib/aims/readiness";
+import { filterSystemsByScope, systemStatusChipClass, systemStatusLabel } from "@/lib/aims/readiness";
 
 const RISK_COLORS: Record<string, string> = {
   Inaceptable: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
   Alto:        "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
   Limitado:    "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
   Mínimo:      "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-};
-
-const STATUS_CHIP: Record<string, string> = {
-  ACTIVO:        "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-  EN_EVALUACION: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  RETIRADO:      "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
-};
-
-const SYSTEM_STATUS_LABEL: Record<string, string> = {
-  ACTIVO: "Activo",
-  EN_EVALUACION: "En evaluación",
-  RETIRADO: "Retirado",
 };
 
 // `ai_systems.status` no tiene CHECK y en Cloud hay valores fuera de esta lista
@@ -65,11 +53,6 @@ function formatDate(value: string | null) {
     month: "2-digit",
     year: "numeric",
   });
-}
-
-function systemStatusLabel(status: string | null | undefined) {
-  if (!status) return "Sin estado";
-  return SYSTEM_STATUS_LABEL[status] ?? status;
 }
 
 function systemRiskLabel(risk: string | null | undefined) {
@@ -261,7 +244,7 @@ export default function Sistemas() {
                 <tbody className="divide-y divide-[var(--g-border-subtle)]">
                   {filtered.map((sys) => {
                     const riskCls = RISK_COLORS[sys.risk_level ?? ""] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
-                    const statusCls = STATUS_CHIP[sys.status] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]";
+                    const statusCls = systemStatusChipClass(sys.status);
                     return (
                       <tr
                         key={sys.id}
@@ -310,7 +293,7 @@ export default function Sistemas() {
             <div className="divide-y divide-[var(--g-border-subtle)] lg:hidden" role="list" aria-label="Lista móvil de sistemas IA">
               {filtered.map((sys) => {
                 const riskCls = RISK_COLORS[sys.risk_level ?? ""] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
-                const statusCls = STATUS_CHIP[sys.status] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]";
+                const statusCls = systemStatusChipClass(sys.status);
                 return (
                   <article key={sys.id} role="listitem" className="p-4">
                     <button

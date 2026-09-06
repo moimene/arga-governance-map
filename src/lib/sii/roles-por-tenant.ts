@@ -16,7 +16,11 @@
 // otro tenant.
 
 import { ORGANOS_SII_POR_DEFECTO, type OrganosSii } from "./whistleblowing-engine";
-import { SII_ORGANOS_GARRIGUES, SII_TENANT } from "../../../scripts/garrigues/sii/canal-interno";
+import {
+  SII_ADMISION_PI31,
+  SII_ORGANOS_GARRIGUES,
+  SII_TENANT,
+} from "../../../scripts/garrigues/sii/canal-interno";
 
 const ARGA_TENANT = "00000000-0000-0000-0000-000000000001";
 
@@ -34,6 +38,12 @@ export interface SiiRolesTenant {
   causaCupulaLabel: string;
   /** Política del tenant que designa los roles. `null` = no consta. */
   politicaDesignacion: string | null;
+  /**
+   * Fase de admisión a trámite exigida por la política del tenant. `null` = no
+   * consta ninguna, y entonces la pantalla NO la enuncia: PI-31 es de
+   * Garrigues, no de todo el mundo.
+   */
+  admisionATramite: typeof SII_ADMISION_PI31 | null;
   organos: OrganosSii;
 }
 
@@ -58,6 +68,7 @@ export function siiRolesPara(tenantId: string | null | undefined): SiiRolesTenan
       // Literal de lo que ARGA ya veía. Cero cambio.
       causaCupulaLabel: "Afectación a Alta Dirección o Consejo (Comisión Auditoría)",
       politicaDesignacion: null,
+      admisionATramite: null,
       organos: ORGANOS_SII_POR_DEFECTO,
     };
   }
@@ -74,6 +85,7 @@ export function siiRolesPara(tenantId: string | null | undefined): SiiRolesTenan
       organoAprobadorRecusacion: "Responsable del SII (Senior Partner) (PI-31, Anexo §2.a)",
       causaCupulaLabel: "Afectación al Responsable del SII o al órgano de administración (PI-31 §4)",
       politicaDesignacion: "PI-31 §4",
+      admisionATramite: SII_ADMISION_PI31,
       organos: SII_ORGANOS_GARRIGUES,
     };
   }
@@ -86,6 +98,7 @@ export function siiRolesPara(tenantId: string | null | undefined): SiiRolesTenan
     organoAprobadorRecusacion: SII_ROL_PENDIENTE,
     causaCupulaLabel: "Afectación al órgano de administración o a la alta dirección",
     politicaDesignacion: null,
+    admisionATramite: null,
     organos: ORGANOS_SIN_DESIGNAR,
   };
 }

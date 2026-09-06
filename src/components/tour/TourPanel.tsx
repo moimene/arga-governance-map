@@ -2,7 +2,7 @@ import { useLocation } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Compass, X, CheckCircle2, Compass as CompassIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useTour, tourSteps } from "@/context/TourContext";
+import { useTour } from "@/context/TourContext";
 import { useTourHighlight } from "@/hooks/useTourHighlight";
 import { cn } from "@/lib/utils";
 
@@ -16,11 +16,16 @@ const toneClasses: Record<string, string> = {
 
 export function TourPanel() {
   useTourHighlight();
-  const { step, total, next, prev, close, finish, goTo, isFreelyExploring, stepForPath } = useTour();
+  // `steps` y no el catálogo `tourSteps`: la lista depende del tenant, y el
+  // panel tiene que numerar exactamente lo que el provider navega.
+  const { steps, step, total, next, prev, close, finish, goTo, isFreelyExploring, stepForPath } = useTour();
   const { pathname } = useLocation();
-  if (step === 0) return null;
+  const data = steps[step - 1];
+  // `!data`: el paso guardado en localStorage puede caer fuera de la lista de
+  // este tenant. El provider lo corrige en un efecto, pero el efecto corre
+  // DESPUÉS del primer render — sin esto, ese render lee `undefined.title`.
+  if (step === 0 || !data) return null;
 
-  const data = tourSteps[step - 1];
   const isLast = step === total;
   const exploring = isFreelyExploring(pathname);
   const matchedStep = stepForPath(pathname);
@@ -40,7 +45,7 @@ export function TourPanel() {
       {/* 10 segments progress */}
       <TooltipProvider delayDuration={150}>
         <div className="flex gap-1 px-5 pt-3">
-          {tourSteps.map((s, i) => {
+          {steps.map((s, i) => {
             const idx = i + 1;
             const completed = idx < step;
             const current = idx === step;

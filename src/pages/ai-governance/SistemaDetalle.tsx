@@ -44,7 +44,13 @@ import {
 import { useEvidenceBundlesForObject } from "@/hooks/useEvidenceBundles";
 import { useFriaBySystem, useFriaDetails } from "@/hooks/useAimsFria";
 import { isFinalSealedEvidence } from "@/lib/secretaria/evidence-sandbox-gate";
-import { assessmentAcreditaConformidad, isMaterialSeverity, normalizeAimsStatus } from "@/lib/aims/readiness";
+import {
+  assessmentAcreditaConformidad,
+  isMaterialSeverity,
+  normalizeAimsStatus,
+  systemStatusChipClass,
+  systemStatusLabel,
+} from "@/lib/aims/readiness";
 import { useBodiesList } from "@/hooks/useBodies";
 import { buildMeetingHandoffPath } from "@/lib/secretaria/cross-module-handoff";
 import DeclaracionConformidadModal from "@/components/ai-governance/DeclaracionConformidadModal";
@@ -419,14 +425,10 @@ export default function SistemaDetalle() {
               Riesgo {system.risk_level || "sin clasificar"}
             </span>
             <span
-              className={`inline-flex items-center px-2.5 py-0.5 text-xs font-semibold ${
-                system.status === "ACTIVO"
-                  ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-                  : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
-              }`}
+              className={`inline-flex items-center px-2.5 py-0.5 text-xs font-semibold ${systemStatusChipClass(system.status)}`}
               style={{ borderRadius: "var(--g-radius-full)" }}
             >
-              {system.status}
+              {systemStatusLabel(system.status)}
             </span>
           </div>
         </div>
@@ -1031,7 +1033,22 @@ export default function SistemaDetalle() {
                   {friaDetails.remediation && (
                     <div className="space-y-0.5">
                       <span className="block">Desencadenante: {friaDetails.remediation.trigger_event}</span>
-                      <span className="block">Órgano: {friaDetails.remediation.governance_body}</span>
+                      {/* El órgano se sirve de la FK, no de un rótulo: si el
+                          enlace no resuelve, se ve. Y sin FK no se inventa
+                          nombre — se dice que no consta. */}
+                      <span className="block">
+                        Órgano:{" "}
+                        {friaDetails.remediation.governing_bodies ? (
+                          <Link
+                            to={`/organos/${friaDetails.remediation.governing_bodies.slug}`}
+                            className="text-[var(--g-link)] hover:text-[var(--g-link-hover)] underline underline-offset-2"
+                          >
+                            {friaDetails.remediation.governing_bodies.name}
+                          </Link>
+                        ) : (
+                          <span className="text-[var(--g-text-secondary)]">sin órgano acreditado</span>
+                        )}
+                      </span>
                       <span className="block">Canal de reclamación: {friaDetails.remediation.complaint_channel}</span>
                       <span className="block">Reparación: {friaDetails.remediation.redress_procedure}</span>
                     </div>

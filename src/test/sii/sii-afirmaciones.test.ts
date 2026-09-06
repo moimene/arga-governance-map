@@ -101,6 +101,26 @@ describe("SII — no se afirma lo que no se sostiene", () => {
     // ── Anonimato y entropía ─────────────────────────────────────────────
     [/100% anónimo|anonimato técnico/, "PI-31 Anexo 1 §3.c reserva el anónimo a la vía postal"],
     [/alta entropía/i, "el token eran 8 caracteres de Math.random() bajo ese rótulo"],
+    // OJO al escribir aquí: la pantalla de alta dice «No garantiza el
+    // anonimato» y ofrece la modalidad «Comunicación Anónima Estricta», que es
+    // el nombre de la opción. Prohibir la PALABRA tumbaría el texto correcto.
+    // Lo que se prohíbe es la promesa de que el sistema PRESERVA algo.
+    [
+      /[Pp]reservaci[óo]n\s+(?:absoluta|estricta|total)/,
+      "«Preservación absoluta de IP y huella» / «Preservación estricta del anonimato en Safe Inbox», pintadas como MEDIDA CAUTELAR ACTIVA en la ficha",
+    ],
+    [/\bIP\b[^.\n]{0,25}huella/i, "ni se trata la IP ni hay huella que preservar"],
+    [/sin metadatos/i, "el saneado solo renombra el fichero: los metadatos ni se tocan"],
+    [/credencial segura/i, "el código de seguimiento son 8 caracteres de Math.random()"],
+    // ── Envío y entrega que no ocurren ───────────────────────────────────
+    [
+      /(?:transmit|remit|elev|escal|notific)\w*\s+(?:\w+\s+){0,3}(?:urgente|inmediat|preferente)/i,
+      "«Alerta transmitida con carácter urgente» / «se eleva de manera inmediata y preferente»: la mutación solo escribe en localStorage de este navegador",
+    ],
+    [
+      /emitid[oa]\s+en\s+plazo\s+legal/i,
+      "el acuse se anunciaba SIEMPRE en plazo, aunque se emitiera pasados los 7 días del art. 9.2.c",
+    ],
     // ── Fases y trazas inexistentes ──────────────────────────────────────
     [/admitid[oa] a trámite/, "no existe fase de admisión: el estado que se escribe es ACUSE_EMITIDO"],
     [/log (?:de auditoría )?independiente/i, "el gate solo escribe una marca en sessionStorage"],
@@ -190,6 +210,37 @@ describe("SII — lo que SÍ debe seguir dicho", () => {
       "src/pages/sii/SiiPortalIntake.tsx",
       "src/pages/sii/SiiSafeInbox.tsx",
     ]);
+  });
+
+  it("el libro-registro distingue asiento incorporado, asignado y calculado al vuelo", () => {
+    // Tres estados distintos que la pantalla pintaba como dos. Desde que el
+    // ALTA asigna número de entrada (PI-31, Anexo §4), hay un estado intermedio:
+    // asignado y conservado, pero todavía no incorporado —eso solo ocurre al
+    // cerrar—. Sin el tercer rótulo, un asiento ya registrado se seguiría
+    // presentando como si se calculara para mostrarlo.
+    const libro = leer("src/pages/sii/SiiLibroRegistro.tsx");
+    expect(libro).toContain("incorporadoAlCierre");
+    expect(libro).toContain("numeroEntradaAsignadoAt");
+    // Y el rótulo del estado intermedio existe de verdad, no solo el campo.
+    expect(/Asignado en el registro/.test(libro)).toBe(true);
+  });
+
+  it("la ficha ENUNCIA la fase de admisión que el producto no modela", () => {
+    // El bloque de relojes pinta 9.2.c y 9.2.d y se quedaba ahí, con lo que un
+    // lector suponía que esos eran todos los plazos del circuito. PI-31, Anexo
+    // §5.b impone otros dos (diez días para decidir, cinco para comunicarlo) y
+    // el producto no los modela. Se declara la regla Y se dice que no se mide:
+    // enunciar el plazo a secas insinuaría que hay reloj detrás.
+    //
+    // Se exige que se RENDERICE —dentro de `{…}`—, no que se importe: el import
+    // solo prueba que alguien escribió una línea.
+    const ficha = leer("src/pages/sii/SiiCaseDetalle.tsx").replace(/^import[^;]*;$/gm, "");
+    expect(/\{\s*roles\.admisionATramite\.plazoDecision\s*\}/.test(ficha)).toBe(true);
+    expect(/\{\s*roles\.admisionATramite\.plazoComunicacion\s*\}/.test(ficha)).toBe(true);
+    // La cautela va en la misma superficie que el plazo, no en otra pantalla.
+    expect(/\{\s*roles\.admisionATramite\.noModelado\s*\}/.test(ficha)).toBe(true);
+    // Y gateado: el bloque sale del resolutor por tenant, no de un literal.
+    expect(ficha).toContain("roles.admisionATramite &&");
   });
 
   it("marca los expedientes sembrados como simulados donde se listan y donde se abren", () => {

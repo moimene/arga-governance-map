@@ -168,6 +168,13 @@ export default function SiiLibroRegistro() {
                       <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[var(--status-success)]/10 text-[var(--status-success)]">
                         Incorporado al cierre
                       </span>
+                    ) : e.numeroEntradaAsignadoAt ? (
+                      <span
+                        className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[var(--status-info)]/10 text-[var(--status-info)]"
+                        title={`Número de entrada y fecha de recepción asignados el ${new Date(e.numeroEntradaAsignadoAt).toLocaleDateString("es-ES")} y conservados en el expediente.`}
+                      >
+                        Asignado en el registro
+                      </span>
                     ) : (
                       <span
                         className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[var(--status-warning)]/10 text-[var(--status-warning)]"

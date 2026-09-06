@@ -118,13 +118,15 @@ export const INITIAL_SII_REPORTS: WhistleblowingReport[] = [
       id: "ret-001",
       reportId: "rep-sii-001",
       riskLevel: "BAJO",
-      riskFactors: ["Canal web estrictamente anónimo sin metadatos"],
-      preventiveMeasuresActive: ["Preservación absoluta de IP y huella en Safe Inbox"],
+      riskFactors: ["Comunicación web sin datos de contacto en el expediente"],
+      // Decía "Preservación absoluta de IP y huella": ni se trata la IP ni hay
+      // huella que preservar, y la sesión que abre el portal está autenticada.
+      preventiveMeasuresActive: ["El expediente no recoge datos de contacto del informante"],
       monitoringSchedule: "TRIMESTRAL",
       lastReviewDate: "2026-04-15T00:00:00Z",
       incidentsReported: 0,
       retaliationReportedViaInbox: false,
-      notes: "Informante anónimo con credencial segura activa.",
+      notes: "Comunicación sin datos de contacto; código de seguimiento activo.",
     },
     evidences: [
       {
@@ -391,6 +393,30 @@ export function initialReportsFor(tenantId: string): WhistleblowingReport[] {
   return [];
 }
 
+/**
+ * La marca `firmeza` la fija el CATÁLOGO, no el almacén.
+ *
+ * `getStoredReports` solo sembraba cuando la clave no existía. Un navegador con
+ * la clave ya creada —antes de que el catálogo marcara los casos sembrados—
+ * devolvía el JSON viejo SIN `firmeza`, y el badge «Simulado» desaparecía de la
+ * lista y de la ficha. La arista se rompía por CACHÉ, no por criterio: el rótulo
+ * estaba bien puesto y bien pintado, pero el dato no llegaba.
+ *
+ * No se versiona la clave porque eso tiraría los expedientes que el usuario haya
+ * dado de alta. Se reaplica la marca por `code` en cada lectura. Un expediente
+ * de alta NO está en el catálogo y por tanto no recibe marca — que es lo
+ * correcto: no es simulado.
+ */
+function reaplicarFirmezaDelCatalogo(
+  tenantId: string,
+  almacenados: WhistleblowingReport[],
+): WhistleblowingReport[] {
+  const catalogo = new Map(initialReportsFor(tenantId).map((r) => [r.code, r.firmeza]));
+  return almacenados.map((r) =>
+    catalogo.has(r.code) ? { ...r, firmeza: catalogo.get(r.code) } : r,
+  );
+}
+
 export function getStoredReports(tenantId: string): WhistleblowingReport[] {
   if (typeof window === "undefined") return initialReportsFor(tenantId);   // puerta 1
   const raw = localStorage.getItem(siiStorageKey(tenantId));
@@ -400,7 +426,7 @@ export function getStoredReports(tenantId: string): WhistleblowingReport[] {
     return inicial;
   }
   try {
-    return JSON.parse(raw);
+    return reaplicarFirmezaDelCatalogo(tenantId, JSON.parse(raw));
   } catch {
     return initialReportsFor(tenantId);                                    // puerta 3
   }
@@ -608,6 +634,14 @@ export function useCreateWhistleblowingReport() {
         evidences,
       };
 
+      // El asiento se conserva desde la recepción: número de entrada y fecha.
+      // Antes solo se creaba al CERRAR, y hasta entonces la tabla lo recalculaba
+      // en cada render.
+      newReport.libroRegistroEntry = {
+        ...generateLibroRegistroEntry(newReport),
+        numeroEntradaAsignadoAt: now.toISOString(),
+      };
+
       const updated = [newReport, ...reports];
       saveStoredReports(tenantId!, updated);
       queryClient.invalidateQueries({ queryKey: siiQueryKey(tenantId) });
@@ -673,6 +707,8 @@ export function useEmitAcknowledgment() {
       if (!rep) throw new Error("Expediente no encontrado.");
 
       const now = new Date();
+      let enPlazo: boolean | null = null;
+      let limiteAcuse: Date | null = null;
       if (isExempt) {
         rep.acknowledgmentExemptReason = exemptReason ?? "Riesgo acreditado para la confidencialidad de la comunicación.";
       } else {
@@ -683,7 +719,8 @@ export function useEmitAcknowledgment() {
         // —el estado que se escribe es ACUSE_EMITIDO—. El plazo lo calcula el
         // motor; la admisión no se afirma porque no ocurre.
         const { ackDeadline7d } = computeWhistleblowingDeadlines(rep.intakeDate, now);
-        const enPlazo = now.getTime() <= ackDeadline7d.getTime();
+        limiteAcuse = ackDeadline7d;
+        enPlazo = now.getTime() <= ackDeadline7d.getTime();
         rep.messages.push({
           id: `msg-ack-${Date.now()}`,
           reportId,
@@ -698,7 +735,9 @@ export function useEmitAcknowledgment() {
 
       saveStoredReports(tenantId!, reports);
       queryClient.invalidateQueries({ queryKey: siiQueryKey(tenantId) });
-      return rep;
+      // `enPlazo` es `null` cuando el acuse quedó exceptuado: no hay plazo que
+      // juzgar. Quien lo consuma no puede confundir "exceptuado" con "en plazo".
+      return { report: rep, enPlazo, limiteAcuse };
     },
   });
 }
@@ -858,11 +897,21 @@ export function useCloseRootCase() {
       rep.closedAt = now.toISOString();
       rep.closingReason = closingReason;
 
-      // Generar asiento oficial en Libro-Registro
-      rep.libroRegistroEntry = generateLibroRegistroEntry(rep, {
-        outcome: closingReason,
-        actionsTaken,
-      });
+      // Completar el asiento con el resultado. La identidad del asiento
+      // —número de entrada, fecha y referencia— es la que se asignó en el alta:
+      // regenerarla entera daría un asiento distinto del que se registró.
+      const asientoPrevio = rep.libroRegistroEntry;
+      rep.libroRegistroEntry = {
+        ...generateLibroRegistroEntry(rep, { outcome: closingReason, actionsTaken }),
+        ...(asientoPrevio
+          ? {
+              recordNumber: asientoPrevio.recordNumber,
+              entryDate: asientoPrevio.entryDate,
+              referenciaAsiento: asientoPrevio.referenciaAsiento,
+              numeroEntradaAsignadoAt: asientoPrevio.numeroEntradaAsignadoAt ?? null,
+            }
+          : {}),
+      };
 
       saveStoredReports(tenantId!, reports);
       queryClient.invalidateQueries({ queryKey: siiQueryKey(tenantId) });

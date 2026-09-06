@@ -27,6 +27,8 @@ import {
   assessmentAcreditaConformidad,
   buildAimsReadiness,
   filterSystemsByScope,
+  systemStatusChipClass,
+  systemStatusLabel,
   type AimsComplianceMonitorDomain,
   type AimsReadinessDomain,
   type AimsReadinessStatus,
@@ -41,12 +43,6 @@ const RISK_COLORS: Record<string, string> = {
   Alto:        "bg-[var(--status-error)]/80 text-[var(--g-text-inverse)]",
   Limitado:    "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
   Mínimo:      "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-};
-
-const AI_STATUS_LABEL: Record<string, string> = {
-  ACTIVO: "Activo",
-  EN_EVALUACION: "En evaluación",
-  RETIRADO: "Retirado",
 };
 
 function RiskBadge({ level }: { level: string | null }) {
@@ -942,16 +938,10 @@ export default function AiDashboard() {
                   <div className="mt-3 flex flex-wrap gap-2">
                     <RiskBadge level={sys.risk_level} />
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${
-                        sys.status === "ACTIVO"
-                          ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-                          : sys.status === "EN_EVALUACION"
-                          ? "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
-                          : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
-                      }`}
+                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${systemStatusChipClass(sys.status)}`}
                       style={{ borderRadius: "var(--g-radius-full)" }}
                     >
-                      {AI_STATUS_LABEL[sys.status] ?? sys.status}
+                      {systemStatusLabel(sys.status)}
                     </span>
                   </div>
                 </Link>
@@ -983,16 +973,10 @@ export default function AiDashboard() {
                     </td>
                     <td className="px-6 py-4">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${
-                          sys.status === "ACTIVO"
-                            ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-                            : sys.status === "EN_EVALUACION"
-                            ? "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
-                            : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
-                        }`}
+                          className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${systemStatusChipClass(sys.status)}`}
                         style={{ borderRadius: "var(--g-radius-full)" }}
                       >
-                        {AI_STATUS_LABEL[sys.status] ?? sys.status}
+                        {systemStatusLabel(sys.status)}
                       </span>
                     </td>
                   </tr>

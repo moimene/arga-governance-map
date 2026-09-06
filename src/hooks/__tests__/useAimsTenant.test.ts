@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
+import { sinComentarios } from "../../test/helpers/sin-comentarios";
 
 /**
  * A1 — Contrato de aislamiento por tenant de los hooks AIMS.
@@ -50,8 +51,22 @@ const HOOKS_ESPERADOS = [
  */
 const SCOPING_POR_JOIN = new Set(["src/hooks/useAiAssessments.ts"]);
 
+/**
+ * El fuente SIN comentarios. Se juzga el código, no la prosa que lo explica.
+ *
+ * Este gate cuenta `.from(` y `.eq("tenant_id", …)` sobre el texto crudo, así
+ * que un comentario que MENCIONA una llamada inflaba el recuento de accesos sin
+ * aportar su filtro, y el gate se ponía rojo contra su propia justificación. Es
+ * el mismo defecto que ya se corrigió tres veces el 2026-09-05 en los guards de
+ * texto; aquí llega por la puerta del CONTEO, no la de la lista negra, pero la
+ * salida fácil es idéntica: borrar el comentario que documenta la corrección.
+ *
+ * Ojo: el criterio no se debilita. Las llamadas reales se siguen contando una a
+ * una y ninguna aserción cambia — lo único que sale del recuento es texto que no
+ * se ejecuta.
+ */
 function read(f: string): string {
-  return readFileSync(f, "utf8");
+  return sinComentarios(readFileSync(f, "utf8"));
 }
 
 describe("A1 — hooks AIMS aislados por tenant", () => {

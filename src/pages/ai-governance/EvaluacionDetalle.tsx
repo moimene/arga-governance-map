@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   Sliders,
 } from "lucide-react";
+import { assessmentAcreditaConformidad } from "@/lib/aims/readiness";
 import { toast } from "sonner";
 
 export default function EvaluacionDetalle() {
@@ -207,7 +208,7 @@ export default function EvaluacionDetalle() {
               </span>
               <span
                 className={`px-2.5 py-1 text-xs font-semibold uppercase tracking-wider ${
-                  assessment.status === "CONFORME"
+                  assessmentAcreditaConformidad(assessment.status)
                     ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
                     : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
                 }`}

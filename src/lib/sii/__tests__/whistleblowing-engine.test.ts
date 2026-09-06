@@ -219,6 +219,34 @@ describe("Whistleblowing Engine — Ley 2/2023 & Harvey Mandate", () => {
       expect(evalResult.riskLevel).toBe("BAJO");
       expect(evalResult.monitoringFrequency).toBe("TRIMESTRAL");
     });
+
+    it("la medida de riesgo bajo NO promete anonimato: dice lo que el sistema sí hace", () => {
+      // El motor devolvía «Preservación estricta del anonimato en Safe Inbox» y
+      // ese texto viajaba a `retaliationRecord.preventiveMeasuresActive`, o sea
+      // a la ficha del expediente, presentado como MEDIDA CAUTELAR ACTIVA.
+      //
+      // Es falso por dos vías independientes: el portal de alta se abre desde
+      // una sesión YA AUTENTICADA, y el expediente vive en claro en
+      // localStorage. Lo único que el producto sostiene es que no pide ni
+      // guarda datos de contacto del informante.
+      const medidas = evaluateAntiRetaliationRisk({
+        isAnonymous: true,
+        informantRole: "EMPLEADO",
+        reportedTargetSeniority: "MANDO_INTERMEDIO",
+      }).recommendedMeasures;
+
+      // Control positivo: hay medidas. Devolver `[]` satisfaría cualquier
+      // aserción de ausencia sin que el motor evaluase nada.
+      expect(medidas.length).toBeGreaterThan(0);
+
+      for (const m of medidas) {
+        expect(/anonimato|anónim/i.test(m), `medida que promete anonimato: ${m}`).toBe(false);
+        expect(/cifrad|encriptad/i.test(m), `medida que promete cifrado: ${m}`).toBe(false);
+      }
+      // Y lo que SÍ debe seguir dicho, para que la retirada no se lleve por
+      // delante la única afirmación verdadera.
+      expect(medidas.some((m) => /no recoge datos de contacto/i.test(m))).toBe(true);
+    });
   });
 
   describe("6. Case Closeout Guard (Anti-Cross-Closeout)", () => {
@@ -291,34 +319,36 @@ describe("Whistleblowing Engine — Ley 2/2023 & Harvey Mandate", () => {
   });
 
   describe("7. Official Libro-Registro Generator (Art. 26 Ley 2/2023)", () => {
-    it("genera el asiento con referencia propia y límite de retención de 10 años", () => {
-      const mockReport: WhistleblowingReport = {
-        id: "rep-101",
-        code: "SII-2026-08-009",
-        trackingToken: "SEC-9F8A-72B1-K82M",
-        trackingTokenReference: "REF-TOKEN-101",
-        intakeDate: "2026-08-10T09:00:00Z",
-        channel: "WEB_ANONIMO",
-        anonymityMode: "ANONIMO_ESTRICTO",
-        entityId: "ent-1",
-        entityName: "ARGA Seguros S.A.",
-        jurisdiction: "ES",
-        category: "Corrupción y Fraude",
-        severity: "GRAVE",
-        status: "EN_INVESTIGACION",
-        summary: "Denuncia sobre irregularidad en contratación",
-        detailedDescription: "Hechos relativos a favorecimiento de proveedor.",
-        resolutionDeadline: "2026-11-17T09:00:00Z",
-        extensionApproved: false,
-        assignedInvestigatorId: "inv-1",
-        assignedInvestigatorName: "Dña. Elena Navarro Pons",
-        isEscalatedToBoardCommittee: false,
-        subcases: [],
-        messages: [],
-        recusations: [],
-        evidences: [],
-      };
+    // Fixture compartido por los tres casos del bloque: el generador es puro y
+    // ninguno lo muta, así que duplicarlo solo invitaría a que se desincronicen.
+    const mockReport: WhistleblowingReport = {
+      id: "rep-101",
+      code: "SII-2026-08-009",
+      trackingToken: "SEC-9F8A-72B1-K82M",
+      trackingTokenReference: "REF-TOKEN-101",
+      intakeDate: "2026-08-10T09:00:00Z",
+      channel: "WEB_ANONIMO",
+      anonymityMode: "ANONIMO_ESTRICTO",
+      entityId: "ent-1",
+      entityName: "ARGA Seguros S.A.",
+      jurisdiction: "ES",
+      category: "Corrupción y Fraude",
+      severity: "GRAVE",
+      status: "EN_INVESTIGACION",
+      summary: "Denuncia sobre irregularidad en contratación",
+      detailedDescription: "Hechos relativos a favorecimiento de proveedor.",
+      resolutionDeadline: "2026-11-17T09:00:00Z",
+      extensionApproved: false,
+      assignedInvestigatorId: "inv-1",
+      assignedInvestigatorName: "Dña. Elena Navarro Pons",
+      isEscalatedToBoardCommittee: false,
+      subcases: [],
+      messages: [],
+      recusations: [],
+      evidences: [],
+    };
 
+    it("genera el asiento con referencia propia y límite de retención de 10 años", () => {
       const entry = generateLibroRegistroEntry(mockReport, {
         outcome: "Investigación completada y confirmada",
         actionsTaken: ["Entrevistas", "Análisis forense"],
@@ -336,6 +366,38 @@ describe("Whistleblowing Engine — Ley 2/2023 & Harvey Mandate", () => {
       // la pantalla del libro-registro tiene que decirlo.
       expect(entry.incorporadoAlCierre).toBe(true);
       expect(generateLibroRegistroEntry(mockReport).incorporadoAlCierre).toBe(false);
+    });
+
+    it("la referencia del asiento es ESTABLE: el mismo expediente da la misma", () => {
+      // Llevaba `-${Date.now().toString(16)}` al final, así que cambiaba en CADA
+      // render de la tabla del libro-registro. Un asiento cuya referencia muta
+      // cada vez que se mira no identifica nada, y el art. 26 exige un registro,
+      // no un número de un solo uso.
+      const a = generateLibroRegistroEntry(mockReport);
+      // Cruzando un tick de reloj A PROPÓSITO: dos llamadas seguidas caen en el
+      // mismo milisegundo y un `Date.now()` reintroducido daría el mismo valor,
+      // con lo que este test pasaría teniendo el defecto delante. Se comprobó:
+      // sin la espera, la mutación que devuelve el sufijo temporal NO lo rompe.
+      const t0 = Date.now();
+      while (Date.now() === t0) { /* esperar al siguiente milisegundo */ }
+      const b = generateLibroRegistroEntry(mockReport);
+      expect(a.referenciaAsiento).toBe(b.referenciaAsiento);
+      // Control discriminante: dos expedientes distintos NO comparten
+      // referencia. Sin esto, devolver una constante pasaría el test de arriba.
+      const otro = generateLibroRegistroEntry({ ...mockReport, code: "SII-2026-08-010" });
+      expect(otro.referenciaAsiento).not.toBe(a.referenciaAsiento);
+    });
+
+    it("un asiento generado al vuelo NO dice tener número de entrada asignado", () => {
+      // `numeroEntradaAsignadoAt` lo escribe quien PERSISTE el asiento (el alta
+      // y el cierre). El generador no puede afirmarlo: si lo rellenara, la
+      // pantalla del libro pintaría «Asignado en el registro» sobre una fila que
+      // se acaba de calcular para mostrarla.
+      expect(generateLibroRegistroEntry(mockReport).numeroEntradaAsignadoAt).toBeNull();
+      expect(
+        generateLibroRegistroEntry(mockReport, { outcome: "x", actionsTaken: [] })
+          .numeroEntradaAsignadoAt,
+      ).toBeNull();
     });
   });
 });

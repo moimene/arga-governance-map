@@ -78,7 +78,7 @@ export default function SiiSafeInbox() {
       });
       setShowRetaliationAlert(false);
       setRetaliationNote("");
-      toast.success("Alerta de represalia transmitida con carácter urgente al Responsable del Sistema.");
+      toast.success("Alerta de represalia registrada en el expediente. Queda en este navegador: no se envía ni se notifica a nadie.");
     } catch (err) {
       toast.error("Error al comunicar la represalia.");
     }
@@ -347,7 +347,7 @@ export default function SiiSafeInbox() {
             </div>
             <div className="p-6 space-y-4 text-xs">
               <p className="text-[var(--t-text-secondary)] leading-relaxed">
-                El <strong>Artículo 36 de la Ley 2/2023</strong> prohíbe de forma absoluta cualquier acto constitutivo de represalia (sanciones, traslados forzosos, evaluaciones desfavorables, aislamiento o trato desfavorable). Esta alerta se eleva de manera inmediata y preferente.
+                El <strong>Artículo 36 de la Ley 2/2023</strong> prohíbe de forma absoluta cualquier acto constitutivo de represalia (sanciones, traslados forzosos, evaluaciones desfavorables, aislamiento o trato desfavorable). Su descripción se incorpora al expediente; en este entorno de validación no se remite a ningún destinatario.
               </p>
               <div>
                 <label className="block font-bold uppercase text-[var(--t-text-secondary)] mb-1">
@@ -370,7 +370,9 @@ export default function SiiSafeInbox() {
                   disabled={!retaliationNote.trim()}
                   className="bg-[var(--status-error)] text-white hover:bg-[var(--status-error)]/90"
                 >
-                  Transmitir Alerta Urgente
+                  {/* «Transmitir» prometía un envío que el párrafo de arriba niega:
+                      la mutación solo escribe en el expediente de este navegador. */}
+                  Registrar en el expediente
                 </Button>
               </div>
             </div>
