@@ -17,7 +17,12 @@
 // aislamiento se «verificaría» con la misma sesión dos veces.
 import { beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DEMO_TENANT, GARRIGUES_TENANT, sesionDe } from "../helpers/supabase-test-client";
+import {
+  DEMO_ENTITY_ARGA,
+  DEMO_TENANT,
+  GARRIGUES_TENANT,
+  sesionDe,
+} from "../helpers/supabase-test-client";
 
 const BUCKET = "matter-documents";
 
@@ -80,6 +85,52 @@ describe("matter-documents — aislamiento por tenant (DA-1)", () => {
     const { data } = await garrigues.storage.from(BUCKET).list(prefijo, { limit: 100 });
     const nombres = (data ?? []).map((o) => o.name);
     expect(nombres).not.toContain(fichero);
+  }, 30_000);
+
+  // La política de INSERT usa el mismo resolutor que la de SELECT, así que una
+  // convención de ruta que no resuelva DEJA DE PODER SUBIRSE. Probar la subida
+  // de verdad no es posible sin ensuciar el bucket —no hay política de DELETE
+  // para `authenticated`, así que el objeto de prueba se quedaría—, de modo que
+  // se comprueba el resolutor con las rutas EXACTAS que construyen hoy los
+  // cuatro escritores vivos. Si alguien añade un escritor con otra forma de
+  // ruta, este test no lo ve: lo que lo protege es la rama `else null` del
+  // resolutor, que deniega por defecto.
+  it("las rutas de los cuatro escritores vivos resuelven al tenant, y una desconocida deniega", async () => {
+    const { data: conv } = await arga
+      .from("convocatorias")
+      .select("id")
+      .eq("tenant_id", DEMO_TENANT)
+      .limit(1)
+      .maybeSingle();
+    expect(conv?.id, "hace falta una convocatoria de ARGA para no probar en vacío").toBeTruthy();
+
+    const casos: Array<[string, string, string | null]> = [
+      // useRegistryEvidenceUpload.ts:41
+      [
+        "registry/<entity>",
+        `registry/${DEMO_ENTITY_ARGA}/00000000-0000-0000-0000-0000000000aa-justificante.pdf`,
+        DEMO_TENANT,
+      ],
+      // useConvocatorias.ts:651
+      [
+        "convocatorias/<id>/supporting",
+        `convocatorias/${conv!.id}/supporting/intent-abc-anexo.docx`,
+        DEMO_TENANT,
+      ],
+      // storage-archiver.ts:126 y standalone-certifications/document.ts:328
+      [
+        "<tenant>/…",
+        `${DEMO_TENANT}/00000000-0000-0000-0000-0000000000bb/acta__hash.docx`,
+        DEMO_TENANT,
+      ],
+      ["ruta desconocida", "inventado/loquesea/x.docx", null],
+    ];
+
+    for (const [nombre, ruta, esperado] of casos) {
+      const { data, error } = await arga.rpc("fn_matter_document_tenant", { p_name: ruta });
+      expect(error, `${nombre}: el resolutor debe ser invocable`).toBeNull();
+      expect(data ?? null, `${nombre} → ${esperado ?? "deniega"}`).toBe(esperado);
+    }
   }, 30_000);
 
   it("ARGA y Garrigues son tenants distintos (control de que la sonda no compara una sesión consigo misma)", async () => {

@@ -262,6 +262,28 @@ Ejecución del prompt `docs/superpowers/prompts/2026-09-05-goal-cierre-gaps-modu
 
 **Reservado al Comité Legal, NO decidido aquí:** plazos art. 17/19 RRM; art. 308 supresión vs exclusión; NULL=ANY en órgano/adopción/tipo social; `SOCIO_UNICO`≈Junta; extractor de mayoría anidada (`rule-pack-params.ts`); y —nuevo— el RDL 5/2023 sustituyó el derecho de oposición por «garantías adecuadas» (arts. 13 y 14) mientras `evaluateCreditorOpposition` sigue computando 30 días: solo se corrigió la **cita** (art. 44 → art. 13).
 
+### Segunda pasada del cierre: verificación y cierre real (2026-09-06)
+
+Re-medición del cierre anterior **sin darlo por bueno**. Ledger:
+`docs/superpowers/plans/2026-09-06-ledger-cierre-gaps-verificacion.md`.
+
+**Dos criterios de salida no estaban cumplidos.** (1) El informe lista **257** hallazgos (215 en §2 + 42 P0 en §6), no 123: faltaban ~134 por juzgar. Re-juzgados los 257 con juez + refutador adversarial (62 agentes, 0 errores) → **0 sin juzgar**; el refutador **corrigió 16 veredictos**. (2) Los e2e del cierre no eran 3 rojos sino **4 estables**; los otros 10 que aparecen en un lote largo son *flakes* por pérdida de sesión. **Un conteo de rojos sin decir el tamaño del lote no significa nada** (10 specs de golpe → 14 fallos; en lotes pequeños → 4).
+
+**Patrón que se repite y que hay que buscar activamente:** *se corrige la superficie que se está mirando y la misma afirmación sobrevive por otro camino.* Seis casos, todos dados por cerrados el 05: TPRM dejó de **pintar** la conformidad DORA fabricada pero su **escritura** seguía sembrando las seis cláusulas a `true` (marcar una persistía cinco conformidades no declaradas); los **toasts** de incidentes se corrigieron y el rótulo **persistente** del botón seguía diciendo «Enviada»; la Guía AESIA se retiró «del módulo entero» salvo de `EvaluacionNueva`, que la renderiza en **siete** superficies incluida la nota que se **persiste** en `ai_risk_assessments.notes`; el dashboard GRC vació la **constante** de readiness y dejó la misma afirmación en **prosa fija**; la marca «Simulado» del SII estaba bien puesta y bien pintada pero no llegaba porque `getStoredReports` solo sembraba si la clave de localStorage no existía (**arista rota por caché, no por criterio**); y el vocabulario de estado se unificó en dos de los tres ficheros del hallazgo.
+
+**Cloud — autorizado expresamente por el usuario, tres migraciones + 4 correcciones de dato.** `20260906072222` cierra **DA-1**, el único P0 unánime: medido en vivo ANTES con los dos logins, la sesión de Garrigues **descargaba y listaba** los justificantes registrales de ARGA (la sonda `src/test/schema/storage-tenant-isolation.test.ts` en rojo es la prueba; después, verde). **No se normalizan rutas**: el bucket tiene **cuatro convenciones** y solo 70 de 389 objetos llevan el tenant delante, así que se resuelve el dueño desde la ruta (371 resuelven; los 18 huérfanos quedan denegados, que es lo correcto). `20260906072910` + `20260906074106` cierran DA-2..DA-7 y DA-22. **Defecto peor de lo registrado:** el grant por columna de `user_profiles` incluía **`tenant_id` y `role_code`** y la política no tenía `WITH CHECK` — comprobado en vivo escribiendo el mismo valor: el UPDATE se acepta. Como `fn_current_tenant_id()` deriva el tenant de esa columna, un usuario podía **cambiarse de tenant y de rol**.
+
+**GOTCHAs nuevos:**
+- **TRUNCATE no pasa por RLS.** `rule_pack_versions`, `pack_rules`, `jurisdiction_rule_sets`, `registry_filings*` y `user_profiles` lo concedían a `anon`: la RLS bloqueaba las escrituras y el grant era la única defensa que faltaba. No alcanzable vía PostgREST, pero sobraba.
+- Dos políticas **permisivas** se OR-ean: `jurisdiction_rule_sets_public_read USING(true)` anulaba a `..._tenant_isolation`. Una permisiva pública convierte el aislamiento en decorado.
+- `pack_rules.pack_id` referencia **`country_packs`**, no `rule_packs`. Y `rule_pack_versions.pack_id` es `text`, no `uuid`.
+- Antes de quitar un `DEFAULT tenant_id`, comprobar que quien inserta nombra la columna: las 8 funciones que escriben en esas tablas lo hacen, así que sin default un olvido **falla en voz alta** en vez de aterrizar en ARGA.
+- El `COALESCE(NEW.tenant_id, ARGA)` de `fn_audit_worm` es **inalcanzable**: las 18 tablas que audita tienen `tenant_id NOT NULL`. Se deja: reescribir el trigger de la cadena WORM para cambiar código muerto no compensa.
+- El stepper de reunión **abre en el primer paso INCOMPLETO**, no en el 1: un e2e que asume el paso 1 falla cuando la reunión demo quedó abierta por la pasada anterior. Y el select de materia **solo existe si el punto es `DECISORIO`**; localizar selects por posición (`nth(1)`) cae en el punto siguiente.
+- Para saber si un e2e rojo es regresión, el control es un **worktree en el commit anterior con la configuración de Playwright de HOY** — si no, sin `channel: 'chrome'` no arranca y la comparación no vale.
+
+**No verificado, y se dice:** el probe en vivo del RPC `fn_aims_close_technical_file` lo bloqueó el clasificador de permisos por poder mutar. Le falta la aserción de tenant, pero el guard de `fn_secretaria_evidence_bundle_insert_guard` lo hace **inalcanzable para `authenticated`** (inserta con `status='SEALED'` sin poner el flag de RPC gobernada) — evidencia **estática**, no medida.
+
 ### Verificación última conocida (2026-07-21, cierre convocatoria integral)
 
 - `bun run db:check-target`: pass contra `governance_OS`.
