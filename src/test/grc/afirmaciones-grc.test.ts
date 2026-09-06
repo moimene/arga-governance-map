@@ -20,6 +20,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { sinComentarios } from "../helpers/sin-comentarios";
 import { nextContractChecks } from "@/lib/grc/contract-checks";
+import { GRC_COMPLIANCE_MONITORS, GRC_NOT_CONNECTED_BACKLOG } from "@/lib/grc/dashboard-readiness";
 
 const raiz = process.cwd();
 const leer = (rel: string) => sinComentarios(readFileSync(join(raiz, rel), "utf8"));
@@ -85,5 +86,33 @@ describe("Incidentes GRC — el rótulo persistente no afirma un envío", () => 
 
   it("y sí dice explícitamente que no hay envío", () => {
     expect(src).toMatch(/sin env[íi]o/i);
+  });
+});
+
+// [#100] Tercer caso de la MISMA forma, encontrado el 2026-09-06: se corrigió
+// el DATO y sobrevivió el TEXTO. `GRC_NOT_CONNECTED_BACKLOG` se vació y el
+// monitor de TPRM pasó a declararse conectado sobre `grc_third_parties` (5
+// filas reales de ARGA, medidas en Cloud), pero el pie del panel seguía
+// diciendo en prosa fija que TPRM «queda marcado como gap». Dos afirmaciones
+// sobre lo mismo: una tenía que estar mintiendo.
+describe("Dashboard GRC — la prosa fija no contradice al dato", () => {
+  const src = leer("src/pages/grc/Dashboard.tsx");
+
+  it("el fichero se leyó y conserva el pie de fuente de verdad", () => {
+    expect(src).toContain("Fuente de verdad");
+  });
+
+  it("el dato dice que TPRM está conectado, no que sea un gap", () => {
+    const tprm = GRC_COMPLIANCE_MONITORS.find((m) => m.route === "/grc/tprm");
+    expect(tprm).toBeDefined();
+    expect(tprm!.sourceTables).toContain("grc_third_parties");
+    expect(GRC_NOT_CONNECTED_BACKLOG.map((b) => b.id)).not.toContain("tprm");
+  });
+
+  it("y la prosa ya no le asigna una postura por su cuenta", () => {
+    expect(src).not.toMatch(/TPRM queda marcado como/i);
+    // Se prohíbe la ATRIBUCIÓN en prosa, no la palabra: la postura de cada
+    // dominio la pinta su fila, que sale del dato.
+    expect(src).not.toMatch(/TPRM[^<>{}\n]{0,40}\bgap\b/i);
   });
 });

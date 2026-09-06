@@ -16,12 +16,12 @@ import { getNavGroups } from "@/components/secretaria/shell/navigation";
 import { ScopeSwitcher } from "@/components/secretaria/shell/ScopeSwitcher";
 import { useSidebarVisibility } from "@/components/secretaria/shell/useSidebarVisibilityContext";
 import { useTenantBranding } from "@/context/TenantBrandContext";
+import { useTenantContext } from "@/context/TenantContext";
 import { brandName } from "@/lib/tenant-brand-labels";
-import { isModuleEnabled } from "@/lib/tenant-modules";
 import { GarriguesModuleSwitcher } from "./GarriguesModuleSwitcher";
 import {
   getActiveGarriguesModule,
-  GRC_NAV_ITEMS,
+  getVisibleGrcNavItems,
   AI_NAV_ITEMS,
   type GarriguesSimpleNavItem,
 } from "./navigation";
@@ -139,6 +139,7 @@ export function GarriguesSidebarContent({
   const navigate = useNavigate();
   const location = useLocation();
   const branding = useTenantBranding();
+  const { tenantId } = useTenantContext();
 
   const activeModule = getActiveGarriguesModule(location.pathname);
   const moduleId = activeModule?.id ?? "secretaria";
@@ -149,9 +150,7 @@ export function GarriguesSidebarContent({
   const secretariaGroups = getVisibleSidebarSections(allSecretariaGroups, visibilityCtx);
 
   // GRC items
-  const grcItems = GRC_NAV_ITEMS.filter(
-    (item) => !item.moduleKey || isModuleEnabled(branding, item.moduleKey)
-  );
+  const grcItems = getVisibleGrcNavItems(branding, tenantId);
 
   // AI items
   const aiItems = AI_NAV_ITEMS;

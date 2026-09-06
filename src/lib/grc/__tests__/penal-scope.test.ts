@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { esRiesgoPenal, nivelRiesgo } from "../penal-scope";
 import { descripcionArticulo } from "../../../../scripts/garrigues/penal/descripcion-articulo";
-import { GRC_NAV_ITEMS } from "@/components/garrigues-shell/navigation";
+import { GRC_NAV_ITEMS, getVisibleGrcNavItems } from "@/components/garrigues-shell/navigation";
 import { isModuleEnabled } from "@/lib/tenant-modules";
 
 // Codificación real de cada tenant, comprobada en Cloud: ARGA guarda sus 18
@@ -103,8 +103,13 @@ describe("navegación GRC — el régimen que no aplica no se ofrece", () => {
     ],
   } as never;
 
-  const visibles = (branding: never | null) =>
-    GRC_NAV_ITEMS.filter((i) => !i.moduleKey || isModuleEnabled(branding, i.moduleKey)).map((i) => i.to);
+  // Se pasa por el MISMO filtro que el sidebar. Reimplementarlo aquí solo con
+  // `moduleKey` dejaba fuera el gate por tenant, y desde que existe un item con
+  // gate por tenant (`/grc/sostenibilidad`) esa reimplementación afirmaba que
+  // ARGA lo ve, que es falso.
+  const TENANT_ARGA = "00000000-0000-0000-0000-000000000001";
+  const visibles = (branding: never | null, tenantId: string | null = TENANT_ARGA) =>
+    getVisibleGrcNavItems(branding, tenantId).map((i) => i.to);
 
   it("un despacho no ve Solvencia II ni el registro DORA de terceros", () => {
     const rutas = visibles(GARRIGUES);
@@ -122,6 +127,9 @@ describe("navegación GRC — el régimen que no aplica no se ofrece", () => {
     expect(rutas).toContain("/grc/solvencia-ii");
     expect(rutas).toContain("/grc/tprm");
     expect(rutas).toContain("/grc/packs");
-    expect(rutas).toHaveLength(GRC_NAV_ITEMS.length);
+    // Todo menos lo que pertenece a otro tenant por dato, no por lista blanca:
+    // el catálogo ESG es de Garrigues y su gate falla CERRADO.
+    expect(rutas).not.toContain("/grc/sostenibilidad");
+    expect(rutas).toHaveLength(GRC_NAV_ITEMS.length - 1);
   });
 });
