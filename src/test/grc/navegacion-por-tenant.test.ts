@@ -103,6 +103,34 @@ describe("#72 — el dashboard GRC no ofrece rutas que el guard va a redirigir",
     // El defecto era la enumeración literal dentro del filtro.
     expect(src).not.toContain('route.startsWith("/grc/m/dora")');
   });
+
+  // Comprobar la FUNCIÓN no prueba que las listas la APLIQUEN: si alguien
+  // quitara el `.filter(...)` de una de ellas, todo lo de arriba seguiría verde
+  // y las tarjetas muertas volverían. Se cuentan las aplicaciones, que son las
+  // cinco superficies que enlazan a módulos: los tres bloques de tarjetas
+  // (monitores, dominios P0, posturas de pantalla) y las dos listas de enlaces
+  // del pie.
+  it("y las CINCO listas que enlazan a módulos aplican el filtro, no solo existe", () => {
+    const src = leer("src/pages/grc/Dashboard.tsx");
+    // Se buscan las LLAMADAS con su argumento, no el nombre suelto: la
+    // declaración de la función lo contiene y contarla habría inflado el total.
+    for (const aplicacion of [
+      "isGrcRouteVisible(branding, monitor.route)",
+      "isGrcRouteVisible(branding, domain.route)",
+      "isGrcRouteVisible(branding, screen.route)",
+      "isGrcRouteVisible(branding, link.to)",
+      "isGrcRouteVisible(branding, mod.to)",
+    ]) {
+      expect(src, `falta el filtro en: ${aplicacion}`).toContain(aplicacion);
+    }
+    for (const lista of [
+      "GRC_COMPLIANCE_MONITORS.filter",
+      "GRC_P0_DOMAINS.filter",
+      "GRC_SCREEN_POSTURES.filter",
+    ]) {
+      expect(src).toContain(lista);
+    }
+  });
 });
 
 describe("#49 — /grc/sostenibilidad deja de ser ruta huérfana", () => {

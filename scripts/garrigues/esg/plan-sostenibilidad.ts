@@ -155,10 +155,16 @@ export const PRINCIPIOS_PACTO_MUNDIAL: readonly string[] = [
  * del tenant (slug `garrigues-comite-sostenibilidad`).
  *
  * Este objeto sigue siendo el criterio de VISIBILIDAD de la pantalla, no un
- * espejo de esa fila: la comparación de tenant se hace aquí. Lo que sigue
- * abierto es la navegación — `/grc/sostenibilidad` no tiene item de menú que
- * lleve a ella, y `grc_modules.route` no es lo que construye el menú
- * (comprobado: los `route` que consume el Dashboard son constantes TS).
+ * espejo de esa fila: la comparación de tenant se hace aquí. Y desde el mismo
+ * día `esgVisibleParaTenant` gobierna también la NAVEGACIÓN: es el `tenantGate`
+ * del item «Sostenibilidad» (`src/components/garrigues-shell/navigation.ts:112`,
+ * filtrado en `getVisibleGrcNavItems`). Se eligió este gate y no `moduleKey`
+ * porque `isModuleEnabled` falla ABIERTO y ARGA —que tiene `branding` NULL—
+ * habría ganado un item hacia una pantalla que su tenant no puede ver.
+ *
+ * `grc_modules.route` NO construye el menú: los `route` que consume el
+ * Dashboard son constantes TS. La fila existe para declarar el módulo, no para
+ * enrutar.
  */
 export const ESG_MODULO = {
   id: "esg",

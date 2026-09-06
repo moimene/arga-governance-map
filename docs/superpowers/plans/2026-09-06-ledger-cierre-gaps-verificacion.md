@@ -127,8 +127,14 @@ de la cadena WORM para cambiar código muerto no compensa el riesgo.
 |---|---|---|
 | DA-12 | `opened_at = 2026-08-29` (fecha del seed) en los 8 `FND-GARR-PEN-*` | 8 filas a NULL |
 | DA-13 | `RSK-GARR-PEN-069` decía «Artículos del Código Penal: Ley de represión del contrabando». El contrabando se tipifica en la LO 12/1995. Es el **único riesgo rojo** del tenant | ahora «Ley de represión del contrabando», idéntico a lo que produce hoy `descripcionArticulo()` |
-| DA-14 | `grc_modules` de Garrigues sin fila `esg` | sembrada con la misma forma que sus cuatro hermanas (`state='Planificado'`, contadores a 0) y `owner` acreditado: «Comité de Sostenibilidad» existe como órgano del tenant |
+| DA-14 | `grc_modules` de Garrigues sin fila `esg` | sembrada con la misma forma que sus cuatro hermanas (`state='Planificado'`, contadores a 0) y `owner` acreditado: «Comité de Sostenibilidad» existe como órgano del tenant. Además tiene item de navegación, gateado por `esgVisibleParaTenant` — que falla CERRADO, al contrario que `isModuleEnabled` |
 | DA-17 | 4 evaluaciones de ARGA con nota fabricada por un e2e que afirmaba «cumplimiento estricto de todos los artículos» del Reglamento de IA | nota sustituida por su procedencia real; 0 restantes |
+
+Las cuatro se aplicaron primero con `execute_sql` y **sin espejo en el repo** —una
+infracción de la regla de reproducibilidad que cometí yo y que cazó la review
+adversarial—. Corregido: la migración idempotente
+`20260906090729_correcciones_dato_cierre_2026_09_06` las recoge y está
+registrada en `schema_migrations`.
 
 ---
 

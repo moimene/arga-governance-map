@@ -7,9 +7,10 @@ import { useTenantContext } from "@/context/TenantContext";
  *
  * Los `.from("aims_…" as never)` que había aquí se han retirado: no hacían
  * nada. `supabase.from()` en esta app NO está tipado por tabla, y la causa no
- * es que falten las tablas en los tipos generados —que faltan: ninguna de las
- * `aims_fria_*` ni `aims_incident_*` está en `supabase/functions/_types/
- * database.ts`—, sino que `createClient` se construye SIN el genérico
+ * es que falten las tablas en los tipos generados —el fichero está a medias:
+ * `aims_incident_evidence_packs` SÍ está en `supabase/functions/_types/
+ * database.ts:1233`, y las `aims_fria_*` no—, sino que `createClient` se
+ * construye SIN el genérico
  * `Database` (`src/integrations/supabase/client.ts`, y no hay ni un
  * `createClient<…>` en todo el repo). Con el cliente sin genérico, `from()`
  * acepta cualquier `string` y devuelve filas `any`.

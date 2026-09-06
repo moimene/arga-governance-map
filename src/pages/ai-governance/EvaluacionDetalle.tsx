@@ -170,7 +170,12 @@ export default function EvaluacionDetalle() {
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs text-[var(--g-text-secondary)]">
               <span className="font-mono font-semibold text-[var(--g-brand-3308)]">
-                {isIso ? "ISO/IEC 42001 AUDIT" : "AESIA GUÍA 16 / RIA"}
+                {/* El alta de esta misma evaluación retiró la atribución a la guía
+                    numerada de la Agencia: la fuente de un requisito del
+                    Reglamento es el ARTÍCULO, y esa atribución nunca se cotejó
+                    contra publicación oficial. El informe del mismo objeto se
+                    había quedado fuera de la retirada. */}
+                {isIso ? "ISO/IEC 42001 AUDIT" : "REGLAMENTO (UE) 2024/1689"}
               </span>
               <span>•</span>
               <span className="flex items-center gap-1">
@@ -381,7 +386,7 @@ export default function EvaluacionDetalle() {
                         <th className="pb-2 font-semibold">Código</th>
                         <th className="pb-2 font-semibold">Descripción de la Medida (MG)</th>
                         <th className="pb-2 font-semibold">Bloque del requisito</th>
-                        <th className="pb-2 font-semibold">Madurez (AESIA)</th>
+                        <th className="pb-2 font-semibold">Madurez</th>
                         <th className="pb-2 font-semibold">Plan de Adaptación</th>
                       </tr>
                     </thead>

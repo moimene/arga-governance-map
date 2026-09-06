@@ -87,6 +87,15 @@ describe("Incidentes GRC — el rótulo persistente no afirma un envío", () => 
   it("y sí dice explícitamente que no hay envío", () => {
     expect(src).toMatch(/sin env[íi]o/i);
   });
+
+  // El gate anterior prohibía el participio («Enviada», «transmitida
+  // formalmente») y dejaba pasar el IMPERATIVO: el botón del formulario de
+  // retraso decía «Transmitir Notificación de Retraso» a cuatro líneas del
+  // toast que avisa de que no se ha transmitido nada. Se prohíbe también la
+  // orden, que es la misma afirmación en otro tiempo verbal.
+  it("ni el imperativo: ningún botón ORDENA transmitir o remitir", () => {
+    expect(src).not.toMatch(/>\s*(?:Transmitir|Remitir|Enviar)\s/);
+  });
 });
 
 // [#100] Tercer caso de la MISMA forma, encontrado el 2026-09-06: se corrigió

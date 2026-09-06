@@ -123,6 +123,15 @@ describe("SII — no se afirma lo que no se sostiene", () => {
     ],
     // ── Fases y trazas inexistentes ──────────────────────────────────────
     [/admitid[oa] a trámite/, "no existe fase de admisión: el estado que se escribe es ACUSE_EMITIDO"],
+    // La misma afirmación con otras palabras, que por eso se le escapó al gate:
+    // el modal del acuse decía «acreditando la recepción y el inicio de las
+    // diligencias previas conforme al Art. 9.2.c», y ni se abre diligencia
+    // ninguna ni el 9.2.c las menciona (cotejado contra BOE-A-2023-4513: solo
+    // regula el envío del acuse en siete días naturales).
+    [
+      /diligencias previas/i,
+      "el acuse no abre diligencia alguna: la mutación escribe status=ACUSE_EMITIDO y un mensaje",
+    ],
     [/log (?:de auditoría )?independiente/i, "el gate solo escribe una marca en sessionStorage"],
     [/metadatos EXIF/i, "el saneado solo renombra el fichero; el contenido ni se sube"],
     // ── Citas legales incorrectas ────────────────────────────────────────

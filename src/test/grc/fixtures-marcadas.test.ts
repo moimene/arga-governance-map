@@ -36,7 +36,18 @@ const EXCEPCIONES: Record<string, string> = {
 const rel = (p: string) => p.slice(RAIZ.length + 1);
 
 // Señales de que la pantalla trae su contenido de Cloud.
-const CONECTADA = /\bsupabase\b|useIncidents\(|useQuery\(/;
+//
+// Se exige una LLAMADA, no una mención. Antes bastaba con que la palabra
+// `supabase` apareciera en el fichero, así que un `import { supabase }` sin usar
+// —o un comentario que lo nombrara— eximía a la pantalla de llevar el aviso: el
+// guard se derrotaba con un señuelo, que es justo la forma de gate vacuo que
+// este repo ya tiene documentada.
+//
+// Las siete pantallas realmente conectadas se midieron una a una: cinco leen
+// con `useQuery(` (audit/ActionPlans, audit/Findings, cyber/Vulnerabilities,
+// dora/BCM, dora/RTO) y dos con `useIncidents(` (cyber/Incidents,
+// dora/Incidents). Ninguna necesita la mención suelta para ser reconocida.
+const CONECTADA = /supabase\s*\.\s*from\s*\(|useQuery\s*\(|useIncidents\s*\(/;
 
 describe("#107 — las pantallas de fixture GRC van marcadas", () => {
   const ficheros = pantallas(RAIZ);
@@ -52,7 +63,10 @@ describe("#107 — las pantallas de fixture GRC van marcadas", () => {
       const src = sinComentarios(readFileSync(f, "utf8"));
       if (CONECTADA.test(src)) return false;
       if (EXCEPCIONES[rel(f)]) return false;
-      return !src.includes("<DemoFixtureNotice");
+      // Con `includes` bastaba un componente cuyo nombre EMPIECE igual
+      // (`<DemoFixtureNoticeX`) para satisfacer el gate. Se exige el cierre del
+      // nombre: `<DemoFixtureNotice` seguido de espacio, `/` o `>`.
+      return !/<DemoFixtureNotice[\s/>]/.test(src);
     });
     expect(sinMarca.map(rel)).toEqual([]);
   });
