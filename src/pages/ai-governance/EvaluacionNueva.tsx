@@ -1,3 +1,31 @@
+/**
+ * Alta del autodiagnóstico de conformidad (Reglamento (UE) 2024/1689).
+ *
+ * QUÉ SE CITA EN PANTALLA. El artículo del Reglamento, que sí está cotejado y
+ * lo pinta el catálogo. NADA MÁS.
+ *
+ * La atribución del método a una guía numerada de la Agencia se retiró el
+ * 2026-09-06 de las siete superficies de texto de esta pantalla (título, nota
+ * por defecto que se PERSISTE en `ai_risk_assessments.notes`, opción de marco,
+ * cabecera y subtítulo del paso 2, rótulo de la justificación y subtítulo del
+ * paso 3) por dos motivos distintos, ninguno de los cuales es que la guía no
+ * exista:
+ *
+ *   1. La fuente de un requisito del Reglamento es el ARTÍCULO. Una guía de la
+ *      Agencia es material de apoyo no vinculante, y presentarla como el origen
+ *      del requisito invierte la jerarquía.
+ *   2. Esa atribución concreta NUNCA se cotejó contra publicación oficial —el
+ *      propio catálogo lo dejó escrito como deuda abierta—, mientras que la
+ *      atribución hermana, la de guía POR REQUISITO, resultó equivocada en diez
+ *      de doce cuando por fin se comprobó.
+ *
+ * El catálogo, los 12 requisitos y las 84 medidas siguen intactos: lo que se
+ * retira es la afirmación de procedencia, no el contenido. Vuelve el día que
+ * haya un cotejo documentado con su fecha.
+ *
+ * Fijado en `src/test/aims/no-fabricated-claims.test.ts` y en
+ * `e2e/aims-evaluaciones.spec.ts`.
+ */
 import { useState, useMemo } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import {
@@ -191,7 +219,7 @@ export default function EvaluacionNueva() {
       status: payload.status,
       notes:
         notes ||
-        `Autodiagnóstico AESIA Guía 16. Medidas evaluadas: ${payload.evaluadas}/${payload.totales}.`,
+        `Autodiagnóstico de conformidad. Medidas evaluadas: ${payload.evaluadas}/${payload.totales}.`,
     };
 
     try {
@@ -226,7 +254,7 @@ export default function EvaluacionNueva() {
             <span>Volver a Evaluaciones</span>
           </button>
           <h1 className="text-2xl font-bold text-[var(--g-text-primary)]">
-            Nuevo Autodiagnóstico de Conformidad (AESIA Guía 16)
+            Nuevo Autodiagnóstico de Conformidad
           </h1>
         </div>
 
@@ -310,7 +338,7 @@ export default function EvaluacionNueva() {
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 <option value="EU_AI_ACT">
-                  Reglamento de IA (UE 2024/1689) + Guías Técnicas AESIA (12 Requisitos)
+                  Reglamento de IA (UE 2024/1689) — 12 requisitos
                 </option>
                 <option value="ISO_42001">UNE-EN ISO/IEC 42001:2023 (Gestión de IA)</option>
               </select>
@@ -364,10 +392,10 @@ export default function EvaluacionNueva() {
           >
             <div className="space-y-0.5">
               <span className="text-xs font-bold text-[var(--g-brand-3308)] uppercase tracking-wider">
-                Autoevaluación Granular (Guía 16 AESIA)
+                Autoevaluación granular por medida
               </span>
               <p className="text-xs text-[var(--g-text-secondary)]">
-                Evalúa el nivel de madurez (L1 a L8) y la dificultad para cada una de las Medidas Guía oficiales.
+                Evalúa el nivel de madurez (L1 a L8) y la dificultad de cada medida del catálogo.
               </p>
             </div>
 
@@ -550,7 +578,7 @@ export default function EvaluacionNueva() {
                       {state.maturity === "L8" && (
                         <div className="p-3 bg-[var(--g-surface-subtle)] border-l-4 border-[var(--g-brand-3308)] space-y-1.5">
                           <label className="block text-xs font-bold text-[var(--g-text-primary)]">
-                            Justificación Técnica Obligatoria (Regla Guía 16) *
+                            Justificación Técnica Obligatoria *
                           </label>
                           <input
                             type="text"
@@ -634,7 +662,7 @@ export default function EvaluacionNueva() {
                   3. Consolidación y Plan de Adaptación (PDA)
                 </h2>
                 <p className="text-xs text-[var(--g-text-secondary)]">
-                  Resumen de diagnóstico generado según las reglas de negocio de la Guía 16 AESIA.
+                  Resumen de diagnóstico generado con las reglas de conversión del catálogo de medidas.
                 </p>
               </div>
               <div className="text-right">

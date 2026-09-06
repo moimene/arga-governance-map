@@ -20,13 +20,16 @@ describe("G1 — el perímetro Garrigues en Cloud refleja el catálogo", () => {
   let authed = false;
 
   beforeAll(async () => {
-    try {
-      // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
-      garr = await sesionDe("GARRIGUES");
-      authed = true;
-    } catch {
-      authed = false;
-    }
+    // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
+    //
+    // SIN try/catch, a propósito. Lo había, y con él un login fallido —clave
+    // rotada, .env sin `DEMO_PASSWORD_GARRIGUES`, Cloud caído— dejaba `authed`
+    // en false y los cinco `it` de abajo se saltaban devolviendo
+    // `expect(true).toBe(true)`: cinco tests EN VERDE sin asertar nada sobre
+    // Cloud, que es peor que no tenerlos porque parecen cobertura. `sesionDe`
+    // LANZA si no autentica; dejar que lance es lo que pone el gate en rojo.
+    garr = await sesionDe("GARRIGUES");
+    authed = true;
   }, 30_000);
 
   // SIN afterAll con signOut: la sesión es COMPARTIDA. Cerrarla aquí dejaría sin
@@ -34,7 +37,7 @@ describe("G1 — el perímetro Garrigues en Cloud refleja el catálogo", () => {
   // en un fichero que no ha hecho nada mal.
 
   it("hay exactamente tantas entidades como entradas del catálogo, todas del tenant", async () => {
-    if (!authed || !garr) { expect(true).toBe(true); return; }
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { data, error } = await garr.from("entities").select("id, tenant_id").limit(500);
     expect(error).toBeNull();
     expect((data ?? []).length).toBe(GARRIGUES_ENTITIES.length);
@@ -42,7 +45,7 @@ describe("G1 — el perímetro Garrigues en Cloud refleja el catálogo", () => {
   });
 
   it("la matriz tiene NIF y registrales del RM", async () => {
-    if (!authed || !garr) { expect(true).toBe(true); return; }
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { data, error } = await garr
       .from("entities")
       .select("registration_number, registry_sheet, registry_volume, registry_folio, forma_administracion")
@@ -56,7 +59,7 @@ describe("G1 — el perímetro Garrigues en Cloud refleja el catálogo", () => {
   });
 
   it("los parents de Cloud coinciden 1:1 con el catálogo", async () => {
-    if (!authed || !garr) { expect(true).toBe(true); return; }
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const bySlugUuid = new Map(GARRIGUES_ENTITIES.map((e) => [e.slug, e.uuid]));
     const expected = new Map(
       GARRIGUES_ENTITIES.map((e) => [e.uuid, e.parentSlug ? bySlugUuid.get(e.parentSlug)! : null]),
@@ -69,7 +72,7 @@ describe("G1 — el perímetro Garrigues en Cloud refleja el catálogo", () => {
   });
 
   it("EAD Trust cuelga de NewLaw con provenance a-confirmar y consejo", async () => {
-    if (!authed || !garr) { expect(true).toBe(true); return; }
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { data, error } = await garr
       .from("entities")
       .select("parent_entity_id, ownership_percentage, forma_administracion, data_provenance")
@@ -82,7 +85,7 @@ describe("G1 — el perímetro Garrigues en Cloud refleja el catálogo", () => {
   });
 
   it("toda entidad tiene data_provenance con cobertura_motor booleana", async () => {
-    if (!authed || !garr) { expect(true).toBe(true); return; }
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { data, error } = await garr.from("entities").select("slug, data_provenance").limit(500);
     expect(error).toBeNull();
     for (const row of data ?? []) {

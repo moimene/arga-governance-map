@@ -435,7 +435,10 @@ export default function IncidenteDetalle() {
                 className="px-4 py-1.5 text-xs font-semibold bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-50 transition-colors"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
-                {clientCommSent ? "Comunicación a Clientes Enviada" : "Emitir Comunicación Oficial a Clientes"}
+                {/* El toast y el badge ya dicen que no hay envío; este rótulo,
+                    que es el PERSISTENTE, seguía afirmándolo. No existe camino
+                    de escritura a `regulatory_notifications` desde aquí. */}
+                {clientCommSent ? "Marcada en pantalla (sin envío)" : "Marcar comunicación a clientes"}
               </button>
             </div>
           </div>
@@ -592,7 +595,11 @@ export default function IncidenteDetalle() {
                   className="px-4 py-1.5 text-xs font-semibold bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
-                  Transmitir Notificación de Retraso
+                  {/* «Transmitir» afirmaba lo contrario que su propio handler,
+                      que a cuatro líneas de aquí avisa de que no se ha
+                      transmitido nada a la autoridad. Mismo defecto que el
+                      rótulo de comunicación a clientes, en el mismo fichero. */}
+                  Registrar justificación del retraso (sin envío)
                 </button>
               </div>
             </form>
@@ -679,7 +686,10 @@ export default function IncidenteDetalle() {
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
                   <Send className="h-3.5 w-3.5" />
-                  Transmitir Propuesta
+                  {/* No transmite nada: `handleEscalateSubmit` NAVEGA al intake
+                      de Secretaría (handoff read-only por navegación, contrato
+                      de `cross-module-handoff.ts`), como dice su propio toast. */}
+                  Abrir intake en Secretaría
                 </button>
               </div>
             </form>

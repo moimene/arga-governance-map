@@ -16,6 +16,7 @@ import {
   getGrcP0ReadinessSummary,
   getGrcScreenPostureSummary,
 } from "@/lib/grc/dashboard-readiness";
+import { grcRouteModuleKey } from "@/lib/grc/route-module-key";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import type { SecretariaScopeController } from "@/components/secretaria/shell";
 import { Link } from "react-router-dom";
@@ -36,15 +37,19 @@ import {
   Waypoints,
 } from "lucide-react";
 
-// D-5 — visibilidad por ruta destino, compartida por las 3 superficies de
+// D-5 — visibilidad por ruta destino, compartida por las 5 superficies de
 // este dashboard que enlazan a un módulo gateado (Readiness P0, Monitor de
-// cumplimiento, Contexto técnico/contratos). Filtra siempre en el consumidor
-// — los registros de dashboard-readiness.ts quedan intactos a propósito
-// (dashboard-readiness.test.ts asierta su contenido completo).
+// cumplimiento, Contexto técnico/contratos, Accesos rápidos, Módulos).
+// Filtra siempre en el consumidor — los registros de dashboard-readiness.ts
+// quedan intactos a propósito (dashboard-readiness.test.ts asierta su
+// contenido completo).
+//
+// El criterio es el MISMO que el del guard de ruta (`grcRouteModuleKey`): antes
+// se enumeraban dos rutas a mano y el resto pasaba, así que Garrigues recibía
+// tarjetas a los módulos anidados que el guard redirige a `/` sin mensaje.
 function isGrcRouteVisible(branding, route: string) {
-  if (route.startsWith("/grc/m/dora")) return isModuleEnabled(branding, "dora");
-  if (route.startsWith("/grc/packs")) return isModuleEnabled(branding, "country-packs");
-  return true;
+  const clave = grcRouteModuleKey(route);
+  return clave === null || isModuleEnabled(branding, clave);
 }
 
 function KpiCard({
@@ -255,8 +260,13 @@ function ComplianceMonitorPanel({ scope }: { scope: SecretariaScopeController })
       </div>
 
       <div className="border-t border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-5 py-3 text-xs leading-5 text-[var(--g-text-secondary)]">
-        Fuente de verdad: tablas GRC conectadas actuales y contratos locales. TPRM queda marcado como gap,
-        y los handoffs a Secretaría/AIMS son rutas de solo lectura, sin escrituras cross-module.
+        {/* La postura de cada dominio la declara su propia fila de arriba, que
+            sale del dato. Esta línea la repetía en prosa fija y se quedó
+            desactualizada: seguía diciendo que TPRM es un gap cuando
+            `/grc/tprm` ya lee `grc_third_parties` del tenant. Una afirmación
+            duplicada solo puede desmentir a la otra. */}
+        Fuente de verdad: tablas GRC conectadas actuales y contratos locales. Los handoffs a
+        Secretaría/AIMS son rutas de solo lectura, sin escrituras cross-module.
       </div>
     </section>
   );

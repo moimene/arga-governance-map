@@ -727,3 +727,177 @@ describe("FRIA — ausencia acreditada, no ausencia a secas", () => {
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cierre 2026-09-06 — lo que se corrigió sin nada que lo sujetara.
+//
+// Cuatro retiradas y una arista quedaron aplicadas en el árbol sin un solo test
+// detrás. Un cambio sin guard dura hasta el próximo refactor, y el sesgo del
+// producto ya está catalogado: el hueco se rellena con la lectura optimista.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Fuente sin comentarios NI líneas de import: lo que la pantalla dice. */
+function textoDe(f: string): string {
+  return sinComentarios(read(f)).replace(/^\s*import[\s\S]*?;\s*$/gm, " ");
+}
+
+const ALTA_EVAL = "src/pages/ai-governance/EvaluacionNueva.tsx";
+
+describe("2026-09-06 — el alta de la evaluación no atribuye el método a una guía", () => {
+  it("ninguna de sus superficies de texto nombra una guía numerada de la Agencia", () => {
+    const t = textoDe(ALTA_EVAL);
+    // La fuente de un requisito del Reglamento es el ARTÍCULO. Una guía de la
+    // Agencia es material de apoyo no vinculante, y esta atribución concreta
+    // nunca se cotejó contra publicación oficial — mientras que su hermana, la
+    // atribución POR REQUISITO, resultó equivocada en diez de doce.
+    for (const patron of [
+      /Gu[íi]as?\s+\d+/i,
+      /Gu[íi]as?\s+T[ée]cnicas/i,
+      /Regla\s+Gu[íi]a/i,
+      /Medidas\s+Gu[íi]a/i,
+      /Autodiagn[óo]stico\s+AESIA/i,
+    ]) {
+      expect(patron.test(t), `${ALTA_EVAL}: vuelve la atribución → ${patron}`).toBe(false);
+    }
+  });
+
+  it("la nota que se PERSISTE tampoco la lleva", () => {
+    // Ésta es la peor de las siete: no se queda en pantalla, se escribe en
+    // `ai_risk_assessments.notes` y sobrevive a cualquier corrección de copy.
+    const t = textoDe(ALTA_EVAL);
+    const nota = t.match(/`Autodiagn[óo]stico[^`]*`/);
+    expect(nota, "desaparece la nota por defecto del autodiagnóstico").not.toBeNull();
+    expect(/Gu[íi]a/i.test(nota![0]), `la nota persistida atribuye una guía: ${nota![0]}`).toBe(false);
+  });
+
+  it("y lo que SÍ se cita sigue en pie: el Reglamento y su catálogo", () => {
+    // Control positivo. Sin esto, vaciar la pantalla satisfaría las dos
+    // aserciones de arriba y «no atribuye» pasaría a significar «no dice nada».
+    const t = textoDe(ALTA_EVAL);
+    expect(/2024\/1689/.test(t), "se ha perdido la cita del Reglamento").toBe(true);
+    expect(/ISO\/IEC 42001/.test(t), "se ha perdido el marco ISO").toBe(true);
+    // El catálogo se sigue consumiendo: lo que se retiró es la procedencia, no
+    // los 12 requisitos ni las 84 medidas.
+    expect(read(ALTA_EVAL)).toContain("AESIA_RIA_REQUIREMENTS");
+  });
+});
+
+describe("2026-09-06 — un solo vocabulario para el estado de un sistema", () => {
+  it("un estado fuera del vocabulario va NEUTRO, no en aviso", async () => {
+    // `ai_systems.status` no tiene CHECK y en Cloud conviven cinco grafías. La
+    // ficha comparaba contra 'ACTIVO' con su propia lista de dos entradas, así
+    // que pintaba de ÁMBAR un sistema 'Conforme' sólo por no estar en ella.
+    const { systemStatusChipClass, systemStatusLabel } = await import("@/lib/aims/readiness");
+
+    const neutro = systemStatusChipClass("Conforme");
+    expect(/status-warning|status-error/.test(neutro), "un estado desconocido se pinta como alarma")
+      .toBe(false);
+    expect(/status-success/.test(neutro), "un estado desconocido se pinta como bueno").toBe(false);
+    // Control discriminante: los conocidos SÍ reciben su color, o el neutro
+    // sería un «todo gris» que tampoco informa.
+    expect(/status-success/.test(systemStatusChipClass("ACTIVO"))).toBe(true);
+    expect(/status-warning/.test(systemStatusChipClass("EN_EVALUACION"))).toBe(true);
+
+    // Y la etiqueta: sin traducción conocida se pinta el literal de la base.
+    expect(systemStatusLabel("Conforme")).toBe("Conforme");
+    expect(systemStatusLabel("EN_EVALUACION")).toBe("En evaluación");
+    expect(systemStatusLabel(null)).toBe("Sin estado");
+  });
+
+  it("ninguna pantalla se monta su propio mapa de estados", () => {
+    // Dos vocabularios divergen: es literalmente lo que pasó. El mapa vive en
+    // `readiness.ts`, junto a `normalizeAimsStatus`, que existe por esto mismo.
+    for (const f of superficieAims()) {
+      if (f === "src/lib/aims/readiness.ts") continue;
+      const src = sinComentarios(read(f));
+      // Se busca la CLAVE de un mapa (`EN_EVALUACION:` al principio de línea),
+      // no el nombre de la constante: `Incidentes.tsx` tiene su propio
+      // `STATUS_CHIP` para ABIERTO/CERRADO, que es otro vocabulario y está
+      // bien. Y no se prohíbe el valor —`value: "EN_EVALUACION"` en un
+      // `<option>` o en un filtro es un camino de escritura legítimo—.
+      expect(
+        /^\s*EN_EVALUACION\s*:/m.test(src),
+        `${f}: vuelve a declarar un mapa del estado de un sistema`,
+      ).toBe(false);
+      expect(
+        /\bsystem\.status\s*===|\bsys\.status\s*===/.test(src),
+        `${f}: compara el estado del sistema a mano en vez de usar el predicado`,
+      ).toBe(false);
+    }
+  });
+});
+
+describe("2026-09-06 — conformidad y severidad, un predicado cada una", () => {
+  it("ninguna pantalla compara la conformidad con un literal", () => {
+    // `assessmentAcreditaConformidad` acepta el vocabulario que se ESCRIBE y el
+    // legado. Comparar a mano contra "CONFORME" deja fuera las filas antiguas
+    // en 'APROBADO' — que es la mitad del inventario de ARGA.
+    for (const f of superficieAims()) {
+      if (f === "src/lib/aims/readiness.ts") continue;
+      const src = sinComentarios(read(f));
+      for (const m of src.match(/status\s*===\s*"(CONFORME|APROBADO)"/g) ?? []) {
+        expect(false, `${f}: conformidad comparada a mano → ${m}`).toBe(true);
+      }
+    }
+  });
+
+  it("ninguna pantalla compara la severidad con grafías que nadie escribe", () => {
+    // 'CRITICA'/'ALTA' no las produce ningún camino de escritura: el alta y la
+    // lista escriben 'CRITICO'/'ALTO'. El chip nunca se encendía.
+    for (const f of superficieAims()) {
+      const src = sinComentarios(read(f));
+      for (const m of src.match(/[Ss]everity\s*===\s*"(CRITICA|ALTA)"/g) ?? []) {
+        expect(false, `${f}: severidad comparada con una grafía inexistente → ${m}`).toBe(true);
+      }
+    }
+  });
+
+  it("los dos predicados discriminan de verdad", async () => {
+    // Control positivo de los predicados en sí: uno que devolviera siempre
+    // `true` satisfaría cualquier pantalla que lo llamara.
+    const { assessmentAcreditaConformidad, isMaterialSeverity } = await import("@/lib/aims/readiness");
+    expect(assessmentAcreditaConformidad("CONFORME")).toBe(true);
+    expect(assessmentAcreditaConformidad("APROBADO")).toBe(true);
+    expect(assessmentAcreditaConformidad("CON_GAPS")).toBe(false);
+    expect(assessmentAcreditaConformidad(null)).toBe(false);
+
+    // Las grafías que el producto escribe de verdad.
+    expect(isMaterialSeverity("CRITICO")).toBe(true);
+    expect(isMaterialSeverity("ALTO")).toBe(true);
+    expect(isMaterialSeverity("MEDIO")).toBe(false);
+    expect(isMaterialSeverity(null)).toBe(false);
+  });
+});
+
+describe("2026-09-06 — el órgano de la FRIA es una ARISTA, no un rótulo", () => {
+  const HOOK_FRIA = "src/hooks/useAimsFria.ts";
+
+  it("el hook lee la FK con su embed y NO declara la columna inexistente", () => {
+    // `aims_fria_remediation_governance` tiene `governance_body_id uuid` con FK
+    // a `governing_bodies` (verificado contra Cloud). La interfaz declaraba en
+    // su lugar un `governance_body: string` que no existe, así que la ficha
+    // habría pintado `undefined` en cuanto hubiera una fila.
+    const src = read(HOOK_FRIA);
+    expect(/\bgovernance_body\b\s*:/.test(sinComentarios(src)),
+      "vuelve la columna de texto que no existe").toBe(false);
+    expect(src).toContain("governance_body_id");
+    expect(src).toContain("governing_bodies(name, slug)");
+  });
+
+  it("la ficha ENLAZA al órgano, y sin FK dice que no consta", () => {
+    // La lección de G4, literal: leer «Propietario: Comité X» en pantalla no
+    // prueba que la FK se use — coincide porque el seed escribe FK y texto con
+    // el mismo valor. La prueba de una relación es el enlace.
+    //
+    // Y el enlace va por SLUG: `/organos/:id` resuelve con `useBodyBySlug`, no
+    // por UUID. Enlazar con el id daría un 404 silencioso.
+    const src = sinComentarios(read(DETALLE));
+    const bloque = src.slice(src.indexOf("friaDetails.remediation"));
+    expect(/organos\/\$\{[^}]*governing_bodies\.slug\}/.test(bloque),
+      "el órgano de la FRIA no enlaza por slug").toBe(true);
+    expect(/governing_bodies\.name/.test(bloque), "no se pinta el nombre del órgano").toBe(true);
+    // Sin FK no se inventa nombre.
+    expect(/sin órgano acreditado/.test(bloque), "sin FK se pinta algo en vez de decir que no consta")
+      .toBe(true);
+  });
+});

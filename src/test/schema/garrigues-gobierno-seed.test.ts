@@ -36,7 +36,7 @@ describe("G2 — el gobierno de la matriz Garrigues en Cloud refleja los seeds T
   // sin autenticar a todas las sondas que corran después.
 
   it("346 condiciones SOCIO vigentes en la matriz", async () => {
-    if (!authed || !garr) { expect(true).toBe(true); return; }
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { data, error } = await garr.from("condiciones_persona")
       .select("id").eq("tipo_condicion", "SOCIO").eq("estado", "VIGENTE").limit(500);
     expect(error).toBeNull();
@@ -44,7 +44,7 @@ describe("G2 — el gobierno de la matriz Garrigues en Cloud refleja los seeds T
   });
 
   it("órganos: 1 JUNTA + 2 CDA + 19 COMITE, todos con config coherente", async () => {
-    if (!authed || !garr) { expect(true).toBe(true); return; }
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { data, error } = await garr.from("governing_bodies").select("slug, body_type, config").limit(100);
     expect(error).toBeNull();
     const byType = (t) => (data ?? []).filter((b) => b.body_type === t);
@@ -55,7 +55,7 @@ describe("G2 — el gobierno de la matriz Garrigues en Cloud refleja los seeds T
   });
 
   it("ADMIN_UNICO de Vives con inscripción I/A 960 y mandato 2026→2032", async () => {
-    if (!authed || !garr) { expect(true).toBe(true); return; }
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { data, error } = await garr.from("condiciones_persona")
       .select("fecha_inicio, fecha_fin, inscripcion_rm_referencia, person:person_id(full_name)")
       // El embed `person:person_id(...)` es to-ONE por la FK, asi que PostgREST
@@ -73,7 +73,7 @@ describe("G2 — el gobierno de la matriz Garrigues en Cloud refleja los seeds T
   });
 
   it("consejo EAD: 7 cargos en el body garrigues-ead-cda", async () => {
-    if (!authed || !garr) { expect(true).toBe(true); return; }
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { data: body } = await garr.from("governing_bodies").select("id").eq("slug", "garrigues-ead-cda").maybeSingle();
     const { data, error } = await garr.from("condiciones_persona")
       .select("tipo_condicion").eq("body_id", body?.id ?? "");
@@ -82,7 +82,7 @@ describe("G2 — el gobierno de la matriz Garrigues en Cloud refleja los seeds T
   });
 
   it("capital: perfil VIGENTE 11.104.008 y 347 holdings que suman ~100", async () => {
-    if (!authed || !garr) { expect(true).toBe(true); return; }
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { data: prof } = await garr.from("entity_capital_profile")
       .select("capital_escriturado").eq("estado", "VIGENTE")
       .eq("entity_id", "00000000-0000-0000-0002-000000000001").maybeSingle();
@@ -95,7 +95,7 @@ describe("G2 — el gobierno de la matriz Garrigues en Cloud refleja los seeds T
   });
 
   it("ARGA intacta: RLS aísla — su cliente ve sus bodies y ninguno de Garrigues", async () => {
-    if (!argaAuthed || !arga) { expect(true).toBe(true); return; }
+    expect(argaAuthed && arga, "sin sesión de ARGA no se puede asertar nada").toBeTruthy();
     const { data, error } = await arga.from("governing_bodies").select("id, tenant_id").limit(200);
     expect(error).toBeNull();
     // ARGA sigue viendo su gobierno (no lo vació el seed Garrigues)...

@@ -106,6 +106,27 @@ export const SII_ART_25 = {
 } as const;
 
 /**
+ * Fase de admisión a trámite. Literal de PI-31, Anexo §5.b.
+ *
+ * El producto NO la modela: no hay decisión de admisión ni inadmisión, ni
+ * estado que la represente —el que se escribe tras el acuse es ACUSE_EMITIDO—.
+ * Se declara la exigencia para que la pantalla no insinúe que se cumple, y se
+ * dice expresamente que no hay cómputo. Inventarlo sería peor que callarlo.
+ *
+ * El plazo de los diez días NO cuenta desde la recepción, sino desde la fecha
+ * de entrada en el Libro-registro (§5.b), que es lo que el §4 obliga a asignar.
+ */
+export const SII_ADMISION_PI31 = {
+  apartado: "PI-31, Anexo §5.b",
+  plazoDecision:
+    "10 días naturales desde la fecha de entrada de la comunicación en el Libro-registro",
+  plazoComunicacion:
+    "5 días naturales siguientes a la decisión (salvo comunicación anónima o renuncia del informante)",
+  noModelado:
+    "Este entorno de validación no modela la fase de admisión: no hay decisión registrada ni reloj que medir.",
+} as const;
+
+/**
  * Los órganos que el motor debe nombrar en el tenant Garrigues.
  *
  * Sustituyen a los valores por defecto —«Comité de Cumplimiento», «Presidencia

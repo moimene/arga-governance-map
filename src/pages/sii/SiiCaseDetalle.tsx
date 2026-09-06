@@ -110,9 +110,16 @@ export default function SiiCaseDetalle() {
 
   const handleEmitAck = async () => {
     try {
-      await ackMutation.mutateAsync({ reportId: report.id });
+      const { enPlazo, limiteAcuse } = await ackMutation.mutateAsync({ reportId: report.id });
       setShowAckModal(false);
-      toast.success("Acuse de recibo formal emitido en plazo legal (Art. 9.2.c Ley 2/2023).");
+      const limite = limiteAcuse ? limiteAcuse.toLocaleDateString("es-ES") : "";
+      if (enPlazo === true) {
+        toast.success(`Acuse de recibo emitido dentro de los 7 días naturales del art. 9.2.c Ley 2/2023 (límite ${limite}).`);
+      } else if (enPlazo === false) {
+        toast.warning(`Acuse de recibo emitido FUERA del plazo de 7 días naturales del art. 9.2.c Ley 2/2023 (límite ${limite}).`);
+      } else {
+        toast.success("Acuse exceptuado y motivado en el expediente. No hay plazo del art. 9.2.c que medir.");
+      }
     } catch (e) {
       toast.error("Error al emitir acuse.");
     }
@@ -320,6 +327,19 @@ export default function SiiCaseDetalle() {
             </span>
           </div>
         </div>
+
+        {roles.admisionATramite && (
+          <div className="border-t border-[var(--t-border-default)] pt-3 text-[11px] leading-relaxed text-[var(--t-text-secondary)]">
+            <span className="font-bold text-[var(--t-text-primary)]">
+              Admisión a trámite ({roles.admisionATramite.apartado}):
+            </span>{" "}
+            el Instructor resuelve en un plazo de {roles.admisionATramite.plazoDecision}, y lo
+            comunica al informante dentro de los {roles.admisionATramite.plazoComunicacion}.{" "}
+            <span className="font-semibold text-[var(--status-warning)]">
+              {roles.admisionATramite.noModelado}
+            </span>
+          </div>
+        )}
       </Card>
 
       {/* Tabs de Gestión del Caso */}
@@ -558,7 +578,7 @@ export default function SiiCaseDetalle() {
               <span className="text-[10px] uppercase font-bold text-[var(--t-text-secondary)] block">Medidas Cautelares Activas:</span>
               <ul className="list-disc pl-4 space-y-1 text-[var(--t-text-primary)]">
                 {(report.retaliationRecord?.preventiveMeasuresActive ?? [
-                  "Preservación estricta del anonimato en Safe Inbox",
+                  "El expediente no recoge datos de contacto del informante",
                 ]).map((m, i) => (
                   <li key={i}>{m}</li>
                 ))}
@@ -602,8 +622,18 @@ export default function SiiCaseDetalle() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in">
           <Card className="p-6 max-w-md w-full space-y-4 border-[var(--t-brand)]">
             <h3 className="font-bold text-sm text-[var(--t-text-primary)]">Emitir Acuse de Recibo Oficial (7 Días)</h3>
+            {/* Decía «y el inicio de las diligencias previas conforme al Art.
+                9.2.c». Dos cosas falsas en una frase: la mutación solo escribe
+                `status = "ACUSE_EMITIDO"` y un mensaje, sin abrir diligencia
+                ninguna; y el art. 9.2.c (cotejado contra BOE-A-2023-4513) es
+                solo «Envío de acuse de recibo … en el plazo de siete días
+                naturales siguientes a su recepción», no menciona diligencias.
+                Además contradecía al panel de esta misma pantalla que declara
+                que la fase de admisión no se modela. */}
             <p className="text-xs text-[var(--t-text-secondary)] leading-relaxed">
-              Se emitirá el acuse formal acreditando la recepción de la comunicación y el inicio de las diligencias previas conforme al Art. 9.2.c de la Ley 2/2023.
+              Se emitirá el acuse de recibo dentro de los siete días naturales del Art. 9.2.c de la
+              Ley 2/2023. Acredita la recepción; la decisión sobre la tramitación es posterior y este
+              entorno no la modela.
             </p>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setShowAckModal(false)}>Cancelar</Button>

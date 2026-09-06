@@ -50,7 +50,10 @@ export function TenantBrandProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
       if (error) throw error;
       // Los tipos generados no incluyen `branding` (regeneración diferida, G0):
-      // cast local vía unknown, mismo patrón que useSii con vistas no tipadas.
+      // cast local vía unknown. El comentario remitía a `useSii` como ejemplo
+      // del mismo patrón; ese hook se borró el 2026-09-06 por código muerto
+      // (cero importadores), así que la referencia se retira en vez de dejar
+      // apuntando a un fichero que no existe.
       const row = data as unknown as { branding?: TenantBranding | null } | null;
       return row?.branding ?? null;
     },

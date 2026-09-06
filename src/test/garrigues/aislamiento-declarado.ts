@@ -62,6 +62,56 @@ export type TablaDeclarada = {
   };
 };
 
+/**
+ * El motivo de las tablas `ai_*` / `aims_*`, escrito una vez.
+ *
+ * Medido en `governance_OS` el 2026-09-06: de las 26 tablas del backbone de IA
+ * que llevan `tenant_id`, el tenant Garrigues tiene CERO filas en las 26. No es
+ * un seed a medias — es que ninguno de sus carriles (G0 a G4: fundación,
+ * espejo societario, gobierno de la matriz, motor SLP y sistema normativo)
+ * incluía inventario de sistemas de IA. Fabricar sistemas verosímiles para un
+ * despacho los haría indistinguibles de los reales, que es exactamente lo que
+ * la política de datos del tenant impide.
+ *
+ * Se declara UNA vez y se reutiliza porque el motivo es literalmente el mismo:
+ * repetirlo nueve veces con distinta redacción invitaría a que nueve copias se
+ * desincronizaran, y la primera que dejara de ser cierta pasaría inadvertida.
+ */
+const SIN_INVENTARIO_IA = {
+  texto:
+    "El tenant no tiene inventario de IA: cero filas propias en las 26 tablas ai_*/aims_* con " +
+    "tenant_id, medido en Cloud. Ninguno de sus carriles sembró sistemas, evaluaciones ni " +
+    "expediente técnico, y fabricarlos haría indistinguible el dato demo del real. La ausencia " +
+    "es la decisión, no un seed roto — y por eso la dirección ARGA→Garrigues de estas tablas se " +
+    "declara vacua en vez de asertarse como si probara aislamiento.",
+  fuente:
+    "medición directa en governance_OS 2026-09-06 (0 filas del tenant en las 26 tablas); " +
+    "carriles G0-G4 sin alcance AIMS, CLAUDE.md §Tenant Garrigues",
+} as const;
+
+/**
+ * Las tablas del backbone de IA que SÍ tienen dato de ARGA.
+ *
+ * Solo estas entran: en ellas la dirección de riesgo real —«Garrigues no ve las
+ * filas de ARGA»— es una aserción de verdad, porque hay filas que ver. Las
+ * otras diecisiete tablas `ai_…` / `aims_…` están vacías en LOS DOS tenants,
+ * así que
+ * vigilarlas sería teatro: dos direcciones vacuas y ninguna información.
+ * Entrarán solas el día que alguien las siembre, porque entonces la medición de
+ * arriba dejará de ser cierta y este comentario habrá que rehacerlo.
+ */
+export const TABLAS_IA_CON_DATO_ARGA = [
+  "ai_systems",
+  "ai_incidents",
+  "aims_system_versions",
+  "aims_technical_file_sections",
+  "aims_requirement_catalog",
+  "aims_requirement_checks",
+  "aims_control_catalog",
+  "aims_monitoring_indicators",
+  "aims_post_market_plans",
+] as const;
+
 export const AISLAMIENTO_DECLARADO: readonly TablaDeclarada[] = [
   {
     tabla: "conflicts_of_interest",
@@ -200,6 +250,19 @@ export const AISLAMIENTO_DECLARADO: readonly TablaDeclarada[] = [
     },
     marcadores: {},
   },
+  // ── Backbone de IA (2026-09-06) ─────────────────────────────────────────
+  // `DOMAIN_TABLES` del gate de aislamiento no cubría NINGUNA tabla ai_*/aims_*
+  // pese a que el módulo AI Governance escribe en `ai_systems` y `ai_incidents`
+  // como owner. Se añaden con su vacuidad declarada, no silenciada: si Garrigues
+  // llega a tener un sistema de IA, la declaración deja de cuadrar y el gate
+  // rompe — que es cuando hay que convertirla en aserción real.
+  ...TABLAS_IA_CON_DATO_ARGA.map((tabla) => ({
+    tabla,
+    arga: "ALGUNA" as const,
+    garrigues: "NINGUNA" as const,
+    motivo: SIN_INVENTARIO_IA,
+    marcadores: {},
+  })),
 ] as const;
 
 /** Las tablas cuya ausencia está declarada, para poder afirmarlo en el gate. */

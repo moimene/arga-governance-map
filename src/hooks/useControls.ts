@@ -41,6 +41,14 @@ export interface EvidenceFull extends EvidenceRow {
 // mismo código rompen el `.maybeSingle()`. Y la clave sin tenant hacía que los
 // dos compartieran entrada de caché: `TenantProvider` arranca en null, de ahí
 // también el `enabled`.
+//
+// El tenant scoping NO basta: el código tampoco es único DENTRO de un tenant.
+// Medido en Cloud el 2026-09-06 — ARGA tiene dos `CTR-004` distintos
+// («Procedimiento de notificación de incidentes DORA», de abril 17, y «Gestión
+// de parches ICT críticos», de abril 19). Con dos filas, `.maybeSingle()`
+// devuelve error y `/controles/CTR-004` no abría ninguno de los dos.
+// El orden explícito + `limit(1)` lo hace determinista: siempre el más
+// antiguo, y `id` como desempate porque `created_at` no está declarado único.
 export function useControlByCode(code: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
@@ -52,6 +60,9 @@ export function useControlByCode(code: string | undefined) {
         .select("*, owner:owner_id(full_name), obligation:obligation_id(code, title, source)")
         .eq("tenant_id", tenantId!)
         .eq("code", code!)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .limit(1)
         .maybeSingle();
       if (error) throw error;
       if (!data) return null;

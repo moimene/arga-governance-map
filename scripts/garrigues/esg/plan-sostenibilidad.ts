@@ -147,12 +147,24 @@ export const PRINCIPIOS_PACTO_MUNDIAL: readonly string[] = [
  * A QUÉ tenant pertenece este catálogo. La pantalla lo compara con el suyo para
  * no servírselo a otro grupo: ese es su único uso real.
  *
- * NO es una fila de `grc_modules`, y decía serlo. `grc_modules` del tenant
- * Garrigues contiene aml, cyber, ethics y risk — comprobado en Cloud — y no hay
- * ninguna migración que añada `esg`. Sembrarla exige una decisión sobre el
- * schema que no corresponde a este carril, así que queda anotado como deuda en
- * vez de afirmar una fila que no existe. Consecuencia hoy: `/grc/sostenibilidad`
- * es además ruta huérfana, sin item de navegación que lleve a ella.
+ * Desde el 2026-09-06 SÍ existe además la fila `esg` en `grc_modules` del
+ * tenant Garrigues (sembrada con autorización expresa, DA-14 del ledger), con
+ * la misma forma que sus cuatro hermanas: `state='Planificado'` y los cuatro
+ * contadores a 0, porque no hay ninguna cifra que declarar todavía. El `owner`
+ * «Comité de Sostenibilidad» está acreditado: existe como `governing_bodies`
+ * del tenant (slug `garrigues-comite-sostenibilidad`).
+ *
+ * Este objeto sigue siendo el criterio de VISIBILIDAD de la pantalla, no un
+ * espejo de esa fila: la comparación de tenant se hace aquí. Y desde el mismo
+ * día `esgVisibleParaTenant` gobierna también la NAVEGACIÓN: es el `tenantGate`
+ * del item «Sostenibilidad» (`src/components/garrigues-shell/navigation.ts:112`,
+ * filtrado en `getVisibleGrcNavItems`). Se eligió este gate y no `moduleKey`
+ * porque `isModuleEnabled` falla ABIERTO y ARGA —que tiene `branding` NULL—
+ * habría ganado un item hacia una pantalla que su tenant no puede ver.
+ *
+ * `grc_modules.route` NO construye el menú: los `route` que consume el
+ * Dashboard son constantes TS. La fila existe para declarar el módulo, no para
+ * enrutar.
  */
 export const ESG_MODULO = {
   id: "esg",

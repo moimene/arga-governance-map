@@ -60,20 +60,16 @@ describe("Evidence bundle RPC hardening — prueba conductual cross-tenant", () 
   let authed = false;
 
   beforeAll(async () => {
-    try {
-      // Sesión COMPARTIDA: la suite entera hace 2 logins en vez de ~40, y cada
-      // cuenta lleva storageKey propio. `sesionDe` lanza si no autentica.
-      client = await sesionDe("ARGA");
-      authed = true;
-    } catch (error) {
-      authed = false;
-      // UN LOGIN FALLIDO NO ES «NADA QUE COMPROBAR». Al tragarse la excepción,
-      // cada `it` de abajo caía en `if (!authed) { expect(true).toBe(true); return; }`
-      // y la sonda Cloud terminaba VERDE sin asertar nada: rotar una contraseña
-      // o caerse Cloud dejaba el gate en verde mudo. `sesionDe` ya lanza con el
-      // motivo; aquí se propaga para que el fichero se ponga ROJO.
-      throw error;
-    }
+    // SIN try/catch, a propósito. Lo había, y con él un login fallido —clave
+    // rotada, `.env` sin `DEMO_PASSWORD_*`, Cloud caído— dejaba `authed` en
+    // false y los `it` de abajo se saltaban devolviendo `expect(true).toBe(true)`:
+    // tests EN VERDE sin asertar nada sobre Cloud, que es peor que no tenerlos
+    // porque parecen cobertura. `sesionDe` LANZA si no autentica; dejar que
+    // lance es lo que pone el gate en rojo.
+    // Sesión COMPARTIDA: la suite entera hace 2 logins en vez de ~40, y cada
+    // cuenta lleva storageKey propio. `sesionDe` lanza si no autentica.
+    client = await sesionDe("ARGA");
+    authed = true;
   }, 30_000);
 
   // SIN afterAll con signOut: la sesión es COMPARTIDA. Cerrarla aquí dejaría sin
@@ -82,12 +78,7 @@ describe("Evidence bundle RPC hardening — prueba conductual cross-tenant", () 
   // en un fichero que no ha hecho nada mal.
 
   it("un usuario autenticado NO puede crear evidencia para otro tenant (42501)", async () => {
-    if (!authed || !client) {
-      // Sin Cloud/credenciales: el contrato queda cubierto por el test de contenido + el
-      // probe en vivo documentado en docs/superpowers/reviews/2026-06-06-...
-      expect(true).toBe(true);
-      return;
-    }
+    expect(authed && client, "sin sesión de ARGA no se puede asertar nada").toBeTruthy();
     const { data, error } = await client.rpc("fn_create_governance_evidence_bundle", {
       p_tenant_id: FOREIGN_TENANT,
       p_source_module: "TEST",

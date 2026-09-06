@@ -272,12 +272,20 @@ export default function AiIncidenteDetalle() {
               {currentStatus.replace("_", " ")}
             </span>
 
+            {/* Mismo predicado que el banner de dos bloques más abajo. Antes eran
+                dos criterios distintos sobre el mismo dato: el banner acertaba
+                con `isMaterialSeverity` y el chip comparaba con 'CRITICA'/'ALTA',
+                grafías que ningún camino de escritura produce (el alta y la
+                lista escriben 'CRITICO'/'ALTO'). El único incidente del
+                inventario, 'ALTO' y en investigación, salía en azul informativo
+                al lado de un banner que lo declaraba material. Se pierde a
+                propósito el matiz crítico/alto en el color —lo dice el literal—
+                a cambio de que las dos superficies no puedan volver a
+                discrepar. */}
             <span
               className={`px-3 py-1 text-xs font-semibold uppercase tracking-wider ${
-                currentSeverity === "CRITICA"
+                isMaterial
                   ? "bg-[var(--status-error)] text-[var(--g-text-inverse)]"
-                  : currentSeverity === "ALTA"
-                  ? "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
                   : "bg-[var(--status-info)] text-[var(--g-text-inverse)]"
               }`}
               style={{ borderRadius: "var(--g-radius-full)" }}

@@ -12,7 +12,10 @@ import {
   GARRIGUES_DEMO_EMAIL,
   sesionDe,
 } from "../helpers/supabase-test-client";
-import { AISLAMIENTO_DECLARADO } from "../garrigues/aislamiento-declarado";
+import {
+  AISLAMIENTO_DECLARADO,
+  TABLAS_IA_CON_DATO_ARGA,
+} from "../garrigues/aislamiento-declarado";
 
 const SUPABASE_URL =
   process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
@@ -34,6 +37,13 @@ const DOMAIN_TABLES = [
   "delegations", "notifications", "condiciones_persona",
   "incidents", "evidence_bundles",
   "governance_module_events", "governance_module_links",
+  // Backbone de IA (2026-09-06): el gate no cubría NI UNA tabla ai_*/aims_*
+  // pese a que AI Governance escribe en `ai_systems` y `ai_incidents` como
+  // owner. Entran las 9 que tienen dato real de ARGA, porque en ellas la
+  // dirección de riesgo —«Garrigues no ve las filas de ARGA»— asierta de
+  // verdad. Las otras 17 están vacías en los DOS tenants y vigilarlas sería
+  // teatro. La dirección contraria es vacua y va declarada, no callada.
+  ...TABLAS_IA_CON_DATO_ARGA,
 ];
 
 function anonClient(): SupabaseClient {
@@ -57,6 +67,23 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
 
   // SIN afterAll con signOut: la sesión es COMPARTIDA. Cerrarla aquí dejaría
   // sin autenticar a todas las sondas que corran después de esta.
+
+  it("el gate cubre de verdad las superficies que dice cubrir", () => {
+    // Control positivo del INSTRUMENTO. Todas las aserciones del bucle son de
+    // ausencia («no ve filas del otro»), así que una lista encogida las pone
+    // verdes a todas a la vez y «hay aislamiento» pasa a significar «no he
+    // mirado». Encoger la lista tiene que romper algo.
+    expect(DOMAIN_TABLES.length).toBeGreaterThanOrEqual(25);
+    for (const esperada of [
+      "entities", "policies", "risks",          // Secretaría, normativo, GRC
+      "ai_systems", "ai_incidents",             // AI Governance, owner-write
+      "aims_technical_file_sections",           // expediente técnico
+    ]) {
+      expect(DOMAIN_TABLES, `${esperada} ha salido del gate`).toContain(esperada);
+    }
+    // Y ninguna repetida: un duplicado infla el recuento sin añadir cobertura.
+    expect(new Set(DOMAIN_TABLES).size).toBe(DOMAIN_TABLES.length);
+  });
 
   it("el perfil del usuario Garrigues resuelve a su tenant", async () => {
     if (!authed || !garr) { expect(true).toBe(true); return; }
@@ -170,6 +197,30 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
     expect(after.error).toBeNull();
     expect(after.data?.branding?.nombre).toBe(before.data?.branding?.nombre);
     expect(after.data?.branding?.nombre).not.toBe("PROBE-DENY-TENANTS-G0");
+  });
+
+  it("la lista blanca de Garrigues en Cloud declara sus módulos, con `sii` dentro", async () => {
+    // El seed DICE qué módulos tiene el tenant; Cloud es lo que la app LEE.
+    // Son dos hechos distintos y este proyecto ya ha visto divergir uno del
+    // otro (el branding se aplicó a mano por MCP durante el drift de junio).
+    // Aquí se comprueba el que gatea de verdad las rutas y el tour.
+    if (!authed || !garr) { expect(true).toBe(true); return; }
+    const { data, error } = await garr
+      .from("tenants").select("branding").eq("id", GARRIGUES_TENANT).maybeSingle();
+    expect(error).toBeNull();
+
+    const modules = (data?.branding as { modules?: unknown })?.modules;
+    // Control positivo: que sea una lista NO vacía. `isModuleEnabled` falla
+    // abierto ante `null` y ante `[]`, así que sin esto un branding borrado
+    // dejaría todo visible y la aserción de abajo seguiría sin enterarse.
+    expect(Array.isArray(modules), "Garrigues ya no declara lista blanca de módulos").toBe(true);
+    expect((modules as string[]).length).toBeGreaterThan(5);
+
+    expect(modules as string[], "el canal SII quedaría oculto a su propio tenant")
+      .toContain("sii");
+    // Discriminante: la lista es una lista BLANCA, no «todo». Si dejara de
+    // excluir lo que D-5 excluye, la aserción de arriba no probaría nada.
+    expect(modules as string[]).not.toContain("dora");
   });
 
   it("excepción documentada: tenants es lectura pública (branding no es secreto)", async () => {

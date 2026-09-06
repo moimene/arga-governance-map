@@ -6,6 +6,7 @@ import {
   deriveDiagnosisStatus,
   computeAssessmentStats,
   getAllMeasuresForFramework,
+  getRequirementsForFramework,
 } from "../catalog-aesia";
 
 describe("AESIA Guía 16 Catalog & Conversion Engine", () => {
@@ -36,6 +37,24 @@ describe("AESIA Guía 16 Catalog & Conversion Engine", () => {
     expect(counts["TECHNICAL_DOC"]).toBe(7);
     expect(counts["POST_MARKET"]).toBe(5);
     expect(counts["INCIDENT_MGMT"]).toBe(5);
+  });
+
+  // Absorbido de `src/hooks/__tests__/useAiGovernanceHooks.test.ts`, que se
+  // llamaba «Hook Contracts» y no probaba ningún hook: repetía este fichero con
+  // cuatro imports sin usar. Esto era lo único suyo que no estaba ya aquí — el
+  // selector por marco, que es el que decide qué catálogo ve la pantalla.
+  it("selecciona el catálogo por marco: 12 requisitos RIA y 4 de ISO 42001", () => {
+    const ria = getRequirementsForFramework("EU_AI_ACT");
+    expect(ria.length).toBe(12);
+    expect(ria[0].code).toBe("QUALITY_MGMT");
+    expect(ria[11].code).toBe("INCIDENT_MGMT");
+
+    const iso = getRequirementsForFramework("ISO_42001");
+    expect(iso.length).toBe(4);
+    expect(iso[0].code).toBe("ISO_POLICIES");
+
+    // Control discriminante: los dos marcos NO devuelven el mismo catálogo.
+    expect(ria[0].code).not.toBe(iso[0].code);
   });
 
   it("should correctly derive Adaptation Plans (PDA) according to Guía 16 rules", () => {

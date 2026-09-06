@@ -21,20 +21,16 @@ describe("ITEM-042 — invariante: cert SIGNED implica agreement CERTIFIED (o po
   let authed = false;
 
   beforeAll(async () => {
-    try {
-      // Sesión COMPARTIDA: la suite entera hace 2 logins en vez de ~40, y cada
-      // cuenta lleva storageKey propio. `sesionDe` lanza si no autentica.
-      client = await sesionDe("ARGA");
-      authed = true;
-    } catch (error) {
-      authed = false;
-      // UN LOGIN FALLIDO NO ES «NADA QUE COMPROBAR». Al tragarse la excepción,
-      // cada `it` de abajo caía en `if (!authed) { expect(true).toBe(true); return; }`
-      // y la sonda Cloud terminaba VERDE sin asertar nada: rotar una contraseña
-      // o caerse Cloud dejaba el gate en verde mudo. `sesionDe` ya lanza con el
-      // motivo; aquí se propaga para que el fichero se ponga ROJO.
-      throw error;
-    }
+    // SIN try/catch, a propósito. Lo había, y con él un login fallido —clave
+    // rotada, `.env` sin `DEMO_PASSWORD_*`, Cloud caído— dejaba `authed` en
+    // false y los `it` de abajo se saltaban devolviendo `expect(true).toBe(true)`:
+    // tests EN VERDE sin asertar nada sobre Cloud, que es peor que no tenerlos
+    // porque parecen cobertura. `sesionDe` LANZA si no autentica; dejar que
+    // lance es lo que pone el gate en rojo.
+    // Sesión COMPARTIDA: la suite entera hace 2 logins en vez de ~40, y cada
+    // cuenta lleva storageKey propio. `sesionDe` lanza si no autentica.
+    client = await sesionDe("ARGA");
+    authed = true;
   }, 30_000);
 
   // SIN afterAll con signOut: la sesión es COMPARTIDA. Cerrarla aquí dejaría sin
@@ -43,10 +39,7 @@ describe("ITEM-042 — invariante: cert SIGNED implica agreement CERTIFIED (o po
   // en un fichero que no ha hecho nada mal.
 
   it("ningún agreement ADOPTED figura en una certificación SIGNED", async () => {
-    if (!authed || !client) {
-      expect(true).toBe(true);
-      return;
-    }
+    expect(authed && client, "sin sesión de ARGA no se puede asertar nada").toBeTruthy();
     const { data: certs, error: certsError } = await client
       .from("certifications")
       .select("id, agreements_certified")
@@ -60,10 +53,13 @@ describe("ITEM-042 — invariante: cert SIGNED implica agreement CERTIFIED (o po
           .filter((ref) => UUID_RE.test(ref))
       ),
     ];
-    if (certifiedIds.length === 0) {
-      expect(true).toBe(true);
-      return;
-    }
+    // Sin acuerdos certificados el invariante se cumple de forma VACUA, y salir
+    // aquí en verde ocultaba exactamente eso: cero certificaciones SIGNED es un
+    // estado que hay que ver, no uno del que salir de puntillas.
+    expect(
+      certifiedIds.length,
+      "no hay ninguna certificación SIGNED con acuerdos: el invariante pasaría de forma vacua",
+    ).toBeGreaterThan(0);
 
     const { data: stuck, error: agreementsError } = await client
       .from("agreements")

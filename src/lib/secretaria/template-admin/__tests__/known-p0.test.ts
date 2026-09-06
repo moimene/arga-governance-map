@@ -37,9 +37,28 @@ describe.skipIf(!ADMIN_DISPONIBLE)("known-p0 Cloud existence", () => {
     }
   });
 
-  it("isKnownP0 reconoce los IDs y rechaza otros", () => {
-    expect(isKnownP0("e3697ad9-e0c2-4baf-9144-c80a11808c07")).toBe(true);
-    expect(isKnownP0("edd5c389-0187-476c-9592-c020058fdc69")).toBe(true);
+});
+
+/**
+ * FUERA del bloque con credenciales, y con las aserciones al derecho.
+ *
+ * `isKnownP0` es una función pura: no necesita Cloud. Estaba dentro del
+ * `describe.skipIf(!ADMIN_DISPONIBLE)`, que en este repo **nunca** se ejecuta
+ * (ver el GOTCHA de arriba), y ahí dentro afirmaba que
+ * `e3697ad9…` y `edd5c389…` eran P0 tolerados. Hoy `KNOWN_P0_TEMPLATES` está
+ * VACÍA —las dos plantillas se corrigieron el 2026-05-14 y dejaron de tolerarse—
+ * así que esas dos aserciones eran **falsas**: el test estaba rojo y el skip
+ * permanente lo tapaba. Un skip no es una sonda; es un hueco con su forma.
+ */
+describe("known-p0 — función pura (sin Cloud)", () => {
+  it("hoy no hay ninguna plantilla P0 tolerada", () => {
+    expect(KNOWN_P0_TEMPLATES).toHaveLength(0);
+  });
+
+  it("las dos plantillas históricas ya no se toleran, y una desconocida tampoco", () => {
+    // FUSION_ESCISION y RATIFICACION_ACTOS: se corrigieron, no se indultan.
+    expect(isKnownP0("e3697ad9-e0c2-4baf-9144-c80a11808c07")).toBe(false);
+    expect(isKnownP0("edd5c389-0187-476c-9592-c020058fdc69")).toBe(false);
     expect(isKnownP0("00000000-0000-0000-0000-000000000000")).toBe(false);
   });
 });

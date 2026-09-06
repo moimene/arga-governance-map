@@ -163,6 +163,14 @@ export interface WhistleblowingLibroRegistroEntry {
   /** Referencia del asiento. Ver `referenciaInterna`: no es prueba criptográfica. */
   referenciaAsiento: string;
   /**
+   * Momento en que se asignó número de entrada y quedó conservado el asiento.
+   * `null` = el asiento se está CALCULANDO al mostrarlo (expedientes anteriores
+   * a que el alta lo asignara). PI-31, Anexo §4: el Instructor incorpora la
+   * comunicación al Libro-registro "dándole un número de entrada e indicando
+   * una fecha de recepción" dentro de los siete días naturales.
+   */
+  numeroEntradaAsignadoAt?: string | null;
+  /**
    * `false` = el asiento se ha CALCULADO al mostrarlo, no está incorporado al
    * libro. Solo se incorpora al cerrar el expediente, así que no hay número de
    * entrada ni fecha de registro conservados desde la recepción. La pantalla lo
@@ -705,7 +713,10 @@ export function evaluateAntiRetaliationRisk(params: {
     return {
       riskLevel: "BAJO",
       recommendedMeasures: [
-        "Preservación estricta del anonimato en Safe Inbox",
+        // No se promete anonimato: el portal de alta se abre desde una sesión
+        // YA AUTENTICADA y el expediente vive en claro en localStorage. Lo
+        // único que el sistema sostiene es que no pide ni guarda contacto.
+        "El expediente no recoge datos de contacto del informante",
         "Canal activo para reporte de sospechas de represalia indirecta",
       ],
       monitoringFrequency: "TRIMESTRAL",
@@ -805,7 +816,7 @@ export function generateLibroRegistroEntry(
     hash = ((hash << 5) - hash) + rawPayload.charCodeAt(i);
     hash |= 0;
   }
-  const referenciaAsiento = `REF-SII-${Math.abs(hash).toString(16).padStart(16, "0")}-${Date.now().toString(16)}`;
+  const referenciaAsiento = `REF-SII-${Math.abs(hash).toString(16).padStart(16, "0")}`;
 
   return {
     recordNumber,
@@ -823,6 +834,9 @@ export function generateLibroRegistroEntry(
     resultOutcome: closureDetails?.outcome ?? (report.closedAt ? "Expediente instruido y archivado con medidas" : "En tramitación"),
     retentionLimitDate: retentionLimitDate.toISOString(),
     referenciaAsiento,
+    // Lo asigna quien PERSISTE el asiento (alta y cierre). Generado al vuelo
+    // para mostrar una tabla, no hay número de entrada conservado.
+    numeroEntradaAsignadoAt: null,
     // Solo hay incorporación cuando el asiento se genera al CERRAR: es la
     // única llamada que aporta `closureDetails` y persiste el resultado.
     incorporadoAlCierre: !!closureDetails,

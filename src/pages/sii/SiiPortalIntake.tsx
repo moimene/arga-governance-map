@@ -43,7 +43,7 @@ export default function SiiPortalIntake() {
   const { data: entities = [] } = useEntitiesList();
   const createMutation = useCreateWhistleblowingReport();
 
-  // Wizard Steps: 1. Modalidad -> 2. Hechos y Canal -> 3. Evidencias -> 4. Confirmación/Credencial
+  // Wizard Steps: 1. Modalidad -> 2. Hechos y Canal -> 3. Evidencias -> 4. Confirmación/código
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
   // Form State
@@ -224,7 +224,10 @@ export default function SiiPortalIntake() {
             { n: 1, label: "1. Modalidad & Anonimato" },
             { n: 2, label: "2. Hechos & Canal" },
             { n: 3, label: "3. Evidencias & Saneamiento" },
-            { n: 4, label: "4. Credencial Segura" },
+            // «Credencial Segura» sobre 8 caracteres de Math.random(): el propio
+            // cuerpo del paso ya lo llama «código de seguimiento» y advierte de que
+            // solo funciona en este navegador. El rótulo decía otra cosa.
+            { n: 4, label: "4. Código de seguimiento" },
           ].map((s) => (
             <div
               key={s.n}
@@ -588,7 +591,7 @@ export default function SiiPortalIntake() {
         </Card>
       )}
 
-      {/* STEP 4: Confirmación y Credencial Segura */}
+      {/* STEP 4: Confirmación y código de seguimiento */}
       {step === 4 && (
         <Card className="border-[var(--status-success)] bg-[var(--t-surface-card)] p-8 space-y-6 text-center animate-fade-in">
           <div className="h-14 w-14 rounded-full bg-[var(--status-success)]/10 text-[var(--status-success)] flex items-center justify-center mx-auto">

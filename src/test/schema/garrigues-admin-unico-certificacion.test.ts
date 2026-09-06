@@ -30,19 +30,15 @@ describe("G3 — contrato RPC de certificación del administrador único", () =>
   let authed = false;
 
   beforeAll(async () => {
-    try {
-      // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
-      garr = await sesionDe("GARRIGUES");
-      authed = true;
-    } catch (error) {
-      authed = false;
-      // UN LOGIN FALLIDO NO ES «NADA QUE COMPROBAR». Al tragarse la excepción,
-      // cada `it` de abajo caía en `if (!authed) { expect(true).toBe(true); return; }`
-      // y la sonda Cloud terminaba VERDE sin asertar nada: rotar una contraseña
-      // o caerse Cloud dejaba el gate en verde mudo. `sesionDe` ya lanza con el
-      // motivo; aquí se propaga para que el fichero se ponga ROJO.
-      throw error;
-    }
+    // SIN try/catch, a propósito. Lo había, y con él un login fallido —clave
+    // rotada, `.env` sin `DEMO_PASSWORD_*`, Cloud caído— dejaba `authed` en
+    // false y los `it` de abajo se saltaban devolviendo `expect(true).toBe(true)`:
+    // tests EN VERDE sin asertar nada sobre Cloud, que es peor que no tenerlos
+    // porque parecen cobertura. `sesionDe` LANZA si no autentica; dejar que
+    // lance es lo que pone el gate en rojo.
+    // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
+    garr = await sesionDe("GARRIGUES");
+    authed = true;
   }, 30_000);
 
   // SIN afterAll con signOut: la sesión es COMPARTIDA. Cerrarla aquí dejaría sin
@@ -50,7 +46,7 @@ describe("G3 — contrato RPC de certificación del administrador único", () =>
   // en un fichero que no ha hecho nada mal.
 
   it("ADMIN_UNICO con VºBº NULL no es rechazado por VºBº (falla por acta, nunca por 'approval')", async () => {
-    if (!authed || !garr) { expect(true).toBe(true); return; }
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { error } = await garr.rpc("fn_generar_certificacion", {
       p_minute_id: DUMMY_MINUTE_ID,
       p_tipo: "CERTIFICACION_ACTA",

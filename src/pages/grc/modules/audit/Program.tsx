@@ -4,6 +4,7 @@ import {
   ShieldCheck, AlertTriangle, FileText, ExternalLink 
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { DemoFixtureNotice } from "@/components/grc/DemoFixtureNotice";
 
 interface AuditEngagement {
   id: string;
@@ -83,6 +84,11 @@ export default function Program() {
 
   return (
     <div className="p-6 space-y-6">
+      <DemoFixtureNotice>
+        El plan anual, sus misiones, los recuentos de hallazgos y la aprobación por la Comisión de
+        Auditoría son un guion fijo del código. No salen de ninguna tabla y no reflejan ninguna
+        planificación real de este grupo.
+      </DemoFixtureNotice>
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">

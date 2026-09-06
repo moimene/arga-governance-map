@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { demoPassword } from "@/test/helpers/supabase-test-client";
+import { sesionDe } from "@/test/helpers/supabase-test-client";
 
 /**
  * Oleada 3A — contrato Cloud de la transición atómica de plantillas.
@@ -15,13 +15,9 @@ const SUPABASE_URL =
 const SUPABASE_ANON_KEY =
   process.env.VITE_SUPABASE_ANON_KEY ??
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6cXdlZmt3c3hvcHdybXRrc2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0Mjc1MDMsImV4cCI6MjA5MjAwMzUwM30.IZ2FbhQLp2ljRcsvsvzpLWQ9cq9p5Lz4dJfVzY3whjQ";
-const DEMO_EMAIL = process.env.DEMO_EMAIL ?? "demo@arga-seguros.com";
-// EXIGIR LOGIN POR DEFECTO. Con el flag en opt-in (`=== "1"`), las cuatro
-// sondas autenticadas de este fichero caían en `expect(true).toBe(true)` en
-// cuanto el login fallaba —contraseña rotada, Cloud caído— y el gate salía
-// VERDE sin haber comprobado nada. Ahora hay que pedir explícitamente el modo
-// degradado con `REQUIRE_CLOUD_AUTH=0`.
-const REQUIRE_CLOUD_AUTH = process.env.REQUIRE_CLOUD_AUTH !== "0";
+// FUERA el interruptor `REQUIRE_CLOUD_AUTH`: con él a 0 las cuatro sondas
+// autenticadas de este fichero pasaban sin preguntar nada a Cloud. Un gate con
+// modo degradado es un gate que alguien puede apagar el día que estorbe.
 
 const MISSING_TEMPLATE_ID = "00000000-0000-0000-0000-000000000000";
 
@@ -90,50 +86,23 @@ describe("Oleada 3A — fn_secretaria_transition_template_state", () => {
 describe("Oleada 3A — RBAC servidor de la transición atómica", () => {
   let client: SupabaseClient | null = null;
   let authenticated = false;
-  let authenticationError: string | null = null;
 
   beforeAll(async () => {
-    try {
-      client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          storageKey: "test-secretaria-template-transition-auth",
-        },
-      });
-      const { error } = await client.auth.signInWithPassword({
-        email: DEMO_EMAIL,
-        password: demoPassword("ARGA"),
-      });
-      authenticated = !error;
-      authenticationError = error?.message ?? null;
-    } catch (error) {
-      authenticated = false;
-      authenticationError = error instanceof Error ? error.message : String(error);
-    }
+    // Sesión COMPARTIDA y memoizada por cuenta: este fichero abría un login
+    // PROPIO, un tercero además de los dos de la suite, que acercaba el 429 de
+    // Supabase Auth. SIN try/catch: `sesionDe` LANZA si no autentica —clave
+    // rotada, `.env` sin `DEMO_PASSWORD_*`, Cloud caído— y dejarlo lanzar es lo
+    // que pone el gate en rojo. Atraparlo dejaba las cuatro sondas de abajo en
+    // `expect(true).toBe(true)`: verde sin haber preguntado nada a Cloud.
+    client = await sesionDe("ARGA");
+    authenticated = true;
   }, 30_000);
 
-  afterAll(async () => {
-    try {
-      await client?.auth.signOut({ scope: "local" });
-    } catch {
-      // El cierre de sesión no altera el contrato de autorización probado.
-    }
-  });
+  // SIN afterAll con signOut: la sesión es COMPARTIDA. Cerrarla aquí dejaría sin
+  // autenticar a las sondas que corran después.
 
   it("deniega al usuario demo SECRETARIO antes de consultar la plantilla", async () => {
-    if (!authenticated || !client) {
-      if (REQUIRE_CLOUD_AUTH) {
-        expect(
-          authenticated,
-          `El gate Cloud exige login demo válido: ${authenticationError ?? "sin cliente"}`,
-        ).toBe(true);
-      }
-      // El gate estructural y el probe anon siguen ejecutándose sin credenciales
-      // o red; la comprobación autenticada se completa en el gate Cloud.
-      expect(true).toBe(true);
-      return;
-    }
+    expect(authenticated && client, "sin sesión de ARGA no se puede asertar nada").toBeTruthy();
 
     const { data, error } = await client.rpc(
       "fn_secretaria_transition_template_state",
@@ -148,16 +117,7 @@ describe("Oleada 3A — RBAC servidor de la transición atómica", () => {
   }, 30_000);
 
   it("deniega también la asignación de bindings antes de consultar la plantilla", async () => {
-    if (!authenticated || !client) {
-      if (REQUIRE_CLOUD_AUTH) {
-        expect(
-          authenticated,
-          `El gate Cloud exige login demo válido: ${authenticationError ?? "sin cliente"}`,
-        ).toBe(true);
-      }
-      expect(true).toBe(true);
-      return;
-    }
+    expect(authenticated && client, "sin sesión de ARGA no se puede asertar nada").toBeTruthy();
 
     const { data, error } = await client.rpc("fn_secretaria_assign_template_binding", {
       p_payload: {
@@ -175,16 +135,7 @@ describe("Oleada 3A — RBAC servidor de la transición atómica", () => {
   }, 30_000);
 
   it("permite leer el rol propio pero impide autoasignarse ADMIN_TENANT", async () => {
-    if (!authenticated || !client) {
-      if (REQUIRE_CLOUD_AUTH) {
-        expect(
-          authenticated,
-          `El gate Cloud exige login demo válido: ${authenticationError ?? "sin cliente"}`,
-        ).toBe(true);
-      }
-      expect(true).toBe(true);
-      return;
-    }
+    expect(authenticated && client, "sin sesión de ARGA no se puede asertar nada").toBeTruthy();
 
     const { data: authData } = await client.auth.getUser();
     const userId = authData.user?.id;
@@ -224,16 +175,7 @@ describe("Oleada 3A — RBAC servidor de la transición atómica", () => {
   }, 30_000);
 
   it("impide usar el helper SoD contra otro tenant", async () => {
-    if (!authenticated || !client) {
-      if (REQUIRE_CLOUD_AUTH) {
-        expect(
-          authenticated,
-          `El gate Cloud exige login demo válido: ${authenticationError ?? "sin cliente"}`,
-        ).toBe(true);
-      }
-      expect(true).toBe(true);
-      return;
-    }
+    expect(authenticated && client, "sin sesión de ARGA no se puede asertar nada").toBeTruthy();
 
     const { data: authData } = await client.auth.getUser();
     const { data, error } = await client.rpc("fn_check_sod_violations", {

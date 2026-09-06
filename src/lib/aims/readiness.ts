@@ -348,6 +348,47 @@ export function normalizeAimsStatus(status: string | null | undefined): string {
 }
 
 /**
+ * Vocabulario de `ai_systems.status`: chip y etiqueta, en UN solo sitio.
+ *
+ * La columna NO tiene CHECK y en Cloud conviven cinco grafías ('ACTIVO',
+ * 'EN_EVALUACION', 'En revision', 'Pendiente', 'Conforme'). La lista y el
+ * dashboard ya toleraban lo desconocido —chip neutro y literal crudo—, pero la
+ * ficha del sistema conservaba su propia comparación contra 'ACTIVO' y pintaba
+ * de AVISO los otros cuatro valores: un sistema 'Conforme' salía en ámbar sólo
+ * por no estar en la lista de dos entradas de esa pantalla.
+ *
+ * Se resuelve donde ya vive `normalizeAimsStatus`, que existe por este mismo
+ * problema, para que no vuelva a haber dos vocabularios.
+ */
+const SYSTEM_STATUS_CHIP_NEUTRO =
+  "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
+
+const SYSTEM_STATUS_CHIP: Record<string, string> = {
+  ACTIVO: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
+  EN_EVALUACION: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
+  RETIRADO: SYSTEM_STATUS_CHIP_NEUTRO,
+};
+
+const SYSTEM_STATUS_LABEL: Record<string, string> = {
+  ACTIVO: "Activo",
+  EN_EVALUACION: "En evaluación",
+  RETIRADO: "Retirado",
+};
+
+/** Clase del chip. Un valor fuera del vocabulario conocido va en neutro: no se
+ *  le atribuye ni bondad ni alarma que nadie ha declarado. */
+export function systemStatusChipClass(status: string | null | undefined): string {
+  return SYSTEM_STATUS_CHIP[status ?? ""] ?? SYSTEM_STATUS_CHIP_NEUTRO;
+}
+
+/** Etiqueta. Sin traducción conocida se pinta el literal tal cual está escrito
+ *  en la base: renombrarlo sería inventar un estado. */
+export function systemStatusLabel(status: string | null | undefined): string {
+  if (!status) return "Sin estado";
+  return SYSTEM_STATUS_LABEL[status] ?? status;
+}
+
+/**
  * Estados de evaluación que ACREDITAN conformidad.
  *
  * El vocabulario está partido entre escritura y lectura: el producto escribe
