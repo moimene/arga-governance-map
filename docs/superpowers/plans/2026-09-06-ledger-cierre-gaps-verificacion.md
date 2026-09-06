@@ -278,13 +278,15 @@ espejo en el repo. La cazó la review, no yo. Corregida con migración idempoten
 | `bun test` | **4184 pass / 151 skip / 3 todo / 0 fail** (23 398 aserciones, 473 ficheros) — línea base 4020 pass / 152 skip: **+164 y un skip MENOS**. El criterio pedía no bajar de 3870 sin skips nuevos |
 | `bun run typecheck` | limpio |
 | `bun run lint` | limpio |
-| e2e lote 1 (`01`, `05`, `10`, `11`, `12`) | 33 pass / 2 fail — **los dos pasan en aislamiento**: flakes de orden, no regresiones |
-| e2e lote 2 (`14`, `16`, `17`, `19`) | **19 / 19** |
+| `bun run build` | pass (warnings conocidos de Browserslist y tamaño de chunk) |
+| e2e lote A (`14`, `16`, `17`, `19`) | **19 / 19** |
+| e2e lote B (`05`, `10`, `11`, `12`) | **29 / 29** — los dos *flakes* de la pasada anterior pasan aquí; era orden, no regresión |
 | e2e `18` golden path | **verde**, con arnés de mutación (§5.3) |
 | Aislamiento cross-tenant (logins reales) | storage 5/5, dominio 47/47, Secretaría 13/13 |
 
-Los dos rojos del lote 1 se verificaron uno a uno: `05` solo → 5/5; `12` solo → 6/6. Es la
-dependencia de orden ya documentada en `CLAUDE.md`, no un efecto de esta rama.
+**Todo el lote de cierre está verde.** GOTCHA de medición confirmado otra vez: encadenar corridas de
+Playwright estrangula el login (el propio `auth.setup` se cae por *timeout*), así que un rojo
+inmediatamente después de otra corrida no es señal — hay que reejecutar en frío antes de concluir.
 
 ---
 
