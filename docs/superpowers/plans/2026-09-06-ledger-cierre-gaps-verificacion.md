@@ -389,3 +389,30 @@ este navegador», «Incidentes mayores abiertos», «sin envío», «Abrir intak
 **Lo que sigue sin verificarse, y es del usuario:** entrar en producción con cada tenant y mirar el
 Dashboard, `/grc`, `/sii` y `/secretaria`. El bundle desplegado está barrido; lo que falta es la
 sesión, y no introduzco contraseñas.
+
+### 9.1 Segunda verificación viva, tras el merge de la tercera tanda
+
+Despliegue `dpl_G32SeBF2ZKMFxVPKW7ddsNFU3tpu` → merge `dcd1e8e`, **READY** sobre
+`arga-governance-map.vercel.app`. La integración GitHub→Vercel volvió a disparar sola con el push.
+
+Método idéntico: `index.html` + su entry + **246 chunks** (6,0 MB) descargados y barridos sobre lo
+que realmente llega al navegador.
+
+| Comprobación | Resultado |
+|---|---|
+| Postura honesta PRESENTE (`Vencido hace`, `Custodia final no disponible`, `Pendiente de renderer autoritativo`, `PI-31`, `no lo envía a EAD Trust`, `sin envío`, `Abrir intake en Secretaría`) | **7 / 7** |
+| Afirmaciones retiradas AUSENTES (`QSeal Custodia`, `PLAN DE SALIDA SELLADO EN LEDGER WORM`, `QSeal no personal`, `QES_SANDBOX`, `referralAuthority`) | **5 / 5** |
+
+**Dos marcadores míos fallaron y ninguno era del código** — se dicen porque el método importa más
+que el número:
+
+1. `no envía a EAD Trust` daba ausente. El copy real es «no **lo** envía», y en el fuente va
+   **partido en dos líneas** de JSX. En el bundle, donde JSX colapsa el salto, está. *Un marcador
+   copiado a ojo del fuente no vale contra el bundle.*
+2. `días restantes` daba presente, y **debe estarlo**: es la rama EN PLAZO de la función pura
+   (`whistleblowing-engine.ts:419`). Lo que se corrigió fue pintar en verde un plazo **agotado**;
+   ninguna pantalla escribe ya la cuenta atrás por su cuenta. *Prohibir una palabra en vez de la
+   afirmación produce falsos positivos igual que falsos negativos.*
+
+Sigue **sin hacerse la comprobación CON SESIÓN INICIADA**: exige introducir credenciales y eso es
+del usuario, no mío.
