@@ -119,14 +119,26 @@ describe("#1113 — el alta de incidente tampoco atribuye la clasificación al a
   });
 
   it("y los dos citan el art. 18 y el RTS 2024/1772", () => {
+    // El bucle filtra DOS veces, así que puede no ejecutarse ni una vez y dejar
+    // el test verde con cero aserciones: si alguien retira la cita legal por
+    // completo, el segundo filtro descarta las líneas y el bucle no mira nada.
+    // El control positivo de arriba NO lo tapa —comprueba subcadenas que
+    // sobreviven a esa retirada—, así que se cuenta lo examinado. Lo señaló la
+    // review adversarial de rama.
+    let examinadas = 0;
     for (const linea of SRC.split("\n")) {
       if (!/clasificaci[óo]n/i.test(linea)) continue;
       // Solo las líneas que CITAN una norma concreta. "clasificación de
       // perímetro DORA/NIS2" no atribuye nada y no tiene que citar.
       if (!/art\.?\s*1[89]\b|2024\/1772|2025\/301/i.test(linea)) continue;
+      examinadas += 1;
       expect(linea, linea.trim()).toContain("2024/1772");
       expect(/\bart\.?\s*19\b/i.test(linea), linea.trim()).toBe(false);
     }
+    expect(
+      examinadas,
+      "el bucle no examinó ninguna línea: la cita legal desapareció del stepper y este gate se quedó mirando al vacío",
+    ).toBeGreaterThan(0);
   });
 });
 

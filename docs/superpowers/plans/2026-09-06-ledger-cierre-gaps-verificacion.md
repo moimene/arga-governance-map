@@ -275,7 +275,7 @@ espejo en el repo. La cazó la review, no yo. Corregida con migración idempoten
 | Gate | Resultado |
 |---|---|
 | `bun run db:check-target` | pass contra `governance_OS` |
-| `bun test` | **4184 pass / 151 skip / 3 todo / 0 fail** (23 398 aserciones, 473 ficheros) — línea base 4020 pass / 152 skip: **+164 y un skip MENOS**. El criterio pedía no bajar de 3870 sin skips nuevos |
+| `bun test` | **4186 pass / 151 skip / 3 todo / 0 fail** (23 404 aserciones, 473 ficheros) — línea base 4020 pass / 152 skip: **+166 y un skip MENOS**. El criterio pedía no bajar de 3870 sin skips nuevos |
 | `bun run typecheck` | limpio |
 | `bun run lint` | limpio |
 | `bun run build` | pass (warnings conocidos de Browserslist y tamaño de chunk) |
@@ -287,6 +287,35 @@ espejo en el repo. La cazó la review, no yo. Corregida con migración idempoten
 **Todo el lote de cierre está verde.** GOTCHA de medición confirmado otra vez: encadenar corridas de
 Playwright estrangula el login (el propio `auth.setup` se cae por *timeout*), así que un rojo
 inmediatamente después de otra corrida no es señal — hay que reejecutar en frío antes de concluir.
+
+### 7.1 Review adversarial de la rama (criterio nº6, segunda rama)
+
+Cuatro lentes disjuntas sobre `main...HEAD` —regresión, honestidad de superficie, gates vacuos y
+Cloud/multi-tenant— con **refutación independiente de cada hallazgo**: 20 agentes, 0 errores.
+
+**16 propuestos → 14 refutados → 2 en pie, ambos P2. Cero P0 y cero P1.**
+
+Las refutaciones evitaron dos correcciones equivocadas: una daba por vigente el estado de
+`ac961a00` ANTERIOR a la reparación de esta misma jornada (hoy tiene sus 3 snapshots `ok=true`), y
+otra señalaba como regresión la estructura `if (acta existente) … else …` de `e2e/18`, que es
+byte-idéntica a `main`.
+
+Los dos que sobrevivieron se corrigieron, y los dos son de las familias que este proyecto ya tiene
+fichadas:
+
+1. **Arista rota por CACHÉ** (`useWhistleblowing.ts`). Corregir los dos casos anónimos a `POSTAL`
+   en el catálogo no bastaba: `getStoredReports` solo siembra si la clave de localStorage no
+   existe, y el reparador reaplicaba **únicamente `firmeza`**. El navegador de la demo seguía
+   pintando «WEB ANONIMO» en el listado, en la ficha y en el asiento del Libro-registro. Es
+   exactamente lo que ya pasó con el badge «Simulado». Ahora la lista de campos que decide el
+   catálogo es **explícita** (`CAMPOS_DEL_CATALOGO`), y el gate comprueba `getStoredReports` con
+   clave **PREEXISTENTE**, que era el escenario que se escapaba, con control de que la reaplicación
+   no arrasa los expedientes dados de alta. Mutación: volviendo la lista a `["firmeza"]`, rojo.
+2. **Bucle que puede no mirar nada** (`citas-legales-grc.test.tsx`). Filtraba dos veces, así que
+   retirar la cita legal dejaba el cuerpo sin ejecutar y el test verde con cero aserciones; el
+   control positivo no lo tapaba porque comprobaba subcadenas que sobreviven a esa retirada. Ahora
+   se cuenta lo examinado. **Prueba decisiva**: con la cita mutada fuera del stepper, el gate
+   ANTIGUO pasa (28 aserciones) y el NUEVO falla — la caída de aserciones era el único delator.
 
 ---
 

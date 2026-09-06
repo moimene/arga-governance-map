@@ -394,27 +394,44 @@ export function initialReportsFor(tenantId: string): WhistleblowingReport[] {
 }
 
 /**
- * La marca `firmeza` la fija el CATÁLOGO, no el almacén.
+ * Los campos que fija el CATÁLOGO, no el almacén.
  *
- * `getStoredReports` solo sembraba cuando la clave no existía. Un navegador con
- * la clave ya creada —antes de que el catálogo marcara los casos sembrados—
- * devolvía el JSON viejo SIN `firmeza`, y el badge «Simulado» desaparecía de la
- * lista y de la ficha. La arista se rompía por CACHÉ, no por criterio: el rótulo
- * estaba bien puesto y bien pintado, pero el dato no llegaba.
+ * `getStoredReports` solo siembra cuando la clave no existe. Un navegador con la
+ * clave ya creada devuelve el JSON viejo, así que **cualquier campo que el
+ * catálogo decida y el almacén copie se queda congelado en el valor anterior**.
+ * La arista se rompe por CACHÉ, no por criterio: el valor está bien puesto y
+ * bien pintado, pero no llega. Ya pasó con `firmeza` (el badge «Simulado»
+ * desaparecía) y volvió a pasar con `channel`: al corregir los dos casos
+ * anónimos de `WEB_ANONIMO` a `POSTAL` —art. 3.c del PI-31, que reserva la vía
+ * web a la modalidad confidencial— el navegador de la demo seguía pintando
+ * «WEB ANONIMO» en el listado, en la ficha y en el asiento del Libro-registro.
+ *
+ * Por eso la lista es EXPLÍCITA y vive aquí: añadir un campo derivado de
+ * política al catálogo obliga a añadirlo también a `CAMPOS_DEL_CATALOGO`, y el
+ * gate de `sii-anonimo-via-postal.test.tsx` lo comprueba sobre una clave
+ * PREEXISTENTE, que es el escenario que se escapaba.
  *
  * No se versiona la clave porque eso tiraría los expedientes que el usuario haya
- * dado de alta. Se reaplica la marca por `code` en cada lectura. Un expediente
- * de alta NO está en el catálogo y por tanto no recibe marca — que es lo
- * correcto: no es simulado.
+ * dado de alta. Un expediente de alta NO está en el catálogo y por tanto no
+ * recibe nada — que es lo correcto: ni es simulado ni su canal lo decide el
+ * despacho.
  */
-function reaplicarFirmezaDelCatalogo(
+const CAMPOS_DEL_CATALOGO = ["firmeza", "channel"] as const;
+
+function reaplicarCamposDelCatalogo(
   tenantId: string,
   almacenados: WhistleblowingReport[],
 ): WhistleblowingReport[] {
-  const catalogo = new Map(initialReportsFor(tenantId).map((r) => [r.code, r.firmeza]));
-  return almacenados.map((r) =>
-    catalogo.has(r.code) ? { ...r, firmeza: catalogo.get(r.code) } : r,
-  );
+  const catalogo = new Map(initialReportsFor(tenantId).map((r) => [r.code, r]));
+  return almacenados.map((r) => {
+    const delCatalogo = catalogo.get(r.code);
+    if (!delCatalogo) return r;
+    const parche: Partial<WhistleblowingReport> = {};
+    for (const campo of CAMPOS_DEL_CATALOGO) {
+      (parche as Record<string, unknown>)[campo] = delCatalogo[campo];
+    }
+    return { ...r, ...parche };
+  });
 }
 
 export function getStoredReports(tenantId: string): WhistleblowingReport[] {
@@ -426,7 +443,7 @@ export function getStoredReports(tenantId: string): WhistleblowingReport[] {
     return inicial;
   }
   try {
-    return reaplicarFirmezaDelCatalogo(tenantId, JSON.parse(raw));
+    return reaplicarCamposDelCatalogo(tenantId, JSON.parse(raw));
   } catch {
     return initialReportsFor(tenantId);                                    // puerta 3
   }

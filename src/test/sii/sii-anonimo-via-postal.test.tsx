@@ -147,3 +147,45 @@ describe("SII Garrigues — los casos demo se siembran por la vía que les corre
     expect(identificados.every((c) => c.channel === "WEB_ANONIMO")).toBe(true);
   });
 });
+
+describe("SII Garrigues — el canal corregido atraviesa el caché del navegador", () => {
+  // ESTE es el bloque que faltaba, y lo señaló la review adversarial de rama.
+  // Los dos de arriba comprueban el CATÁLOGO y el formulario de alta; ninguno
+  // toca `getStoredReports`, que solo siembra cuando la clave NO existe. Un
+  // navegador que ya hubiera abierto /sii —el de la demo, sin ir más lejos—
+  // seguía devolviendo `WEB_ANONIMO` desde localStorage, y ese canal viciado
+  // se pinta en el listado, en la ficha y en el asiento del Libro-registro.
+  // Es el mismo patrón de arista rota por CACHÉ que ya ocurrió con `firmeza`.
+  const sembrarClaveVieja = async () => {
+    const { siiStorageKey } = await import("@/lib/sii/tenant-scope");
+    const previos = CASOS_DEMO_GARRIGUES.map((c) => ({ ...c, channel: "WEB_ANONIMO" }));
+    localStorage.setItem(siiStorageKey(SII_TENANT), JSON.stringify(previos));
+  };
+
+  afterEach(() => localStorage.clear());
+
+  it("con la clave YA creada, los anónimos se leen como POSTAL", async () => {
+    await sembrarClaveVieja();
+    const { getStoredReports } = await import("@/hooks/useWhistleblowing");
+    const leidos = getStoredReports(SII_TENANT);
+
+    const anonimos = leidos.filter((r) => r.anonymityMode === "ANONIMO_ESTRICTO");
+    expect(anonimos.length, "sin anónimos la aserción sería vacua").toBeGreaterThan(0);
+    for (const r of anonimos) expect(r.channel, `${r.code} sigue viniendo del caché`).toBe("POSTAL");
+  });
+
+  it("CONTROL: la reaplicación no arrasa los expedientes dados de alta", async () => {
+    // Sin esto, «reaplicar el catálogo entero» pasaría el caso anterior
+    // borrando lo que el usuario haya registrado.
+    const { siiStorageKey } = await import("@/lib/sii/tenant-scope");
+    const propio = { ...CASOS_DEMO_GARRIGUES[0], code: "SII-ALTA-PROPIA", channel: "WEB_ANONIMO" };
+    localStorage.setItem(
+      siiStorageKey(SII_TENANT),
+      JSON.stringify([...CASOS_DEMO_GARRIGUES, propio]),
+    );
+    const { getStoredReports } = await import("@/hooks/useWhistleblowing");
+    const propioLeido = getStoredReports(SII_TENANT).find((r) => r.code === "SII-ALTA-PROPIA");
+    expect(propioLeido, "el expediente de alta desapareció").toBeDefined();
+    expect(propioLeido!.channel, "no está en el catálogo: nadie decide su canal").toBe("WEB_ANONIMO");
+  });
+});
