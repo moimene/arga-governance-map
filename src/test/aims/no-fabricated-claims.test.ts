@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
+import { sinComentarios } from "../helpers/sin-comentarios";
 
 /**
  * A3 — Ninguna superficie de AI Governance afirma un hecho que no esté en BD.
@@ -15,18 +16,6 @@ import { readFileSync, readdirSync } from "node:fs";
  */
 const read = (f: string) => readFileSync(f, "utf8");
 
-/**
- * Quita comentarios (`//`, `/* *\/` y `{/* *\/}` de JSX) antes de comprobar lo
- * que la pantalla DICE. Sin esto, el comentario que documenta la corrección
- * satisface el gate que vigila la corrección: la prosa que explica por qué algo
- * está mal contiene, por fuerza, las palabras del defecto.
- */
-function sinComentarios(src: string): string {
-  return src
-    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, " ")
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/^[ \t]*\/\/.*$/gm, " ");
-}
 
 /** Toda la superficie de AI Governance, descubierta, no enumerada. */
 function superficieAims(): string[] {
@@ -899,5 +888,194 @@ describe("2026-09-06 — el órgano de la FRIA es una ARISTA, no un rótulo", ()
     // Sin FK no se inventa nombre.
     expect(/sin órgano acreditado/.test(bloque), "sin FK se pinta algo en vez de decir que no consta")
       .toBe(true);
+  });
+});
+
+/**
+ * 2026-09-06 — La misma familia, once veces: un NULL o un estado que no se sabe
+ * leer se rellena con un hecho.
+ *
+ * Todas las aserciones de este bloque se hacen sobre el fuente SIN COMENTARIOS.
+ * Cada corrección de abajo dejó escrito el motivo, y el motivo cita por fuerza
+ * la frase retirada: sin esto el gate se dispara contra su propia justificación
+ * y la salida fácil pasa a ser borrar la explicación.
+ */
+describe("2026-09-06 — la ausencia de dato se dice, no se rellena", () => {
+  const INCIDENTE = "src/pages/ai-governance/IncidenteDetalle.tsx";
+  const SISTEMAS = "src/pages/ai-governance/Sistemas.tsx";
+  const DASHBOARD = "src/pages/ai-governance/Dashboard.tsx";
+  const EVAL_DETALLE = "src/pages/ai-governance/EvaluacionDetalle.tsx";
+
+  it("una fecha de despliegue ausente no se convierte en un estado del sistema", () => {
+    // `deployment_date` es nullable y el alta la deja pasar vacía. La ficha
+    // rellenaba el hueco con «En validación», que no es la ausencia de una
+    // fecha: es una fase del ciclo de vida que nadie ha declarado.
+    const src = sinComentarios(read(DETALLE));
+    const m = src.match(/deployment_date[\s\S]{0,220}?\}/);
+    expect(m, "la ficha ya no pinta la fecha de despliegue").not.toBeNull();
+    expect(
+      /En validaci[óo]n/.test(m![0]),
+      `la fecha de despliegue ausente vuelve a fabricar un estado → ${m![0].trim()}`,
+    ).toBe(false);
+    expect(
+      /Sin fecha de despliegue registrada/.test(m![0]),
+      "el hueco de fecha de despliegue no dice que no consta",
+    ).toBe(true);
+  });
+
+  it("un indicador de vigilancia con estado desconocido no se pinta como aviso", () => {
+    // La columna tiene DEFAULT 'OK' y el único indicador de Cloud está en 'OK'
+    // (medido 2026-09-06); la ficha comparaba con 'OPTIMAL', un literal que
+    // nadie escribe, y lo mandaba todo a ámbar. Lo desconocido va a NEUTRO.
+    const src = sinComentarios(read(DETALLE));
+    expect(
+      /ind\.status\s*===\s*"OPTIMAL"/.test(src),
+      "vuelve la igualdad estricta que pinta de aviso cualquier estado no previsto",
+    ).toBe(false);
+    expect(src).toContain("INDICATOR_STATUS_CHIP");
+    // …y el mapa reconoce lo que el producto escribe de verdad.
+    const mapa = src.slice(src.indexOf("const INDICATOR_STATUS_CHIP"));
+    const cuerpo = mapa.slice(0, mapa.indexOf("};"));
+    expect(/\bOK:/.test(cuerpo), "el estado 'OK', que es el DEFAULT de la columna, no se reconoce").toBe(true);
+    // El fallback es el chip neutro, no el de aviso ni el de éxito.
+    const uso = src.slice(src.indexOf("INDICATOR_STATUS_CHIP[normalizeAimsStatus(ind.status)]"));
+    expect(/\?\?\s*SECTION_STATUS_CHIP_NEUTRO/.test(uso.slice(0, 160)),
+      "el estado desconocido de un indicador ya no cae al chip neutro").toBe(true);
+  });
+
+  it("la distribución por nivel de riesgo suma el inventario entero", () => {
+    // Tres filas contando tres literales dejaban fuera a los sistemas sin
+    // `risk_level`: una «distribución» que no sumaba el total, y un sistema sin
+    // clasificar que desaparecía en vez de figurar como hueco.
+    const src = sinComentarios(read(DASHBOARD));
+    const i = src.indexOf("Distribución por nivel de riesgo");
+    expect(i, "no se encuentra la distribución por nivel de riesgo").toBeGreaterThan(0);
+    const bloque = src.slice(i, i + 1800);
+    expect(/label: "Sin clasificar"/.test(bloque),
+      "la distribución vuelve a esconder los sistemas sin nivel de riesgo declarado").toBe(true);
+    expect(/systems\.length - sistemasClasificados/.test(bloque),
+      "«Sin clasificar» no se deriva del inventario: es un número suelto").toBe(true);
+  });
+
+  it("el inventario no afirma su estado cuando no hay inventario", () => {
+    // Con 0 sistemas la tarjeta decía «Demo AIMS conectada» y pintaba 0/0 y un
+    // 0 en rojo: tres ceros que se leen como medición. Mismo gate que
+    // Incidentes.tsx, que ya lo hacía bien.
+    const src = sinComentarios(read(SISTEMAS));
+    const i = src.indexOf('aria-label="Estado del inventario AIMS"');
+    expect(i, "ha desaparecido la tarjeta de estado del inventario").toBeGreaterThan(0);
+    const antes = src.slice(Math.max(0, i - 500), i);
+    expect(/systems\.length > 0 &&/.test(antes),
+      "la tarjeta de estado del inventario vuelve a pintarse sin inventario").toBe(true);
+  });
+
+  it("el plazo del art. 73 dice que su tipología no se guarda", () => {
+    // El vencimiento se calcula desde estado de UI que se pierde al recargar.
+    // El control de edición ya lo advertía; en modo lectura no lo decía nadie.
+    const src = sinComentarios(read(INCIDENTE));
+    const i = src.indexOf("formatDeadline(clocks.ria?.deadlineDate)");
+    expect(i, "el reloj del art. 73 ya no pinta vencimiento").toBeGreaterThan(0);
+    const ventana = src.slice(i, i + 700);
+    expect(/no registrada/.test(ventana),
+      "el vencimiento del art. 73 se presenta sin decir que su tipología no consta").toBe(true);
+    expect(/grave ordinario/i.test(ventana),
+      "no se dice qué tipología se está asumiendo para calcular el plazo").toBe(true);
+  });
+
+  it("los regímenes no se presentan como subexpedientes registrados", () => {
+    // `aims_incident_regimes` no tiene un solo camino de escritura en `src/`
+    // (0 `.insert(` sobre la tabla) y en Cloud hay 0 filas: el panel enumeraba
+    // tres subexpedientes con su autoridad y su responsable como si constaran.
+    const src = sinComentarios(read(INCIDENTE));
+    expect(/Subexpedientes Regulatorios/.test(src),
+      "el panel vuelve a titularse como registro de subexpedientes").toBe(false);
+    expect(/Regímenes potencialmente aplicables/.test(src),
+      "el panel no dice que es un catálogo de regímenes, no un registro").toBe(true);
+    expect(/no está disponible/.test(src),
+      "no se dice que la apertura de subexpediente no está disponible").toBe(true);
+    // Y el dato de la fila manda sobre el del catálogo cuando existe.
+    expect(/fila\?\.target_authority \?\? reg\.authority/.test(src),
+      "la autoridad se pinta del catálogo aunque haya subexpediente registrado").toBe(true);
+    expect(/fila\?\.lead_role \?\? reg\.role/.test(src),
+      "el responsable se pinta del catálogo aunque haya subexpediente registrado").toBe(true);
+  });
+
+  it("el escalado a Risk 360 usa el contrato que Risk 360 lee", () => {
+    // `origen=aims&assessment_id=` no lo lee nadie: Risk360 pinta la entrada
+    // desde AIMS con `source` + `handoff`. El enlace llegaba mudo.
+    const risk360 = sinComentarios(read("src/pages/grc/Risk360.tsx"));
+    expect(/params\.get\("source"\)/.test(risk360), "Risk 360 ya no lee `source`").toBe(true);
+    expect(/params\.get\("handoff"\)/.test(risk360), "Risk 360 ya no lee `handoff`").toBe(true);
+    for (const f of superficieAims()) {
+      const src = sinComentarios(read(f));
+      for (const m of src.match(/risk-360\?[^`"']*/g) ?? []) {
+        expect(
+          /source=aims/.test(m) && /handoff=/.test(m),
+          `${f}: enlace a Risk 360 con un contrato que la pantalla destino no lee → ${m}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("no se atribuye a la AESIA un corpus de guías numerado y cotejado", () => {
+    // El documento que el usuario DESCARGA enumeraba «AESIA Guías 1 a 16» entre
+    // sus marcos normativos de referencia, sin cotejo. El gate anterior sólo
+    // vigilaba la forma «Guía N AESIA», y ésta se le escapaba.
+    for (const f of superficieAims()) {
+      const src = sinComentarios(read(f));
+      const hit = src.match(/Gu[íi]as?\s+\d+\s*(?:a|-|–)\s*\d+/i);
+      expect(hit, `${f}: vuelve el rango numerado de guías AESIA → ${hit?.[0]}`).toBeNull();
+      expect(/directrices AESIA/i.test(src),
+        `${f}: vuelve a declararse conformidad «y directrices AESIA» sin cotejo`).toBe(false);
+    }
+  });
+
+  it("la cabecera de la FRIA no generaliza el alcance del art. 27", () => {
+    // La misma pantalla explica en su estado vacío que el art. 27 exige DOS
+    // condiciones a la vez —alto riesgo del anexo III y tipo de desplegador—.
+    // Su cabecera lo resumía en «obligación para sistemas de alto riesgo».
+    const src = sinComentarios(read(DETALLE));
+    expect(
+      /Obligaci[óo]n previa al despliegue para sistemas de alto riesgo/.test(src),
+      "la cabecera de la FRIA vuelve a generalizar el art. 27 a todo sistema de alto riesgo",
+    ).toBe(false);
+    expect(/art\. 27\.1/.test(src), "la cabecera no acota el alcance al art. 27.1").toBe(true);
+  });
+
+  it("el cierre del expediente no ofrece sello ni firmante", () => {
+    // `p_qseal_token`/`p_tsq_token` no los produce nadie, y `p_signed_by`
+    // alimenta `evidence_bundles.signed_by` y `signature_date`, dos columnas
+    // cuyo nombre AFIRMA una firma que aquí no ocurre. Los tres tienen DEFAULT
+    // NULL en la RPC, así que omitirlos es válido.
+    const hook = sinComentarios(read(HOOK));
+    const i = hook.indexOf("useCloseAimsTechnicalFile");
+    expect(i, "ha desaparecido el hook de cierre del expediente").toBeGreaterThan(0);
+    const bloque = hook.slice(i);
+    for (const p of ["p_qseal_token", "p_tsq_token", "p_signed_by"]) {
+      expect(new RegExp(p).test(bloque), `el hook vuelve a enviar ${p} a la RPC`).toBe(false);
+    }
+    const detalle = sinComentarios(read(DETALLE));
+    const llamada = detalle.slice(detalle.indexOf("closeTechnicalFileMutation.mutateAsync"));
+    expect(/user\?\.email/.test(llamada.slice(0, 300)),
+      "la ficha vuelve a mandar el correo del usuario como firmante").toBe(false);
+  });
+
+  it("no queda declarado un hook de mutación que nadie usa", () => {
+    // Un `useXxxMutation()` colgado en el cuerpo del componente hace creer que
+    // la pantalla escribe. Ninguna de estas dos lo hacía.
+    const detalle = sinComentarios(read(DETALLE));
+    expect(/useUpdateTechnicalFileSection/.test(detalle),
+      "vuelve la mutación de secciones declarada y nunca invocada").toBe(false);
+    for (const f of superficieAims()) {
+      expect(/useCreateIncidentReport/.test(sinComentarios(read(f))),
+        `${f}: vuelve el informe «con acuse» que ningún camino envía`).toBe(false);
+    }
+  });
+
+  it("el enlace de escalado sigue existiendo (control positivo)", () => {
+    // Las dos aserciones de arriba sobre Risk 360 son de ausencia dentro de un
+    // bucle: si el enlace desapareciera, pasarían por vacuidad.
+    const src = sinComentarios(read(EVAL_DETALLE));
+    expect(/risk-360\?source=aims/.test(src), "ha desaparecido el escalado a Risk 360").toBe(true);
   });
 });

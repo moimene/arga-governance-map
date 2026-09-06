@@ -129,11 +129,12 @@ describe("D-2 — una banda NUNCA cuenta como un nivel con nombre", () => {
 });
 
 describe("D-2 — y Risk360 usa esas funciones, no una copia propia", () => {
-  // El bloque de arriba prueba el COMPORTAMIENTO de las funciones puras, lo que
-  // mata cualquier variante semántica del defecto (constante intermedia, tabla
-  // de lookup, switch, includes…). Pero no probaría nada si la pantalla dejara
-  // de llamarlas y se reimplementara el recuento en línea — que es exactamente
-  // el mutante M6 de la review: revertir solo el KPI. Esta es la arista.
+  // BACKSTOP, Y ES LA CAPA DÉBIL. Esto es un grep: `void countSeverity(…)` al
+  // lado de un recuento reimplementado en línea lo satisface entero, porque la
+  // cadena sigue en el fichero aunque el KPI vuelva a contar bandas como
+  // críticos. La arista de verdad se comprueba RENDERIZANDO Risk360 y leyendo
+  // el KPI en el DOM, en src/test/grc/perimetro-declarado.test.tsx (#1119);
+  // este bloque se conserva solo porque es barato y cubre el caso trivial.
   const RISK360 = read("src/pages/grc/Risk360.tsx");
 
   it("delega el recuento de severidad y el filtro de prioridad", () => {

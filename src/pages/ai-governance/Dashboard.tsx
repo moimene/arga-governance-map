@@ -863,6 +863,19 @@ export default function AiDashboard() {
                   { label: "Alto", count: alto, total: systems.length, color: "bg-[var(--status-error)]" },
                   { label: "Limitado", count: limitado, total: systems.length, color: "bg-[var(--status-warning)]" },
                   { label: "Mínimo", count: minimo, total: systems.length, color: "bg-[var(--status-success)]" },
+                  // Cuarta fila obligatoria: las tres anteriores sólo cuentan
+                  // los tres literales de clasificación, así que un sistema sin
+                  // `risk_level` desaparecía de una «distribución» que dejaba
+                  // de sumar el inventario. Un sistema sin clasificar no es un
+                  // sistema de riesgo mínimo. ARGA tiene hoy sus 8 clasificados
+                  // y ve un 0; el catálogo de Garrigues siembra `risk_level`
+                  // nulo a propósito y ahí es donde el hueco se lee.
+                  {
+                    label: "Sin clasificar",
+                    count: systems.length - sistemasClasificados,
+                    total: systems.length,
+                    color: "bg-[var(--g-surface-muted)]",
+                  },
                 ].map((row) => (
                   <div key={row.label} className="flex items-center gap-3">
                     <div className="w-20 text-xs font-medium text-[var(--g-text-secondary)]">{row.label}</div>

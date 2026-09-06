@@ -57,12 +57,18 @@ test.describe('Core UX assigned routes — responsive', () => {
       await allowSiiAccess(page);
       await page.goto('/sii');
 
-      await expect(page.getByRole('heading', { name: 'Intake SII' })).toBeVisible({ timeout: 10_000 });
-      await expect(page.getByText('Entrada segura de comunicaciones')).toBeVisible();
-      await expect(page.getByText('Bandeja de investigación')).toBeVisible();
-      if (viewport.width < 1024) {
-        await expect(page.getByTestId('sii-mobile-case-list')).toBeVisible();
-      }
+      // Los cuatro selectores anteriores ('Intake SII', 'Entrada segura de
+      // comunicaciones', 'Bandeja de investigación' y el testid
+      // 'sii-mobile-case-list') no existen en `src`: el spec no podía pasar
+      // aunque la pantalla estuviera perfecta. Se sustituyen por lo que
+      // SiiDashboard.tsx renderiza de verdad. No hay lista específica de móvil
+      // —la tabla es una sola en los tres anchos—, así que la rama por ancho
+      // desaparece en vez de exigir un elemento inexistente.
+      await expect(
+        page.getByRole('heading', { name: /Sistema Interno de Información/ }),
+      ).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText('Zona Segregada de Información Confidencial')).toBeVisible();
+      await expect(page.getByRole('button', { name: /Registrar Comunicación/ })).toBeVisible();
       await expectNoHorizontalOverflow(page);
     });
 

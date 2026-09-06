@@ -222,27 +222,30 @@ export function useUpdateTechnicalFileSection() {
  * integridad — ni `aims_system_versions` ni `aims_technical_file_sections`
  * tienen columna donde guardarlo (verificado en Cloud, 2026-09-05).
  * No interviene ningún prestador de confianza: la función no realiza llamada externa.
+ *
+ * La RPC admite además tres parámetros que este hook NO envía y que dejan de
+ * existir en su contrato (2026-09-06):
+ *
+ *  - `p_qseal_token` / `p_tsq_token`: nadie los produce. Aceptarlos como
+ *    entrada era ofrecer un sello que el producto no emite, y dejaba la puerta
+ *    abierta a que cualquier llamador colase un valor arbitrario en columnas
+ *    que se leen como prueba.
+ *  - `p_signed_by`: alimenta `evidence_bundles.signed_by` y `signature_date`,
+ *    dos columnas cuyo nombre AFIRMA una firma. No hay ninguna. Sin el
+ *    parámetro quedan NULL y la cadena de custodia registra el actor como
+ *    «sin firmante atribuido», que es lo que consta.
+ *
+ * Los tres tienen DEFAULT NULL en la función, así que omitirlos es válido.
+ * Revocar el EXECUTE a `authenticated` y forzar NULL dentro de la RPC es
+ * trabajo de Cloud, fuera de este carril.
  */
 export function useCloseAimsTechnicalFile() {
   const qc = useQueryClient();
   const { tenantId } = useTenantContext();
   return useMutation({
-    mutationFn: async ({
-      versionId,
-      qsealToken,
-      tsqToken,
-      signedBy,
-    }: {
-      versionId: string;
-      qsealToken?: string;
-      tsqToken?: string;
-      signedBy?: string;
-    }) => {
+    mutationFn: async ({ versionId }: { versionId: string }) => {
       const { data, error } = await supabase.rpc("fn_aims_close_technical_file", {
         p_version_id: versionId,
-        p_qseal_token: qsealToken,
-        p_tsq_token: tsqToken,
-        p_signed_by: signedBy,
       });
       if (error) throw error;
       return data;

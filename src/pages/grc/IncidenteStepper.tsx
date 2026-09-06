@@ -302,7 +302,7 @@ export default function IncidenteStepper() {
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 />
                 <p className="text-[10px] text-[var(--g-text-secondary)] mt-1">
-                  Momento de clasificación como Grave TIC (DORA Art. 19).
+                  Momento de clasificación como Grave TIC (DORA art. 18 y Reglamento Delegado (UE) 2024/1772).
                 </p>
               </div>
             </div>
@@ -334,7 +334,7 @@ export default function IncidenteStepper() {
             {isDora && (
               <div className="space-y-3">
                 <div className="text-xs font-bold text-[var(--g-brand-3308)] uppercase">
-                  Criterios de Clasificación DORA Art. 19:
+                  Criterios de Clasificación — DORA art. 18 y Reglamento Delegado (UE) 2024/1772:
                 </div>
                 {[
                   { key: "q1_clients", label: "Afecta a más del 10% de clientes o >100.000 usuarios" },

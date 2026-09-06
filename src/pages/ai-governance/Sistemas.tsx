@@ -148,6 +148,11 @@ export default function Sistemas() {
         </button>
       </div>
 
+      {/* Sin inventario no hay estado que resumir: con 0 sistemas la tarjeta
+          afirmaba «Demo AIMS conectada» y pintaba 0/0 y un 0 en rojo bajo
+          «Atención prioritaria», tres ceros que se leen como medición y no lo
+          son. Mismo gate que `Incidentes.tsx`. */}
+      {!isLoading && systems.length > 0 && (
       <section
         className="grid gap-3 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] p-4 md:grid-cols-[1.3fr_0.7fr_0.7fr]"
         style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
@@ -176,6 +181,7 @@ export default function Sistemas() {
           <p className="mt-1 text-lg font-semibold text-[var(--status-error)]">{attentionCount}</p>
         </div>
       </section>
+      )}
 
       {/* Filtros */}
       <section

@@ -17,6 +17,7 @@ import {
 } from "@/hooks/useWhistleblowing";
 import {
   computeWhistleblowingDeadlines,
+  describeDeadlineCountdown,
   validateCaseCloseoutGuard,
   SII_AVISO_EXPEDIENTE_SIMULADO,
   SII_ETIQUETA_SIMULADO,
@@ -67,17 +68,34 @@ export default function SiiCaseDetalle() {
 
   // Modal States
   const [showAckModal, setShowAckModal] = useState(false);
+  // Excepción del art. 9.2.c: «…salvo que ello pueda poner en peligro la
+  // confidencialidad de la comunicación» (literal del consolidado del BOE,
+  // BOE-A-2023-4513, cotejado el 2026-09-06). El hook la modelaba y el KPI del
+  // panel la contaba como cumplimiento, pero NINGUNA superficie podía
+  // registrarla: el único camino de la pantalla emitía el acuse siempre. El
+  // motivo NO se rellena por defecto — motivar la excepción es lo único que la
+  // sostiene, y ponerle un texto de fábrica sería fabricar la motivación.
+  const [ackExempt, setAckExempt] = useState(false);
+  const [ackExemptReason, setAckExemptReason] = useState("");
   const [showExtModal, setShowExtModal] = useState(false);
   const [extReason, setExtReason] = useState("");
   const [showRecusationModal, setShowRecusationModal] = useState(false);
   const [recReason, setRecReason] = useState<WhistleblowingRecusation["reason"]>("UNIDAD_DENUNCIADA");
   const [recDetails, setRecDetails] = useState("");
-  const [recSubstitute, setRecSubstitute] = useState("D. Carlos Mendieta (Instructor Independiente)");
+  // Sin nombre de fábrica. Venía con «D. Carlos Mendieta (Instructor
+  // Independiente)» precargado: quien confirmara sin mirar dejaba en el
+  // expediente un instructor sustituto que nadie designó.
+  const [recSubstitute, setRecSubstitute] = useState("");
   
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [closeStatus, setCloseStatus] = useState<"RESUELTO_MEDIDAS" | "ARCHIVADO_MOTIVADO">("RESUELTO_MEDIDAS");
   const [closeReason, setCloseReason] = useState("");
-  const [closeActions, setCloseActions] = useState("Investigación completada, entrevistas finalizadas y plan de remediación activado.");
+  // Las actuaciones van al asiento del Libro-registro (art. 26 Ley 2/2023), y
+  // el asiento las afirma como hechas. Estaban precargadas con «Investigación
+  // completada, entrevistas finalizadas y plan de remediación activado.» y NO
+  // había campo para cambiarlas: el registro oficial daba por practicadas unas
+  // diligencias que nadie escribió. Ahora se escriben o el asiento va vacío.
+  const [closeActions, setCloseActions] = useState("");
 
   const [newChatMsg, setNewChatMsg] = useState("");
 
@@ -106,12 +124,24 @@ export default function SiiCaseDetalle() {
   }
 
   const deadlines = computeWhistleblowingDeadlines(report.intakeDate, report.acknowledgmentSentDate, report.extensionApproved);
+  const acuseChip = describeDeadlineCountdown(deadlines.clocks[0]);
+  const resolucionChip = describeDeadlineCountdown(deadlines.clocks[1]);
   const closeGuard = validateCaseCloseoutGuard(report);
 
   const handleEmitAck = async () => {
+    if (ackExempt && !ackExemptReason.trim()) {
+      toast.error("Motive el riesgo para la confidencialidad que justifica no acusar recibo (art. 9.2.c).");
+      return;
+    }
     try {
-      const { enPlazo, limiteAcuse } = await ackMutation.mutateAsync({ reportId: report.id });
+      const { enPlazo, limiteAcuse } = await ackMutation.mutateAsync(
+        ackExempt
+          ? { reportId: report.id, isExempt: true, exemptReason: ackExemptReason.trim() }
+          : { reportId: report.id },
+      );
       setShowAckModal(false);
+      setAckExempt(false);
+      setAckExemptReason("");
       const limite = limiteAcuse ? limiteAcuse.toLocaleDateString("es-ES") : "";
       if (enPlazo === true) {
         toast.success(`Acuse de recibo emitido dentro de los 7 días naturales del art. 9.2.c Ley 2/2023 (límite ${limite}).`);
@@ -185,7 +215,7 @@ export default function SiiCaseDetalle() {
         reportId: report.id,
         status: closeStatus,
         closingReason: closeReason.trim(),
-        actionsTaken: [closeActions],
+        actionsTaken: closeActions.trim() ? [closeActions.trim()] : [],
       });
       setShowCloseModal(false);
       toast.success("Expediente raíz cerrado y registrado en el Libro-Registro oficial.");
@@ -206,7 +236,7 @@ export default function SiiCaseDetalle() {
         </nav>
 
         <div className="flex items-center gap-2">
-          {!report.acknowledgmentSentDate && (
+          {!report.acknowledgmentSentDate && !report.acknowledgmentExemptReason && (
             <Button
               size="sm"
               onClick={() => setShowAckModal(true)}
@@ -294,20 +324,28 @@ export default function SiiCaseDetalle() {
           <div className="p-3 bg-[var(--t-surface-card)] border border-[var(--t-border-default)] rounded">
             <div className="flex items-center justify-between mb-1">
               <span className="font-bold text-[var(--t-text-secondary)]">Acuse de Recibo (7d)</span>
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${report.acknowledgmentSentDate ? "bg-[var(--status-success)]/10 text-[var(--status-success)]" : deadlines.ackIsOverdue ? "bg-[var(--status-error)]/10 text-[var(--status-error)]" : "bg-[var(--status-warning)]/10 text-[var(--status-warning)]"}`}>
-                {report.acknowledgmentSentDate ? "Cumplido" : `${deadlines.ackDaysRemaining} días restantes`}
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${report.acknowledgmentSentDate ? "bg-[var(--status-success)]/10 text-[var(--status-success)]" : report.acknowledgmentExemptReason ? "bg-[var(--status-info)]/10 text-[var(--status-info)]" : acuseChip.claseChip}`}>
+                {report.acknowledgmentSentDate
+                  ? "Cumplido"
+                  : report.acknowledgmentExemptReason
+                    ? "Excepción registrada"
+                    : acuseChip.texto}
               </span>
             </div>
             <span className="text-[11px] text-[var(--t-text-secondary)]">
-              {report.acknowledgmentSentDate ? `Emitido: ${new Date(report.acknowledgmentSentDate).toLocaleDateString("es-ES")}` : `Límite: ${deadlines.ackDeadline7d.toLocaleDateString("es-ES")}`}
+              {report.acknowledgmentSentDate
+                ? `Emitido: ${new Date(report.acknowledgmentSentDate).toLocaleDateString("es-ES")}`
+                : report.acknowledgmentExemptReason
+                  ? `Excepción del art. 9.2.c: ${report.acknowledgmentExemptReason}`
+                  : `Límite: ${deadlines.ackDeadline7d.toLocaleDateString("es-ES")}`}
             </span>
           </div>
 
           <div className="p-3 bg-[var(--t-surface-card)] border border-[var(--t-border-default)] rounded">
             <div className="flex items-center justify-between mb-1">
               <span className="font-bold text-[var(--t-text-secondary)]">Resolución Ordinaria (3m)</span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[var(--status-success)]/10 text-[var(--status-success)]">
-                {deadlines.resolutionDaysRemaining} días restantes
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${resolucionChip.claseChip}`}>
+                {resolucionChip.texto}
               </span>
             </div>
             <span className="text-[11px] text-[var(--t-text-secondary)]">
@@ -429,7 +467,11 @@ export default function SiiCaseDetalle() {
                             reportId: report.id,
                             subcaseId: sub.id,
                             status: "TRANSFERIDO_REMEDIACION",
-                            remediationPlanId: "PLAN-REM-2026-01",
+                            // Sin `remediationPlanId`: no existe plan al que
+                            // enlazar. El identificador iba cableado a
+                            // «PLAN-REM-2026-01», un plan que no está en
+                            // ninguna parte, y el subexpediente quedaba
+                            // apuntando a él.
                           });
                           toast.success(`Subexpediente ${sub.regime} transferido a Plan de Remediación.`);
                         }}
@@ -635,9 +677,44 @@ export default function SiiCaseDetalle() {
               Ley 2/2023. Acredita la recepción; la decisión sobre la tramitación es posterior y este
               entorno no la modela.
             </p>
+            <div className="space-y-2 border-t border-[var(--t-border-default)] pt-3">
+              <label className="flex items-start gap-2 text-xs text-[var(--t-text-primary)]">
+                <input
+                  type="checkbox"
+                  checked={ackExempt}
+                  onChange={(e) => setAckExempt(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  No acusar recibo por la salvedad del art. 9.2.c: «salvo que ello pueda poner en
+                  peligro la confidencialidad de la comunicación».
+                </span>
+              </label>
+              {ackExempt && (
+                <textarea
+                  rows={3}
+                  value={ackExemptReason}
+                  onChange={(e) => setAckExemptReason(e.target.value)}
+                  placeholder="Motive el riesgo concreto para la confidencialidad. Sin motivación no se registra la excepción."
+                  className="w-full px-3 py-2 text-xs border border-[var(--t-border-default)] rounded bg-[var(--t-surface-card)] text-[var(--t-text-primary)]"
+                />
+              )}
+            </div>
+
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setShowAckModal(false)}>Cancelar</Button>
-              <Button onClick={handleEmitAck} className="bg-[var(--t-brand)] text-white">Emitir y Notificar</Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowAckModal(false);
+                  setAckExempt(false);
+                  setAckExemptReason("");
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={handleEmitAck} className="bg-[var(--t-brand)] text-white">
+                {ackExempt ? "Registrar excepción motivada" : "Emitir y Notificar"}
+              </Button>
             </div>
           </Card>
         </div>
@@ -761,6 +838,18 @@ export default function SiiCaseDetalle() {
                     value={closeReason}
                     onChange={(e) => setCloseReason(e.target.value)}
                     placeholder="Detalle la motivación de la resolución final del expediente..."
+                    className="w-full px-3 py-2 border rounded"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold uppercase text-[var(--t-text-secondary)] mb-1">
+                    Actuaciones practicadas (van al asiento del Libro-registro):
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={closeActions}
+                    onChange={(e) => setCloseActions(e.target.value)}
+                    placeholder="Describa las actuaciones realmente practicadas. Si se deja en blanco, el asiento no afirma ninguna."
                     className="w-full px-3 py-2 border rounded"
                   />
                 </div>

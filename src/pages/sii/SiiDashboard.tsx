@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useWhistleblowingReports } from "@/hooks/useWhistleblowing";
 import {
   computeWhistleblowingDeadlines,
+  describeDeadlineCountdown,
   SII_AVISO_EXPEDIENTE_SIMULADO,
   SII_AVISO_PERSISTENCIA_LOCAL,
   SII_ETIQUETA_SIMULADO,
@@ -234,6 +235,8 @@ export default function SiiDashboard() {
           <TableBody>
             {filteredReports.map((r) => {
               const deadlines = computeWhistleblowingDeadlines(r.intakeDate, r.acknowledgmentSentDate, r.extensionApproved);
+              const acuseChip = describeDeadlineCountdown(deadlines.clocks[0]);
+              const resolucionChip = describeDeadlineCountdown(deadlines.clocks[1]);
               return (
                 <TableRow key={r.id} className="hover:bg-[var(--t-surface-subtle)]/40 transition-colors">
                   <TableCell className="font-mono font-bold text-[var(--t-brand)]">
@@ -273,8 +276,8 @@ export default function SiiDashboard() {
                         <CheckCircle2 className="h-3 w-3" /> Emitido
                       </span>
                     ) : (
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${deadlines.ackIsOverdue ? "bg-[var(--status-error)]/10 text-[var(--status-error)]" : "bg-[var(--status-warning)]/10 text-[var(--status-warning)]"}`}>
-                        {deadlines.ackDaysRemaining}d restantes
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${acuseChip.claseChip}`}>
+                        {acuseChip.texto}
                       </span>
                     )}
                   </TableCell>
@@ -282,6 +285,9 @@ export default function SiiDashboard() {
                     <div className="text-[11px] font-medium text-[var(--t-text-primary)]">
                       {new Date(r.resolutionDeadline).toLocaleDateString("es-ES")}
                     </div>
+                    <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${resolucionChip.claseChip}`}>
+                      {resolucionChip.texto}
+                    </span>
                     {r.extensionApproved && (
                       <span className="text-[10px] text-[var(--status-warning)] font-semibold block">Prórroga +3m</span>
                     )}

@@ -247,9 +247,11 @@ export default function EvaluacionDetalle() {
               </div>
             </div>
             <Link
-              to={`/grc/risk-360?origen=aims&assessment_id=${assessment.id}&sistema=${encodeURIComponent(
-                assessment.ai_systems?.name || ""
-              )}`}
+              // `origen`/`assessment_id` no los lee nadie: Risk 360 pinta la
+              // entrada desde AIMS con `source` + `handoff` (Risk360.tsx). Con
+              // el contrato anterior el enlace llegaba mudo. Mismo literal que
+              // el de la lista de evaluaciones.
+              to={`/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP&assessment=${assessment.id}`}
               className="px-3 py-1.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-xs font-medium transition-colors inline-flex items-center gap-1.5"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >

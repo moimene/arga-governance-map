@@ -88,6 +88,25 @@ export const SII_CANALES_EXTERNOS = [
   },
 ] as const;
 
+/**
+ * Vía prevista para la comunicación ANÓNIMA. Literal de PI-31, Anexo §3.c,
+ * cotejado contra el PDF el 2026-09-06.
+ *
+ * Importa quién la ofrece: el apartado a) enumera las dos vías del Canal —la
+ * aplicación web (i) y el escrito postal (ii)—, y el §3.c reconduce el anónimo
+ * al (ii). El portal ofrecía el formulario web para el anónimo estricto y los
+ * casos demo se sembraban así, con lo que se presentaba como cauce del
+ * despacho uno que su política no da para esa modalidad.
+ */
+export const SII_ANONIMO_VIA_POSTAL = {
+  apartado: "PI-31, Anexo §3.c",
+  cita:
+    "Las comunicaciones podrán realizarse de forma anónima mediante el envío de una " +
+    "comunicación postal conforme a lo indicado en el apartado a) (ii) anterior, sin " +
+    "identificación del remitente.",
+  direccion: "Garrigues, calle Hermosilla, 3, 28001, Madrid (PI-31, Anexo §3.a (ii)).",
+} as const;
+
 /** La advertencia que acompaña al bloque. Es el matiz del art. 25. */
 export const SII_CANAL_EXTERNO_AVISO =
   "El Canal Interno es el cauce preferente, pero no es obligatorio ni previo: se puede acudir " +

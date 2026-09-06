@@ -38,7 +38,17 @@ test.describe('GRC Compass', () => {
     await expect(page.getByText(/Modo Sociedad/i).first()).toBeVisible();
 
     await page.getByRole('button', { name: /^Grupo$/ }).click();
-    await expect(page).toHaveURL(/\/grc\/risk-360$/);
+    // La vuelta a Grupo conserva la ruta y declara el ámbito EXPLÍCITAMENTE.
+    // `?scope=grupo` no es adorno: `readQueryMode`
+    // (src/components/secretaria/shell/useSecretariaScope.ts:52) solo reconoce
+    // el modo grupo si el parámetro está; sin él devuelve null y el ámbito
+    // «sociedad» guardado en localStorage (STORAGE_KEY del mismo módulo)
+    // vuelve a ganar al recargar. Por eso ScopeSwitcher pasó de
+    // `params.delete("scope")` a `params.set("scope","grupo")` en cdd1551, y
+    // este spec —escrito en mayo, antes de ese cambio— fijaba la forma vieja.
+    // Se exige la ruta exacta, la ausencia de `entity` y el modo grupo
+    // pintado: una pantalla en blanco no satisface la última.
+    await expect(page).toHaveURL(/\/grc\/risk-360\?scope=grupo$/);
     await expect(page.getByText(/Modo Grupo/i).first()).toBeVisible();
   });
 

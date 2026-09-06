@@ -24,6 +24,12 @@
 import type { WhistleblowingReport } from "@/lib/sii/whistleblowing-engine";
 import { SII_ORGANOS_GARRIGUES } from "./canal-interno";
 
+// EL CANAL DE LOS DOS ANÓNIMOS ES POSTAL, y no es un detalle de adorno: PI-31,
+// Anexo §3.c reconduce la comunicación anónima al escrito postal del apartado
+// a) (ii). Sembrarlos como «WEB_ANONIMO» ponía en el Libro-registro —y en la
+// columna «Canal / Modalidad» del listado— una vía que la política del despacho
+// no prevé para esa modalidad. La invariante la fija `sii-anonimo-via-postal`.
+
 export const CASOS_DEMO_TENANT = "00000000-0000-0000-0002-000000000001";
 
 /** Marca de procedencia. La pantalla la muestra; el test la exige. */
@@ -63,7 +69,7 @@ export const CASOS_DEMO_GARRIGUES: readonly CasoDemo[] = [
     category: "Prevención del blanqueo de capitales",
     severity: "GRAVE",
     status: "EN_INVESTIGACION",
-    channel: "WEB_ANONIMO",
+    channel: "POSTAL",
     anonymityMode: "ANONIMO_ESTRICTO",
     summary:
       "Se comunica que en un encargo no se completó la diligencia debida sobre el titular real " +
@@ -101,7 +107,7 @@ export const CASOS_DEMO_GARRIGUES: readonly CasoDemo[] = [
     category: "Conducta y clima laboral",
     severity: "MUY_GRAVE",
     status: "EN_INVESTIGACION",
-    channel: "WEB_ANONIMO",
+    channel: "POSTAL",
     anonymityMode: "ANONIMO_ESTRICTO",
     summary:
       "Se comunican comentarios reiterados de contenido discriminatorio en un equipo, con " +

@@ -53,17 +53,30 @@ describe("C3 Tarea 5 — hallazgos enlazados y planes etiquetados", () => {
     }
   });
 
-  it("el código del hallazgo NO depende del orden del catálogo", () => {
-    // El esquema anterior era `FND-GARR-PEN-${i + 1}`: reordenar el catálogo
-    // reasignaba los ocho hallazgos en silencio, sin tocar una sola línea de
-    // código. Esto se comprueba barajando, no leyendo el fuente.
+  it("el código del hallazgo sale de la CELDA, no de su posición", () => {
+    // Barajar el catálogo y comparar conjuntos NO probaba nada: `map` sobre una
+    // permutación da el mismo conjunto para CUALQUIER función pura, igual que
+    // `f(c) === f({...c})`. Las dos aserciones anteriores no podían caer ni con
+    // el esquema por posición `FND-GARR-PEN-${i + 1}`, que es justo lo que
+    // venían a impedir. Se sustituyen por el CONTENIDO del código.
+    expect(codigoHallazgo({ codigo: "RSK-GARR-PEN-010", columna: "IP" }))
+      .toBe("FND-GARR-PEN-010-IP");
+    expect(codigoHallazgo({ codigo: "RSK-GARR-PEN-069", columna: "Fiscal" }))
+      .toBe("FND-GARR-PEN-069-FISCAL");
+
+    // La columna forma parte de la identidad: el mismo delito en dos áreas da
+    // dos hallazgos distintos. Sin esto, quitar el área del código pasaría.
+    expect(codigoHallazgo({ codigo: "RSK-GARR-PEN-010", columna: "IP" }))
+      .not.toBe(codigoHallazgo({ codigo: "RSK-GARR-PEN-010", columna: "Fiscal" }));
+
+    // Y el número sale del riesgo, no del índice: mover una celda de sitio no
+    // le cambia el código.
+    const primera = CELDAS_BANDA_ALTA[0];
+    const ultima = CELDAS_BANDA_ALTA[CELDAS_BANDA_ALTA.length - 1];
+    expect(codigoHallazgo(primera)).toContain(primera.codigo.replace("RSK-GARR-PEN-", ""));
+    expect(codigoHallazgo(ultima)).toContain(ultima.codigo.replace("RSK-GARR-PEN-", ""));
+
     const original = CELDAS_BANDA_ALTA.map(codigoHallazgo);
-    const barajado = [...CELDAS_BANDA_ALTA].reverse().map(codigoHallazgo);
-    expect(new Set(barajado)).toEqual(new Set(original));
-    // Y sigue identificando a la misma celda una por una.
-    for (const c of CELDAS_BANDA_ALTA) {
-      expect(codigoHallazgo(c)).toBe(codigoHallazgo({ ...c }));
-    }
     expect(new Set(original).size).toBe(CELDAS_BANDA_ALTA.length);
   });
 

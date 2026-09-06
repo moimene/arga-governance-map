@@ -47,24 +47,6 @@ export interface IncidentRegimeCase {
 // `incident-clocks.ts` y no se persisten. El tipo se ha retirado para que no
 // sugiera una persistencia que no existe; la tabla sigue en Cloud.
 
-export interface IncidentReport {
-  id: string;
-  tenant_id: string;
-  incident_regime_id: string;
-  report_type: "INITIAL" | "INTERMEDIATE" | "FINAL" | "DELAY_JUSTIFICATION" | "NON_APPLICABILITY";
-  authority: string;
-  sent_at: string | null;
-  submission_channel: string | null;
-  acknowledgment_ref: string | null;
-  is_complete: boolean;
-  content_summary: string | null;
-  manifest_hash: string | null;
-  // Igual que en la FRIA: `aims_incident_reports` no tiene `qseal_token` ni
-  // `tsq_token`. Con ellas en el tipo, `useCreateIncidentReport` —que hace
-  // spread del objeto entero— rompía con PGRST204 en cuanto alguien respetara
-  // el contrato. No se reintroducen: serían un claim de sello.
-}
-
 /**
  * Consulta los subexpedientes por régimen asociados a un incidente.
  */
@@ -122,31 +104,7 @@ export function useUpdateIncidentRegime() {
   });
 }
 
-/**
- * Registra un informe formal de notificación con acuse para un subexpediente.
- */
-export function useCreateIncidentReport() {
-  const queryClient = useQueryClient();
-  const { tenantId } = useTenantContext();
-
-  return useMutation({
-    mutationFn: async (report: Omit<IncidentReport, "id" | "tenant_id">) => {
-      const { data, error } = await supabase
-        .from("aims_incident_reports")
-        .insert({
-          ...report,
-          tenant_id: tenantId!,
-          sent_at: report.sent_at || new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data as IncidentReport;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["aims_incident_reports", tenantId] });
-      queryClient.invalidateQueries({ queryKey: ["aims_incident_regimes", tenantId] });
-    },
-  });
-}
+// `useCreateIncidentReport` y su tipo `IncidentReport` se retiran (2026-09-06).
+// No tenían ni un llamador en todo el repo: prometían en el nombre un informe
+// «con acuse» a la autoridad que ningún camino del producto envía ni acusa.
+// `aims_incident_reports` sigue en Cloud, vacía.

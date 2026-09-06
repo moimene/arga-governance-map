@@ -8,7 +8,8 @@
  * 4. NIS2 Directiva (UE) 2022/2555 (Alerta 24h, notificación 72h, final 1m).
  * 5. Motor de Perímetro DORA vs NIS2 (desplazamiento sectorial / entidades no cubiertas).
  * 6. TPRM Matriz de Concentración y Sustituibilidad (Escala 1-5 & CTPP DORA Art. 31).
- * 7. Criterios de clasificación de incidentes mayores DORA Art. 19.
+ * 7. Criterios de clasificación de incidentes graves: DORA art. 18 y Reglamento
+ *    Delegado (UE) 2024/1772 (el art. 19 y el RD 2025/301 son los PLAZOS, punto 1).
  */
 
 /**
@@ -375,7 +376,7 @@ export function classifyDoraIncident(criteria: DoraIncidentThresholdCriteria): D
     requiresSupervisoryNotification: isMajor,
     requiresClientNotification,
     rationale: isMajor 
-      ? `Clasificado como Incidente Grave TIC bajo Art. 19 DORA por concurrencia de ${triggers.length} criterios de impacto.`
+      ? `Clasificado como Incidente Grave TIC por concurrencia de ${triggers.length} criterios de impacto (DORA art. 18 y Reglamento Delegado (UE) 2024/1772). Regla simplificada de demostración: no aplica el árbol del art. 8 del RTS 2024/1772, que exige afección a servicios esenciales más los umbrales de sus arts. 9 y 10.`
       : `Incidente no clasificado como mayor DORA (criterios activados: ${triggers.length}).`,
   };
 }

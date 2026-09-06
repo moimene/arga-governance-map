@@ -262,7 +262,11 @@ describe("SII — lo que SÍ debe seguir dicho", () => {
 });
 
 describe("SII — ningún KPI afirma cumplimiento sin dato", () => {
-  const dashboard = leer("src/pages/sii/SiiDashboard.tsx");
+  // Con `leer` a secas, el bloque de abajo lo satisfacía el COMENTARIO que
+  // explica la corrección —«no hay cumplimiento que medir» está escrito en él—,
+  // así que borrar el render y dejar la prosa pasaba el gate. Se juzga lo que
+  // se renderiza: mismo criterio que la superficie de arriba.
+  const dashboard = sinComentarios(leer("src/pages/sii/SiiDashboard.tsx"));
 
   it("no hay porcentajes literales cableados", () => {
     // Había un "100%" literal en Garantías de Protección que no calculaba nada,
@@ -274,6 +278,10 @@ describe("SII — ningún KPI afirma cumplimiento sin dato", () => {
 
   it("el cumplimiento de acuse distingue 'sin dato' de 'cumplido'", () => {
     expect(dashboard).toContain("no hay cumplimiento que medir");
+    // Y la invariante que sostiene la frase: con CERO expedientes el KPI no
+    // pinta porcentaje ninguno. Un 100% verde sobre cero se lee «vamos
+    // perfectos», que es lo contrario de «no hay dato».
+    expect(dashboard).toMatch(/totalReports > 0\s*\?[^:]*%[^:]*:\s*"—"/);
   });
 
   it("el cumplimiento de acuse mide PUNTUALIDAD, no presencia", () => {
@@ -296,5 +304,42 @@ describe("GRC — el banner del canal no afirma capacidad del proveedor", () => 
 
   it("enuncia los plazos como exigencia legal, no como nivel de servicio cumplido", () => {
     expect(penal).toContain("Plazos legales: 7 días / 3 meses");
+  });
+});
+
+describe("SII — un plazo agotado no se enuncia como plazo por consumir", () => {
+  // El chip «Resolución Ordinaria (3m)» iba cableado al token de éxito y
+  // escribía el contador crudo: con los tres expedientes sembrados —los tres
+  // pasado el plazo del art. 9.2.d— la ficha decía «-58 días restantes» EN
+  // VERDE. El comportamiento se prueba en whistleblowing-engine.test.ts; esto
+  // impide que una pantalla vuelva a redactar la cuenta atrás por su cuenta.
+  const PANTALLAS = ["src/pages/sii/SiiCaseDetalle.tsx", "src/pages/sii/SiiDashboard.tsx"];
+
+  for (const ruta of PANTALLAS) {
+    it(`${ruta} deja la cuenta atrás en el motor`, () => {
+      const src = sinComentarios(leer(ruta));
+      expect(src).toContain("describeDeadlineCountdown(");
+      // Escribir «restantes» en la pantalla es reintroducir el defecto: el
+      // texto lo produce la función pura, que mira el signo. Un contador con
+      // signo negativo NO puede llamarse «restantes».
+      expect(src).not.toMatch(/restantes/);
+    });
+  }
+});
+
+describe("SII — el modelo no nombra destinatarios de remisión que nadie sabe escribir", () => {
+  // El expediente declaraba `referralAuthority` con tres destinatarios
+  // —Ministerio Fiscal, Fiscalía Europea y la Autoridad Independiente— y NADIE
+  // lo escribía ni lo leía: ni el cierre, ni la derivación, ni el asiento del
+  // Libro-registro. Un campo así insinúa una remisión que el producto no hace.
+  //
+  // La regla no es «prohibido el campo», es «si está, alguien lo escribe»: el
+  // día que la ficha ofrezca elegir destinatario, el campo vuelve y este gate
+  // sigue verde. Se mira la superficie SIN comentarios, porque el comentario
+  // que explica la retirada lo nombra.
+  it("si el tipo declara el destinatario, alguna superficie lo asigna", () => {
+    const declarantes = superficie.filter(([, src]) => /referralAuthority\??:/.test(src));
+    const escritores = superficie.filter(([, src]) => /referralAuthority\s*[:=]\s*[^;\n]*"/.test(src));
+    expect(declarantes.length === 0 || escritores.length > 0).toBe(true);
   });
 });

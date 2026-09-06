@@ -39,7 +39,6 @@ import {
   useAimsModelRegistry,
   useAimsDatasetRegistry,
   useAimsMonitoringIndicators,
-  useUpdateTechnicalFileSection,
 } from "@/hooks/useAimsTechnicalFile";
 import { useEvidenceBundlesForObject } from "@/hooks/useEvidenceBundles";
 import { useFriaBySystem, useFriaDetails } from "@/hooks/useAimsFria";
@@ -55,7 +54,6 @@ import { useBodiesList } from "@/hooks/useBodies";
 import { buildMeetingHandoffPath } from "@/lib/secretaria/cross-module-handoff";
 import DeclaracionConformidadModal from "@/components/ai-governance/DeclaracionConformidadModal";
 import { toast } from "sonner";
-import { useAuth } from "@/context/AuthContext";
 
 /** Vocabularios de la FRIA en castellano: la superficie es jurídica y en español. */
 const FRECUENCIA_USO: Record<string, string> = {
@@ -155,10 +153,26 @@ const SECTION_STATUS_CHIP: Record<string, string> = {
 const SECTION_STATUS_CHIP_NEUTRO =
   "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
 
+/**
+ * Indicadores de vigilancia poscomercialización. El chip salía de una igualdad
+ * estricta con `OPTIMAL`, un literal que NADIE escribe: la columna tiene
+ * `DEFAULT 'OK'` y el único indicador que existe en Cloud está en `OK` (medido
+ * 2026-09-06). Se pintaba en ámbar —como problema— un indicador que dice que
+ * todo va bien.
+ *
+ * Sólo se enumera el vocabulario que consta. Lo desconocido cae a NEUTRO y
+ * nunca a ámbar: un estado que no se sabe leer no es una alerta, es un estado
+ * que no se sabe leer. Inventar aquí `DEGRADED`/`BREACH` sería declarar una
+ * escala que la tabla no tiene (no hay CHECK) y que nada escribe.
+ */
+const INDICATOR_STATUS_CHIP: Record<string, string> = {
+  OK: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
+  OPTIMAL: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
+};
+
 export default function SistemaDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
 
   const { data: system, isLoading: loadSys } = useAiSystemById(id);
   const { data: assessments = [] } = useAssessmentsBySystem(id);
@@ -172,7 +186,6 @@ export default function SistemaDetalle() {
   const { data: indicators = [] } = useAimsMonitoringIndicators(id);
   const closeTechnicalFileMutation = useCloseAimsTechnicalFile();
   const updateSystemMutation = useUpdateAiSystem();
-  const updateSectionMutation = useUpdateTechnicalFileSection();
 
   const { data: fria, isLoading: friaLoading, isError: friaError } = useFriaBySystem(id);
   const { data: friaDetailsRaw } = useFriaDetails(fria?.id);
@@ -315,15 +328,11 @@ export default function SistemaDetalle() {
 
   const handleSealTechnicalFile = async (versionId: string) => {
     try {
-      await closeTechnicalFileMutation.mutateAsync({
-        versionId,
-        // Sin token: no interviene ningún prestador de confianza. El registro
-        // es interno y no lleva hash de integridad: la tabla no tiene columna
-        // donde guardarlo (verificado en Cloud, 2026-09-05).
-        qsealToken: undefined,
-        tsqToken: undefined,
-        signedBy: user?.email ?? undefined,
-      });
+      // Sólo el identificador de versión. El hook ya no acepta tokens de sello
+      // (nadie los produce) ni firmante: el correo del usuario alimentaba
+      // `evidence_bundles.signed_by` y `signature_date`, columnas que afirman
+      // una firma que aquí no ocurre.
+      await closeTechnicalFileMutation.mutateAsync({ versionId });
       toast.success("Expediente técnico cerrado y registrado (registro interno, sin hash de integridad)");
       refetchVersions();
       refetchSections();
@@ -448,7 +457,7 @@ export default function SistemaDetalle() {
             <span className="font-semibold text-[var(--g-text-primary)]">
               {system.deployment_date
                 ? new Date(system.deployment_date).toLocaleDateString("es-ES")
-                : "En validación"}
+                : "Sin fecha de despliegue registrada"}
             </span>
           </div>
           <div>
@@ -809,7 +818,7 @@ export default function SistemaDetalle() {
                 <div key={ind.id} className="p-4 bg-[var(--g-surface-subtle)]/30 border border-[var(--g-border-subtle)] space-y-2 text-xs" style={{ borderRadius: "var(--g-radius-md)" }}>
                   <div className="flex justify-between items-start">
                     <span className="font-bold text-sm text-[var(--g-text-primary)]">{ind.indicator_name}</span>
-                    <span className={`px-2 py-0.5 font-semibold text-[10px] ${ind.status === "OPTIMAL" ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]" : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"}`} style={{ borderRadius: "var(--g-radius-full)" }}>
+                    <span className={`px-2 py-0.5 font-semibold text-[10px] ${INDICATOR_STATUS_CHIP[normalizeAimsStatus(ind.status)] ?? SECTION_STATUS_CHIP_NEUTRO}`} style={{ borderRadius: "var(--g-radius-full)" }}>
                       {ind.status}
                     </span>
                   </div>
@@ -919,8 +928,9 @@ export default function SistemaDetalle() {
                     </div>
                     <h2 className="text-xl font-bold text-[var(--g-text-primary)]">{fria.title}</h2>
                     <p className="text-xs text-[var(--g-text-secondary)]">
-                      Obligación previa al despliegue para sistemas de alto riesgo · Notificación a la
-                      Autoridad de Vigilancia del Mercado
+                      Evaluación del art. 27 RIA registrada para este sistema. El alcance de la
+                      obligación —alto riesgo del anexo III y tipo de desplegador, art. 27.1— no se
+                      acredita por esta cabecera.
                     </p>
                   </div>
 

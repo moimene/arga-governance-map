@@ -392,6 +392,13 @@ export default function AiIncidenteDetalle() {
                 {formatDeadline(clocks.ria?.deadlineDate)}
               </span>
             </div>
+            {clocks.ria && (
+              <p className="text-[11px] text-[var(--g-text-secondary)] leading-relaxed">
+                Tipología del art. 73 no registrada: el incidente no tiene columna donde guardarla.
+                El plazo se calcula asumiendo incidente grave ordinario (15 días naturales); al
+                editar puede elegirse otra tipología, pero el cambio no se guarda con el incidente.
+              </p>
+            )}
           </div>
 
           {/* Reloj 2: RGPD Art. 33/34 */}
@@ -483,7 +490,7 @@ export default function AiIncidenteDetalle() {
           <div className="flex items-center gap-2">
             <Layers className="w-5 h-5 text-[var(--g-brand-3308)]" />
             <h3 className="text-sm font-bold text-[var(--g-text-primary)]">
-              Subexpedientes Regulatorios & Aislamiento de Cierres
+              Regímenes potencialmente aplicables
             </h3>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-[var(--g-text-secondary)]">
@@ -491,6 +498,21 @@ export default function AiIncidenteDetalle() {
             <span>El cierre de un subexpediente no arrastra ni altera el estado de los demás regímenes.</span>
           </div>
         </div>
+
+        {/* Este listado es un catálogo de referencia, no el registro del
+            incidente. Ninguna pantalla del producto abre un subexpediente:
+            `aims_incident_regimes` no tiene un solo camino de escritura en
+            `src/` (verificado 2026-09-06) y en Cloud hay 0 filas. Decirlo es lo
+            que corresponde; abrirlos automáticamente al dar de alta el
+            incidente afirmaría que el régimen ALCANZA al caso, que es
+            exactamente la presunción que esta ficha dejó de hacer con el RGPD y
+            con DORA. Cuando exista una fila, sus valores mandan sobre los del
+            catálogo. */}
+        <p className="text-xs text-[var(--g-text-secondary)]">
+          Correspondencia régimen ↔ autoridad de referencia. No acredita que el régimen alcance a
+          este incidente ni que exista subexpediente abierto: la apertura no está disponible desde
+          esta consola. Los datos de un subexpediente ya registrado sustituyen a los de referencia.
+        </p>
 
         <div className="space-y-3">
           {[
@@ -521,7 +543,12 @@ export default function AiIncidenteDetalle() {
                   role: "CISO",
                 }]
               : []),
-          ].map((reg) => (
+          ].map((reg) => {
+            // La fila registrada, si la hay, es el dato; `reg` sólo es el
+            // catálogo de referencia. Pintar siempre el literal hacía pasar por
+            // registrado un valor que nadie ha escrito.
+            const fila = dbRegimes.find((r) => r.regime_code === reg.code);
+            return (
             <div
               key={reg.code}
               className="p-4 bg-[var(--g-surface-subtle)]/30 border border-[var(--g-border-subtle)] flex flex-wrap items-center justify-between gap-4"
@@ -534,14 +561,16 @@ export default function AiIncidenteDetalle() {
                 </div>
                 <p className="text-xs text-[var(--g-text-secondary)]">{reg.desc}</p>
                 <div className="flex gap-3 text-[11px] text-[var(--g-text-secondary)] pt-1">
-                  <span>Autoridad: <strong className="text-[var(--g-text-primary)]">{reg.authority}</strong></span>
+                  <span>Autoridad: <strong className="text-[var(--g-text-primary)]">{fila?.target_authority ?? reg.authority}</strong></span>
                   <span>•</span>
-                  <span>Responsable: <strong className="text-[var(--g-text-primary)]">{reg.role}</strong></span>
+                  <span>Responsable: <strong className="text-[var(--g-text-primary)]">{fila?.lead_role ?? reg.role}</strong></span>
+                  <span>•</span>
+                  <span>{fila ? "Dato del subexpediente registrado" : "Valor de referencia, no registrado"}</span>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                {dbRegimes.some((r) => r.regime_code === reg.code) ? (
+                {fila ? (
                   <button
                     onClick={() => handleCloseRegimeSubcase(reg.code as "RIA" | "GDPR" | "DORA")}
                     disabled={updateRegimeMutation.isPending}
@@ -558,7 +587,8 @@ export default function AiIncidenteDetalle() {
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

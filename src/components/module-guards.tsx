@@ -1,5 +1,6 @@
 import { Navigate, useParams } from "react-router-dom";
 import { useTenantBranding, useTenantBrandingLoading } from "@/context/TenantBrandContext";
+import { useTenantContext } from "@/context/TenantContext";
 import { isModuleEnabled } from "@/lib/tenant-modules";
 
 function ModuleFallback() {
@@ -14,11 +15,21 @@ function ModuleFallback() {
  * D-5 — guard de ruta por módulo. Espera a que el branding cargue antes de
  * decidir: useTenantBranding() devuelve null tanto para ARGA como durante la
  * carga, y redirigir con esa ambigüedad produce parpadeo/falso negativo.
+ *
+ * Hay DOS esperas, no una. `useTenantBrandingLoading()` vale
+ * `!!tenantId && isLoading`, así que mientras `TenantProvider` resuelve el
+ * perfil por red —tenantId todavía null— vale FALSE, el branding vale null e
+ * `isModuleEnabled` falla ABIERTO: el guard se abre y un módulo que el tenant
+ * no declara alcanza a pintarse durante ese frame. La espera del tenant va
+ * ANTES que la del branding porque es la que decide de qué tenant hablamos.
+ * ARGA no cambia: cuando las dos esperas terminan, su branding sigue siendo
+ * NULL y lo sigue viendo todo.
  */
 export function RequireModule({ moduleKey, children }: { moduleKey: string; children: React.ReactNode }) {
+  const { isLoading: tenantLoading } = useTenantContext();
   const branding = useTenantBranding();
   const loading = useTenantBrandingLoading();
-  if (loading) return <ModuleFallback />;
+  if (tenantLoading || loading) return <ModuleFallback />;
   if (!isModuleEnabled(branding, moduleKey)) return <Navigate to="/" replace />;
   return <>{children}</>;
 }

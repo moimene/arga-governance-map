@@ -33,14 +33,18 @@ vi.mock("@/context/TenantContext", () => ({
   }),
 }));
 
-// Mock TenantBrandContext
+// Mock TenantBrandContext. Mutable para poder montar el shell con una lista
+// blanca de módulos y comprobar qué secciones sobreviven.
+const BRANDING_BASE = {
+  nombre: "Grupo ARGA",
+  shell_label: "TGMS PLATFORM",
+  scope_label: "Grupo ARGA",
+  scopes: ["Grupo ARGA", "ARGA España", "ARGA LATAM"],
+};
+let brandingMock: Record<string, unknown> = { ...BRANDING_BASE };
+
 vi.mock("@/context/TenantBrandContext", () => ({
-  useTenantBranding: () => ({
-    nombre: "Grupo ARGA",
-    shell_label: "TGMS PLATFORM",
-    scope_label: "Grupo ARGA",
-    scopes: ["Grupo ARGA", "ARGA España", "ARGA LATAM"],
-  }),
+  useTenantBranding: () => brandingMock,
   useTenantBrandingLoading: () => false,
 }));
 
@@ -96,6 +100,7 @@ function renderShell(initialRoute = "/") {
 
 afterEach(() => {
   cleanup();
+  brandingMock = { ...BRANDING_BASE };
 });
 
 describe("TGMS Shell Layout & Management Console Tests", () => {
@@ -125,6 +130,34 @@ describe("TGMS Shell Layout & Management Console Tests", () => {
     const userBtn = screen.getByRole("button", { name: /Menú de usuario: Dña. Lucía Paredes Vega/i });
     expect(userBtn).toBeDefined();
     expect(screen.getByText("LP")).toBeDefined();
+  });
+
+  it("un tenant sin `sii` no lee el rótulo de una sección vacía", () => {
+    // El rótulo es parte de lo gateado: "Canal interno" sobre cero items
+    // anuncia una superficie que ese tenant no tiene. Lista blanca REAL de
+    // Garrigues menos `sii`.
+    brandingMock = {
+      ...BRANDING_BASE,
+      modules: ["secretaria", "grc", "ai-governance", "politicas", "obligaciones",
+                "delegaciones", "hallazgos", "conflictos", "governance-map",
+                "entidades", "organos"],
+    };
+    renderShell("/");
+    expect(screen.queryByText("Canal interno")).toBeNull();
+    expect(screen.queryByText("SII — Canal Interno")).toBeNull();
+    // Controles positivos: el instrumento ve lo que sí queda. Sin esto, un
+    // shell que no pintara nada pasaría las dos ausencias de arriba.
+    expect(screen.getByText("Gobernanza")).toBeDefined();
+    expect(screen.getByText("Módulos")).toBeDefined();
+    expect(screen.getByText("Secretaría")).toBeDefined();
+  });
+
+  it("ARGA (sin lista blanca) conserva las tres secciones, SII incluido", () => {
+    renderShell("/");
+    expect(screen.getByText("Gobernanza")).toBeDefined();
+    expect(screen.getByText("Módulos")).toBeDefined();
+    expect(screen.getByText("Canal interno")).toBeDefined();
+    expect(screen.getByText("SII — Canal Interno")).toBeDefined();
   });
 
   it("renders GlobalSearch quick search trigger in the header", () => {
