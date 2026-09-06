@@ -96,4 +96,37 @@ describe("meeting source links", () => {
       agreement_ids: ["agreement-1"],
     });
   });
+  // El servidor declara inmutable el vínculo a una convocatoria EMITIDA: el
+  // trigger `fn_secretaria_guard_meeting_open_transition` rechaza CUALQUIER
+  // diferencia en `quorum_data->source_links`. Reescribirlo tiraba el UPDATE
+  // entero y con él los `point_snapshots`, dejando el acta inalcanzable en el
+  // camino que nace de convocatoria. Se comprueba la IDENTIDAD del objeto, no
+  // solo su contenido: una copia con las mismas claves en otro orden ya es
+  // `IS DISTINCT FROM` para el trigger.
+  it("no toca un vínculo explícito a convocatoria: lo deja idéntico", () => {
+    const sourceLinks = {
+      source: "explicit",
+      convocatoria_id: "conv-emitida",
+      convocatoria_ids: ["conv-emitida"],
+    };
+    const quorumData = { quorum: { reached: true }, source_links: sourceLinks };
+
+    const patched = patchQuorumDataSourceLinks(quorumData, {
+      convocatoria_id: null,
+      agreement_ids: ["agreement-nuevo"],
+      source: "derived",
+    });
+
+    expect(patched.source_links).toBe(sourceLinks);
+    expect(patched.quorum).toEqual({ reached: true });
+  });
+
+  it("y sí lo reescribe cuando el vínculo NO es explícito", () => {
+    const patched = patchQuorumDataSourceLinks(
+      { source_links: { source: "derived", convocatoria_id: "conv-1" } },
+      { convocatoria_id: "conv-1", agreement_ids: ["agreement-1"], source: "derived" }
+    );
+
+    expect(patched.source_links).toMatchObject({ agreement_ids: ["agreement-1"] });
+  });
 });

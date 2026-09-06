@@ -115,9 +115,34 @@ export function mergeMeetingSourceLinks(existing: unknown, next: MeetingSourceLi
 export function patchQuorumDataSourceLinks(
   quorumData: Record<string, unknown> | null | undefined,
   next: MeetingSourceLinks,
-): Record<string, unknown> & { source_links: ReturnType<typeof mergeMeetingSourceLinks> } {
+): Record<string, unknown> & { source_links: unknown } {
+  const base = (quorumData ?? {}) as Record<string, unknown>;
+  const raw = base.source_links as { source?: unknown } | undefined;
+
+  // Un vínculo `explicit` es la atadura AUTORITATIVA de la reunión a una
+  // convocatoria EMITIDA, y el servidor la declara inmutable: el trigger
+  // `fn_secretaria_guard_meeting_open_transition` rechaza con 42501
+  // MEETING_CONVOCATION_BINDING_IMMUTABLE **cualquier** diferencia en
+  // `quorum_data->source_links`, no solo un cambio de `source`.
+  //
+  // Aquí se reescribía siempre, y `sourceLinksFromAgendaPoints` devuelve
+  // `source: "derived"` y acumula `agreement_ids`: dos diferencias. El UPDATE
+  // ENTERO se caía, así que `point_snapshots` no llegaba nunca a una reunión
+  // convocada. Consecuencia medida en Cloud el 2026-09-06: las reuniones
+  // `derived` tienen snapshots y la vinculada `ac961a00-…` tiene 0 con 3
+  // resoluciones — y sin snapshots `loadActaAgendaContract` no encuentra el
+  // resultado de la votación, así que «Confirmar cierre y generar acta» queda
+  // deshabilitado PARA SIEMPRE. El acta era inalcanzable en el camino que nace
+  // de una convocatoria, que es el camino principal del módulo.
+  //
+  // No se pierde nada al no reescribirlo: al rechazarse el UPDATE completo, esa
+  // acumulación nunca llegó a persistir en una reunión vinculada.
+  if (raw && raw.source === "explicit") {
+    return base as Record<string, unknown> & { source_links: unknown };
+  }
+
   return {
-    ...(quorumData ?? {}),
+    ...base,
     source_links: mergeMeetingSourceLinks(quorumData, next),
   };
 }
