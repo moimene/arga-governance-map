@@ -74,6 +74,47 @@ describe("vocabulario de evaluaciones: escritura ↔ lectura", () => {
     expect(dominio?.status, "una evaluación conforme no cubre al sistema que evalúa").toBe("ready");
   });
 
+  it("los findings que el producto ESCRIBE cuentan como controles cerrados al LEERSE", () => {
+    // Tercer sitio donde escritura y lectura estaban partidas.
+    // `buildEvaluationPayload` guarda en `findings[].status` el NIVEL de
+    // madurez (`L5`, `L8`…), no una palabra de estado; `buildAimsReadiness`
+    // contaba cerrados sólo `CERRADO/APROBADO/CONFORME/OK`. Una evaluación
+    // contestada entera y conforme daba «0/2 cerrados» y arrastraba el dominio
+    // «Controles» a demo-con-gaps para siempre.
+    const conforme = buildEvaluationPayload(
+      { MG_RISK_01: { maturity: "L5" }, MG_RISK_02: { maturity: "L8" } },
+      MEDIDAS,
+      [REQ],
+    );
+    // Control positivo: el camino de escritura produce de verdad niveles, no
+    // palabras de estado. Sin esto, un payload que emitiera "CONFORME" dejaría
+    // el test verde sin probar nada.
+    expect(conforme.findings.map((f) => f.status)).toEqual(["L5", "L8"]);
+
+    const resumen = buildAimsReadiness({
+      systems: [{ id: "sys-1", status: "ACTIVO", risk_level: "Alto" }],
+      assessments: [{ id: "a-1", system_id: "sys-1", status: conforme.status, score: 100, findings: conforme.findings }],
+      incidents: [],
+    });
+    const controles = resumen.domains.find((d) => d.id === "controls");
+    expect(controles?.metric, "los findings conformes que se escriben se leen como 0 cerrados")
+      .toBe("2/2 cerrados");
+
+    // Y discrimina: un nivel que NO acredita conformidad no cuenta.
+    const conGaps = buildEvaluationPayload(
+      { MG_RISK_01: { maturity: "L3" }, MG_RISK_02: { maturity: "L5" } },
+      MEDIDAS,
+      [REQ],
+    );
+    const resumenGaps = buildAimsReadiness({
+      systems: [{ id: "sys-1", status: "ACTIVO", risk_level: "Alto" }],
+      assessments: [{ id: "a-1", system_id: "sys-1", status: conGaps.status, score: 50, findings: conGaps.findings }],
+      incidents: [],
+    });
+    expect(resumenGaps.domains.find((d) => d.id === "controls")?.metric, "L3 se cuenta como control cerrado")
+      .toBe("1/2 cerrados");
+  });
+
   it("una evaluación CONFORME no se propone como gap de expediente técnico", () => {
     const [conforme, conGaps] = estadosQueElProductoEscribe();
     expect(

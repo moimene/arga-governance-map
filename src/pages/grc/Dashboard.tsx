@@ -57,11 +57,16 @@ function KpiCard({
   label,
   value,
   tone = "neutral",
+  helper,
 }: {
   icon: React.ElementType;
   label: string;
   value: number | undefined;
   tone?: "danger" | "warning" | "neutral";
+  /** Qué queda FUERA del número. Un recuento con perímetro implícito miente
+   *  por omisión: sin esto, "Riesgos críticos: 0" se lee como "no hay
+   *  exposición alta" aunque casi todo el perímetro esté fuera de la escala. */
+  helper?: string;
 }) {
   const iconColor =
     tone === "danger"
@@ -84,6 +89,9 @@ function KpiCard({
       <div className="text-3xl font-bold text-[var(--g-text-primary)]">
         {value ?? <span className="text-[var(--g-text-secondary)]">—</span>}
       </div>
+      {helper && (
+        <p className="text-xs leading-4 text-[var(--g-text-secondary)]">{helper}</p>
+      )}
     </div>
   );
 }
@@ -351,6 +359,14 @@ export default function GrcDashboard() {
       ? "Vista Sociedad: riesgos filtrados por entidad y señales GRC relacionadas."
       : "Vista Grupo: señales agregadas de todas las sociedades.";
   const { data: kpis, isLoading } = useGrcKpis(scopedEntityId);
+  // Medido en Cloud el 2026-09-06: de 167 riesgos de ARGA, 159 no tienen
+  // residual; de los 82 del mapa penal del otro tenant, 82. El recuento
+  // "críticos" solo mira residual >= 15, así que la inmensa mayoría del
+  // perímetro no entra — y el número desnudo lo ocultaba.
+  const riesgosCriticosHelper = kpis?.risksSinScore
+    ? `${kpis.risksSinScore} sin residual, fuera del recuento` +
+      (kpis.risksBandaAlta ? `; ${kpis.risksBandaAlta} en banda alta del mapa evaluado` : "")
+    : undefined;
   const visibleP0Domains = GRC_P0_DOMAINS.filter((domain) => isGrcRouteVisible(branding, domain.route));
   const readiness = getGrcP0ReadinessSummary(visibleP0Domains);
   const visibleScreens = GRC_SCREEN_POSTURES.filter((screen) => isGrcRouteVisible(branding, screen.route));
@@ -527,6 +543,7 @@ export default function GrcDashboard() {
           label="Riesgos críticos"
           value={kpis?.criticalRisks}
           tone="danger"
+          helper={riesgosCriticosHelper}
         />
         <KpiCard
           icon={AlertOctagon}

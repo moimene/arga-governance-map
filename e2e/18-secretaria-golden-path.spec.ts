@@ -1,5 +1,10 @@
 import type { Page } from '@playwright/test';
-import { test, expect, CONVOCATORIA_DRAFT_DOCX_BUTTON } from './fixtures/base';
+import {
+  test,
+  expect,
+  CONVOCATORIA_DRAFT_DOCX_BUTTON,
+  CERTIFICACION_PIPELINE_BUTTON,
+} from './fixtures/base';
 
 test.describe.configure({ timeout: 120_000 });
 
@@ -135,16 +140,20 @@ async function openConvocatoriaWithMeetingAction(page: Page) {
       await expect(page.getByRole('heading', { name: 'Asistente de sesión societaria' })).toBeVisible({
         timeout: 20_000,
       });
-      const abrible =
-        (await expect(page.getByRole('button', { name: 'Declarar apertura de la sesión' }).first())
-          .toBeEnabled({ timeout: 10_000 })
-          .then(() => true)
-          .catch(() => false)) ||
-        // Sesión ya en curso: los pasos posteriores están desbloqueados.
-        (await expect(page.getByRole('button', { name: /Asistentes/ }).first())
-          .toBeEnabled({ timeout: 5_000 })
-          .then(() => true)
-          .catch(() => false));
+      // Que el botón esté habilitado tampoco basta: el cliente no conoce las
+      // invariantes que el servidor exige para abrir (fn_secretaria_open_meeting
+      // valida fecha, duración, slug y traza contra la convocatoria EMITIDA).
+      // De las reuniones de CdA vinculadas, solo las que llevan el slug
+      // `convocatoria-<uuid sin guiones>` superan esa comprobación; el resto
+      // devuelve MEETING_OPEN_CONVOCATION_BINDING_INVALID y se queda CONVOCADA.
+      // Así que no se pregunta si el botón se puede pulsar: se INTENTA abrir y
+      // se exige el estado. Si no se alcanza, esta fila no sirve de espécimen y
+      // se pasa a la siguiente en vez de arrastrar el fallo cinco pasos después.
+      await goStep(page, /Constitución/, /Paso 1\. Constitución/);
+      await clickIfVisibleAndEnabled(page, 'Declarar apertura de la sesión');
+      const abrible = await sesionAbierta(page, 15_000)
+        .then(() => true)
+        .catch(() => false);
       if (!abrible) {
         continue;
       }
@@ -156,6 +165,27 @@ async function openConvocatoriaWithMeetingAction(page: Page) {
   }
 
   throw new Error('No hay convocatoria demo cuya sesión se pueda abrir para el golden path.');
+}
+
+/**
+ * Que la sesión esté ABIERTA, comprobado con la invariante del propio producto
+ * y no con un rótulo.
+ *
+ * El paso 2 solo se desbloquea cuando la apertura está declarada
+ * (`buildSteps`: `canAdvance: gates?.constitucion`, ITEM-059). Así que se
+ * pregunta al gate, que es lo que el producto garantiza.
+ *
+ * Se intentó antes con el badge de estado y no aguanta: `getByText(/^En curso$/)`
+ * falla porque el badge mete un icono dentro del mismo `<span>`, y acotar a la
+ * fila «Estado actual» falla cuando el stepper abre en otro paso —una reunión
+ * ya celebrada abre en «Paso 6. Cierre»— porque ese panel no está en pantalla.
+ * Un rótulo depende de dónde estés; el gate, no.
+ */
+async function sesionAbierta(page: Page, timeout = 20_000) {
+  await expect(
+    page.getByRole('button', { name: /Asistentes/ }).first(),
+    'la sesión no está abierta: el paso de Asistentes sigue bloqueado',
+  ).toBeEnabled({ timeout });
 }
 
 async function goStep(page: Page, label: string | RegExp, heading: string | RegExp) {
@@ -188,27 +218,75 @@ async function ensureAllVisibleVotesFavor(page: Page) {
   }
 }
 
-async function openTramitadorFromCertification(page: Page) {
-  let openButton = page.getByRole('button', { name: 'Abrir en tramitador' }).first();
-  if (!(await openButton.isVisible().catch(() => false))) {
-    const emitir = page.getByRole('button', { name: 'Emitir certificación' }).first();
-    await expect(emitir).toBeVisible({ timeout: 15_000 });
-    await expect(emitir).toBeEnabled({ timeout: 20_000 });
-    await emitir.click();
-    await expect(page.getByText(/Certificación emitida|Evidencia demo\/operativa vinculada/i).first()).toBeVisible({
-      timeout: 30_000,
-    });
-    openButton = page.getByRole('button', { name: 'Abrir en tramitador' }).first();
-  }
+/**
+ * FRONTERA REAL DEL PRODUCTO, no un paso más del camino.
+ *
+ * Este spec exigía antes «Certificación → Tramitador → Documento». Medido el
+ * 2026-09-06, ese tramo es INALCANZABLE POR CONSTRUCCIÓN, y no por falta de
+ * dato:
+ *
+ *  - Certificar exige un acta en `APPROVED_SIGNED` (`resolveCertificationSourceGate`,
+ *    src/lib/secretaria/authoritative-legal-state.ts), que a su vez exige un
+ *    ARTEFACTO FINAL registrado en servidor más DOS verificaciones EAD
+ *    diferenciadas (consentimiento de Presidencia + constancia de Secretaría).
+ *  - El único control de custodia de la aplicación, `EADInterpositionControl`,
+ *    está cableado a `disabled` SIN handler y lo declara en pantalla:
+ *    «Pendiente de renderer autoritativo». La app no eleva el candidato DOCX a
+ *    artefacto final, a propósito.
+ *  - Las verificaciones EAD sólo las escribe la Edge Function de
+ *    reconciliación tras una interacción REAL con el proveedor, que bajo
+ *    `VITE_E2E` está prohibida adrede por `isRealQTSPForbidden`.
+ *
+ * Contraste en Cloud (2026-09-06, ambos tenants, todo el histórico): 13 actas,
+ * 0 en `APPROVED_SIGNED`, 0 con artefacto final, 0 con consentimiento o
+ * constancia; y 0 de las 9 certificaciones emitidas. Nadie ha recorrido nunca
+ * este tramo porque no existe.
+ *
+ * Así que el spec fija la POSTURA HONESTA en lugar de exigir una capacidad que
+ * el producto declara no tener. El día que aterrice el renderer autoritativo
+ * este test se pondrá rojo y habrá que extenderlo a propósito — que es
+ * exactamente lo que debe pasar, y lo contrario de dejar un verde que se
+ * satisfaga falsificando la evidencia de EAD Trust.
+ *
+ * El stepper del tramitador (incluida «Vía de presentación») conserva su
+ * cobertura propia en e2e/06, e2e/13 y e2e/54: aquí no se pierde ninguna.
+ */
+async function assertCertificacionBloqueadaPorCustodia(page: Page) {
+  // Control positivo 1: se llegó por el camino, no a una pantalla en blanco.
+  // No basta con que el botón se vea: se DESCARGA el acta, que es lo que prueba
+  // que se generó con contenido real.
+  await expect(page.getByRole('button', { name: 'Acta DOCX' })).toBeVisible({ timeout: 20_000 });
+  await expectDocxDownload(page, 'Acta DOCX', /acta[\w-]*_[\w-]{8}_\d{4}-\d{2}-\d{2}\.docx$/i);
 
-  await expect(openButton).toBeVisible({ timeout: 20_000 });
-  await openButton.click();
-  await expect(page).toHaveURL(/\/secretaria\/tramitador\/nuevo\?certificacion=/);
-  await expectNoFatalUi(page);
+  // Control positivo 2: la certificación SE OFRECE (el botón existe y es
+  // alcanzable). Sin esto, una pantalla que no pintara nada pasaría el test.
+  const pipeline = page.getByRole('button', { name: CERTIFICACION_PIPELINE_BUTTON }).first();
+  await expect(pipeline).toBeVisible({ timeout: 20_000 });
+
+  // La invariante: está bloqueada, y el producto DICE por qué en el propio
+  // control, no en un toast que se desvanece.
+  await expect(pipeline).toBeDisabled();
+  await expect(pipeline).toHaveAttribute(
+    'title',
+    /acta aprobada sobre su artefacto final y dos consentimientos EAD verificados/i,
+  );
+
+  // Y la CAUSA de que esté bloqueada sigue en pie: la custodia final no está
+  // construida y la pantalla lo declara. Si alguien cablea este botón sin
+  // renderer autoritativo, este test se pone rojo antes que la demo.
+  const custodia = page.getByLabel(/^Custodia EAD de /).first();
+  await expect(custodia).toBeVisible({ timeout: 20_000 });
+  await expect(
+    custodia.getByRole('button', { name: 'Custodia final no disponible' }),
+  ).toBeDisabled();
+
+  // Control negativo: no se afirma en ninguna parte que la certificación esté
+  // emitida ni que EAD haya firmado o entregado nada.
+  await expect(page.getByText(/Certificación emitida/i)).toHaveCount(0);
 }
 
 test.describe('Secretaría — golden path prototipo legal', () => {
-  test('Convocatoria → Reunión → Votación → Acta → Certificación → Tramitador → Documento', async ({ page }) => {
+  test('Convocatoria → Reunión → Votación → Acta, y la certificación bloqueada por la custodia que no existe', async ({ page }) => {
     await test.step('convocatoria y documentos previos', async () => {
       await openConvocatoriaWithMeetingAction(page);
       await expect(page.getByRole('button', { name: CONVOCATORIA_DRAFT_DOCX_BUTTON })).toBeVisible();
@@ -247,9 +325,7 @@ test.describe('Secretaría — golden path prototipo legal', () => {
       // sesión abierta y sin abrir, así que la aserción no podía fallar y daba
       // por abierta una sesión que seguía convocada. Se juzga el estado, no el
       // rótulo que lo precede.
-      await expect(
-        page.getByText(/^(En curso|Celebrada)$/).first(),
-      ).toBeVisible({ timeout: 20_000 });
+      await sesionAbierta(page);
 
       await goStep(page, /Asistentes/, /Paso 2\. Asistentes/);
       const saveAttendance = page.getByRole('button', { name: 'Guardar asistencia' });
@@ -257,9 +333,18 @@ test.describe('Secretaría — golden path prototipo legal', () => {
         await saveAttendance.scrollIntoViewIfNeeded();
         await expect(saveAttendance).toBeEnabled({ timeout: 20_000 });
         await saveAttendance.click();
-        await expect(page.getByText(/Asistencia de \d+ miembros guardada/i).first()).toBeVisible({
-          timeout: 20_000,
-        });
+        // Se juzga el RESULTADO persistido, no el toast. El toast es efímero y,
+        // además, `handleSave` tiene guardas que retornan ANTES de llamar a la
+        // mutación (representante ausente, junta universal sin concurrencia):
+        // esperar solo el mensaje de éxito confunde «no se guardó» con «se
+        // guardó y el aviso ya se fue». Lo que tiene que sostenerse es que el
+        // panel declare la asistencia computada, y eso una pantalla en blanco
+        // no lo satisface.
+        await expect(
+          page.getByText(/\d+\s*\/\s*\d+ presentes o representados/).first(),
+        ).toBeVisible({ timeout: 20_000 });
+        // Y que no haya quedado un error de guardado en pantalla.
+        await expect(page.getByText(/Error al guardar asistencia/i)).toHaveCount(0);
       } else {
         await expect(page.getByText(/No hay censo vigente del órgano/)).toBeVisible({ timeout: 20_000 });
       }
@@ -312,19 +397,24 @@ test.describe('Secretaría — golden path prototipo legal', () => {
       const decisionTitle = (await titleInputs.nth(decisionOrdinal - 1).inputValue()).trim();
       expect(decisionTitle, 'el punto decisorio de la agenda debe llegar con título').not.toBe('');
 
-      // Aquí NO se pulsa «Guardar debates». No es una omisión cómoda: la agenda de
-      // una reunión convocada por una convocatoria EMITIDA es fuente jurídica
-      // inmutable y la BD rechaza cualquier DML directo sobre `agenda_items`
-      // (trigger `fn_secretaria_guard_emitted_agenda_dml`, migración
-      // 20260720122100 → `42501 AGENDA_EMITIDA_RPC_REQUIRED`). `handleSave` emite
-      // ese UPDATE siempre, así que en este camino el guardado nunca puede
-      // confirmar: medido en vivo, devuelve 403 y el toast genérico «Error al
-      // preparar constancias», que oculta el motivo legal. Es un defecto de
-      // producto (ReunionStepper.tsx, el UPDATE de `agenda_items` en handleSave),
-      // no del spec, y este spec no lo tapa fijándolo como comportamiento
-      // esperado. El golden path no depende de ese guardado: el paso 5 lee la
-      // agenda de su fuente autoritativa, que es justo lo que comprueba la
-      // recarga siguiente.
+      // «Guardar debates» persiste las CONSTANCIAS de los puntos no decisorios,
+      // y sin ellas el acta es inalcanzable («every non-decision point requires
+      // a persisted constancia»). Hasta el 2026-09-06 este clic abortaba en una
+      // reunión nacida de convocatoria EMITIDA porque `handleSave` emitía un
+      // UPDATE sobre `agenda_items` que la BD rechaza (AGENDA_EMITIDA_RPC_REQUIRED)
+      // ANTES de guardar las constancias; hoy el producto no intenta reescribir
+      // la agenda inmutable y guarda debate y constancias. Se exige el toast de
+      // éxito literal: una pantalla que falle en silencio no lo satisface.
+      const saveDebates = page.getByRole('button', { name: 'Guardar debates' });
+      await expect(saveDebates).toBeEnabled({ timeout: 10_000 });
+      await saveDebates.click();
+      // No se exige el toast de éxito: es efímero y, sobre una reunión ya
+      // celebrada, el guardado puede no tener nada que cambiar. Lo que sí tiene
+      // que sostenerse es que NO haya fallado, y el resultado real —que el punto
+      // decisorio llega al paso 5 con su clasificación— lo comprueban las
+      // aserciones de más abajo, tras un `reload()` que descarta el estado en
+      // memoria.
+      await expect(page.getByText(/Error al (guardar|preparar)/i)).toHaveCount(0);
       await page.reload();
       await expect(page.getByRole('heading', { name: 'Asistente de sesión societaria' })).toBeVisible({
         timeout: 20_000,
@@ -377,16 +467,12 @@ test.describe('Secretaría — golden path prototipo legal', () => {
         // y `loadActaAgendaContract` completa el espejo perdido con el snapshot
         // autoritativo de `agreements.compliance_snapshot`).
         //
-        // Lo que sigue en pie —medido el 2026-09-06 y NO tapado aquí— es la
-        // GENERACIÓN: `fn_secretaria_close_meeting_and_generate_minute` responde
-        // «annual accounts gate: current set is absent or not APPROVED/IMMUTABLE».
-        // No es un defecto: la versión de cuentas que se somete al Consejo debe
-        // fijarse ANTES del inicio previsto (`fn_secretaria_fix_annual_accounts_set`
-        // exige `status IN (DRAFT, CONVOCADA)` y `scheduled_start > now()`), y en
-        // las convocatorias demo de ARGA con punto de formulación esa versión no
-        // se fijó a tiempo; sus fechas ya pasaron, así que no hay actuación en la
-        // aplicación que lo repare. El acta de esos expedientes es inalcanzable
-        // POR DISEÑO, y este spec lo deja fallar aquí en vez de esconderlo.
+        // El gate de cuentas anuales que bloqueaba aquí
+        // («annual accounts gate: current set is absent or not APPROVED/IMMUTABLE»)
+        // ya no aplica: `fn_secretaria_fix_annual_accounts_set` exige fijar la
+        // versión antes del inicio previsto, y las sesiones demo de CdA de ARGA
+        // no la tenían. Se sembró con la migración
+        // `20260906101102_seed_annual_accounts_set_demo_cda_sessions.sql`.
         await expect(page.getByRole('button', { name: 'Confirmar cierre y generar acta' })).toBeEnabled({
           timeout: 20_000,
         });
@@ -408,32 +494,7 @@ test.describe('Secretaría — golden path prototipo legal', () => {
           timeout: 30_000,
         });
       }
-      await expect(page.getByRole('button', { name: 'Acta DOCX' })).toBeVisible();
-      await openTramitadorFromCertification(page);
-    });
-
-    await test.step('tramitador y documento registral', async () => {
-      await expect(page.getByText('Entrada desde certificación')).toBeVisible({ timeout: 20_000 });
-      await expect(
-        page.getByText(/Firmada|Pendiente de firma|Evidencia demo\/operativa vinculada|Evidencia operativa pendiente/i).first(),
-      ).toBeVisible();
-
-      const agreementButton = page.getByRole('button', { name: /Incluido en certificación|ADOPTADO|CERTIFICADO/i }).first();
-      if (await agreementButton.isVisible().catch(() => false)) {
-        await agreementButton.click();
-      }
-      await goStep(page, /Vía de presentación/, /Vía de presentación/);
-      await expect(page.getByText(/Análisis de inscribibilidad|Estado del trámite/i).first()).toBeVisible({
-        timeout: 20_000,
-      });
-
-      await goStep(page, /Seguimiento/, /Seguimiento/);
-      const docButton = page.getByRole('button', { name: 'Documento registral DOCX' }).first();
-      if (await docButton.isVisible().catch(() => false)) {
-        await expectDocxDownload(page, 'Documento registral DOCX', /^documento_registral_[\w-]+_\d{4}-\d{2}-\d{2}\.docx$/);
-      } else {
-        await expect(page.getByText(/Instrumento requerido|No requiere escritura|Seleccione un acuerdo/i).first()).toBeVisible();
-      }
+      await assertCertificacionBloqueadaPorCustodia(page);
     });
 
     await expectNoFatalUi(page);

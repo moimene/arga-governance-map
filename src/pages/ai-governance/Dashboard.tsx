@@ -37,6 +37,7 @@ import { useScope } from "@/context/ScopeContext";
 import { useTenantContext } from "@/context/TenantContext";
 import { useBodyBySlug } from "@/hooks/useBodies";
 import { aiGovernanceBodySlug } from "@/lib/aims/governing-body";
+import { normalizeAimsStatus } from "@/lib/aims/readiness";
 
 const RISK_COLORS: Record<string, string> = {
   Inaceptable: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
@@ -462,7 +463,12 @@ export default function AiDashboard() {
   const assessments = rawAssessments.filter((a) => a.system_id && systemIds.has(a.system_id));
   const complianceChecks = rawComplianceChecks.filter((c) => c.system_id && systemIds.has(c.system_id));
 
-  const activos = systems.filter((s) => s.status === "ACTIVO").length;
+  // Comparación sobre el vocabulario normalizado, como el resto del módulo:
+  // `ai_systems.status` convive con cinco grafías en Cloud (ACTIVO,
+  // EN_EVALUACION, Pendiente, Conforme, En revision). Con la igualdad estricta
+  // un «Activo» en otra grafía no contaba. Hoy ARGA no cambia: sus 4 activos
+  // ya están escritos como ACTIVO.
+  const activos = systems.filter((s) => normalizeAimsStatus(s.status) === "ACTIVO").length;
   const alto    = systems.filter((s) => s.risk_level === "Alto").length;
   const limitado = systems.filter((s) => s.risk_level === "Limitado").length;
   const minimo  = systems.filter((s) => s.risk_level === "Mínimo").length;
@@ -857,6 +863,19 @@ export default function AiDashboard() {
                   { label: "Alto", count: alto, total: systems.length, color: "bg-[var(--status-error)]" },
                   { label: "Limitado", count: limitado, total: systems.length, color: "bg-[var(--status-warning)]" },
                   { label: "Mínimo", count: minimo, total: systems.length, color: "bg-[var(--status-success)]" },
+                  // Cuarta fila obligatoria: las tres anteriores sólo cuentan
+                  // los tres literales de clasificación, así que un sistema sin
+                  // `risk_level` desaparecía de una «distribución» que dejaba
+                  // de sumar el inventario. Un sistema sin clasificar no es un
+                  // sistema de riesgo mínimo. ARGA tiene hoy sus 8 clasificados
+                  // y ve un 0; el catálogo de Garrigues siembra `risk_level`
+                  // nulo a propósito y ahí es donde el hueco se lee.
+                  {
+                    label: "Sin clasificar",
+                    count: systems.length - sistemasClasificados,
+                    total: systems.length,
+                    color: "bg-[var(--g-surface-muted)]",
+                  },
                 ].map((row) => (
                   <div key={row.label} className="flex items-center gap-3">
                     <div className="w-20 text-xs font-medium text-[var(--g-text-secondary)]">{row.label}</div>

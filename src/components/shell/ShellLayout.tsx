@@ -134,6 +134,16 @@ function ShellSidebarContent({
   tourLabel: string;
 }) {
   const branding = useTenantBranding();
+  // Las listas se filtran ANTES del JSX: el rótulo de sección es parte de lo
+  // que se gatea, no un adorno. Con el filtro dentro del <nav>, un tenant que
+  // no declara `sii` seguía leyendo "Canal interno" sobre un hueco vacío —
+  // anuncia una superficie que ese tenant no tiene. ARGA no cambia: su
+  // `branding` es NULL, `isModuleEnabled` falla ABIERTO y las tres secciones
+  // conservan todos sus items.
+  const visible = (it: NavItem) => !it.moduleKey || isModuleEnabled(branding, it.moduleKey);
+  const govVisibles = govItems.filter(visible);
+  const moduleVisibles = moduleItems.filter(visible);
+  const siiVisible = visible(siiItem);
   return (
     <>
       {/* Logo */}
@@ -157,28 +167,34 @@ function ShellSidebarContent({
       </div>
 
       {/* Gobernanza */}
-      <SectionLabel>Gobernanza</SectionLabel>
-      <nav className="space-y-[1px] mb-3">
-        {govItems
-          .filter((it) => !it.moduleKey || isModuleEnabled(branding, it.moduleKey))
-          .map((it) => <NavRow key={it.to} item={it} onNavigate={onNavigate} />)}
-      </nav>
+      {govVisibles.length > 0 && (
+        <>
+          <SectionLabel>Gobernanza</SectionLabel>
+          <nav className="space-y-[1px] mb-3">
+            {govVisibles.map((it) => <NavRow key={it.to} item={it} onNavigate={onNavigate} />)}
+          </nav>
+        </>
+      )}
 
       {/* Módulos */}
-      <SectionLabel>Módulos</SectionLabel>
-      <nav className="space-y-[1px] mb-3">
-        {moduleItems
-          .filter((it) => !it.moduleKey || isModuleEnabled(branding, it.moduleKey))
-          .map((it) => <NavRow key={it.to} item={it} onNavigate={onNavigate} />)}
-      </nav>
+      {moduleVisibles.length > 0 && (
+        <>
+          <SectionLabel>Módulos</SectionLabel>
+          <nav className="space-y-[1px] mb-3">
+            {moduleVisibles.map((it) => <NavRow key={it.to} item={it} onNavigate={onNavigate} />)}
+          </nav>
+        </>
+      )}
 
       {/* SII — zona segregada */}
-      <SectionLabel>Canal interno</SectionLabel>
-      <nav className="space-y-[1px]">
-        {(!siiItem.moduleKey || isModuleEnabled(branding, siiItem.moduleKey)) && (
-          <NavRow item={siiItem} onNavigate={onNavigate} />
-        )}
-      </nav>
+      {siiVisible && (
+        <>
+          <SectionLabel>Canal interno</SectionLabel>
+          <nav className="space-y-[1px]">
+            <NavRow item={siiItem} onNavigate={onNavigate} />
+          </nav>
+        </>
+      )}
 
       {/* Spacer empuja la sección de ayuda al final */}
       <div className="flex-1" />

@@ -31,11 +31,11 @@ export default function Thresholds() {
           </h1>
         </div>
         <p className="text-sm text-[var(--g-text-secondary)]">
-          Configuración y simulación de criterios de materialidad conforme a DORA Art. 19 y Reglamento Delegado (UE) 2025/301.
+          Configuración y simulación de criterios de materialidad conforme a DORA art. 18 y Reglamento Delegado (UE) 2024/1772 (criterios de clasificación y umbrales de importancia relativa). Los plazos de notificación son otra norma: DORA art. 19 y Reglamento Delegado (UE) 2025/301.
         </p>
       </header>
 
-      {/* Criterios Oficiales DORA Art. 19 */}
+      {/* Criterios de clasificacion: DORA art. 18 + RTS 2024/1772, no art. 19 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
           {

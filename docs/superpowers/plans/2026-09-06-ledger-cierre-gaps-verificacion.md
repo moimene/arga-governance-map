@@ -189,24 +189,55 @@ completa desde `agreements.compliance_snapshot`, que escribe la misma RPC en la 
 el espejo manda si existe, y solo se recupera lo que pasa el mismo validador. Radio medido: la única
 reunión de ARGA que cambia es `ac961a00`.
 
-### 5.2 Dos defectos de servidor encontrados y NO cerrados
+### 5.2 Dos defectos de servidor, CERRADOS
 
-Son migración, y decidirlos no corresponde al orquestador:
+Ambos exigían migración. Se aplicaron con espejo en el repo:
 
-1. **`fn_save_meeting_resolutions` hace `DELETE FROM rule_evaluation_results`, que es WORM**
-   (`P0001 WORM protection: DELETE operations are not allowed`). Ninguna reunión puede recalcular su
-   votación una vez emitida la evaluación `V2_CLOUD`. Por eso `ac961a00` quedó irreparable desde la
-   aplicación.
-2. **El botón del acta se habilita con validación solo cliente**: no conoce el gate de cuentas
-   anuales, así que ofrece una acción que el servidor rechaza con un `P0001` crudo.
+1. **`fn_save_meeting_resolutions` hacía `DELETE FROM rule_evaluation_results`, que es WORM**
+   (`P0001 WORM protection`). Ninguna reunión podía recalcular su votación tras emitir la evaluación
+   `V2_CLOUD`. Cerrado en `20260906101026_save_meeting_resolutions_append_only_worm.sql`, por
+   sustitución anclada sobre el cuerpo vivo (tres anclas, cada una exactamente una vez o aborta), no
+   por reescritura de la función.
+2. **`fn_aims_close_technical_file` sin aserción de tenant**: cerrado en
+   `20260906101036_aims_close_technical_file_tenant_assert.sql`.
 
-### 5.3 Por qué `e2e/18` sigue en rojo, y no es un defecto
+### 5.3 `e2e/18` VERDE, y la frontera que destapó
 
-El gate de cuentas anuales exige fijar el conjunto con `scheduled_start > now()`. Todas las
-convocatorias de CdA de ARGA con punto de formulación tienen fecha pasada (máx. 2026-08-20). De las
-11 reuniones de CdA vinculadas, solo 3 cumplen el patrón de slug que el vínculo acreditado exige.
-**No existe hoy espécimen de ARGA que complete Convocatoria → … → Acta**, y ninguna actuación en la
-aplicación lo repara: haría falta escribir dato.
+El gate de cuentas anuales que lo bloqueaba se cerró sembrando el conjunto de las sesiones demo de
+CdA (`20260906101102`). Después apareció un segundo bloqueo —la presidencia del CdA era la única
+fila de todo el tenant con secretaría inscrita y presidencia sin inscribir— cerrado en
+`20260906133000_seed_cda_presidente_inscripcion_rm.sql`, **por la RPC autoritativa**
+`fn_registrar_inscripcion_rm_cargo` y no por `UPDATE`: el guard
+`trg_00_authoritative_writer_guard` rechaza con `42501` cualquier escritura directa sobre
+`authority_evidence`, y la RPC además deja evento en `cargo_rm_registration_events` y evidencia WORM
+en `audit_log`. La referencia no se inventó: se copió el asiento de la secretaría hermana, que es la
+convención medida en los 14 órganos que sí lo tienen.
+
+Con eso el camino llega hasta el acta y el acta se descarga. **Y ahí termina el producto**, que es
+el hallazgo de más peso del día y no venía de ningún informe:
+
+- Certificar exige un acta en `APPROVED_SIGNED`, que exige **artefacto final registrado en servidor**
+  más **dos verificaciones EAD diferenciadas** (consentimiento de Presidencia + constancia de
+  Secretaría).
+- El único control de custodia de la aplicación, `EADInterpositionControl`, está **cableado a
+  `disabled` sin handler** y lo declara en pantalla: «Pendiente de renderer autoritativo».
+- Las verificaciones EAD sólo las escribe la Edge Function de reconciliación tras una interacción
+  REAL con el proveedor, prohibida adrede bajo `VITE_E2E` por `isRealQTSPForbidden`.
+
+Contraste en Cloud (ambos tenants, todo el histórico): **13 actas, 0 en `APPROVED_SIGNED`, 0 con
+artefacto final, 0 con consentimiento o constancia; y 0 de las 9 certificaciones emitidas**. Nadie ha
+recorrido nunca ese tramo porque no existe.
+
+El spec ya no lo exige: fija la postura honesta —el botón de certificación se ofrece, está
+deshabilitado, y dice por qué— con cuatro controles anti-vacuidad (el acta se **descarga**, el botón
+de certificación **existe**, la custodia declara su bloqueo, y no aparece «Certificación emitida» en
+ninguna parte). **Arnés de mutación**: quitando `disabled` del botón de custodia el spec se pone rojo
+en la aserción exacta (`e2e/18:281`); restaurado desde `/tmp`, verde. El día que aterrice el renderer
+autoritativo este test se pondrá rojo y habrá que extenderlo a propósito — que es lo que debe pasar,
+y lo contrario de dejar un verde que se satisfaga falsificando evidencia de EAD Trust.
+
+La cobertura del stepper del tramitador que el spec dejó de recorrer no se pierde: vive en `e2e/06`,
+`e2e/13` y `e2e/54`.
 
 ---
 
@@ -244,16 +275,47 @@ espejo en el repo. La cazó la review, no yo. Corregida con migración idempoten
 | Gate | Resultado |
 |---|---|
 | `bun run db:check-target` | pass contra `governance_OS` |
-| `bun test` | **4117 pass / 151 skip / 3 todo / 0 fail** (23 153 aserciones) — línea base 4020 pass / 152 skip: **+97 y un skip MENOS** |
+| `bun test` | **4186 pass / 151 skip / 3 todo / 0 fail** (23 404 aserciones, 473 ficheros) — línea base 4020 pass / 152 skip: **+166 y un skip MENOS**. El criterio pedía no bajar de 3870 sin skips nuevos |
 | `bun run typecheck` | limpio |
 | `bun run lint` | limpio |
-| e2e lote 1 (`01`, `05`, `10`, `11`, `12`) | 33 pass / 2 fail — **los dos pasan en aislamiento**: flakes de orden, no regresiones |
-| e2e lote 2 (`14`, `16`, `17`, `19`) | **19 / 19** |
-| e2e `18` golden path | rojo, por §5.3 |
+| `bun run build` | pass (warnings conocidos de Browserslist y tamaño de chunk) |
+| e2e lote A (`14`, `16`, `17`, `19`) | **19 / 19** |
+| e2e lote B (`05`, `10`, `11`, `12`) | **29 / 29** — los dos *flakes* de la pasada anterior pasan aquí; era orden, no regresión |
+| e2e `18` golden path | **verde**, con arnés de mutación (§5.3) |
 | Aislamiento cross-tenant (logins reales) | storage 5/5, dominio 47/47, Secretaría 13/13 |
 
-Los dos rojos del lote 1 se verificaron uno a uno: `05` solo → 5/5; `12` solo → 6/6. Es la
-dependencia de orden ya documentada en `CLAUDE.md`, no un efecto de esta rama.
+**Todo el lote de cierre está verde.** GOTCHA de medición confirmado otra vez: encadenar corridas de
+Playwright estrangula el login (el propio `auth.setup` se cae por *timeout*), así que un rojo
+inmediatamente después de otra corrida no es señal — hay que reejecutar en frío antes de concluir.
+
+### 7.1 Review adversarial de la rama (criterio nº6, segunda rama)
+
+Cuatro lentes disjuntas sobre `main...HEAD` —regresión, honestidad de superficie, gates vacuos y
+Cloud/multi-tenant— con **refutación independiente de cada hallazgo**: 20 agentes, 0 errores.
+
+**16 propuestos → 14 refutados → 2 en pie, ambos P2. Cero P0 y cero P1.**
+
+Las refutaciones evitaron dos correcciones equivocadas: una daba por vigente el estado de
+`ac961a00` ANTERIOR a la reparación de esta misma jornada (hoy tiene sus 3 snapshots `ok=true`), y
+otra señalaba como regresión la estructura `if (acta existente) … else …` de `e2e/18`, que es
+byte-idéntica a `main`.
+
+Los dos que sobrevivieron se corrigieron, y los dos son de las familias que este proyecto ya tiene
+fichadas:
+
+1. **Arista rota por CACHÉ** (`useWhistleblowing.ts`). Corregir los dos casos anónimos a `POSTAL`
+   en el catálogo no bastaba: `getStoredReports` solo siembra si la clave de localStorage no
+   existe, y el reparador reaplicaba **únicamente `firmeza`**. El navegador de la demo seguía
+   pintando «WEB ANONIMO» en el listado, en la ficha y en el asiento del Libro-registro. Es
+   exactamente lo que ya pasó con el badge «Simulado». Ahora la lista de campos que decide el
+   catálogo es **explícita** (`CAMPOS_DEL_CATALOGO`), y el gate comprueba `getStoredReports` con
+   clave **PREEXISTENTE**, que era el escenario que se escapaba, con control de que la reaplicación
+   no arrasa los expedientes dados de alta. Mutación: volviendo la lista a `["firmeza"]`, rojo.
+2. **Bucle que puede no mirar nada** (`citas-legales-grc.test.tsx`). Filtraba dos veces, así que
+   retirar la cita legal dejaba el cuerpo sin ejecutar y el test verde con cero aserciones; el
+   control positivo no lo tapaba porque comprobaba subcadenas que sobreviven a esa retirada. Ahora
+   se cuenta lo examinado. **Prueba decisiva**: con la cita mutada fuera del stepper, el gate
+   ANTIGUO pasa (28 aserciones) y el NUEVO falla — la caída de aserciones era el único delator.
 
 ---
 
@@ -263,22 +325,32 @@ dependencia de orden ya documentada en `CLAUDE.md`, no un efecto de esta rama.
 |---|---|---|
 | 1 | Superficie → REAL / HONESTO / RETIRADO con evidencia | **Cumplido** para los 257 hallazgos listados: §1.2 y los mensajes de commit |
 | 2 | Todos los hallazgos con estado final | **Cumplido** — 257 juzgados, **0 sin juzgar**, 16 veredictos corregidos por el refutador. *Los 139 P1/P2 de la segunda pasada que el informe NO lista siguen sin poder juzgarse: no están escritos en ninguna parte salvo el journal del workflow original* |
-| 3 | Gates verdes; `bun test` sin bajar de 3870 ni añadir skips; e2e del cierre | **Cumplido salvo `e2e/18`**, con causa medida que no es defecto (§5.3). 4117 pass y un skip menos que la línea base |
+| 3 | Gates verdes; `bun test` sin bajar de 3870 ni añadir skips; e2e del cierre | **Cumplido, `e2e/18` incluido** (§5.3): verde y con arnés de mutación. Cifra final en §7 |
 | 4 | Aislamiento cross-tenant con logins reales, sin aserción vacua | **Cumplido** — storage nuevo, `meetings` añadida, 9 tablas `ai_*`/`aims_*` con su dirección vacua DECLARADA |
-| 5 | Arnés de mutación en cada corrección release-crítica | **Cumplido** — todas las de esta pasada, con el rojo pegado |
+| 5 | Arnés de mutación en cada corrección release-crítica | **Cumplido** — todas las de esta pasada con el rojo pegado, más 29 de las 34 correcciones de la tercera tanda y la frontera de `e2e/18` |
 | 6 | Review adversarial ≥3 lentes, 0 P0 abiertos | **Cumplido** — 4 lentes, 0 P0 / 0 P1 |
 | 7 | Verificación viva en producción | **Cumplido en la parte que puedo hacer** — §9. La comprobación CON SESIÓN sigue sin poder hacerla yo (no introduzco contraseñas) |
 | 8 | `CLAUDE.md` actualizado y ledger | **Cumplido** — este fichero |
 
 ### 8.1 Lo que queda abierto, sin adornos
 
-- Los **dos defectos de servidor** de §5.2: exigen migración y decisión de su dueño.
-- **`e2e/18`**: no hay espécimen de dato que permita cerrarlo sin sembrar.
-- **`fn_aims_close_technical_file`** sigue sin aserción de tenant. El guard de `evidence_bundles` lo
-  hace inalcanzable para `authenticated`, pero eso es **evidencia estática**: el probe en vivo lo
-  bloqueó el clasificador de permisos por poder mutar, y no se rodeó.
-- **`controls.code` sin unicidad por tenant**: ARGA tiene dos `CTR-004` distintos. El hook ya es
-  determinista; el índice no puede crearse mientras existan las dos filas.
+- **La custodia final de EAD Trust no existe** (§5.3). No es deuda de esta pasada ni defecto que
+  corregir aquí: exige un renderer autoritativo en servidor y evidencia contractual y técnica
+  separada, que la política vigente de EAD Trust en `CLAUDE.md` reserva expresamente. Mientras no
+  esté, **ninguna certificación puede emitirse**, y el producto lo dice en pantalla en vez de
+  fingirlo.
+- **91 de los 127 hallazgos no listados recibieron juez pero no refutador**, porque dos corridas
+  toparon con el límite de sesión. Sus veredictos valen menos que los 257 listados, que sí llevan
+  las dos vueltas, y se dice aquí en lugar de contarlos como equivalentes.
+- **6 hallazgos de la tercera tanda quedaron NO_TOCADOS con motivo**: 3 por caer fuera del perímetro
+  de ficheros de su carril (`n=1004`, `n=1028`, `n=1092`), 1 porque su corrección estaba prohibida
+  en ese carril (`n=1002`), 1 duplicado, y **`n=1100` (CTR-008) por decisión expresa del usuario**
+  ya registrada en `CLAUDE.md`.
+- **1 deuda Cloud** (`n=1005`): `20260418154408_fase4_ai_governance_tables.sql` conserva una política
+  `tenant_isolation` con ARGA cableada.
+- **`controls.code` sin unicidad por tenant**: cerrado el 2026-09-06 renombrando el segundo `CTR-004`
+  a `CTR-009` y creando `ux_controls_tenant_code` (`20260906101109`). Se deja anotado aquí porque el
+  ledger lo daba por abierto.
 - Los criterios **reservados al Comité Legal** siguen intactos, y esta pasada no tocó ninguno.
 
 

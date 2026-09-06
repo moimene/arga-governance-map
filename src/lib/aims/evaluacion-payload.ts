@@ -23,7 +23,7 @@ import { calculateAdaptationPlan } from "./catalog-aesia";
  * que es exactamente lo que esta tarea cierra. Se enumera lo que SÍ acredita,
  * no lo que falla: un nivel nuevo en la escala será brecha por defecto.
  */
-const NIVELES_CONFORMES = new Set(["L5", "L8"]);
+export const NIVELES_CONFORMES = new Set(["L5", "L8"]);
 
 export type EstadoMedida = { maturity?: string; difficulty?: string };
 export type MedidaRef = { id: string; description: string };

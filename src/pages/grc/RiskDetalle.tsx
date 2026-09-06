@@ -18,6 +18,18 @@ export default function RiskDetalle() {
   const scope = useSecretariaScope();
   const riskListPath = scope.createScopedTo("/grc/risk-360");
   const { data: risk, isLoading, error } = useRiskById(id);
+  // `assessment_provenance` venía en el select y no lo leía NADIE: la banda se
+  // pintaba con su etiqueta y su color como si fuera un dato firme. Para los
+  // 82 riesgos del mapa penal la fuente dice `firmeza: "DEMO_PILOTO"` y que el
+  // nivel se sacó por muestreo de píxel sobre un render, sin leyenda publicada.
+  // Cuando la columna es NULL (todo el perímetro de ARGA) no se pinta nada.
+  const procedencia = (risk?.assessment_provenance ?? null) as {
+    firmeza?: string;
+    metodo_extraccion?: string;
+    escala?: { advertencia?: string };
+  } | null;
+  const cautelaProcedencia =
+    procedencia?.escala?.advertencia ?? procedencia?.metodo_extraccion ?? null;
 
   if (isLoading) {
     return (
@@ -133,7 +145,7 @@ export default function RiskDetalle() {
             <div className="text-xs font-semibold uppercase text-[var(--g-text-secondary)]">
               Banda evaluada en origen
             </div>
-            <div className="mt-1 flex items-center gap-2">
+            <div className="mt-1 flex flex-wrap items-center gap-2">
               <span
                 className="inline-block h-3 w-3 border border-[var(--g-border-subtle)]"
                 style={{
@@ -144,7 +156,20 @@ export default function RiskDetalle() {
               <span className="text-base font-bold text-[var(--g-text-primary)]">
                 {ETIQUETA_BANDA[risk.assessed_band]}
               </span>
+              {procedencia?.firmeza && (
+                <span
+                  className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]"
+                  style={{ borderRadius: "var(--g-radius-full)" }}
+                >
+                  {procedencia.firmeza}
+                </span>
+              )}
             </div>
+            {cautelaProcedencia && (
+              <p className="mt-1 text-[10px] leading-4 text-[var(--g-text-secondary)]">
+                {cautelaProcedencia}
+              </p>
+            )}
           </div>
         ) : null}
       </section>

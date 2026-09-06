@@ -100,7 +100,9 @@ import {
   buildMeetingAdoptionDoubleEvaluation,
   type DualEvaluationComparison,
 } from "@/lib/secretaria/dual-evaluation";
+import { puedeRecalcularResoluciones } from "@/lib/secretaria/meeting-resolution-recalc";
 import {
+  isMeetingBoundToEmittedConvocation,
   patchQuorumDataSourceLinks,
   sourceLinksFromAgendaPoints,
 } from "@/lib/secretaria/meeting-links";
@@ -1998,6 +2000,15 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
       return;
     }
 
+    // La agenda de una convocatoria EMITIDA es fuente jurídica inmutable: el
+    // servidor rechaza cualquier UPDATE directo sobre `agenda_items`
+    // (AGENDA_EMITIDA_RPC_REQUIRED). Antes se intentaba igual, el trigger lo
+    // tumbaba y este guardado abortaba antes de persistir las constancias, con
+    // lo que el acta quedaba inalcanzable. Los textos que vienen de la
+    // convocatoria no se reescriben; debate y constancias sí se guardan.
+    const agendaInmutable = isMeetingBoundToEmittedConvocation(existingQD ?? null);
+    let avisoAgendaInmutable = false;
+
     try {
       for (let index = 0; index < debatesForSave.length; index += 1) {
         const point = debatesForSave[index];
@@ -2019,7 +2030,9 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
             decisionSubtype: point.decision_subtype ?? null,
           });
 
-        if (existingAgendaItemId) {
+        if (existingAgendaItemId && agendaInmutable) {
+          avisoAgendaInmutable = true;
+        } else if (existingAgendaItemId) {
           const persistedKind = kindIndex.get(existingAgendaItemId);
           const updatePayload: Record<string, unknown> = {
             title: point.punto,
@@ -2103,6 +2116,11 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
     try {
       await updateQuorum.mutateAsync(nextQd);
       await saveConstancias.mutateAsync(constancias);
+      if (avisoAgendaInmutable) {
+        toast.info(
+          "Los textos de la agenda proceden de la convocatoria emitida y no se modifican; se han guardado el debate y las constancias.",
+        );
+      }
       toast.success("Agenda, debate y constancias guardados");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al guardar agenda y constancias");
@@ -3046,17 +3064,14 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
   const hasResolutions = existingResolutions.length > 0 || resolutionsSaved;
   const linkedAgreementCount = existingResolutions.filter((resolution) => resolution.agreement_id).length;
   const existingPointSnapshots = ((quorumData?.point_snapshots ?? []) as MeetingAdoptionSnapshot[]);
-  const hasCertifiableExistingSnapshot = existingPointSnapshots.some(
-    (snapshot) => snapshot.societary_validity.ok && snapshot.status_resolucion === "ADOPTED"
-  );
-  const hasBlockedExistingSnapshot =
-    existingPointSnapshots.length > 0 && !hasCertifiableExistingSnapshot;
-  const hasRejectedExistingResolution = existingResolutions.some(
-    (resolution) => resolution.status !== "ADOPTED"
-  );
-  const canRecalculateExistingResolutions =
-    existingResolutions.length > 0 &&
-    (linkedAgreementCount === 0 || hasBlockedExistingSnapshot || hasRejectedExistingResolution);
+  // El criterio vive en `meeting-resolution-recalc.ts` con su test: aquí exigía
+  // `point_snapshots.length > 0` para considerar bloqueado el paso, así que una
+  // reunión con resoluciones pero SIN ningún snapshot se daba por terminada y
+  // perdía el único control capaz de generarlos.
+  const canRecalculateExistingResolutions = puedeRecalcularResoluciones({
+    resoluciones: existingResolutions,
+    snapshots: existingPointSnapshots,
+  });
 
   async function handleSaveResolutions() {
     const pointWithoutResolution = votablePointIndices

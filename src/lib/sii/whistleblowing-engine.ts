@@ -256,7 +256,12 @@ export interface WhistleblowingReport {
   closedAt?: string | null;
   closingReason?: string | null;
   referralToProsecutorDate?: string | null;
-  referralAuthority?: "MINISTERIO_FISCAL" | "FISCALIA_EUROPEA_EPPO" | "AUTORIDAD_INDEPENDIENTE_AII" | null;
+  // NO hay `referralAuthority`. El campo existía con tres destinatarios
+  // —Ministerio Fiscal, Fiscalía Europea y la Autoridad Independiente— y NADIE
+  // lo escribía ni lo leía: ni el cierre, ni la derivación, ni el asiento del
+  // Libro-registro. Un modelo que nombra destinatarios que el producto no sabe
+  // elegir sugiere una remisión que aquí no ocurre. Cuando exista superficie
+  // para escoger destinatario, el campo vuelve con quien lo escriba.
   libroRegistroEntry?: WhistleblowingLibroRegistroEntry;
 }
 
@@ -375,6 +380,44 @@ export function computeWhistleblowingDeadlines(
     ackDaysRemaining,
     resolutionDaysRemaining,
     clocks,
+  };
+}
+
+/** Clases de chip por estado del reloj. Mismos tokens que ya usaba la ficha. */
+const CLASE_CHIP_PLAZO = {
+  VENCIDO: "bg-[var(--status-error)]/10 text-[var(--status-error)]",
+  PROXIMO_VENCIMIENTO: "bg-[var(--status-warning)]/10 text-[var(--status-warning)]",
+  EN_PLAZO: "bg-[var(--status-success)]/10 text-[var(--status-success)]",
+  COMPLETADO: "bg-[var(--status-success)]/10 text-[var(--status-success)]",
+} as const;
+
+/**
+ * Cómo se ENUNCIA un plazo en pantalla: texto y color salen del mismo sitio.
+ *
+ * POR QUÉ ES UNA FUNCIÓN Y NO UN TERNARIO EN CADA PANTALLA. El chip de la
+ * resolución ordinaria estaba cableado al token de éxito y escribía
+ * `${daysRemaining} días restantes` sin mirar el signo. Los tres expedientes
+ * sembrados llevan meses pasado el plazo del art. 9.2.d, y la ficha los pintaba
+ * en verde diciendo «-58 días restantes»: un plazo agotado no queda por
+ * consumir, y presentar así un incumplimiento es afirmar lo contrario de lo que
+ * ocurre. El chip hermano del acuse sí discriminaba, con lo que las dos mitades
+ * de la misma tarjeta decían cosas distintas del mismo expediente.
+ *
+ * El SIGNO manda sobre el estado: si el plazo ya pasó, ni el texto ni el color
+ * pueden decir otra cosa, venga el estado de donde venga.
+ */
+export function describeDeadlineCountdown(
+  clock: Pick<WhistleblowingClock, "status" | "daysRemaining">
+): { vencido: boolean; texto: string; claseChip: string } {
+  const vencido = clock.daysRemaining < 0;
+  const dias = Math.abs(clock.daysRemaining);
+  const unidad = dias === 1 ? "día" : "días";
+  return {
+    vencido,
+    texto: vencido
+      ? `Vencido hace ${dias} ${unidad}`
+      : `${dias} ${unidad} restantes`,
+    claseChip: vencido ? CLASE_CHIP_PLAZO.VENCIDO : CLASE_CHIP_PLAZO[clock.status],
   };
 }
 

@@ -75,7 +75,8 @@ DECLARACIÓN DE CONFORMIDAD UE (REGLAMENTO UE 2024/1689 - ARTÍCULO 47)
 5. MARCOS NORMATIVOS DE REFERENCIA (su aplicación efectiva se acredita con las
    evaluaciones registradas del sistema, no con esta enumeración):
    - Reglamento (UE) 2024/1689 del Parlamento Europeo y del Consejo (AI Act)
-   - Guías Técnicas de la Agencia Española de Supervisión de IA (AESIA Guías 1 a 16)
+   - Guías técnicas publicadas por la AESIA (material no vinculante; sin cotejo
+     guía a guía en este módulo)
    - UNE-EN ISO/IEC 42001:2023 - Sistema de Gestión de Inteligencia Artificial
    - Real Decreto 817/2023 - Entorno Controlado de Pruebas (Sandbox IA España)
 
@@ -137,7 +138,7 @@ validación funcional y no constituye una declaración de conformidad emitida.
               Declaración de Conformidad UE
             </h1>
             <p className="text-xs text-[var(--g-text-secondary)]">
-              Conforme al Reglamento (UE) 2024/1689 (Reglamento de Inteligencia Artificial) y directrices AESIA
+              Conforme al Reglamento (UE) 2024/1689 (Reglamento de Inteligencia Artificial)
             </p>
           </div>
 
@@ -177,7 +178,10 @@ validación funcional y no constituye una declaración de conformidad emitida.
               </h3>
               <ul className="list-disc list-inside space-y-1 text-[var(--g-text-secondary)] pl-1">
                 <li>Reglamento (UE) 2024/1689 (Artículos 9 a 17, 72 y 73).</li>
-                <li>Catálogo de 84 Medidas Guía (MG) del Manual de Checklists de la AESIA (Guía 16).</li>
+                {/* Misma retirada que en el alta y el informe de la evaluación: la
+                    atribución a una guía numerada de la Agencia nunca se cotejó
+                    contra publicación oficial y no es la fuente del requisito. */}
+                <li>Catálogo de 84 medidas de referencia (MG) del módulo, alineadas con el Reglamento (UE) 2024/1689.</li>
                 <li>Estándar UNE-EN ISO/IEC 42001:2023 (Gestión de Inteligencia Artificial).</li>
                 {marcoResilienciaVisible && (
                   <li>Marco de Ciberseguridad y Resiliencia Operativa Digital (DORA / NIS2).</li>

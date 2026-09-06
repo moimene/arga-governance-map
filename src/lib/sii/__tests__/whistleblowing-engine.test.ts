@@ -7,6 +7,7 @@ import {
   evaluateAntiRetaliationRisk,
   validateCaseCloseoutGuard,
   generateLibroRegistroEntry,
+  describeDeadlineCountdown,
   type WhistleblowingReport,
   type WhistleblowingSubcase,
 } from "../whistleblowing-engine";
@@ -399,5 +400,50 @@ describe("Whistleblowing Engine — Ley 2/2023 & Harvey Mandate", () => {
           .numeroEntradaAsignadoAt,
       ).toBeNull();
     });
+  });
+});
+
+describe("SII — un plazo agotado no se enuncia como plazo por consumir", () => {
+  // El defecto medido el 2026-09-06: el chip «Resolución Ordinaria (3m)» iba
+  // cableado al token de éxito y escribía el contador tal cual. Los tres
+  // expedientes sembrados están fuera del plazo del art. 9.2.d, así que la
+  // ficha decía «-58 días restantes» EN VERDE. Eso es afirmar cumplimiento
+  // donde hay incumplimiento.
+  it("vencido: lo dice el texto y lo dice el color", () => {
+    const r = describeDeadlineCountdown({ status: "VENCIDO", daysRemaining: -58 });
+    expect(r.vencido).toBe(true);
+    expect(r.texto).toBe("Vencido hace 58 días");
+    // Ni rastro de la lectura contraria: no quedan días por consumir.
+    expect(r.texto).not.toContain("restantes");
+    expect(r.claseChip).toContain("--status-error");
+    expect(r.claseChip).not.toContain("--status-success");
+  });
+
+  it("el signo manda sobre el estado: VENCIDO aunque el reloj lo llame de otro modo", () => {
+    // Defensa en profundidad. Si el umbral del motor cambia y un reloj con
+    // días negativos llega marcado EN_PLAZO, la pantalla no puede pintarlo
+    // en verde: el signo es el hecho, el estado es la etiqueta.
+    const r = describeDeadlineCountdown({ status: "EN_PLAZO", daysRemaining: -1 });
+    expect(r.texto).toBe("Vencido hace 1 día");
+    expect(r.claseChip).toContain("--status-error");
+  });
+
+  it("en plazo y próximo a vencer conservan su lectura, cada uno con su color", () => {
+    const enPlazo = describeDeadlineCountdown({ status: "EN_PLAZO", daysRemaining: 42 });
+    expect(enPlazo.vencido).toBe(false);
+    expect(enPlazo.texto).toBe("42 días restantes");
+    expect(enPlazo.claseChip).toContain("--status-success");
+
+    const proximo = describeDeadlineCountdown({ status: "PROXIMO_VENCIMIENTO", daysRemaining: 3 });
+    expect(proximo.texto).toBe("3 días restantes");
+    expect(proximo.claseChip).toContain("--status-warning");
+    expect(proximo.claseChip).not.toContain("--status-success");
+  });
+
+  it("el día del vencimiento todavía no está vencido", () => {
+    const r = describeDeadlineCountdown({ status: "PROXIMO_VENCIMIENTO", daysRemaining: 0 });
+    expect(r.vencido).toBe(false);
+    expect(r.texto).toBe("0 días restantes");
+    expect(r.claseChip).not.toContain("--status-error");
   });
 });

@@ -1,3 +1,5 @@
+import { NIVELES_CONFORMES } from "./evaluacion-payload";
+
 export type AimsSourcePosture = "legacy-ai" | "aims-ready" | "local-derived";
 export type AimsReadinessStatus = "ready" | "watch" | "gap";
 export type AimsContractPosture =
@@ -752,9 +754,16 @@ export function buildAimsReadiness({
   ).length;
   const findings = assessments.flatMap((assessment) => assessment.findings ?? []);
   const controlFindings = findings.filter((finding) => finding.code || finding.status);
-  const closedControlFindings = controlFindings.filter(
-    (finding) => ["CERRADO", "APROBADO", "CONFORME", "OK"].includes(normalizeAimsStatus(finding.status)),
-  ).length;
+  // El vocabulario que el producto ESCRIBE en `findings[].status` es el nivel
+  // de madurez (`L1`…`L8`), no una palabra de estado: `buildEvaluationPayload`
+  // guarda `estado.maturity` tal cual. Con la lista literal de abajo, una
+  // evaluación contestada entera en L5 daba «0 cerrados» y arrastraba el
+  // dominio «Controles» a demo-con-gaps para siempre. Los niveles que acreditan
+  // conformidad se traen del propio camino de escritura, no se recopian aquí.
+  const closedControlFindings = controlFindings.filter((finding) => {
+    const st = normalizeAimsStatus(finding.status);
+    return ["CERRADO", "APROBADO", "CONFORME", "OK"].includes(st) || NIVELES_CONFORMES.has(st);
+  }).length;
 
   const inventoryCoverage = pct(activeSystems, totalSystems);
   const assessmentCoverage = pct(highRiskAssessed, highRiskSystems.length);

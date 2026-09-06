@@ -235,6 +235,45 @@ MEDICIÓN EN VENTANA SERIALIZADA concedida por la orquestación, tras integrar e
 
 ---
 
+## Tarea 4 — ESG / sostenibilidad (2026-08-29) — SIN LEDGER EN SU MOMENTO
+
+Entrada escrita el **2026-09-06**, en la revisión adversarial, al detectar que el
+carril exigía «ledger completo» como criterio de cierre y esta tarea no tenía
+ninguna entrada. Las Tareas 2 y 3 sí la tienen, como entradas de cuerpo dentro
+del bloque de la Tarea 1 (`Task 2:` y `Task 3:`), no como cabecera propia.
+
+**Commits.** `ce395e0` (feat) y merge `8d2239b` sobre `410e6a2`.
+
+**Ficheros** (`git show --stat 8d2239b`):
+
+```
+scripts/garrigues/esg/plan-sostenibilidad.ts   +152
+src/App.tsx                                      +2
+src/pages/grc/Sostenibilidad.tsx               +229
+src/test/garrigues/esg-catalogo.test.ts         +98
+```
+
+**Criterio, según el propio mensaje del merge.** El Informe de Sostenibilidad
+2025 no está en el corpus, así que no hay objetivo ni indicador que sembrar y no
+se inventa ninguno. Lo que sí consta, literal de PI-22 y citado con su fuente:
+los siete compromisos de los tres ejes, el departamento que la política hace
+responsable del control de consumos, la adhesión al Pacto Mundial (2002) con sus
+diez principios, el Comité Pro bono y los ODS. Tres de los siete quedan sin
+responsable porque la fuente no lo designa, y la pantalla lo dice. Los slugs de
+los dos órganos se tomaron de Cloud y no del JSON de origen, porque la ficha
+resuelve por slug.
+
+**Declarado como pendiente en el propio merge:** la fila `esg` en `grc_modules`
+y la línea de navegación.
+
+**Gates: SIN MEDIR en su momento.** No se registró ejecución de `bun test`,
+`typecheck` ni verificación viva de `/grc/sostenibilidad` para esta tarea. No se
+reconstruyen aquí a posteriori: una medición inventada hoy sería peor que el
+hueco. Queda como **deuda de proceso**, del mismo tipo que la anotada para G5 y
+G6 (ejecución sin ledger ni review adversarial).
+
+---
+
 ## Gate de tipos — CERRADO (2026-08-30)
 
 `bun run typecheck` = **0**, con `scripts/` y los tests dentro del perímetro.

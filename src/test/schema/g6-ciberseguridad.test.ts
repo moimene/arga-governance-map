@@ -150,6 +150,25 @@ describe("G6 — Ciberseguridad y SGSI en Cloud (Supabase)", () => {
 
   it("ARGA intacta: su número de obligaciones y controles de ciberseguridad se mantiene", async () => {
     if (!arga) return;
+
+    // CONTROL POSITIVO, antes de las dos ausencias. Las dos aserciones de
+    // abajo son «ARGA no ve los códigos ciber de Garrigues», y una lista vacía
+    // significa lo mismo si ARGA no viera NADA —sesión caída, RLS mal, tabla
+    // equivocada—. Sin esto, el test se pone verde por el motivo contrario al
+    // que dice medir. El censo exacto de ARGA (5 y 8) va pinado en
+    // garrigues-obligaciones-seed.test.ts; aquí solo se comprueba que el
+    // instrumento ve lo suyo, para no duplicar el número en dos ficheros.
+    const { count: oPropias, error: eCount } = await arga
+      .from("obligations").select("id", { count: "exact", head: true });
+    expect(eCount, "ARGA no pudo contar sus propias obligaciones").toBeNull();
+    expect(oPropias ?? 0, "ARGA no ve NI UNA obligación suya: la ausencia de abajo sería vacua")
+      .toBeGreaterThan(0);
+    const { count: cPropios, error: eCount2 } = await arga
+      .from("controls").select("id", { count: "exact", head: true });
+    expect(eCount2, "ARGA no pudo contar sus propios controles").toBeNull();
+    expect(cPropios ?? 0, "ARGA no ve NI UN control suyo: la ausencia de abajo sería vacua")
+      .toBeGreaterThan(0);
+
     const { data: oblArga, error: eObl } = await arga
       .from("obligations")
       .select("code")

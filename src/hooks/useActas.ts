@@ -794,9 +794,12 @@ type ActaAgreementRowWithSnapshot = ActaAgreementRow & { compliance_snapshot?: u
  *
  * Cuando ese espejo se pierde, el acta declaraba
  * «adopted_decision_without_vote_result» aunque el servidor SÍ tuviera
- * documentada la votación. Y no había vuelta atrás por la aplicación: la RPC
- * no puede reejecutarse porque su `DELETE FROM rule_evaluation_results` choca
- * con el WORM de esa tabla (`P0001`, medido el 2026-09-06). Medido en Cloud el
+ * documentada la votación. Y hasta el 2026-09-06 no había vuelta atrás por la
+ * aplicación: la RPC hacía `DELETE FROM rule_evaluation_results`, que chocaba
+ * con el WORM de esa tabla (`P0001`). La migración
+ * `save_meeting_resolutions_append_only_worm` la volvió append-only, así que
+ * hoy sí puede reejecutarse; esta recuperación sigue siendo necesaria para
+ * los espejos que se perdieron antes. Medido en Cloud el
  * mismo día: la reunión nacida de convocatoria `ac961a00-…` tenía 3
  * resoluciones ADOPTED, sus 3 snapshots autoritativos en `agreements` y 0 en
  * el espejo, con el acta bloqueada.

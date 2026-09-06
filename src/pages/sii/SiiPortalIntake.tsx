@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { useTenantContext } from "@/context/TenantContext";
 import {
+  SII_ANONIMO_VIA_POSTAL,
   SII_ART_25,
   SII_CANALES_EXTERNOS,
   SII_CANAL_EXTERNO_AVISO,
@@ -49,6 +50,16 @@ export default function SiiPortalIntake() {
   // Form State
   const [anonymityMode, setAnonymityMode] = useState<AnonymityMode>("ANONIMO_ESTRICTO");
   const [channel, setChannel] = useState<WhistleblowingChannel>("WEB_ANONIMO");
+  // PI-31, Anexo §3.c, literal: «Las comunicaciones podrán realizarse de forma
+  // anónima mediante el envío de una comunicación postal conforme a lo indicado
+  // en el apartado a) (ii) anterior, sin identificación del remitente». Es la
+  // ÚNICA vía que la política del despacho prevé para el anónimo: el formulario
+  // web del apartado a) (i) no la contempla. Ofrecerlo —y sembrar los casos
+  // demo con él— presentaba como cauce del despacho uno que su política no da.
+  // Se DERIVA, no se guarda en estado: sin efecto que sincronizar no hay
+  // ventana en la que el canal enviado no sea el que la pantalla enseña.
+  const anonimoSoloPostal = hayCanalDeclarado && anonymityMode === "ANONIMO_ESTRICTO";
+  const channelEfectivo: WhistleblowingChannel = anonimoSoloPostal ? "POSTAL" : channel;
   const [pseudonym, setPseudonym] = useState("");
   const [notificationEmail, setNotificationEmail] = useState("");
   
@@ -102,7 +113,7 @@ export default function SiiPortalIntake() {
 
     try {
       const res = await createMutation.mutateAsync({
-        channel,
+        channel: channelEfectivo,
         anonymityMode,
         informantContact: anonymityMode === "CONFIDENCIAL_IDENTIFICADO" ? {
           pseudonym: pseudonym || "Informante Confidencial",
@@ -365,15 +376,20 @@ export default function SiiPortalIntake() {
                 { id: "POSTAL", label: "Correo Postal / Registro", icon: FileText },
               ].map((c) => {
                 const Icon = c.icon;
+                const noPrevisto = anonimoSoloPostal && c.id !== "POSTAL";
                 return (
                   <button
                     key={c.id}
                     type="button"
+                    disabled={noPrevisto}
+                    title={noPrevisto ? SII_ANONIMO_VIA_POSTAL.cita : undefined}
                     onClick={() => setChannel(c.id as WhistleblowingChannel)}
                     className={`p-3 rounded border flex flex-col items-center gap-1.5 text-center transition-all ${
-                      channel === c.id
-                        ? "bg-[var(--t-surface-subtle)] border-[var(--t-brand)] text-[var(--t-brand)] font-bold shadow-sm"
-                        : "bg-[var(--t-surface-card)] border-[var(--t-border-default)] text-[var(--t-text-secondary)] hover:bg-[var(--t-surface-subtle)]/40"
+                      noPrevisto
+                        ? "bg-[var(--t-surface-muted)] border-[var(--t-border-default)] text-[var(--t-text-secondary)] opacity-50 cursor-not-allowed"
+                        : channelEfectivo === c.id
+                          ? "bg-[var(--t-surface-subtle)] border-[var(--t-brand)] text-[var(--t-brand)] font-bold shadow-sm"
+                          : "bg-[var(--t-surface-card)] border-[var(--t-border-default)] text-[var(--t-text-secondary)] hover:bg-[var(--t-surface-subtle)]/40"
                     }`}
                   >
                     <Icon className="h-4 w-4" />
@@ -382,6 +398,13 @@ export default function SiiPortalIntake() {
                 );
               })}
             </div>
+            {anonimoSoloPostal && (
+              <p className="mt-2 text-[11px] leading-relaxed text-[var(--status-warning)]">
+                <strong>{SII_ANONIMO_VIA_POSTAL.apartado}:</strong> «{SII_ANONIMO_VIA_POSTAL.cita}» La
+                comunicación anónima se registra por esa vía; para usar el formulario web elija la
+                modalidad confidencial con identificación en el paso anterior.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">

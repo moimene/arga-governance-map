@@ -12,12 +12,13 @@ import * as __realModule0 from "@/context/TenantBrandContext";
  * Prueba de COMPORTAMIENTO: renderiza el guard con una ruta real y mira si el
  * hijo se pinta o si redirige.
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 let brandingActual: { modules?: string[] } | null = null;
 let cargando = false;
+let tenantCargando = false;
 
 const __realModulesForRestore: Array<[string, Record<string, unknown>]> = [
   ["@/context/TenantBrandContext", { ...__realModule0 }],
@@ -32,6 +33,16 @@ __afterAllRestore(() => {
 vi.mock("@/context/TenantBrandContext", () => ({
   useTenantBranding: () => brandingActual,
   useTenantBrandingLoading: () => cargando,
+}));
+
+vi.mock("@/context/TenantContext", () => ({
+  useTenantContext: () => ({
+    tenantId: tenantCargando ? null : "00000000-0000-0000-0000-000000000002",
+    entityId: null,
+    personId: null,
+    roleCode: null,
+    isLoading: tenantCargando,
+  }),
 }));
 
 const { RequireGrcModule } = await import("../module-guards");
@@ -57,6 +68,12 @@ function montarEn(moduleId: string) {
 }
 
 describe("RequireGrcModule", () => {
+  beforeEach(() => {
+    brandingActual = null;
+    cargando = false;
+    tenantCargando = false;
+  });
+
   it("ARGA (branding NULL) alcanza todas las vistas de módulo", () => {
     brandingActual = null;
     cargando = false;
@@ -91,6 +108,26 @@ describe("RequireGrcModule", () => {
     cargando = true;
     montarEn("gdpr");
     expect(screen.queryByText("dashboard")).toBeNull();
+  });
+
+  it("mientras el TENANT se resuelve tampoco se pinta el módulo", () => {
+    // La otra espera. `useTenantBrandingLoading()` es `!!tenantId && isLoading`:
+    // con el tenant aún sin resolver vale false, el branding vale null e
+    // `isModuleEnabled` falla ABIERTO. Sin esperar al tenant, el hijo se pinta
+    // un frame antes de saber de quién es la sesión.
+    tenantCargando = true;
+    brandingActual = null;
+    cargando = false;
+    const { unmount } = montarEn("gdpr");
+    expect(screen.queryByText("vista-del-modulo"), "se pintó sin saber el tenant").toBeNull();
+    expect(screen.queryByText("dashboard"), "redirigió sin saber el tenant").toBeNull();
+    unmount();
+
+    // Control discriminante: el MISMO estado con el tenant ya resuelto sí pinta.
+    // Sin esto, un guard que cerrara siempre pasaría la aserción de arriba.
+    tenantCargando = false;
+    montarEn("gdpr");
+    expect(screen.getByText("vista-del-modulo")).toBeTruthy();
   });
 
   it("lista blanca vacía falla ABIERTO: un seed a medio escribir no deja al tenant sin producto", () => {
