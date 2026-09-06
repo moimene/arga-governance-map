@@ -267,7 +267,7 @@ dependencia de orden ya documentada en `CLAUDE.md`, no un efecto de esta rama.
 | 4 | Aislamiento cross-tenant con logins reales, sin aserción vacua | **Cumplido** — storage nuevo, `meetings` añadida, 9 tablas `ai_*`/`aims_*` con su dirección vacua DECLARADA |
 | 5 | Arnés de mutación en cada corrección release-crítica | **Cumplido** — todas las de esta pasada, con el rojo pegado |
 | 6 | Review adversarial ≥3 lentes, 0 P0 abiertos | **Cumplido** — 4 lentes, 0 P0 / 0 P1 |
-| 7 | Verificación viva en producción | **Parcial** — pendiente del push; la comprobación CON SESIÓN sigue sin poder hacerla yo (no introduzco contraseñas) |
+| 7 | Verificación viva en producción | **Cumplido en la parte que puedo hacer** — §9. La comprobación CON SESIÓN sigue sin poder hacerla yo (no introduzco contraseñas) |
 | 8 | `CLAUDE.md` actualizado y ledger | **Cumplido** — este fichero |
 
 ### 8.1 Lo que queda abierto, sin adornos
@@ -280,3 +280,40 @@ dependencia de orden ya documentada en `CLAUDE.md`, no un efecto de esta rama.
 - **`controls.code` sin unicidad por tenant**: ARGA tiene dos `CTR-004` distintos. El hook ya es
   determinista; el índice no puede crearse mientras existan las dos filas.
 - Los criterios **reservados al Comité Legal** siguen intactos, y esta pasada no tocó ninguno.
+
+
+---
+
+## 9. Verificación viva en producción
+
+Despliegue `dpl_AZGex7aCF3LNJMsRyYbvfXuXCc63` → commit `4df54bb`, **READY** y aliasado a
+`arga-governance-map.vercel.app`. La integración GitHub→Vercel disparó sola.
+
+Método: se descargó el `index.html`, su entry y **los 251 chunks** que referencia (7,7 MB), y se
+barrió el código realmente servido. No es un grep del repo: es lo que llega al navegador.
+
+**La trampa de método del cierre anterior sigue viva y se descontó**: Vercel inlinea
+`VITE_VERCEL_GIT_COMMIT_MESSAGE` y Vite lo mete en el bundle — el mensaje de este merge aparece en
+tres chunks, y contiene «QSeal», «WORM», «Transmitir»… o sea, palabras prohibidas. Se retiró el
+literal antes de barrer: **juzgar la propia prosa de commit como si fuera pantalla daría un falso
+positivo por cada frase escrita**.
+
+| Comprobación | Resultado |
+|---|---|
+| Afirmaciones retiradas, AUSENTES | **26 / 26** |
+| Postura honesta, PRESENTE | **12 / 12** |
+
+Las 26 incluyen las diez del cierre anterior (QSeal Custodia, Verificar QSeal, EAD Trust Custody ID,
+bundle WORM cualificado, Cumple RGPD, Remitido formalmente a DGSFP, Firmar y Registrar, buzón
+cifrado, log de auditoría independiente, admitido a trámite…) y las nuevas de esta pasada:
+«Comunicación a Clientes Enviada», «Transmitir Notificación de Retraso», «Transmitir Propuesta»,
+«Transmitir Alerta Urgente», «Credencial Segura», «diligencias previas», «emitido en plazo legal»,
+«AESIA GUÍA 16 / RIA», «Madurez (AESIA)» y «Preservación absoluta».
+
+Y las 12 presentes son la postura que las sustituye: «no medido», «sin dato», «Simulado», «solo en
+este navegador», «Incidentes mayores abiertos», «sin envío», «Abrir intake en Secretaría»,
+«Registrar justificación del retraso», «no la modela», «REGLAMENTO (UE) 2024/1689».
+
+**Lo que sigue sin verificarse, y es del usuario:** entrar en producción con cada tenant y mirar el
+Dashboard, `/grc`, `/sii` y `/secretaria`. El bundle desplegado está barrido; lo que falta es la
+sesión, y no introduzco contraseñas.
