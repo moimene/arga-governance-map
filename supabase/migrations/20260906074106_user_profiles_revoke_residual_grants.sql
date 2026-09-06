@@ -1,0 +1,13 @@
+-- Residuo medido tras `20260906072910_rls_grants_hardening`: esa migración
+-- retiró el UPDATE de `user_profiles` (que era la escalada real: el grant por
+-- columna incluía `tenant_id` y `role_code`), pero la tabla seguía concediendo
+-- DELETE, INSERT, TRUNCATE, REFERENCES y TRIGGER a `anon` y `authenticated`.
+--
+-- La RLS bloquea el DELETE y el INSERT —no hay política para ellos salvo la de
+-- `service_role`—, pero **TRUNCATE no pasa por RLS**: el grant era la única
+-- defensa sobre la tabla de la que `fn_current_tenant_id()` deriva el tenant de
+-- toda la aplicación. No es alcanzable vía PostgREST, que no expone TRUNCATE,
+-- así que no había exposición práctica; el grant sobraba igualmente.
+--
+-- Queda SELECT, que es lo que leen `TenantContext`, `useCurrentUser` y `Login`.
+revoke delete, insert, truncate, references, trigger on public.user_profiles from anon, authenticated;
