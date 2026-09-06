@@ -46,7 +46,8 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
   });
 
   it("Garrigues tiene al menos 12 obligaciones PBC/FT y todas citan artículo de Ley 10/2010", async () => {
-    if (!authed || !garr || !seeded) return;
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
+    if (!seeded) return;
     const { data, error } = await garr
       .from("obligations")
       .select("code, source, legal_reference, owner_body_id")
@@ -61,7 +62,8 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
   });
 
   it("source es el marco normativo, no el artículo", async () => {
-    if (!authed || !garr || !seeded) return;
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
+    if (!seeded) return;
     // /obligaciones deriva sus secciones y su filtro de `source`. Un `source`
     // por artículo produciría una sección por fila.
     const { data } = await garr.from("obligations").select("code, source").like("code", "OBL-PBC-%");
@@ -71,7 +73,8 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
   });
 
   it("toda obligación tiene comité responsable", async () => {
-    if (!authed || !garr || !seeded) return;
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
+    if (!seeded) return;
     const { count } = await garr
       .from("obligations").select("id", { count: "exact", head: true }).is("owner_body_id", null);
     expect(count).toBe(0);
@@ -82,7 +85,8 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
   // `legal_reference`, una fila titulada como obligación exigible pasaría el
   // gate, que es justo el error que se quiere impedir.
   it("la exención de abogados aparece etiquetada como exclusión", async () => {
-    if (!authed || !garr || !seeded) return;
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
+    if (!seeded) return;
     const { data } = await garr.from("obligations").select("code, title, legal_reference");
     const hit = (data ?? []).some(
       (o: Record<string, unknown>) =>
@@ -93,7 +97,8 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
   });
 
   it("la comunicación sistemática está como excepción, no como obligación exigible", async () => {
-    if (!authed || !garr || !seeded) return;
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
+    if (!seeded) return;
     const { data } = await garr.from("obligations").select("code, title, legal_reference");
     const rows = (data ?? []) as Record<string, unknown>[];
     // No puede quedar ninguna fila que afirme la comunicación sistemática como
@@ -125,7 +130,8 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
   // que la ley no exige. Los art. 28 ("examen anual") y 29 ("plan anual") sí
   // son literales y deben conservarla.
   it("la periodicidad solo aparece donde el artículo la fija", async () => {
-    if (!authed || !garr || !seeded) return;
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
+    if (!seeded) return;
     const { data } = await garr.from("obligations").select("code, legal_reference, periodicity");
     const byArt = (art: string) =>
       (data ?? []).find((o: Record<string, unknown>) => String(o.legal_reference).endsWith(`art. ${art}`)) as
@@ -149,7 +155,8 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
   // criterio deja de ser DEMO_PILOTO, y a cambio la cita que llega a pantalla
   // tiene que decir en qué versión se apoya.
   it("la excepción del art. 27.3 ya no es un criterio pendiente y cita la versión cotejada", async () => {
-    if (!authed || !garr || !seeded) return;
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
+    if (!seeded) return;
     const { data } = await garr.from("obligations").select("code, title, legal_reference");
     const row = (data ?? []).find((o: Record<string, unknown>) => /27\.3/.test(String(o.legal_reference))) as
       | Record<string, unknown>
@@ -162,7 +169,8 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
   });
 
   it("los controles usan solo estados admitidos por el CHECK", async () => {
-    if (!authed || !garr || !seeded) return;
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
+    if (!seeded) return;
     const { data } = await garr
       .from("controls")
       .select("code, status, owner_body_id, obligation_id")
@@ -176,7 +184,7 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
   });
 
   it("ARGA sigue con 5 obligaciones y 8 controles", async () => {
-    if (!argaAuthed || !arga) return;
+    expect(argaAuthed && arga, "sin sesión de ARGA no se puede asertar nada").toBeTruthy();
     const { count: o } = await arga.from("obligations").select("id", { count: "exact", head: true });
     const { count: c } = await arga.from("controls").select("id", { count: "exact", head: true });
     expect(o).toBe(5);

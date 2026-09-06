@@ -28,30 +28,47 @@ describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta"
   let argaAuthed = false;
   let seeded = false;
 
+  let seedError: string | null = null;
+
   beforeAll(async () => {
     // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
+    // SIN try/catch: `sesionDe` LANZA si no autentica —clave rotada, `.env` sin
+    // `DEMO_PASSWORD_*`, Cloud caído— y dejarlo lanzar es lo que pone el gate
+    // en rojo. Atraparlo devolvía tests EN VERDE sin mirar Cloud.
     [garr, arga] = await Promise.all([sesionDe("GARRIGUES"), sesionDe("ARGA")]);
     authed = true;
     argaAuthed = true;
-    const { count } = await garr.from("policies").select("id", { count: "exact", head: true });
+    const { count, error } = await garr.from("policies").select("id", { count: "exact", head: true });
+    seedError = error ? error.message : count == null ? "el recuento vino a null" : null;
     seeded = (count ?? 0) >= 39;
   });
 
+  // Sin este test, `seeded` era un SKIP MUDO en los 7 de abajo: perder el seed
+  // —justo lo que esta sonda vigila— pintaba el gate verde. Ahora falla aquí,
+  // una vez y con el motivo, y los demás siguen dando su detalle.
+  it("el seed normativo del tenant Garrigues está aplicado", () => {
+    expect(seedError, `no se pudo contar políticas: ${seedError}`).toBeNull();
+    expect(seeded, "Garrigues tiene menos de 39 políticas: el seed no está aplicado").toBe(true);
+  });
+
   it("Garrigues ve exactamente 39 documentos normativos", async () => {
-    if (!authed || !garr || !seeded) return;
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
+    if (!seeded) return;
     const { count, error } = await garr.from("policies").select("id", { count: "exact", head: true });
     expect(error).toBeNull();
     expect(count).toBe(39);
   });
 
   it("las 32 PI están completas", async () => {
-    if (!authed || !garr || !seeded) return;
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
+    if (!seeded) return;
     const { data } = await garr.from("policies").select("policy_code").like("policy_code", "PI-%");
     expect(data).toHaveLength(32);
   });
 
   it("el ownership acreditado apunta a órganos reales del tenant", async () => {
-    if (!authed || !garr || !seeded) return;
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
+    if (!seeded) return;
     const { data } = await garr
       .from("policies")
       .select("policy_code, owner_body:owner_body_id(slug)")
@@ -73,7 +90,8 @@ describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta"
   // menciona comité alguno. Atribuírselos era sustituir al responsable que la
   // fuente nombra por un órgano parecido que sí estaba modelado.
   it("no se atribuye al comité que solo auxilia o informa", async () => {
-    if (!authed || !garr || !seeded) return;
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
+    if (!seeded) return;
     const { data } = await garr
       .from("policies")
       .select("policy_code, owner_body_id, owner_function")
@@ -87,14 +105,16 @@ describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta"
   });
 
   it("solo 4 documentos tienen órgano responsable; el resto queda NULL", async () => {
-    if (!authed || !garr || !seeded) return;
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
+    if (!seeded) return;
     const { count } = await garr
       .from("policies").select("id", { count: "exact", head: true }).not("owner_body_id", "is", null);
     expect(count).toBe(4);
   });
 
   it("PPD-02 y el Código de Conducta del Socio quedan etiquetados sin contenido", async () => {
-    if (!authed || !garr || !seeded) return;
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
+    if (!seeded) return;
     const { data } = await garr
       .from("policies").select("policy_code, summary, content_outline").in("policy_code", ["PPD-02", "CCS"]);
     expect((data ?? []).length).toBe(2);
@@ -104,7 +124,8 @@ describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta"
   // Contracara del anterior: PPD-01 tiene su texto en la carpeta y debe
   // llegar con objeto e índice, no como documento "citado, no incorporado".
   it("PPD-01 llega con su objeto y su índice", async () => {
-    if (!authed || !garr || !seeded) return;
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
+    if (!seeded) return;
     const { data } = await garr
       .from("policies").select("summary, content_outline, current_version").eq("policy_code", "PPD-01").maybeSingle();
     expect(data?.summary).toBeTruthy();
@@ -113,7 +134,7 @@ describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta"
   });
 
   it("ARGA sigue con sus 25 políticas y sin ownership por órgano", async () => {
-    if (!argaAuthed || !arga) return;
+    expect(argaAuthed && arga, "sin sesión de ARGA no se puede asertar nada").toBeTruthy();
     const { count } = await arga.from("policies").select("id", { count: "exact", head: true });
     expect(count).toBe(25);
     const { count: owned } = await arga
@@ -122,7 +143,7 @@ describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta"
   });
 
   it("ARGA no ve ninguna política de Garrigues", async () => {
-    if (!argaAuthed || !arga) return;
+    expect(argaAuthed && arga, "sin sesión de ARGA no se puede asertar nada").toBeTruthy();
     const { data } = await arga.from("policies").select("policy_code").like("policy_code", "PI-%");
     expect(data ?? []).toHaveLength(0);
   });

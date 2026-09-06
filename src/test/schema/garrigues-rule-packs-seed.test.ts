@@ -40,60 +40,27 @@ describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant,
   let arga: SupabaseClient | null = null;
   let authed = false;
   let argaAuthed = false;
-  // Además del graceful-skip por login (sin red / credenciales), esta sonda
-  // se escribe ANTES de que el controller ejecute el Step 4 (aplicar la
-  // migración en Cloud). Si el entorno de ejecución SÍ tiene red — como
-  // ocurrió al verificar este fichero — el login puede tener éxito y las
-  // queries GARR_* devolver 0 filas de forma legítima y esperada, no por
-  // fallo de conexión. `packsSeeded` distingue ambos casos: los tests que
-  // dependen de los 4 packs que crea la migración de este Task se saltan
-  // (verde, no rojo) hasta que existan; los que verifican datos YA
-  // existentes (aislamiento ARGA, invariante art. 4.3 de G2) se ejecutan
-  // igual, con red, desde el primer momento.
-  let packsSeeded = false;
-  // Fix round 2: mismo patrón, gate independiente — la migración de los 6
-  // packs por-materia es posterior a la de los 4 GARR_*, así que
-  // `packsSeeded` (ya en true desde que el controller aplicó el Step 4
-  // original) no sirve para saber si ESTOS 6 existen todavía.
-  let materiaPacksSeeded = false;
+  // FUERA los flags `packsSeeded` / `materiaPacksSeeded`. Nacieron cuando la
+  // migración de este Task aún no estaba aplicada y servían para saltar en
+  // VERDE los tests que dependen de los packs. Los packs llevan en Cloud desde
+  // G3: el flag ya solo servía para que la desaparición del seed —el fallo que
+  // esta sonda existe para cazar— dejara el gate verde. Si no están, rojo.
 
   beforeAll(async () => {
-    try {
-      // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
-      garr = await sesionDe("GARRIGUES");
-      authed = true;
+    // SIN try/catch, a propósito. Lo había, y con él un login fallido —clave
+    // rotada, `.env` sin `DEMO_PASSWORD_*`, Cloud caído— dejaba `authed` en
+    // false y los `it` de abajo se saltaban devolviendo `expect(true).toBe(true)`:
+    // tests EN VERDE sin asertar nada sobre Cloud, que es peor que no tenerlos
+    // porque parecen cobertura. `sesionDe` LANZA si no autentica; dejar que
+    // lance es lo que pone el gate en rojo.
+    // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
+    garr = await sesionDe("GARRIGUES");
+    authed = true;
 
-      if (authed && garr) {
-        const { data: probe } = await garr.from("rule_packs").select("id").like("id", "GARR_%").limit(1);
-        packsSeeded = (probe ?? []).length > 0;
-        if (!packsSeeded) {
-          console.warn("[g3-rule-packs-seed] packs GARR_* aún no existen en Cloud — Step 4 (controller) pendiente; tests dependientes en skip.");
-        }
-
-        const { data: materiaProbe } = await garr
-          .from("rule_packs")
-          .select("id")
-          .eq("id", "ADMISION_SOCIO_CUOTA")
-          .limit(1);
-        materiaPacksSeeded = (materiaProbe ?? []).length > 0;
-        if (!materiaPacksSeeded) {
-          console.warn("[g3-rule-packs-seed] packs por-materia (fix round 2) aún no existen en Cloud — tests dependientes en skip.");
-        }
-      }
-
-      // ARGA client para verificar aislamiento RLS — cliente e idempotencia
-      // de login independientes del cliente Garrigues.
-      arga = await sesionDe("ARGA");
-      argaAuthed = true;
-    } catch (error) {
-      authed = false;
-      // UN LOGIN FALLIDO NO ES «NADA QUE COMPROBAR». Al tragarse la excepción,
-      // cada `it` de abajo caía en `if (!authed) { expect(true).toBe(true); return; }`
-      // y la sonda Cloud terminaba VERDE sin asertar nada: rotar una contraseña
-      // o caerse Cloud dejaba el gate en verde mudo. `sesionDe` ya lanza con el
-      // motivo; aquí se propaga para que el fichero se ponga ROJO.
-      throw error;
-    }
+    // ARGA client para verificar aislamiento RLS — cliente e idempotencia
+    // de login independientes del cliente Garrigues.
+    arga = await sesionDe("ARGA");
+    argaAuthed = true;
   }, 30_000);
 
   // SIN afterAll con signOut: la sesión es COMPARTIDA. Cerrarla aquí dejaría sin
@@ -101,7 +68,7 @@ describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant,
   // en un fichero que no ha hecho nada mal.
 
   it("Garrigues ve sus 4 packs núcleo bajo su tenant (RLS per-tenant)", async () => {
-    if (!authed || !garr || !packsSeeded) { expect(true).toBe(true); return; }
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { data, error } = await garr.from("rule_packs").select("id, organo_tipo").like("id", "GARR_%");
     expect(error).toBeNull();
     const ids = (data ?? []).map((r) => r.id);
@@ -118,7 +85,7 @@ describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant,
   });
 
   it("ARGA no ve los packs GARR_ (aislamiento) y conserva sus 59", async () => {
-    if (!argaAuthed || !arga) { expect(true).toBe(true); return; }
+    expect(argaAuthed && arga, "sin sesión de ARGA no se puede asertar nada").toBeTruthy();
     const { data: garrRows, error: eGarr } = await arga.from("rule_packs").select("id").like("id", "GARR_%");
     expect(eGarr).toBeNull();
     expect((garrRows ?? []).length).toBe(0);
@@ -142,7 +109,7 @@ describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant,
   });
 
   it("Garrigues ve además sus 6 packs por-materia (fix round 2), organo_tipo=JUNTA_GENERAL, y no ve ninguno ajeno", async () => {
-    if (!authed || !garr || !materiaPacksSeeded) { expect(true).toBe(true); return; }
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { data, error } = await garr.from("rule_packs").select("id, organo_tipo").in("id", [...MATERIA_PACK_IDS]);
     expect(error).toBeNull();
     const ids = (data ?? []).map((r) => r.id);
@@ -172,7 +139,7 @@ describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant,
   });
 
   it("los 6 packs por-materia pasan invariantes: nunca Ley 2/2007 en el plazo de convocatoria, y la mayoría real vive en votacion.mayoria.SL", async () => {
-    if (!authed || !garr || !materiaPacksSeeded) { expect(true).toBe(true); return; }
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { data, error } = await garr
       .from("rule_pack_versions")
       .select("pack_id, payload, is_active")
@@ -210,7 +177,7 @@ describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant,
   });
 
   it("GARR_JUNTA_SOCIOS tiene versión ACTIVA con el overlay Ley 2/2007 (5 citas) y la doble mayoría de exclusión anidada en votacion.mayoria", async () => {
-    if (!authed || !garr || !packsSeeded) { expect(true).toBe(true); return; }
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { data, error } = await garr
       .from("rule_pack_versions")
       .select("payload, is_active, status")
@@ -325,7 +292,7 @@ describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant,
   // matriz), así que .maybeSingle() sin filtro de entity_id es seguro, igual
   // que en garrigues-gobierno-seed.test.ts.
   it("art. 4.3 Ley 2/2007 — el administrador único de la matriz (Vives) figura también en el censo de socios profesionales", async () => {
-    if (!authed || !garr) { expect(true).toBe(true); return; }
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { data: adminUnico, error: eAdmin } = await garr
       .from("condiciones_persona")
       .select("person_id, person:person_id(full_name)")

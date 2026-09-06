@@ -40,43 +40,23 @@ describe("G3 Task 8 — plantillas núcleo del tenant Garrigues (RLS per-tenant,
   let arga: SupabaseClient | null = null;
   let authed = false;
   let argaAuthed = false;
-  // Igual que garrigues-rule-packs-seed.test.ts: distingue "sin red" de "con
-  // red pero el controller aún no ejecutó --commit" — ambos deben quedar en
-  // skip verde, no en rojo.
-  let templatesSeeded = false;
+  // FUERA el flag `templatesSeeded`: nació para saltar en verde mientras el
+  // seed no estaba aplicado, y hoy solo serviría para que su desaparición
+  // —justo lo que esta sonda vigila— dejara el gate verde. Si no están, rojo.
 
   beforeAll(async () => {
-    try {
-      // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
-      garr = await sesionDe("GARRIGUES");
-      authed = true;
+    // SIN try/catch, a propósito. Lo había, y con él un login fallido —clave
+    // rotada, `.env` sin `DEMO_PASSWORD_*`, Cloud caído— dejaba `authed` en
+    // false y los `it` de abajo se saltaban devolviendo `expect(true).toBe(true)`:
+    // tests EN VERDE sin asertar nada sobre Cloud, que es peor que no tenerlos
+    // porque parecen cobertura. `sesionDe` LANZA si no autentica; dejar que
+    // lance es lo que pone el gate en rojo.
+    // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
+    garr = await sesionDe("GARRIGUES");
+    authed = true;
 
-      if (authed && garr) {
-        const { data: probe } = await garr
-          .from("plantillas_protegidas")
-          .select("id")
-          .in("materia_acuerdo", TEMPLATE_MATERIAS.map((t) => t.materia))
-          .limit(1);
-        templatesSeeded = (probe ?? []).length > 0;
-        if (!templatesSeeded) {
-          console.warn(
-            "[g3-templates-seed] plantillas núcleo aún no existen en Cloud — Step 2/3 (controller) " +
-              "pendiente; tests dependientes en skip.",
-          );
-        }
-      }
-
-      arga = await sesionDe("ARGA");
-      argaAuthed = true;
-    } catch (error) {
-      authed = false;
-      // UN LOGIN FALLIDO NO ES «NADA QUE COMPROBAR». Al tragarse la excepción,
-      // cada `it` de abajo caía en `if (!authed) { expect(true).toBe(true); return; }`
-      // y la sonda Cloud terminaba VERDE sin asertar nada: rotar una contraseña
-      // o caerse Cloud dejaba el gate en verde mudo. `sesionDe` ya lanza con el
-      // motivo; aquí se propaga para que el fichero se ponga ROJO.
-      throw error;
-    }
+    arga = await sesionDe("ARGA");
+    argaAuthed = true;
   }, 30_000);
 
   // SIN afterAll con signOut: la sesión es COMPARTIDA. Cerrarla aquí dejaría sin
@@ -84,7 +64,7 @@ describe("G3 Task 8 — plantillas núcleo del tenant Garrigues (RLS per-tenant,
   // en un fichero que no ha hecho nada mal.
 
   it("Garrigues ve sus 6 plantillas núcleo ACTIVA por materia_acuerdo (RLS per-tenant)", async () => {
-    if (!authed || !garr || !templatesSeeded) { expect(true).toBe(true); return; }
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { data, error } = await garr
       .from("plantillas_protegidas")
       .select("materia_acuerdo, tipo, estado, tenant_id, organo_tipo, tipo_social")
@@ -105,7 +85,7 @@ describe("G3 Task 8 — plantillas núcleo del tenant Garrigues (RLS per-tenant,
   });
 
   it("ARGA no ve las plantillas núcleo de Garrigues (aislamiento) y conserva su catálogo", async () => {
-    if (!argaAuthed || !arga) { expect(true).toBe(true); return; }
+    expect(argaAuthed && arga, "sin sesión de ARGA no se puede asertar nada").toBeTruthy();
     const { data: leaked, error: eLeak } = await arga
       .from("plantillas_protegidas")
       .select("id")
@@ -124,7 +104,7 @@ describe("G3 Task 8 — plantillas núcleo del tenant Garrigues (RLS per-tenant,
   });
 
   it("el binding materia_template_binding cubre las 4 materias del gate T7 apuntando al informe ACTIVA", async () => {
-    if (!authed || !garr || !templatesSeeded) { expect(true).toBe(true); return; }
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { data: informe, error: eInforme } = await garr
       .from("plantillas_protegidas")
       .select("id, estado")
@@ -151,7 +131,7 @@ describe("G3 Task 8 — plantillas núcleo del tenant Garrigues (RLS per-tenant,
     "resolución runtime real del gate (composer.ts): tipo='INFORME_PRECEPTIVO' ACTIVA satisface " +
       "template_binding_key='INFORME_PRECEPTIVO_ORGANO:'||agreement_kind para cualquiera de las 4 materias",
     async () => {
-      if (!authed || !garr || !templatesSeeded) { expect(true).toBe(true); return; }
+      expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
       // Reproduce la selección de selectProcessTemplate/composer.ts sin
       // necesitar un agreement real: el filtro que decide si el botón "Crear
       // y enlazar" del panel puede generar el informe es

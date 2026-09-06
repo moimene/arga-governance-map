@@ -26,12 +26,15 @@ describe("G4 Task 1 — esquema de ownership normativo", () => {
 
   beforeAll(async () => {
     // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
+    // SIN try/catch: `sesionDe` LANZA si no autentica —clave rotada, `.env` sin
+    // `DEMO_PASSWORD_*`, Cloud caído— y dejarlo lanzar es lo que pone el gate en
+    // rojo, en vez de que los `it` de abajo salgan en verde sin mirar Cloud.
     garr = await sesionDe("GARRIGUES");
     authed = true;
   });
 
   it("policies expone owner_body_id, summary y content_outline", async () => {
-    if (!authed || !garr) return;
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { error } = await garr
       .from("policies")
       .select("id, owner_body_id, summary, content_outline")
@@ -40,7 +43,7 @@ describe("G4 Task 1 — esquema de ownership normativo", () => {
   });
 
   it("obligations expone owner_body_id, legal_reference y periodicity", async () => {
-    if (!authed || !garr) return;
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { error } = await garr
       .from("obligations")
       .select("id, owner_body_id, legal_reference, periodicity")
@@ -49,7 +52,7 @@ describe("G4 Task 1 — esquema de ownership normativo", () => {
   });
 
   it("controls expone owner_body_id", async () => {
-    if (!authed || !garr) return;
+    expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     const { error } = await garr.from("controls").select("id, owner_body_id").limit(1);
     expect(error).toBeNull();
   });
