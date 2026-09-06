@@ -37,6 +37,7 @@ import { useScope } from "@/context/ScopeContext";
 import { useTenantContext } from "@/context/TenantContext";
 import { useBodyBySlug } from "@/hooks/useBodies";
 import { aiGovernanceBodySlug } from "@/lib/aims/governing-body";
+import { normalizeAimsStatus } from "@/lib/aims/readiness";
 
 const RISK_COLORS: Record<string, string> = {
   Inaceptable: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
@@ -462,7 +463,12 @@ export default function AiDashboard() {
   const assessments = rawAssessments.filter((a) => a.system_id && systemIds.has(a.system_id));
   const complianceChecks = rawComplianceChecks.filter((c) => c.system_id && systemIds.has(c.system_id));
 
-  const activos = systems.filter((s) => s.status === "ACTIVO").length;
+  // Comparación sobre el vocabulario normalizado, como el resto del módulo:
+  // `ai_systems.status` convive con cinco grafías en Cloud (ACTIVO,
+  // EN_EVALUACION, Pendiente, Conforme, En revision). Con la igualdad estricta
+  // un «Activo» en otra grafía no contaba. Hoy ARGA no cambia: sus 4 activos
+  // ya están escritos como ACTIVO.
+  const activos = systems.filter((s) => normalizeAimsStatus(s.status) === "ACTIVO").length;
   const alto    = systems.filter((s) => s.risk_level === "Alto").length;
   const limitado = systems.filter((s) => s.risk_level === "Limitado").length;
   const minimo  = systems.filter((s) => s.risk_level === "Mínimo").length;

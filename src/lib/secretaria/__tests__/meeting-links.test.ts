@@ -4,6 +4,7 @@ import {
   extractMeetingSourceLinks,
   patchQuorumDataSourceLinks,
   sourceLinksFromAgendaPoints,
+  isMeetingBoundToEmittedConvocation,
 } from "../meeting-links";
 
 describe("canUseLegacyConvocatoriaFallback", () => {
@@ -128,5 +129,18 @@ describe("meeting source links", () => {
     );
 
     expect(patched.source_links).toMatchObject({ agreement_ids: ["agreement-1"] });
+  });
+
+  // Mismo criterio que fn_secretaria_guard_emitted_agenda_dml: el vínculo puede
+  // venir por source_links, por scheduled_from o por agenda_binding.
+  it("detecta la atadura a convocatoria emitida por cualquiera de sus tres huellas", () => {
+    expect(isMeetingBoundToEmittedConvocation(null)).toBe(false);
+    expect(isMeetingBoundToEmittedConvocation({})).toBe(false);
+    expect(isMeetingBoundToEmittedConvocation({ source_links: { source: "derived", convocatoria_id: "c" } })).toBe(false);
+    expect(isMeetingBoundToEmittedConvocation({ source_links: { source: "explicit", convocatoria_id: "c" } })).toBe(true);
+    expect(isMeetingBoundToEmittedConvocation({ scheduled_from: { source: "convocatoria", convocatoria_id: "c" } })).toBe(true);
+    expect(isMeetingBoundToEmittedConvocation({ agenda_binding: { convocatoria_id: "c" } })).toBe(true);
+    // Un source_links explícito SIN id no ata a nada.
+    expect(isMeetingBoundToEmittedConvocation({ source_links: { source: "explicit" } })).toBe(false);
   });
 });

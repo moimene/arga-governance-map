@@ -177,7 +177,10 @@ validación funcional y no constituye una declaración de conformidad emitida.
               </h3>
               <ul className="list-disc list-inside space-y-1 text-[var(--g-text-secondary)] pl-1">
                 <li>Reglamento (UE) 2024/1689 (Artículos 9 a 17, 72 y 73).</li>
-                <li>Catálogo de 84 Medidas Guía (MG) del Manual de Checklists de la AESIA (Guía 16).</li>
+                {/* Misma retirada que en el alta y el informe de la evaluación: la
+                    atribución a una guía numerada de la Agencia nunca se cotejó
+                    contra publicación oficial y no es la fuente del requisito. */}
+                <li>Catálogo de 84 medidas de referencia (MG) del módulo, alineadas con el Reglamento (UE) 2024/1689.</li>
                 <li>Estándar UNE-EN ISO/IEC 42001:2023 (Gestión de Inteligencia Artificial).</li>
                 {marcoResilienciaVisible && (
                   <li>Marco de Ciberseguridad y Resiliencia Operativa Digital (DORA / NIS2).</li>

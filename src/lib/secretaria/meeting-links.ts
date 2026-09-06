@@ -146,3 +146,30 @@ export function patchQuorumDataSourceLinks(
     source_links: mergeMeetingSourceLinks(quorumData, next),
   };
 }
+
+/**
+ * Si la reunión está ATADA a una convocatoria emitida. Es el mismo criterio con
+ * el que `fn_secretaria_guard_emitted_agenda_dml` decide bloquear cualquier
+ * DML directo sobre `agenda_items` (busca el vínculo en `source_links`,
+ * `scheduled_from` o `agenda_binding` de `quorum_data`), y con el que
+ * `fn_secretaria_guard_meeting_open_transition` declara inmutable la atadura.
+ *
+ * El cliente lo necesita para NO intentar lo que el servidor va a rechazar:
+ * `handleSave` del paso 4 emitía un UPDATE de título/descripción/kind sobre la
+ * agenda de una convocatoria emitida, el trigger lo tumbaba con
+ * AGENDA_EMITIDA_RPC_REQUIRED y el guardado abortaba ANTES de persistir las
+ * constancias — y sin constancias de los puntos no decisorios el acta es
+ * inalcanzable («every non-decision point requires a persisted constancia»,
+ * medido 2026-09-06 sobre ac961a00).
+ */
+export function isMeetingBoundToEmittedConvocation(
+  quorumData: Record<string, unknown> | null | undefined,
+): boolean {
+  if (!quorumData) return false;
+  const links = quorumData.source_links as { source?: unknown; convocatoria_id?: unknown } | undefined;
+  if (links && links.source === "explicit" && typeof links.convocatoria_id === "string") return true;
+  const scheduled = quorumData.scheduled_from as { source?: unknown; convocatoria_id?: unknown } | undefined;
+  if (scheduled && scheduled.source === "convocatoria" && typeof scheduled.convocatoria_id === "string") return true;
+  const binding = quorumData.agenda_binding as { convocatoria_id?: unknown } | undefined;
+  return !!binding && typeof binding.convocatoria_id === "string";
+}

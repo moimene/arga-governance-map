@@ -312,19 +312,20 @@ test.describe('Secretaría — golden path prototipo legal', () => {
       const decisionTitle = (await titleInputs.nth(decisionOrdinal - 1).inputValue()).trim();
       expect(decisionTitle, 'el punto decisorio de la agenda debe llegar con título').not.toBe('');
 
-      // Aquí NO se pulsa «Guardar debates». No es una omisión cómoda: la agenda de
-      // una reunión convocada por una convocatoria EMITIDA es fuente jurídica
-      // inmutable y la BD rechaza cualquier DML directo sobre `agenda_items`
-      // (trigger `fn_secretaria_guard_emitted_agenda_dml`, migración
-      // 20260720122100 → `42501 AGENDA_EMITIDA_RPC_REQUIRED`). `handleSave` emite
-      // ese UPDATE siempre, así que en este camino el guardado nunca puede
-      // confirmar: medido en vivo, devuelve 403 y el toast genérico «Error al
-      // preparar constancias», que oculta el motivo legal. Es un defecto de
-      // producto (ReunionStepper.tsx, el UPDATE de `agenda_items` en handleSave),
-      // no del spec, y este spec no lo tapa fijándolo como comportamiento
-      // esperado. El golden path no depende de ese guardado: el paso 5 lee la
-      // agenda de su fuente autoritativa, que es justo lo que comprueba la
-      // recarga siguiente.
+      // «Guardar debates» persiste las CONSTANCIAS de los puntos no decisorios,
+      // y sin ellas el acta es inalcanzable («every non-decision point requires
+      // a persisted constancia»). Hasta el 2026-09-06 este clic abortaba en una
+      // reunión nacida de convocatoria EMITIDA porque `handleSave` emitía un
+      // UPDATE sobre `agenda_items` que la BD rechaza (AGENDA_EMITIDA_RPC_REQUIRED)
+      // ANTES de guardar las constancias; hoy el producto no intenta reescribir
+      // la agenda inmutable y guarda debate y constancias. Se exige el toast de
+      // éxito literal: una pantalla que falle en silencio no lo satisface.
+      const saveDebates = page.getByRole('button', { name: 'Guardar debates' });
+      await expect(saveDebates).toBeEnabled({ timeout: 10_000 });
+      await saveDebates.click();
+      await expect(page.getByText('Agenda, debate y constancias guardados').first()).toBeVisible({
+        timeout: 20_000,
+      });
       await page.reload();
       await expect(page.getByRole('heading', { name: 'Asistente de sesión societaria' })).toBeVisible({
         timeout: 20_000,

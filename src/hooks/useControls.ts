@@ -42,13 +42,15 @@ export interface EvidenceFull extends EvidenceRow {
 // dos compartieran entrada de caché: `TenantProvider` arranca en null, de ahí
 // también el `enabled`.
 //
-// El tenant scoping NO basta: el código tampoco es único DENTRO de un tenant.
-// Medido en Cloud el 2026-09-06 — ARGA tiene dos `CTR-004` distintos
-// («Procedimiento de notificación de incidentes DORA», de abril 17, y «Gestión
-// de parches ICT críticos», de abril 19). Con dos filas, `.maybeSingle()`
-// devuelve error y `/controles/CTR-004` no abría ninguno de los dos.
-// El orden explícito + `limit(1)` lo hace determinista: siempre el más
-// antiguo, y `id` como desempate porque `created_at` no está declarado único.
+// El tenant scoping NO bastaba: el 2026-09-06 se midió que ARGA tenía dos
+// `CTR-004` distintos («Procedimiento de notificación de incidentes DORA», de
+// abril 17, y «Gestión de parches ICT críticos», de abril 19), y con dos filas
+// `.maybeSingle()` devolvía error y `/controles/CTR-004` no abría ninguno.
+// Ese mismo día la migración `controls_code_unique_per_tenant` renombró el
+// segundo a CTR-009 y creó el índice único (tenant_id, code): hoy el código SÍ
+// es único por tenant. El orden explícito + `limit(1)` se conserva como
+// defensa en profundidad — si el índice desapareciera, la ficha seguiría
+// abriendo el más antiguo en vez de romper.
 export function useControlByCode(code: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
