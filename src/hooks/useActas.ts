@@ -782,6 +782,49 @@ export interface ActaAgendaContract {
   agreementRows: ActaAgreementRow[];
 }
 
+/** `agreements.compliance_snapshot` no está en `ActaAgreementRow`; se lee aquí. */
+type ActaAgreementRowWithSnapshot = ActaAgreementRow & { compliance_snapshot?: unknown };
+
+/**
+ * El resultado de la votación que el acta necesita se leía SOLO del espejo
+ * cliente `meetings.quorum_data.point_snapshots`. La copia AUTORITATIVA la
+ * escribe la RPC `fn_save_meeting_resolutions` (SECURITY DEFINER) en la misma
+ * transacción que la resolución: `agreements.compliance_snapshot` y, en WORM,
+ * `rule_evaluation_results`.
+ *
+ * Cuando ese espejo se pierde, el acta declaraba
+ * «adopted_decision_without_vote_result» aunque el servidor SÍ tuviera
+ * documentada la votación. Y no había vuelta atrás por la aplicación: la RPC
+ * no puede reejecutarse porque su `DELETE FROM rule_evaluation_results` choca
+ * con el WORM de esa tabla (`P0001`, medido el 2026-09-06). Medido en Cloud el
+ * mismo día: la reunión nacida de convocatoria `ac961a00-…` tenía 3
+ * resoluciones ADOPTED, sus 3 snapshots autoritativos en `agreements` y 0 en
+ * el espejo, con el acta bloqueada.
+ *
+ * El espejo tiene PREFERENCIA cuando existe: solo se completan los índices que
+ * le faltan, de modo que ninguna reunión con su espejo íntegro cambia. Y solo
+ * se recupera lo que pasa el mismo validador que el espejo, así que un
+ * `compliance_snapshot` de otra procedencia (los de seed son
+ * `agreement-compliance-snapshot.seed.v1`) no se cuela como votación.
+ */
+export function mergeAuthoritativeAdoptionSnapshots(
+  mirrorSnapshots: MeetingAdoptionSnapshot[],
+  agreementRows: ActaAgreementRowWithSnapshot[],
+): MeetingAdoptionSnapshot[] {
+  const covered = new Set(mirrorSnapshots.map((snapshot) => snapshot.agenda_item_index));
+  const recovered: MeetingAdoptionSnapshot[] = [];
+  for (const row of agreementRows) {
+    // `extractPointSnapshots` es el ÚNICO sitio donde se decide qué es un
+    // snapshot de adopción válido; se reutiliza en vez de duplicar el criterio.
+    for (const snapshot of extractPointSnapshots({ point_snapshots: [row.compliance_snapshot] })) {
+      if (covered.has(snapshot.agenda_item_index)) continue;
+      covered.add(snapshot.agenda_item_index);
+      recovered.push(snapshot);
+    }
+  }
+  return [...mirrorSnapshots, ...recovered];
+}
+
 /**
  * Construye el array de puntos del acta preservando el orden cronológico
  * exigido por RRM art. 99. NUNCA reagrupa por `kind`.
@@ -832,7 +875,7 @@ async function loadActaAgendaContract(params: {
       .maybeSingle(),
     supabase
       .from("agreements")
-      .select("id, parent_meeting_id, agenda_item_id, status, proposal_text, decision_text")
+      .select("id, parent_meeting_id, agenda_item_id, status, proposal_text, decision_text, compliance_snapshot")
       .eq("parent_meeting_id", params.meetingId)
       .eq("tenant_id", params.tenantId),
   ]);
@@ -845,9 +888,12 @@ async function loadActaAgendaContract(params: {
   const agendaItems = (itemsRes.data ?? []) as ActaAgendaItemRow[];
   const resolutions = (resolutionsRes.data ?? []) as ActaMeetingResolutionRow[];
   const constancias = (constanciasRes.data ?? []) as ActaAgendaConstanciaRow[];
-  const agreementRows = (agreementsRes.data ?? []) as ActaAgreementRow[];
-  const snapshots = extractPointSnapshots(
-    (meetingRes.data as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data ?? null,
+  const agreementRows = (agreementsRes.data ?? []) as ActaAgreementRowWithSnapshot[];
+  const snapshots = mergeAuthoritativeAdoptionSnapshots(
+    extractPointSnapshots(
+      (meetingRes.data as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data ?? null,
+    ),
+    agreementRows,
   );
   const quorumData =
     (meetingRes.data as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data ?? null;

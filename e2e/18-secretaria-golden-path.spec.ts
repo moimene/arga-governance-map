@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { test, expect } from './fixtures/base';
+import { test, expect, CONVOCATORIA_DRAFT_DOCX_BUTTON } from './fixtures/base';
 
 test.describe.configure({ timeout: 120_000 });
 
@@ -108,20 +108,54 @@ async function openConvocatoriaWithMeetingAction(page: Page) {
       await row.dblclick();
     }
     await expect(page).toHaveURL(/\/secretaria\/convocatorias\/[^/?]+/);
-    const docButton = page.getByRole('button', { name: /Convocatoria(?: revisada)? DOCX|Convocatoria con plantilla/ }).first();
+    const docButton = page.getByRole('button', { name: CONVOCATORIA_DRAFT_DOCX_BUTTON }).first();
     if (!(await expect(docButton).toBeVisible({ timeout: 15_000 }).then(() => true).catch(() => false))) {
       continue;
     }
+    const convocatoriaUrl = page.url();
     const action = page.getByRole('button', { name: /Programar reunión|Abrir reunión/ }).first();
     const actionReady =
       (await expect(action).toBeVisible({ timeout: 10_000 }).then(() => true).catch(() => false)) &&
       (await expect(action).toBeEnabled({ timeout: 20_000 }).then(() => true).catch(() => false));
-    if (actionReady) {
-      return action;
+    if (!actionReady) {
+      continue;
     }
+
+    // Que el botón esté habilitado NO significa que la sesión se pueda abrir:
+    // un expediente rectificado conserva su «Abrir reunión» pero su reunión
+    // quedó CANCELADA, y el paso 1 bloquea la apertura —correctamente— con
+    // «El estado actual de la reunión no permite declarar su apertura». El
+    // golden path necesita una sesión abrible de verdad, así que se comprueba
+    // en el propio stepper y, si no sirve, se sigue con la siguiente fila.
+    // Solo se sondea «Abrir reunión»: sondear «Programar reunión» crearía
+    // reuniones que luego se descartarían.
+    if (/Abrir reunión/.test((await action.innerText()).trim())) {
+      await action.click();
+      await expect(page).toHaveURL(/\/secretaria\/reuniones\/[^/?]+/);
+      await expect(page.getByRole('heading', { name: 'Asistente de sesión societaria' })).toBeVisible({
+        timeout: 20_000,
+      });
+      const abrible =
+        (await expect(page.getByRole('button', { name: 'Declarar apertura de la sesión' }).first())
+          .toBeEnabled({ timeout: 10_000 })
+          .then(() => true)
+          .catch(() => false)) ||
+        // Sesión ya en curso: los pasos posteriores están desbloqueados.
+        (await expect(page.getByRole('button', { name: /Asistentes/ }).first())
+          .toBeEnabled({ timeout: 5_000 })
+          .then(() => true)
+          .catch(() => false));
+      if (!abrible) {
+        continue;
+      }
+      await page.goto(convocatoriaUrl);
+      await expect(page.getByRole('button', { name: 'Volver al listado' })).toBeVisible({ timeout: 15_000 });
+    }
+
+    return action;
   }
 
-  throw new Error('No hay convocatoria demo con acción de reunión disponible para el golden path.');
+  throw new Error('No hay convocatoria demo cuya sesión se pueda abrir para el golden path.');
 }
 
 async function goStep(page: Page, label: string | RegExp, heading: string | RegExp) {
@@ -177,7 +211,7 @@ test.describe('Secretaría — golden path prototipo legal', () => {
   test('Convocatoria → Reunión → Votación → Acta → Certificación → Tramitador → Documento', async ({ page }) => {
     await test.step('convocatoria y documentos previos', async () => {
       await openConvocatoriaWithMeetingAction(page);
-      await expect(page.getByRole('button', { name: /Convocatoria(?: revisada)? DOCX|Convocatoria con plantilla/ })).toBeVisible();
+      await expect(page.getByRole('button', { name: CONVOCATORIA_DRAFT_DOCX_BUTTON })).toBeVisible();
       await expect(page.getByRole('button', { name: /Informe PRE/ })).toBeVisible();
       const action = page.getByRole('button', { name: /Programar reunión|Abrir reunión/ }).first();
       await expect(action).toBeEnabled({ timeout: 20_000 });
@@ -189,9 +223,33 @@ test.describe('Secretaría — golden path prototipo legal', () => {
     });
 
     await test.step('reunión, constitución y asistencia', async () => {
+      // El stepper abre en el primer paso INCOMPLETO, no en el 1. Si la reunión
+      // ya está en curso —dato de demo que una ejecución anterior dejó abierto—
+      // arranca en «Paso 4. Agenda y debate» y el panel de Constitución no está
+      // en pantalla, así que la aserción de estado no encontraba nada y el
+      // fallo parecía del producto. Se navega al paso explícitamente en vez de
+      // dar por hecho dónde abre: así se juzga el panel que se quiere juzgar.
+      await goStep(page, /Constitución/, /Paso 1\. Constitución/);
+      // El botón nace deshabilitado hasta que resuelve la consulta de la reunión
+      // (`openingAvailability` se calcula sobre datos que aún no han llegado).
+      // Preguntar `isEnabled()` a bocajarro daba false en una sesión
+      // perfectamente abrible —medido el 2026-09-06—, el clic no ocurría y el
+      // fallo aparecía dos pasos más allá, en «Asistentes», como si el producto
+      // bloqueara el paso. Se espera a que se habilite; si nunca lo hace es que
+      // la sesión ya está abierta, y eso lo comprueba la aserción siguiente.
+      await expect(page.getByRole('button', { name: 'Declarar apertura de la sesión' }).first())
+        .toBeEnabled({ timeout: 15_000 })
+        .catch(() => null);
       await clickIfVisibleAndEnabled(page, 'Declarar apertura de la sesión');
       // ITEM-146: apertura → EN_CURSO (badge "En curso"); CELEBRADA es post-cierre.
-      await expect(page.getByText(/Sesión declarada abierta|En curso|Estado actual/i).first()).toBeVisible({ timeout: 20_000 });
+      // Se asertaba «Sesión declarada abierta|En curso|Estado actual», y
+      // «Estado actual» es el rótulo FIJO de la ficha: está en pantalla con la
+      // sesión abierta y sin abrir, así que la aserción no podía fallar y daba
+      // por abierta una sesión que seguía convocada. Se juzga el estado, no el
+      // rótulo que lo precede.
+      await expect(
+        page.getByText(/^(En curso|Celebrada)$/).first(),
+      ).toBeVisible({ timeout: 20_000 });
 
       await goStep(page, /Asistentes/, /Paso 2\. Asistentes/);
       const saveAttendance = page.getByRole('button', { name: 'Guardar asistencia' });
@@ -218,56 +276,93 @@ test.describe('Secretaría — golden path prototipo legal', () => {
 
       await goStep(page, /Agenda y debate/, /Paso 4\. Agenda y debate/);
       await expect(page.getByText(/Agenda formal|Punto 1/i).first()).toBeVisible({ timeout: 20_000 });
-      const materiaSelect = page.locator('main select').nth(1);
-      if (await expect(materiaSelect).toBeVisible({ timeout: 10_000 }).then(() => true).catch(() => false)) {
-        await materiaSelect.selectOption('NOMBRAMIENTO_CONSEJERO');
-        await expect(materiaSelect).toHaveValue('NOMBRAMIENTO_CONSEJERO', { timeout: 5_000 });
-      }
-      const agendaTitle = page.getByRole('textbox', { name: /Aprobación de cuentas anuales/i }).first();
-      if (await agendaTitle.isVisible().catch(() => false)) {
-        await agendaTitle.fill('Nombramiento de consejero por cooptación');
-      }
-      const saveDebates = page.getByRole('button', { name: 'Guardar debates' });
-      await expect(saveDebates).toBeEnabled({ timeout: 10_000 });
-      await saveDebates.click();
-      await page
-        .getByText(/Agenda.*guardad|Debate.*guardad/i)
-        .first()
-        .waitFor({ state: 'visible', timeout: 5_000 })
-        .catch(() => null);
+      // La agenda es dato de la convocatoria, no del spec. `mergeMeetingAgendaSources`
+      // reescribe el título con el de su fuente (`punto: source.punto || point.punto`,
+      // src/lib/secretaria/meeting-agenda.ts), así que un título tecleado aquí NO
+      // sobrevive a la recarga: el spec inventaba «Nombramiento de consejero por
+      // cooptación», lo tecleaba dentro de un `if` que se saltaba en silencio y luego
+      // lo buscaba en el paso 5, donde el producto nunca podía pintarlo. Y forzar el
+      // tipo del punto 1 a «Acuerdo» habría dejado un punto decisorio sin texto
+      // resolutivo, que es justo lo que deshabilita el guardado del paso.
+      // El invariante que sí sostiene el producto es el ARRASTRE: el punto decisorio
+      // guardado en el paso 4 es el que se somete a votación en el paso 5, con su
+      // título y su clasificación. Se lee de la pantalla; no se fabrica.
+      const kindSelects = page.locator('main select[title]'); // «Tipo de punto»: único select con title
+      const titleInputs = page.getByPlaceholder('p.ej. Aprobación de cuentas anuales ejercicio 2025');
+      // Se sondea hasta que la agenda llega: el paso monta con un punto vacío
+      // (`newSessionAgendaPoint`, kind DELIBERATIVO) y lo sustituye cuando resuelve
+      // `useMeetingAgendaSources`; leerlo de una sola pasada daba «sin punto
+      // decisorio» de forma intermitente.
+      let decisionOrdinal = 0;
+      await expect
+        .poll(
+          async () => {
+            decisionOrdinal = 0;
+            const count = await kindSelects.count();
+            for (let index = 0; index < count; index += 1) {
+              if ((await kindSelects.nth(index).inputValue()) !== 'DECISORIO') continue;
+              decisionOrdinal = index + 1;
+              break;
+            }
+            return decisionOrdinal;
+          },
+          { timeout: 20_000, message: 'el golden path necesita un punto decisorio en la agenda para votarlo' },
+        )
+        .toBeGreaterThan(0);
+      const decisionTitle = (await titleInputs.nth(decisionOrdinal - 1).inputValue()).trim();
+      expect(decisionTitle, 'el punto decisorio de la agenda debe llegar con título').not.toBe('');
+
+      // Aquí NO se pulsa «Guardar debates». No es una omisión cómoda: la agenda de
+      // una reunión convocada por una convocatoria EMITIDA es fuente jurídica
+      // inmutable y la BD rechaza cualquier DML directo sobre `agenda_items`
+      // (trigger `fn_secretaria_guard_emitted_agenda_dml`, migración
+      // 20260720122100 → `42501 AGENDA_EMITIDA_RPC_REQUIRED`). `handleSave` emite
+      // ese UPDATE siempre, así que en este camino el guardado nunca puede
+      // confirmar: medido en vivo, devuelve 403 y el toast genérico «Error al
+      // preparar constancias», que oculta el motivo legal. Es un defecto de
+      // producto (ReunionStepper.tsx, el UPDATE de `agenda_items` en handleSave),
+      // no del spec, y este spec no lo tapa fijándolo como comportamiento
+      // esperado. El golden path no depende de ese guardado: el paso 5 lee la
+      // agenda de su fuente autoritativa, que es justo lo que comprueba la
+      // recarga siguiente.
       await page.reload();
       await expect(page.getByRole('heading', { name: 'Asistente de sesión societaria' })).toBeVisible({
         timeout: 20_000,
       });
 
       await goStep(page, /Votaciones/, /Paso 5\. Votaciones/);
-      await expect(page.getByText('Nombramiento de consejero por cooptación').first()).toBeVisible({
-        timeout: 20_000,
-      });
-      await expect(page.getByText(/fallback tecnico de prototipo|Nombramiento de consejero · ORDINARIA/i).first()).toBeVisible({
-        timeout: 20_000,
-      });
+      // Tras la recarga (estado en memoria del paso 4 descartado), el punto
+      // decisorio de la agenda llega al carril de votación con el mismo ordinal, el
+      // mismo título y su clasificación materia · clase · origen resuelta por el
+      // motor.
+      await page.getByRole('button', { name: new RegExp(`^Punto ${decisionOrdinal}\\b`) }).first().click();
+      await expect(page.getByText(decisionTitle).first()).toBeVisible({ timeout: 20_000 });
+      await expect(
+        page.getByText(/ · (ORDINARIA|ESTATUTARIA|ESTRUCTURAL|ESPECIAL) · /).first(),
+      ).toBeVisible({ timeout: 20_000 });
       await expect(page.getByText('Evaluación de adopción por punto')).toBeVisible({ timeout: 20_000 });
-      const saveResolutionButton = page.getByRole('button', {
-        name: /Registrar resolución y crear expediente Acuerdo 360|Recalcular resolución y crear expediente Acuerdo 360/,
-      }).first();
+      // Rótulos vigentes del producto (ReunionStepper.tsx): el botón dice «votación
+      // del acuerdo», no «resolución», y el estado de ya-registrado dice «acuerdos ya
+      // están votados y registrados». Con los literales antiguos el `if` no
+      // encontraba el botón, caía siempre al `else` y juzgaba una pantalla que no era
+      // la que había delante.
+      const saveResolutionButton = page
+        .getByRole('button', { name: /(Registrar|Recalcular) votación del acuerdo y crear expediente Acuerdo 360/ })
+        .first();
       if (await saveResolutionButton.isVisible().catch(() => false)) {
         await ensureAllVisibleVotesFavor(page);
-        if (await saveResolutionButton.isVisible().catch(() => false)) {
-          await expect(saveResolutionButton).toBeEnabled({ timeout: 20_000 });
-          await saveResolutionButton.click();
-          await expect(page.getByText(/Snapshot legal actualizado|resolución\(es\) registrada\(s\)|resoluciones ya están registradas/i).first()).toBeVisible({
-            timeout: 30_000,
-          });
-        } else {
-          await expect(page.getByText(/resoluciones ya están registradas/i).first()).toBeVisible({ timeout: 10_000 });
-        }
-      } else {
-        await expect(page.getByText(/resoluciones ya están registradas/i).first()).toBeVisible({ timeout: 10_000 });
+        await expect(saveResolutionButton).toBeEnabled({ timeout: 20_000 });
+        await saveResolutionButton.click();
       }
-      await expect(page.getByText(/Snapshot legal actualizado|resoluciones ya están registradas/i).first()).toBeVisible({
-        timeout: 30_000,
-      });
+      // Los tres desenlaces posibles del paso, sin rama muda: votación registrada,
+      // votación ya registrada de una pasada anterior, o snapshot-only del prototipo.
+      await expect(
+        page
+          .getByText(
+            /acuerdo\(s\) votado\(s\) y registrado\(s\)|ya están votados y registrados|Snapshot legal actualizado/i,
+          )
+          .first(),
+      ).toBeVisible({ timeout: 30_000 });
     });
 
     await test.step('acta y certificación', async () => {
@@ -276,6 +371,22 @@ test.describe('Secretaría — golden path prototipo legal', () => {
       if (await expect(existingMinuteButton).toBeVisible({ timeout: 5_000 }).then(() => true).catch(() => false)) {
         await existingMinuteButton.click();
       } else {
+        // Este botón ESTABA deshabilitado para siempre en el camino que nace de
+        // una convocatoria y hoy ya se habilita: la votación vuelve a llegar al
+        // acta (`patchQuorumDataSourceLinks` deja intacto el vínculo explícito,
+        // y `loadActaAgendaContract` completa el espejo perdido con el snapshot
+        // autoritativo de `agreements.compliance_snapshot`).
+        //
+        // Lo que sigue en pie —medido el 2026-09-06 y NO tapado aquí— es la
+        // GENERACIÓN: `fn_secretaria_close_meeting_and_generate_minute` responde
+        // «annual accounts gate: current set is absent or not APPROVED/IMMUTABLE».
+        // No es un defecto: la versión de cuentas que se somete al Consejo debe
+        // fijarse ANTES del inicio previsto (`fn_secretaria_fix_annual_accounts_set`
+        // exige `status IN (DRAFT, CONVOCADA)` y `scheduled_start > now()`), y en
+        // las convocatorias demo de ARGA con punto de formulación esa versión no
+        // se fijó a tiempo; sus fechas ya pasaron, así que no hay actuación en la
+        // aplicación que lo repare. El acta de esos expedientes es inalcanzable
+        // POR DISEÑO, y este spec lo deja fallar aquí en vez de esconderlo.
         await expect(page.getByRole('button', { name: 'Confirmar cierre y generar acta' })).toBeEnabled({
           timeout: 20_000,
         });
