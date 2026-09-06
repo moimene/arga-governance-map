@@ -28,13 +28,29 @@ import { DEMO_TENANT, GARRIGUES_TENANT, sesionDe } from "../helpers/supabase-tes
  * está revocado, que es justo lo que comprueba el último bloque.
  */
 
-/** Tablas del carril Secretaría con filas reales en AMBOS tenants (Cloud, 2026-09-05). */
+/**
+ * Tablas del carril Secretaría con filas reales en AMBOS tenants.
+ *
+ * La condición «en ambos» no es un detalle: este fichero exige que el tenant vea
+ * SUS filas antes de afirmar que no ve las del otro. Con una tabla vacía en un
+ * lado, esa mitad se pondría roja — no pasaría en falso, pero tampoco probaría
+ * nada nuevo.
+ *
+ * Medido en Cloud el 2026-09-06 (ARGA / Garrigues): `meetings` 27 / 1, que entra
+ * ahora. NO entran `minutes` (12 / 0) ni `certifications` (9 / 0): Garrigues no
+ * ha cerrado todavía ninguna sesión, así que su mitad sería vacua. Entrarán
+ * solas el día que la tenga — y hasta entonces la ausencia está declarada aquí,
+ * no silenciada.
+ */
 const TABLAS_SECRETARIA = [
   "registry_filings",
   "plantillas_protegidas",
   "agreements",
   "governing_bodies",
   "rule_packs",
+  // El corazón del carril, y no estaba: una reunión es el objeto del que
+  // cuelgan actas, acuerdos y certificaciones.
+  "meetings",
 ] as const;
 
 /** Id inexistente: el DELETE/UPDATE de sondeo no puede tocar ninguna fila. */
