@@ -12,6 +12,7 @@ import { useEvidenceBundlesList } from "@/hooks/useEvidenceBundles";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { isFinalSealedEvidence } from "@/lib/secretaria/evidence-sandbox-gate";
 import { evaluateTprmConcentration } from "@/lib/grc/regulatory-clocks";
+import { nextContractChecks } from "@/lib/grc/contract-checks";
 import { toast } from "sonner";
 import { 
   Search, ShieldAlert, FileText, CheckCircle2, User, Mail, 
@@ -151,18 +152,10 @@ export default function TPRM() {
 
   const handleToggleContractCheck = async (checkKey: keyof ContractualDoraChecks) => {
     if (!selected) return;
-    const currentChecks = selected.payload?.contract_checks ?? {
-      audit_rights: true,
-      supervisory_inspection: true,
-      data_return_insolvency: true,
-      exit_plan_tested: true,
-      bcm_tested: true,
-      incident_assistance: true,
-    };
-    const nextChecks = {
-      ...currentChecks,
-      [checkKey]: !currentChecks[checkKey],
-    };
+    // La regla vive en `src/lib/grc/contract-checks.ts` con su test: aquí
+    // partía de un objeto con las SEIS cláusulas a `true`, así que marcar una
+    // persistía cinco conformidades DORA que nadie había declarado.
+    const nextChecks = nextContractChecks(selected.payload?.contract_checks, checkKey);
 
     try {
       await updateMutation.mutateAsync({

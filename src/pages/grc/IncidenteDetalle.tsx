@@ -435,7 +435,10 @@ export default function IncidenteDetalle() {
                 className="px-4 py-1.5 text-xs font-semibold bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-50 transition-colors"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
-                {clientCommSent ? "Comunicación a Clientes Enviada" : "Emitir Comunicación Oficial a Clientes"}
+                {/* El toast y el badge ya dicen que no hay envío; este rótulo,
+                    que es el PERSISTENTE, seguía afirmándolo. No existe camino
+                    de escritura a `regulatory_notifications` desde aquí. */}
+                {clientCommSent ? "Marcada en pantalla (sin envío)" : "Marcar comunicación a clientes"}
               </button>
             </div>
           </div>
