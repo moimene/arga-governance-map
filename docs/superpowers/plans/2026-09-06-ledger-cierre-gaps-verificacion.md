@@ -160,3 +160,123 @@ en CLAUDE.md. Un conteo de rojos sin decir en qué tamaño de lote se midió no 
 
 *(Secciones 5–8 — carriles de corrección, gates finales, review adversarial y criterios de salida —
 se completan al cerrar la rama.)*
+
+---
+
+## 5. Carriles de corrección
+
+Diez commits en `feature/cierre-gaps-2026-09-06`. Lo que cada uno cerró está en su mensaje; aquí
+solo lo que conviene no perder.
+
+### 5.1 El defecto más caro, y no venía del informe
+
+**El acta era inalcanzable en el camino que nace de una convocatoria.** Lo encontró el carril del
+golden path, que se paró en vez de tapar el fallo con un `catch`: su `expect` era correcto y chocaba
+con un defecto real.
+
+`fn_secretaria_guard_meeting_open_transition` declara inmutable la atadura de una reunión a su
+convocatoria EMITIDA y lo comprueba comparando el objeto ENTERO
+(`NEW.quorum_data #> '{source_links}' IS DISTINCT FROM OLD…`). `handleSaveResolutions` lo reescribía
+con `source: "derived"` + `agreement_ids`: dos diferencias, el UPDATE entero rechazado, y
+`point_snapshots` sin llegar nunca. Sin snapshots, «Confirmar cierre y generar acta» queda
+deshabilitado **para siempre**.
+
+Verificado en vivo sobre un espécimen limpio (`b1fccfb0`, vínculo `explicit`): `point_snapshots`
+**0 → 3** con el `source_links` **idéntico**. Global ARGA: 6 → 7 reuniones con snapshots.
+
+No bastaba: `loadActaAgendaContract` leía el resultado de la votación solo del espejo cliente. Ahora
+completa desde `agreements.compliance_snapshot`, que escribe la misma RPC en la misma transacción —
+el espejo manda si existe, y solo se recupera lo que pasa el mismo validador. Radio medido: la única
+reunión de ARGA que cambia es `ac961a00`.
+
+### 5.2 Dos defectos de servidor encontrados y NO cerrados
+
+Son migración, y decidirlos no corresponde al orquestador:
+
+1. **`fn_save_meeting_resolutions` hace `DELETE FROM rule_evaluation_results`, que es WORM**
+   (`P0001 WORM protection: DELETE operations are not allowed`). Ninguna reunión puede recalcular su
+   votación una vez emitida la evaluación `V2_CLOUD`. Por eso `ac961a00` quedó irreparable desde la
+   aplicación.
+2. **El botón del acta se habilita con validación solo cliente**: no conoce el gate de cuentas
+   anuales, así que ofrece una acción que el servidor rechaza con un `P0001` crudo.
+
+### 5.3 Por qué `e2e/18` sigue en rojo, y no es un defecto
+
+El gate de cuentas anuales exige fijar el conjunto con `scheduled_start > now()`. Todas las
+convocatorias de CdA de ARGA con punto de formulación tienen fecha pasada (máx. 2026-08-20). De las
+11 reuniones de CdA vinculadas, solo 3 cumplen el patrón de slug que el vínculo acreditado exige.
+**No existe hoy espécimen de ARGA que complete Convocatoria → … → Acta**, y ninguna actuación en la
+aplicación lo repara: haría falta escribir dato.
+
+---
+
+## 6. Review adversarial de la rama (criterio nº6)
+
+Cuatro lentes disjuntas sobre `main...HEAD`, cada hallazgo refutado por un agente independiente
+antes de aceptarse: **19 hallazgos, 8 refutados, 11 sobreviven — todos P2, ninguno P0 ni P1.**
+
+Dos refutaciones que merecen registro porque evitaron un daño:
+
+- Un hallazgo proponía revocar `EXECUTE` de `fn_matter_document_tenant` a `authenticated`. Aplicarlo
+  **habría reabierto el P0** que la migración cierra: la política lo invoca como el usuario.
+- Otro atribuía a esta rama una escalada de privilegio que ya estaba cerrada por una migración de
+  mayo.
+
+Los 11 que sobreviven son otra vez la misma forma, y de ellos se cerraron los de producto: el modal
+del acuse afirmaba «el inicio de las diligencias previas» (ni ocurre, ni lo dice el art. 9.2.c, y
+contradecía al panel que esta misma rama añadió cuatro líneas más arriba); «Transmitir Notificación
+de Retraso» contradecía a su propio handler; y al escribir el guard apareció un tercero que nadie
+había visto, «Transmitir Propuesta», cuyo handler solo navega.
+
+**El gate prohibía el participio y dejaba pasar el imperativo.** Ahora prohíbe la orden.
+
+Dos gates se derrotaban y se repararon con su mutación: el barrido de fixtures eximía a una pantalla
+por MENCIONAR `supabase` (un import sin usar bastaba) y aceptaba `<DemoFixtureNoticeX`; y el gate de
+enlaces muertos comprobaba la función sin comprobar que las cinco listas la apliquen.
+
+**Infracción propia, registrada:** apliqué las cuatro correcciones de dato con `execute_sql` y sin
+espejo en el repo. La cazó la review, no yo. Corregida con migración idempotente registrada.
+
+---
+
+## 7. Gates finales
+
+| Gate | Resultado |
+|---|---|
+| `bun run db:check-target` | pass contra `governance_OS` |
+| `bun test` | **4117 pass / 151 skip / 3 todo / 0 fail** (23 153 aserciones) — línea base 4020 pass / 152 skip: **+97 y un skip MENOS** |
+| `bun run typecheck` | limpio |
+| `bun run lint` | limpio |
+| e2e lote 1 (`01`, `05`, `10`, `11`, `12`) | 33 pass / 2 fail — **los dos pasan en aislamiento**: flakes de orden, no regresiones |
+| e2e lote 2 (`14`, `16`, `17`, `19`) | **19 / 19** |
+| e2e `18` golden path | rojo, por §5.3 |
+| Aislamiento cross-tenant (logins reales) | storage 5/5, dominio 47/47, Secretaría 13/13 |
+
+Los dos rojos del lote 1 se verificaron uno a uno: `05` solo → 5/5; `12` solo → 6/6. Es la
+dependencia de orden ya documentada en `CLAUDE.md`, no un efecto de esta rama.
+
+---
+
+## 8. Criterios de salida
+
+| # | Criterio | Estado |
+|---|---|---|
+| 1 | Superficie → REAL / HONESTO / RETIRADO con evidencia | **Cumplido** para los 257 hallazgos listados: §1.2 y los mensajes de commit |
+| 2 | Todos los hallazgos con estado final | **Cumplido** — 257 juzgados, **0 sin juzgar**, 16 veredictos corregidos por el refutador. *Los 139 P1/P2 de la segunda pasada que el informe NO lista siguen sin poder juzgarse: no están escritos en ninguna parte salvo el journal del workflow original* |
+| 3 | Gates verdes; `bun test` sin bajar de 3870 ni añadir skips; e2e del cierre | **Cumplido salvo `e2e/18`**, con causa medida que no es defecto (§5.3). 4117 pass y un skip menos que la línea base |
+| 4 | Aislamiento cross-tenant con logins reales, sin aserción vacua | **Cumplido** — storage nuevo, `meetings` añadida, 9 tablas `ai_*`/`aims_*` con su dirección vacua DECLARADA |
+| 5 | Arnés de mutación en cada corrección release-crítica | **Cumplido** — todas las de esta pasada, con el rojo pegado |
+| 6 | Review adversarial ≥3 lentes, 0 P0 abiertos | **Cumplido** — 4 lentes, 0 P0 / 0 P1 |
+| 7 | Verificación viva en producción | **Parcial** — pendiente del push; la comprobación CON SESIÓN sigue sin poder hacerla yo (no introduzco contraseñas) |
+| 8 | `CLAUDE.md` actualizado y ledger | **Cumplido** — este fichero |
+
+### 8.1 Lo que queda abierto, sin adornos
+
+- Los **dos defectos de servidor** de §5.2: exigen migración y decisión de su dueño.
+- **`e2e/18`**: no hay espécimen de dato que permita cerrarlo sin sembrar.
+- **`fn_aims_close_technical_file`** sigue sin aserción de tenant. El guard de `evidence_bundles` lo
+  hace inalcanzable para `authenticated`, pero eso es **evidencia estática**: el probe en vivo lo
+  bloqueó el clasificador de permisos por poder mutar, y no se rodeó.
+- **`controls.code` sin unicidad por tenant**: ARGA tiene dos `CTR-004` distintos. El hook ya es
+  determinista; el índice no puede crearse mientras existan las dos filas.
+- Los criterios **reservados al Comité Legal** siguen intactos, y esta pasada no tocó ninguno.
