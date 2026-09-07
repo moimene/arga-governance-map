@@ -101,7 +101,8 @@ const SIN_INVENTARIO_IA = {
  * arriba dejará de ser cierta y este comentario habrá que rehacerlo.
  */
 export const TABLAS_IA_CON_DATO_ARGA = [
-  "ai_systems",
+  // `ai_systems` SALIÓ de esta lista el 2026-09-07: Garrigues ya tiene
+  // inventario propio y su aislamiento pasa a ser aserción REAL (abajo).
   "ai_incidents",
   "aims_system_versions",
   "aims_technical_file_sections",
@@ -263,6 +264,33 @@ export const AISLAMIENTO_DECLARADO: readonly TablaDeclarada[] = [
     motivo: SIN_INVENTARIO_IA,
     marcadores: {},
   })),
+  {
+    // 2026-09-07 — LA VACUIDAD DECLARADA SE ACABÓ, Y LA CAZÓ ESTE GATE.
+    //
+    // El comentario de arriba prometía que estas tablas «entrarán solas el día
+    // que alguien las siembre». Pasó: `ai_systems` tiene desde hoy una fila del
+    // tenant Garrigues, y el gate se puso ROJO sin que nadie avisara —que es
+    // exactamente para lo que se escribió—. Medido en Cloud el 2026-09-07:
+    // ARGA 8 filas, Garrigues 1. Las otras 8 tablas de IA siguen sin dato de
+    // Garrigues y por eso siguen arriba, con su vacuidad declarada.
+    //
+    // Con esto la dirección ARGA→Garrigues de `ai_systems` deja de ser vacua:
+    // ya no pasa por conjunto vacío, sino porque la RLS aísla de verdad.
+    //
+    // SALVEDAD, dicha y no disimulada: la siembra está A MEDIAS. El catálogo
+    // `scripts/garrigues/ia/catalogo-ia.ts` lleva 7 sistemas y en Cloud hay 1.
+    // No se completa ni se borra desde aquí: el dato es de otra sesión y
+    // `scripts/seed-garrigues-ia.ts` es el camino con su contrato cero-cambio
+    // ARGA. Lo que sí queda es que la presencia esté DECLARADA en vez de
+    // romper el gate en silencio.
+    // Sin `motivo`: ese campo documenta una AUSENCIA declarada, y aquí ya no
+    // hay ninguna. Ponerlo sería un motivo huérfano, y el gate de al lado lo
+    // rechaza — con razón.
+    tabla: "ai_systems",
+    arga: "ALGUNA" as const,
+    garrigues: "ALGUNA" as const,
+    marcadores: {},
+  },
 ] as const;
 
 /** Las tablas cuya ausencia está declarada, para poder afirmarlo en el gate. */

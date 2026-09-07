@@ -482,7 +482,49 @@ que arregla de menos: **el informe es parte del entregable**, y hay que revisar 
 
 | Gate | Resultado |
 |---|---|
-| `bun test` | **4217 pass / 151 skip / 3 todo / 0 fail** (23 565 aserciones, 476 ficheros) |
+| `bun test` | **4219 pass / 151 skip / 3 todo / 0 fail** (23 566 aserciones, 476 ficheros) |
 | `bun run typecheck` / `lint` / `build` | limpios |
 | Migraciones repo ↔ Cloud | **12 ↔ 12** (nueva `20260907090000`, espejo RLS verificado antes y después: 32 resuelven el tenant de sesión, 0 cablean ARGA) |
 | Producción, dos tenants, con sesión | **3 / 3** |
+
+### 10.6 La custodia de EAD Trust: medida, y por qué no se abre
+
+Es lo único que queda abierto del cierre, así que se mide en vez de repetirlo. Certificar exige un
+acta en `APPROVED_SIGNED`, que exige un **artefacto final** registrado en servidor, y ese registro
+solo puede nacer de `fn_secretaria_register_custodied_legal_artifact`. Esa función está fail-closed
+en **tres capas independientes**, puestas a propósito el 2026-07-20 para impedir que un resultado
+del proveedor se eleve a artefacto autoritativo:
+
+| Capa | Estado medido | Quién lo vigila |
+|---|---|---|
+| UI | `EADInterpositionControl` sin handler, botón `disabled`, «Pendiente de renderer autoritativo» | `e2e/18` |
+| Edge | `qtsp-proxy` corta antes con `AUTHORITATIVE_BINARY_REQUIRED` | `secretaria-ead-closeout-hardening.test.ts` |
+| SQL | EXECUTE revocado de PUBLIC, anon, authenticated **y service_role**. ACL medido: `{postgres=X/postgres}` | **no lo vigilaba nadie** |
+
+La tercera capa era la única sin gate propio: lo único que la sostenía era un regex sobre el texto
+de UNA migración de julio, derrotable con una migración posterior que reconceda el privilegio —el
+fichero viejo seguiría casando y el gate seguiría verde con la puerta abierta—. **Cerrado**: el gate
+nuevo barre TODAS las migraciones en orden, se queda con el último gesto sobre el privilegio y exige
+que el revoke nombre a `service_role` (que es justo quien la invoca desde el Edge Function). Dos
+mutaciones —una migración posterior que reconcede, y un revoke que se olvida de `service_role`— lo
+ponen rojo en la aserción exacta.
+
+**Por qué no se abre:** sin renderer autoritativo que produzca el binario, conceder el privilegio no
+habilita una capacidad — solo permite acuñar «artefactos finales» que nadie ha producido, es decir,
+fabricar evidencia de un QTSP. Construir ese renderer es fase de producto (existe el precedente de
+`convocation-artifact-register` para convocatorias) y **exige la evidencia contractual y técnica que
+la política vigente de EAD Trust reserva expresamente**. No es deuda de esta pasada: es la decisión
+que le toca al dueño, y ahora está especificada en vez de enunciada.
+
+### 10.7 La vacuidad declarada que se acabó, y la cazó el gate
+
+`ai_systems` estaba declarada «Garrigues: NINGUNA» con su motivo. La corrida completa se puso roja:
+otra sesión sembró a las 01:15 la primera fila del inventario de IA de Garrigues. El comentario de
+la declaración prometía exactamente esto —«entrarán solas el día que alguien las siembre»— y así
+fue, sin que nadie avisara.
+
+`ai_systems` pasa a **aserción bidireccional REAL** (ARGA 8 / Garrigues 1, medido). La cobertura no
+encoge: el control anti-encogimiento de `tenant-isolation.test.ts` se puso rojo al sacarla de la
+lista y hubo que reintroducirla como aserción de verdad. **Salvedad dicha:** la siembra está a
+medias (1 de 7 del catálogo); no se completa ni se borra desde aquí porque el dato es de otra
+sesión y `scripts/seed-garrigues-ia.ts` es su camino.

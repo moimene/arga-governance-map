@@ -44,6 +44,11 @@ const DOMAIN_TABLES = [
   // verdad. Las otras 17 están vacías en los DOS tenants y vigilarlas sería
   // teatro. La dirección contraria es vacua y va declarada, no callada.
   ...TABLAS_IA_CON_DATO_ARGA,
+  // `ai_systems` salió de esa lista el 2026-09-07 porque Garrigues ya tiene
+  // inventario propio: su aislamiento pasó de vacuo a REAL en las dos
+  // direcciones (ver aislamiento-declarado.ts). Sigue aquí —la cobertura no
+  // puede encoger— pero ahora asierta de verdad por los dos lados.
+  "ai_systems",
 ];
 
 function anonClient(): SupabaseClient {
