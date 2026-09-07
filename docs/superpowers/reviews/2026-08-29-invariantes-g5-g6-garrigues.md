@@ -37,7 +37,7 @@ ser «corregidos» al menos una vez.
 > | § | Estado tras el 2026-09-07 |
 > |---|---|
 > | 1 | Ya estaba SUPERADO por fuente sobrevenida. Sin cambio. |
-> | 2 | **SIGUE EN PIE.** Es invariante de MODELO, no de la orden vieja: una banda de riesgo publicada como color único no tiene P e I derivables. El CHECK `risks_banda_sin_ejes_check` sigue siendo la red. Sembrar simulado no autoriza a inventar los ejes de un riesgo cuya fuente publica solo el nivel compuesto. |
+> | 2 | **DEROGADO POR DECISIÓN EXPRESA DEL USUARIO el 2026-09-07.** El CHECK `risks_banda_sin_ejes_check` se retiró (`20260907160000`) para poder sembrar ejes simulados. El razonamiento de abajo —que de un color final no se derivan P e I— **sigue siendo cierto**: lo que cambia es que ya no lo impide la base. Ahora un riesgo puede traer las dos evaluaciones, y la regla es que **no se concilian**: se pintan las dos, la pantalla lo declara, y la escala 1-25 se alimenta solo de los ejes (`lecturaRiesgo`, `src/lib/grc/assessed-band.ts`). Lo que se pierde está dicho: la base ya no distingue un eje medido de uno inventado. |
 > | 3 | **SIGUE EN PIE.** El 8 es «el resultado de contar» las celdas de banda alta del mapa, no un tamaño de demo elegido: si tras un reseed salen ≠ 8, cambió la fuente o se rompió el extractor. |
 > | 4 | **DEROGADO en su parte decisoria.** Ver el apartado, reescrito abajo. El aviso de pantalla y el peligro del `DEFAULT` a ARGA siguen vigentes. |
 > | 5 | **SIGUE EN PIE.** Es criterio jurídico con fuente, no ausencia de dato. |
@@ -102,8 +102,14 @@ despacho facilitara la leyenda real. La ha facilitado.
 
 ## 2. `probability`, `impact` y `residual_score` están en NULL a propósito
 
-Los 82 riesgos penales los tienen vacíos, y hay un CHECK (`risks_banda_sin_ejes_check`) que
-impide rellenarlos cuando existe `assessed_band`.
+> **DEROGADO EN SU PARTE IMPERATIVA — 2026-09-07.** El usuario decidió permitir ejes simulados
+> sobre riesgos con banda, y el CHECK se retiró en `20260907160000`. Todo lo que sigue explica
+> POR QUÉ estaban en NULL y sigue siendo la mejor descripción del problema; lo único que ya no
+> vale es la conclusión operativa («no se pueden rellenar»). Hoy sí se pueden, y por eso importa
+> más que antes lo que dice el párrafo final sobre la leyenda.
+
+Los 82 riesgos penales los tienen vacíos. Hasta el 2026-09-07 hubo un CHECK
+(`risks_banda_sin_ejes_check`) que impedía rellenarlos cuando existe `assessed_band`.
 
 La fuente da **un nivel compuesto por celda** y no lo descompone en probabilidad × impacto.
 **Rellenarlos es fabricar dato, no completarlo.** El CHECK es la red; la razón es esta.
@@ -116,9 +122,16 @@ Socio 1 → Staff y superior 2), máximo bruto 10, normalizado a 0-1 con cortes 
 
 Eso **no cambia este invariante**. La plantilla acredita la **leyenda**, no los **ejes de cada
 riesgo concreto**: el PDF evaluado sigue publicando únicamente el color final, y de ahí no se
-pueden derivar la P y la I de cada celda. Dejarlos en NULL sigue siendo lo correcto. Solo si
-llegan las **plantillas rellenas** habrá P e I reales, y **entonces** —no antes— se revisa el
-CHECK `risks_banda_sin_ejes_check`.
+pueden derivar la P y la I de cada celda.
+
+**Y esto es lo que sobrevive a la derogación, y es lo importante:** que ahora se PUEDA sembrar
+ejes no significa que se puedan DERIVAR de la banda. Un eje sembrado sobre uno de estos 82 es
+dato nuevo, no la descomposición del color que ya estaba: tiene que declarar su procedencia y su
+firmeza, o la ficha lo pintará como dato firme. Los `RSK-GARR-PEN-%` son además una extracción
+congelada —`src/test/schema/g5-mapa-penal.test.ts` exige sus ejes en NULL—, así que **los riesgos
+con ejes simulados deben usar otro prefijo**; ese gate poniéndose rojo sobre los 82 sería la
+señal correcta, no un estorbo. Derivar P e I del color seguiría exigiendo una leyenda que la
+fuente no publica: eso sigue siendo del Comité Legal.
 
 De aquí salieron cuatro superficies que afirmaban algo falso al leer NULL, y las cuatro se
 corrigieron en código: la ficha de Risk 360 imprimía «Prob. 1 · Impacto 1», la rejilla apilaba

@@ -91,11 +91,43 @@ for (const tenant of tenants) {
       await gate.getByRole('button', { name: 'Entrar a zona SII', exact: true }).click();
       await expect(page.getByRole('heading', { name: 'Sistema Interno de Información (SII) — Canal de Denuncias', exact: true })).toBeVisible();
       const sii = await page.locator('body').innerText();
-      expect(sii).toMatch(/solo en este navegador|simulad/i);
+      // 2026-09-07: el canal pasó a persistir en Cloud, así que la afirmación
+      // «solo en este navegador» dejó de ser cierta y este check la exigía —
+      // el mismo patrón de gate que fija la frase vieja en vez de la
+      // invariante. Ahora se juzgan los CONCEPTOS que la pantalla debe
+      // sostener, no una redacción concreta: que se declara dato de demo, que
+      // se niega la eficacia jurídica, y que se dice dónde vive.
+      expect(sii, 'la pantalla no declara que el dato es de demostración').toMatch(/demostraci[óo]n|simulad/i);
+      expect(sii, 'la pantalla no niega la eficacia jurídica').toMatch(/sin eficacia jur[íi]dica|ni eficacia jur[íi]dica/i);
+      expect(sii, 'la pantalla no dice dónde vive el expediente').toMatch(/aislada por tenant|base de datos del prototipo/i);
+      // Y lo que NO puede volver: ni las afirmaciones retiradas, ni la de
+      // localidad, que ya sería falsa.
       expect(sii).not.toMatch(/log de auditoría independiente|buzón cifrado|sellado EAD/i);
+      expect(sii, 'reaparece «solo en este navegador», que hoy es falso').not.toMatch(/solo en este navegador|únicamente en el navegador/i);
       if (tenant.entorno === 'garrigues') {
         expect.soft(sii).not.toMatch(/Elena Navarro|ARGA Seguros/i);
       }
+      // LA PERSISTENCIA, PROBADA DE VERDAD. Hasta hoy este bloque se quedaba en
+      // la portada del canal: no tocaba `sii_reports` ni una vez, así que no
+      // decía nada del almacén. La siembra la hace el CLIENTE la primera vez
+      // que se abre el canal, contrastando su tenant contra
+      // `fn_current_tenant_id()`; si los dos no coinciden la política responde
+      // 42501 y la pantalla se queda sin expedientes. Esto lo caza.
+      // ESTE CHECK NO SIEMBRA, Y NO DEBE. Su mejor propiedad es que aborta
+      // cualquier escritura (`blocked`), así que el POST con el que el canal
+      // siembra su catálogo la primera vez queda cortado aquí a propósito. Lo
+      // que se comprueba es que el dato YA ESTÁ PERSISTIDO: si el contador
+      // sale a cero, o nadie ha abierto nunca el canal de este tenant, o la
+      // política respondió 42501 y la siembra no llegó. Las dos cosas hay que
+      // saberlas.
+      const kpi = (sii.match(/EXPEDIENTES TOTALES\s*\n?\s*(\d+)/i) ?? [])[1];
+      expect(kpi, 'no se encuentra el contador de expedientes en el panel del canal').toBeDefined();
+      expect(
+        Number(kpi),
+        'el canal no tiene ningún expediente persistido para este tenant',
+      ).toBeGreaterThan(0);
+      evidence.siiExpedientes = Number(kpi);
+
       evidence.sii = { gateIdentityMatched: true, dashboardVisible: true };
       await page.screenshot({ path: info.outputPath(`${tenant.entorno}-sii.png`), fullPage: true });
       expect(blocked, 'ninguna navegación debe intentar una escritura de dominio').toEqual([]);
