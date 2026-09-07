@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { useAssessmentById } from "@/hooks/useAiAssessments";
+import { useAssessmentById, useFreezeAssessment, useReviewAssessment } from "@/hooks/useAiAssessments";
 import {
   AESIA_RIA_REQUIREMENTS,
   ISO_42001_REQUIREMENTS,
@@ -10,6 +10,7 @@ import {
   subpartTitle,
 } from "@/lib/aims/catalog-aesia";
 import { motivoNoAcredita } from "@/lib/aims/conformidad";
+import { resumenPlan, type AccionPDA } from "@/lib/aims/plan-adaptacion";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -21,6 +22,7 @@ import {
   Download,
   ExternalLink,
   FileCheck,
+  Lock,
   Printer,
   ShieldCheck,
   Sliders,
@@ -136,10 +138,76 @@ function MedidasAdicionales({
   );
 }
 
+/**
+ * El Plan de Adaptación como tabla de acciones.
+ *
+ * Cuando la evaluación no lo trae —las anteriores al 2026-09-07 no lo
+ * tienen— no se pinta nada aquí y el plan sigue leyéndose en la sección de
+ * notas, donde vivía como prosa. No se INVENTA un plan retroactivo.
+ */
+function PlanDeAdaptacionEstructurado({ acciones }: { acciones: AccionPDA[] | null | undefined }) {
+  const items = Array.isArray(acciones) ? acciones : [];
+  if (items.length === 0) return null;
+  const resumen = resumenPlan(items, new Date());
+  return (
+    <section
+      className="p-6 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] space-y-3 break-inside-avoid"
+      style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--g-border-subtle)] pb-3">
+        <h2 className="text-sm font-bold text-[var(--g-text-primary)]">
+          Plan de Adaptación ({resumen.total} acciones)
+        </h2>
+        <span className="text-xs text-[var(--g-text-secondary)]">
+          {resumen.alta} de prioridad alta · {resumen.sinResponsable} sin responsable ·{" "}
+          {resumen.vencidas} vencidas
+        </span>
+      </div>
+      <table className="w-full text-left text-xs border-collapse">
+        <thead>
+          <tr className="border-b border-[var(--g-border-subtle)] text-[var(--g-text-secondary)]">
+            <th className="pb-2 pr-3 font-semibold">Medida</th>
+            <th className="pb-2 pr-3 font-semibold">Acción</th>
+            <th className="pb-2 pr-3 font-semibold">Prioridad</th>
+            <th className="pb-2 pr-3 font-semibold">Vence</th>
+            <th className="pb-2 font-semibold">Estado</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[var(--g-border-subtle)]">
+          {items.map((a) => (
+            <tr key={a.measureCode}>
+              <td className="py-2 pr-3 font-mono font-semibold text-[var(--g-brand-3308)]">{a.measureCode}</td>
+              <td className="py-2 pr-3 text-[var(--g-text-primary)]">{a.titulo}</td>
+              <td className="py-2 pr-3">
+                <span
+                  className={`px-2 py-0.5 text-[10px] font-bold ${
+                    a.prioridad === "ALTA"
+                      ? "bg-[var(--status-error)] text-[var(--g-text-inverse)]"
+                      : a.prioridad === "MEDIA"
+                      ? "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
+                      : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
+                  }`}
+                  style={{ borderRadius: "var(--g-radius-full)" }}
+                >
+                  {a.prioridad}
+                </span>
+              </td>
+              <td className="py-2 pr-3 text-[var(--g-text-secondary)]">{a.vence_el ?? "Sin fecha"}</td>
+              <td className="py-2 text-[var(--g-text-secondary)]">{a.estado}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
 export default function EvaluacionDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: assessment, isLoading, error } = useAssessmentById(id);
+  const congelar = useFreezeAssessment();
+  const revisar = useReviewAssessment();
 
   const [expandedRequirements, setExpandedRequirements] = useState<Record<string, boolean>>({
     QUALITY_MGMT: true,
@@ -231,6 +299,28 @@ export default function EvaluacionDetalle() {
 
   /** Códigos que el marco conoce: lo que quede fuera es medida adicional. */
   const codigosDelCatalogo = new Set(catalog.flatMap((r) => r.measures.map((m) => m.id)));
+
+  const handleCongelar = async () => {
+    try {
+      const res = await congelar.mutateAsync(assessment.id);
+      toast.success(`Evaluación congelada. Huella ${res?.content_hash?.slice(0, 16)}…`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`No se pudo congelar: ${msg}`);
+    }
+  };
+
+  const handleRevisar = async () => {
+    try {
+      await revisar.mutateAsync(assessment.id);
+      toast.success("Revisión registrada.");
+    } catch (err) {
+      // El error de la RPC ya explica el caso: misma cuenta que congeló, no
+      // congelada todavía, o ya revisada. Se muestra tal cual.
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`No se pudo registrar la revisión: ${msg}`);
+    }
+  };
 
   const handlePrint = () => {
     window.print();
@@ -385,6 +475,82 @@ export default function EvaluacionDetalle() {
           </div>
         )}
       </div>
+
+      {/* ---------------------------------------------------------------
+          Custodia: congelación y revisión.
+
+          Una evaluación guardada seguía siendo editable, sin versión ni
+          huella. El hash SÍ es de servidor —el contenido está en la fila, así
+          que no depende de lo que diga un cliente—, y se dice lo que NO
+          acredita: `now()` es la hora del servidor, no fecha cierta.
+          --------------------------------------------------------------- */}
+      <section
+        className="p-4 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] space-y-2"
+        style={{ borderRadius: "var(--g-radius-md)" }}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <h2 className="text-sm font-bold text-[var(--g-text-primary)]">Custodia de la evaluación</h2>
+            {assessment.frozen_at ? (
+              <p className="text-xs text-[var(--g-text-secondary)]">
+                Congelada el {new Date(assessment.frozen_at).toLocaleString("es-ES")}.{" "}
+                {assessment.reviewed_at
+                  ? `Revisada el ${new Date(assessment.reviewed_at).toLocaleString("es-ES")}.`
+                  : "Pendiente de revisión por una persona distinta de quien la congeló."}
+              </p>
+            ) : (
+              <p className="text-xs text-[var(--g-text-secondary)]">
+                Editable. Congelarla fija su contenido y calcula su huella en servidor.
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 print:hidden">
+            {!assessment.frozen_at ? (
+              <button
+                type="button"
+                onClick={handleCongelar}
+                disabled={congelar.isPending || assessment.status === "BORRADOR"}
+                aria-busy={congelar.isPending}
+                title={
+                  assessment.status === "BORRADOR"
+                    ? "Un borrador no se congela: ciérralo antes."
+                    : undefined
+                }
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <Lock className="w-3.5 h-3.5" />
+                {congelar.isPending ? "Congelando…" : "Congelar evaluación"}
+              </button>
+            ) : !assessment.reviewed_at ? (
+              <button
+                type="button"
+                onClick={handleRevisar}
+                disabled={revisar.isPending}
+                aria-busy={revisar.isPending}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] disabled:opacity-60 transition-colors"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <FileCheck className="w-3.5 h-3.5 text-[var(--g-brand-3308)]" />
+                {revisar.isPending ? "Registrando…" : "Revisar y aprobar"}
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        {assessment.content_hash && (
+          <div className="space-y-1 pt-2 border-t border-[var(--g-border-subtle)]">
+            <p className="font-mono text-[10px] break-all text-[var(--g-text-secondary)]">
+              SHA-512 {assessment.content_hash}
+            </p>
+            <p className="text-[11px] text-[var(--g-text-secondary)]">
+              Huella calculada en servidor sobre la serialización canónica de la evaluación.
+              Acredita integridad y quién la congeló. No acredita fecha cierta: la marca temporal es
+              la hora del servidor, no un sello de tiempo cualificado.
+            </p>
+          </div>
+        )}
+      </section>
 
       {catalog === DESPLIEGUE_REQUIREMENTS && (
         <div
@@ -629,6 +795,8 @@ export default function EvaluacionDetalle() {
           );
         })}
       </div>
+
+      <PlanDeAdaptacionEstructurado acciones={assessment.action_plan as AccionPDA[] | null} />
 
       <MedidasAdicionales findings={assessment.findings} catalogCodes={codigosDelCatalogo} />
 

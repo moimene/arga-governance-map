@@ -141,16 +141,27 @@ describe("A3 — sin sellos fabricados", () => {
     // nombre haya que decir DÓNDE se calcula: un hash de navegador acredita
     // integridad, no fecha cierta ni identidad, y presentarlo a secas sería la
     // misma sobreafirmación por otra puerta.
-    const FICHERO_DE_LA_TABLA_CON_HASH = "src/hooks/useAimsEvidence.ts";
+    //
+    // Dos columnas medidas en Cloud el 2026-09-07:
+    //   `aims_evidence_items.content_hash`  → calculado en el NAVEGADOR
+    //   `ai_risk_assessments.content_hash`  → calculado en SERVIDOR al congelar
+    //
+    // Los dos pueden nombrarse, y los dos tienen que decir **dónde se calculan
+    // y qué NO acreditan**. Un hash de navegador no prueba autoría; ninguno de
+    // los dos prueba fecha cierta, porque no hay sello de tiempo cualificado.
+    // Presentarlos a secas sería la misma sobreafirmación que el módulo ya tuvo
+    // con los sellos de EAD Trust, por otra puerta.
+    const CON_COLUMNA_MEDIDA: Record<string, RegExp> = {
+      "src/hooks/useAimsEvidence.ts": /hash_computed_in|calculada? en el navegador|en CLIENTE/i,
+      "src/pages/ai-governance/EvaluacionDetalle.tsx": /calculada en servidor|EN SERVIDOR/i,
+    };
     for (const f of superficieAims()) {
       const src = read(f);
       const menciones = src.match(/[^\n]*SHA-?512[^\n]*/gi) ?? [];
-      if (f === FICHERO_DE_LA_TABLA_CON_HASH) {
+      const exigeDonde = CON_COLUMNA_MEDIDA[f];
+      if (exigeDonde) {
         expect(menciones.length, `${f} ya no menciona el hash: revisa este invariante`).toBeGreaterThan(0);
-        expect(
-          /hash_computed_in|calculada? en el navegador|en CLIENTE/i.test(src),
-          `${f}: nombra el hash sin decir dónde se calcula`,
-        ).toBe(true);
+        expect(exigeDonde.test(src), `${f}: nombra el hash sin decir dónde se calcula`).toBe(true);
         expect(
           /No acredita fecha cierta|no prueba fecha cierta/i.test(src),
           `${f}: presenta el hash sin decir lo que NO acredita`,

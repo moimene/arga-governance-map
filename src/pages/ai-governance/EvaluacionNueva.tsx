@@ -47,6 +47,8 @@ import {
 import { toast } from "sonner";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { useEvidenceBySystem, evidenciasPorMedida } from "@/hooks/useAimsEvidence";
+import { usePersonasCanonical } from "@/hooks/usePersonasCanonical";
+import { generarPlanDeAdaptacion, type AccionPDA } from "@/lib/aims/plan-adaptacion";
 import EvidenciaDeMedida from "@/components/ai-governance/EvidenciaDeMedida";
 import {
   useCreateComplianceChecks,
@@ -228,6 +230,9 @@ export default function EvaluacionNueva() {
   const [draftId, setDraftId] = useState<string | null>(null);
   const [autoguardado, setAutoguardado] = useState<"limpio" | "guardando" | "guardado" | "error">("limpio");
   const [borradorCargado, setBorradorCargado] = useState<string | null>(null);
+  /** Lo EDITADO a mano del plan. Lo generado se recalcula de los findings. */
+  const [planEditado, setPlanEditado] = useState<AccionPDA[]>([]);
+  const { data: personas = [] } = usePersonasCanonical({ person_type: "PF" });
 
   const selectedSystem = systems.find((s) => s.id === systemId);
 
@@ -374,6 +379,33 @@ export default function EvaluacionNueva() {
     framework,
   );
 
+  /**
+   * El plan se DERIVA de los findings y conserva lo editado a mano: quien
+   * asignó responsable y fecha no puede perderlos porque alguien vuelva a
+   * tocar una medida.
+   */
+  const planDeAdaptacion = useMemo(() => {
+    const payload = buildEvaluationPayload(
+      evaluations,
+      allMeasures,
+      requirements,
+      undefined,
+      additionalMeasures,
+      cuentaEvidencias,
+    );
+    return generarPlanDeAdaptacion(payload.findings, planEditado, new Date());
+  }, [evaluations, allMeasures, requirements, additionalMeasures, cuentaEvidencias, planEditado]);
+
+  const editarAccion = (measureCode: string, cambio: Partial<AccionPDA>) => {
+    sucioRef.current = true;
+    setPlanEditado((prev) => {
+      const actual = planDeAdaptacion.find((a) => a.measureCode === measureCode);
+      if (!actual) return prev;
+      const resto = prev.filter((a) => a.measureCode !== measureCode);
+      return [...resto, { ...actual, ...cambio }];
+    });
+  };
+
   const construirPayload = useCallback(
     (estadoFinal: boolean) => {
       const payload = buildEvaluationPayload(
@@ -392,6 +424,7 @@ export default function EvaluacionNueva() {
           score: stats.maturityScore,
           assessment_date: new Date().toISOString().slice(0, 10),
           findings: payload.findings,
+          action_plan: generarPlanDeAdaptacion(payload.findings, planEditado, new Date()),
           status: estadoFinal ? payload.status : "BORRADOR",
           notes:
             notes ||
@@ -399,7 +432,7 @@ export default function EvaluacionNueva() {
         },
       };
     },
-    [evaluations, allMeasures, requirements, additionalMeasures, cuentaEvidencias, systemId, framework, stats.maturityScore, notes],
+    [evaluations, allMeasures, requirements, additionalMeasures, cuentaEvidencias, planEditado, systemId, framework, stats.maturityScore, notes],
   );
 
   // Reanudar: el finding persistido es round-trippable a propósito (nivel,
@@ -412,6 +445,7 @@ export default function EvaluacionNueva() {
     setEvaluations(recuperadas);
     setAdditionalMeasures(maRecuperadas);
     if (borrador.notes) setNotes(borrador.notes);
+    if (Array.isArray(borrador.action_plan)) setPlanEditado(borrador.action_plan as AccionPDA[]);
     setDraftId(borrador.id);
     setBorradorCargado(borrador.id);
     const n = Object.keys(recuperadas).length;
@@ -1038,6 +1072,96 @@ export default function EvaluacionNueva() {
                 </p>
               </div>
             )}
+
+            {/* ---------------------------------------------------------
+                Plan de Adaptación como ACCIONES.
+
+                En el primer piloto vive entero dentro de `notes`: seis
+                acciones con responsable, prioridad y fecha escritas a mano en
+                un párrafo, que no se puede filtrar ni ordenar ni vencer.
+                --------------------------------------------------------- */}
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className={LABEL_CLASSES}>
+                  Plan de Adaptación ({planDeAdaptacion.length} acciones)
+                </label>
+                <span className="text-xs text-[var(--g-text-secondary)]">
+                  Una acción por medida con brecha. La prioridad sale del plan y de la dificultad;
+                  la fecha es una propuesta editable.
+                </span>
+              </div>
+              {planDeAdaptacion.length === 0 ? (
+                <p className="text-xs text-[var(--g-text-secondary)] italic">
+                  Ninguna medida evaluada exige acción todavía.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-[var(--g-border-subtle)] text-[var(--g-text-secondary)]">
+                        <th className="pb-2 pr-3 font-semibold">Medida</th>
+                        <th className="pb-2 pr-3 font-semibold">Acción</th>
+                        <th className="pb-2 pr-3 font-semibold">Prioridad</th>
+                        <th className="pb-2 pr-3 font-semibold">Responsable</th>
+                        <th className="pb-2 pr-3 font-semibold">Vence</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--g-border-subtle)]">
+                      {planDeAdaptacion.map((a) => (
+                        <tr key={a.measureCode}>
+                          <td className="py-2 pr-3 font-mono text-[var(--g-brand-3308)] font-semibold align-top">
+                            {a.measureCode}
+                          </td>
+                          <td className="py-2 pr-3 text-[var(--g-text-primary)] align-top max-w-sm">
+                            {a.titulo}
+                          </td>
+                          <td className="py-2 pr-3 align-top">
+                            <span
+                              className={`px-2 py-0.5 text-[10px] font-bold ${
+                                a.prioridad === "ALTA"
+                                  ? "bg-[var(--status-error)] text-[var(--g-text-inverse)]"
+                                  : a.prioridad === "MEDIA"
+                                  ? "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
+                                  : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
+                              }`}
+                              style={{ borderRadius: "var(--g-radius-full)" }}
+                            >
+                              {a.prioridad}
+                            </span>
+                          </td>
+                          <td className="py-2 pr-3 align-top">
+                            <select
+                              value={a.owner_id ?? ""}
+                              onChange={(e) => editarAccion(a.measureCode, { owner_id: e.target.value || null })}
+                              className="h-8 w-40 px-2 text-xs border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]"
+                              style={{ borderRadius: "var(--g-radius-sm)" }}
+                              aria-label={`Responsable de ${a.measureCode}`}
+                            >
+                              <option value="">Sin asignar</option>
+                              {personas.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.full_name}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-2 pr-3 align-top">
+                            <input
+                              type="date"
+                              value={a.vence_el ?? ""}
+                              onChange={(e) => editarAccion(a.measureCode, { vence_el: e.target.value || null })}
+                              className="h-8 px-2 text-xs border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]"
+                              style={{ borderRadius: "var(--g-radius-sm)" }}
+                              aria-label={`Vencimiento de ${a.measureCode}`}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
 
             {/* Form Notes */}
             <div className="space-y-2">

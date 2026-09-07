@@ -30,6 +30,14 @@ export type AiRiskAssessment = {
   status: string;
   notes: string | null;
   created_at: string;
+  /** Plan de Adaptación como acciones. `null` en las filas anteriores. */
+  action_plan?: unknown;
+  /** SHA-512 calculado EN SERVIDOR al congelar. */
+  content_hash?: string | null;
+  frozen_at?: string | null;
+  frozen_by_id?: string | null;
+  reviewed_at?: string | null;
+  reviewed_by_id?: string | null;
 };
 
 export type AiComplianceCheck = {
@@ -250,6 +258,48 @@ export function useSaveAssessment() {
         );
       }
       return data as AiRiskAssessment;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ai_risk_assessments"] }),
+  });
+}
+
+/**
+ * Congela una evaluación: hash SHA-512 calculado EN SERVIDOR sobre la
+ * serialización canónica de la fila, y estado de sólo lectura.
+ *
+ * A diferencia del hash de las evidencias —que se calcula en el navegador
+ * porque el fichero nunca llega a la base de datos—, aquí el contenido YA ESTÁ
+ * en la fila, así que la huella no depende de lo que diga un cliente. Lo que
+ * sigue sin acreditar es FECHA CIERTA: `now()` es la hora del servidor, no un
+ * sello de tiempo cualificado.
+ */
+export function useFreezeAssessment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (assessmentId: string) => {
+      // La RPC asierta el tenant por el join con `ai_systems`: la tabla no
+      // tiene columna propia y una SECURITY DEFINER sin ese assert sería una
+      // escritura cross-tenant con privilegios elevados.
+      const { data, error } = await supabase.rpc("fn_aims_freeze_assessment", {
+        p_assessment_id: assessmentId,
+      });
+      if (error) throw error;
+      return (data ?? [])[0] as { id: string; content_hash: string; frozen_at: string };
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ai_risk_assessments"] }),
+  });
+}
+
+/** Aprueba una congelada. La RPC rechaza que la firme quien la congeló. */
+export function useReviewAssessment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (assessmentId: string) => {
+      const { data, error } = await supabase.rpc("fn_aims_review_assessment", {
+        p_assessment_id: assessmentId,
+      });
+      if (error) throw error;
+      return (data ?? [])[0] as { id: string; reviewed_by_id: string; reviewed_at: string };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ai_risk_assessments"] }),
   });
