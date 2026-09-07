@@ -38,9 +38,16 @@ const MEDIDAS = [
   { id: "MG_RISK_02", description: "Evaluar riesgos" },
 ];
 
+/**
+ * `L8` («no aplica») acredita SÓLO con su justificación: la escala la declara
+ * obligatoria. Hasta el 2026-09-07 el texto se recogía en pantalla y se
+ * descartaba al persistir, así que aquí bastaba con el nivel a secas.
+ */
+const L8_JUSTIFICADA = { maturity: "L8", justification: "El sistema no trata datos biométricos." };
+
 /** Los tres estados que el camino de escritura puede producir, producidos. */
 function estadosQueElProductoEscribe(): string[] {
-  const conforme = buildEvaluationPayload({ MG_RISK_01: { maturity: "L5" }, MG_RISK_02: { maturity: "L8" } }, MEDIDAS, [REQ]);
+  const conforme = buildEvaluationPayload({ MG_RISK_01: { maturity: "L5" }, MG_RISK_02: L8_JUSTIFICADA }, MEDIDAS, [REQ]);
   const conGaps = buildEvaluationPayload({ MG_RISK_01: { maturity: "L1" }, MG_RISK_02: { maturity: "L5" } }, MEDIDAS, [REQ]);
   const borrador = buildEvaluationPayload({}, MEDIDAS, [REQ]);
   return [conforme.status, conGaps.status, borrador.status];
@@ -82,7 +89,7 @@ describe("vocabulario de evaluaciones: escritura ↔ lectura", () => {
     // contestada entera y conforme daba «0/2 cerrados» y arrastraba el dominio
     // «Controles» a demo-con-gaps para siempre.
     const conforme = buildEvaluationPayload(
-      { MG_RISK_01: { maturity: "L5" }, MG_RISK_02: { maturity: "L8" } },
+      { MG_RISK_01: { maturity: "L5" }, MG_RISK_02: L8_JUSTIFICADA },
       MEDIDAS,
       [REQ],
     );
@@ -113,6 +120,35 @@ describe("vocabulario de evaluaciones: escritura ↔ lectura", () => {
     });
     expect(resumenGaps.domains.find((d) => d.id === "controls")?.metric, "L3 se cuenta como control cerrado")
       .toBe("1/2 cerrados");
+  });
+
+  it("una L8 SIN justificación no acredita: ni el requisito ni el control", () => {
+    // La escala declara `requiresJustification: true` para `L8` y la pantalla
+    // la pide con asterisco. El texto se recogía y se tiraba al persistir, así
+    // que una exención en blanco contaba igual que una motivada.
+    const sinMotivo = buildEvaluationPayload(
+      { MG_RISK_01: { maturity: "L5" }, MG_RISK_02: { maturity: "L8" } },
+      MEDIDAS,
+      [REQ],
+    );
+    expect(sinMotivo.status, "una L8 sin motivo sigue dando el requisito por conforme").toBe("CON_GAPS");
+    expect(sinMotivo.checks[0].status).toBe("NO_CONFORME");
+
+    const resumen = buildAimsReadiness({
+      systems: [{ id: "sys-1", status: "ACTIVO", risk_level: "Alto" }],
+      assessments: [{ id: "a-1", system_id: "sys-1", status: sinMotivo.status, score: 50, findings: sinMotivo.findings }],
+      incidents: [],
+    });
+    expect(resumen.domains.find((d) => d.id === "controls")?.metric, "una L8 en blanco cuenta como control cerrado")
+      .toBe("1/2 cerrados");
+
+    // Y el mismo nivel CON motivo sí acredita: la diferencia es el dato, no el nivel.
+    const conMotivo = buildEvaluationPayload(
+      { MG_RISK_01: { maturity: "L5" }, MG_RISK_02: L8_JUSTIFICADA },
+      MEDIDAS,
+      [REQ],
+    );
+    expect(conMotivo.status).toBe("CONFORME");
   });
 
   it("una evaluación CONFORME no se propone como gap de expediente técnico", () => {

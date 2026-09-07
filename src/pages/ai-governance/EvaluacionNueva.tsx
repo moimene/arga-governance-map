@@ -26,7 +26,7 @@
  * Fijado en `src/test/aims/no-fabricated-claims.test.ts` y en
  * `e2e/aims-evaluaciones.spec.ts`.
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -46,8 +46,18 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
-import { useCreateAssessment, useCreateComplianceChecks } from "@/hooks/useAiAssessments";
-import { buildEvaluationPayload } from "@/lib/aims/evaluacion-payload";
+import {
+  useCreateComplianceChecks,
+  useDraftAssessment,
+  useSaveAssessment,
+} from "@/hooks/useAiAssessments";
+import {
+  buildEvaluationPayload,
+  restoreEvaluationState,
+  NIVEL_NO_APLICABLE,
+  MOTIVO_L8_SIN_JUSTIFICAR,
+  type MedidaAdicionalRef,
+} from "@/lib/aims/evaluacion-payload";
 import {
   AESIA_RIA_REQUIREMENTS,
   ISO_42001_REQUIREMENTS,
@@ -58,6 +68,7 @@ import {
   subpartTitle,
   MATURITY_LEVELS,
   DIFFICULTY_LEVELS,
+  DIFICULTAD_SIN_EVALUAR,
   ADAPTATION_PLANS,
   MeasureGuideDef,
   RequirementDef,
@@ -75,22 +86,117 @@ const SELECT_CLASSES =
 const LABEL_CLASSES = "block text-sm font-medium text-[var(--g-text-primary)] mb-1";
 
 type MeasureEvaluationState = {
-  difficulty: string; // '00', '01', '02'
+  /** `''` = sin evaluar. Antes nacía en `'01'` (media) sin que nadie graduara. */
+  difficulty: string;
   maturity: string; // 'L1' - 'L8'
   justification: string;
-  evidence_url: string;
-  notes: string;
 };
 
-type AdditionalMeasure = {
-  id: string;
-  requirementCode: string;
-  subpartId: string;
-  description: string;
-  difficulty: string;
-  maturity: string;
-  evidence_url: string;
+/**
+ * Una Medida Adicional guarda aquí sólo su DEFINICIÓN. Su evaluación va al
+ * mismo mapa `evaluations` que las del catálogo: mientras tuvo estado propio,
+ * ni se graduaba, ni entraba en las estadísticas, ni llegaba al payload — se
+ * añadía, se pintaba y se perdía al enviar.
+ */
+type AdditionalMeasure = MedidaAdicionalRef;
+
+const ESTADO_VACIO: MeasureEvaluationState = {
+  difficulty: DIFICULTAD_SIN_EVALUAR,
+  maturity: "",
+  justification: "",
 };
+
+/** Margen tras la última pulsación antes de guardar el borrador. */
+const AUTOGUARDADO_MS = 1500;
+
+/**
+ * Nivel de madurez, dificultad y —cuando toca— justificación.
+ *
+ * Es un componente y no JSX repetido porque lo usan las Medidas Guía **y** las
+ * Medidas Adicionales. Mientras las MA no tuvieron estos controles no eran
+ * evaluables: se añadían, se pintaban y se descartaban al enviar.
+ */
+function ControlesDeMedida({
+  state,
+  onChange,
+}: {
+  state: MeasureEvaluationState;
+  onChange: (key: keyof MeasureEvaluationState, value: string) => void;
+}) {
+  const matMeta = MATURITY_LEVELS[state.maturity];
+  const l8SinMotivo = state.maturity === NIVEL_NO_APLICABLE && !state.justification.trim();
+
+  return (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-[var(--g-border-subtle)]">
+        <div>
+          <label className="block text-xs font-semibold text-[var(--g-text-primary)] mb-1">
+            Nivel de madurez (escala L1–L8)
+          </label>
+          <select
+            value={state.maturity}
+            onChange={(e) => onChange("maturity", e.target.value)}
+            className={SELECT_CLASSES}
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <option value="">Sin evaluar</option>
+            {Object.values(MATURITY_LEVELS).map((lvl) => (
+              <option key={lvl.level} value={lvl.level}>
+                {lvl.level}: {lvl.title} → {lvl.planLabel}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-[var(--g-text-secondary)] mt-1 italic">
+            {matMeta?.description}
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-[var(--g-text-primary)] mb-1">
+            Dificultad de implementación
+          </label>
+          <select
+            value={state.difficulty}
+            onChange={(e) => onChange("difficulty", e.target.value)}
+            className={SELECT_CLASSES}
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            {/* Sin preselección: venía en «media» y las 84 medidas nacían
+                graduadas por nadie. Y sin el código numérico, que va al revés
+                de la intuición (`00` = alta) y se leía como escala. */}
+            <option value={DIFICULTAD_SIN_EVALUAR}>Sin evaluar</option>
+            <option value="02">Baja</option>
+            <option value="01">Media</option>
+            <option value="00">Alta</option>
+          </select>
+        </div>
+      </div>
+
+      {state.maturity === NIVEL_NO_APLICABLE && (
+        <div className="p-3 bg-[var(--g-surface-subtle)] border-l-4 border-[var(--g-brand-3308)] space-y-1.5">
+          <label className="block text-xs font-bold text-[var(--g-text-primary)]">
+            Justificación técnica obligatoria *
+          </label>
+          <input
+            type="text"
+            value={state.justification}
+            onChange={(e) => onChange("justification", e.target.value)}
+            placeholder="Explicar por qué esta medida no resulta necesaria para este sistema..."
+            className={INPUT_CLASSES}
+            style={{ borderRadius: "var(--g-radius-md)" }}
+            aria-invalid={l8SinMotivo}
+          />
+          {l8SinMotivo && (
+            <p className="text-[11px] font-semibold text-[var(--status-error)]">
+              {MOTIVO_L8_SIN_JUSTIFICAR}: sin el motivo, esta medida no acredita conformidad y no
+              suma al porcentaje.
+            </p>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
 
 export default function EvaluacionNueva() {
   const navigate = useNavigate();
@@ -98,7 +204,7 @@ export default function EvaluacionNueva() {
   // reelegir a mano el sistema del que se venía.
   const [params] = useSearchParams();
   const { data: systems = [], isLoading: loadingSystems } = useAiSystemsList();
-  const createAssessment = useCreateAssessment();
+  const saveAssessment = useSaveAssessment();
   const createChecks = useCreateComplianceChecks();
 
   const [step, setStep] = useState(1);
@@ -108,6 +214,10 @@ export default function EvaluacionNueva() {
   const [overallStatus, setOverallStatus] = useState("COMPLETADA");
   const [notes, setNotes] = useState("");
   const [createdId, setCreatedId] = useState<string | null>(null);
+  /** Fila `BORRADOR` sobre la que se autoguarda; se convierte en la definitiva. */
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [autoguardado, setAutoguardado] = useState<"limpio" | "guardando" | "guardado" | "error">("limpio");
+  const [borradorCargado, setBorradorCargado] = useState<string | null>(null);
 
   // Requisitos del marco seleccionado
   const requirements: RequirementDef[] = useMemo(() => {
@@ -138,25 +248,30 @@ export default function EvaluacionNueva() {
   }, [requirements, activeReqCode]);
 
   const updateEvaluation = (measureId: string, key: keyof MeasureEvaluationState, value: string) => {
+    sucioRef.current = true;
     setEvaluations((prev) => ({
       ...prev,
-      [measureId]: {
-        ...(prev[measureId] || {
-          difficulty: "01",
-          maturity: "",
-          justification: "",
-          evidence_url: "",
-          notes: "",
-        }),
-        [key]: value,
-      },
+      [measureId]: { ...(prev[measureId] || ESTADO_VACIO), [key]: value },
     }));
   };
 
+  /**
+   * Catálogo + Medidas Adicionales. Las estadísticas, el porcentaje y el PDA se
+   * calculan sobre ESTA lista: si una MA no cuenta, añadirla no tiene ninguna
+   * consecuencia y vuelve a ser decoración.
+   */
+  const medidasEvaluables = useMemo(
+    () => [
+      ...allMeasures.map((m) => ({ id: m.id, description: m.description, requirementCode: m.requirementCode })),
+      ...additionalMeasures.map((ma) => ({ id: ma.id, description: ma.description, requirementCode: ma.requirementCode })),
+    ],
+    [allMeasures, additionalMeasures],
+  );
+
   // Estadísticas globales de madurez y cálculo de planes PDA
   const stats = useMemo(() => {
-    return computeAssessmentStats(allMeasures, evaluations);
-  }, [allMeasures, evaluations]);
+    return computeAssessmentStats(medidasEvaluables, evaluations);
+  }, [medidasEvaluables, evaluations]);
 
   const activeRequirement = useMemo(() => {
     return requirements.find((r) => r.code === activeReqCode) || requirements[0];
@@ -169,14 +284,14 @@ export default function EvaluacionNueva() {
       return;
     }
     const newMa: AdditionalMeasure = {
-      id: `MA_${Date.now().toString().slice(-4)}`,
+      // El sufijo por posición evita que dos MA creadas en el mismo
+      // milisegundo compartan `id` y se pisen en el mapa de evaluaciones.
+      id: `MA_${Date.now().toString().slice(-6)}_${additionalMeasures.length + 1}`,
       requirementCode: activeReqCode,
-      subpartId: newMaSubpart || activeRequirement?.subparts[0]?.subpartId || "17.1.a",
-      description: newMaDescription,
-      difficulty: "01",
-      maturity: "",
-      evidence_url: "",
+      subpartId: newMaSubpart || activeRequirement?.subparts[0]?.subpartId || "",
+      description: newMaDescription.trim(),
     };
+    sucioRef.current = true;
     setAdditionalMeasures((prev) => [...prev, newMa]);
     setNewMaDescription("");
     setShowAddMaModal(false);
@@ -184,9 +299,106 @@ export default function EvaluacionNueva() {
   };
 
   const handleRemoveMa = (maId: string) => {
+    sucioRef.current = true;
     setAdditionalMeasures((prev) => prev.filter((m) => m.id !== maId));
+    // Se retira también su evaluación: si no, quedaría un finding huérfano
+    // apuntando a una medida que ya no existe.
+    setEvaluations((prev) => {
+      const { [maId]: _fuera, ...resto } = prev;
+      return resto;
+    });
     toast.info("Medida Adicional eliminada");
   };
+
+  // ---------------------------------------------------------------------
+  // Borrador: guardado automático y reanudación
+  //
+  // El wizard tenía las 84 medidas en `useState` y nada más. Cerrar la pestaña
+  // en el paso 2 —entre 30 y 60 minutos de trabajo— lo perdía todo. El estado
+  // `BORRADOR` ya existía en la columna y en el filtro de la lista, pero
+  // ningún camino del producto lo producía.
+  // ---------------------------------------------------------------------
+  const sucioRef = useRef(false);
+
+  const { data: borrador } = useDraftAssessment(
+    step >= 2 || Boolean(systemId) ? systemId || undefined : undefined,
+    framework,
+  );
+
+  const construirPayload = useCallback(
+    (estadoFinal: boolean) => {
+      const payload = buildEvaluationPayload(
+        evaluations,
+        allMeasures,
+        requirements,
+        undefined,
+        additionalMeasures,
+      );
+      return {
+        payload,
+        fila: {
+          system_id: systemId,
+          framework,
+          score: stats.maturityScore,
+          assessment_date: new Date().toISOString().slice(0, 10),
+          findings: payload.findings,
+          status: estadoFinal ? payload.status : "BORRADOR",
+          notes:
+            notes ||
+            `Autodiagnóstico de conformidad. Medidas evaluadas: ${payload.evaluadas}/${payload.totales}.`,
+        },
+      };
+    },
+    [evaluations, allMeasures, requirements, additionalMeasures, systemId, framework, stats.maturityScore, notes],
+  );
+
+  // Reanudar: el finding persistido es round-trippable a propósito (nivel,
+  // dificultad, justificación, tipo y requisito), así que el borrador se
+  // reconstruye entero, MA incluidas.
+  useEffect(() => {
+    if (!borrador?.id || borradorCargado === borrador.id || sucioRef.current) return;
+    const { evaluations: recuperadas, additionalMeasures: maRecuperadas } =
+      restoreEvaluationState(borrador.findings);
+    setEvaluations(recuperadas);
+    setAdditionalMeasures(maRecuperadas);
+    if (borrador.notes) setNotes(borrador.notes);
+    setDraftId(borrador.id);
+    setBorradorCargado(borrador.id);
+    const n = Object.keys(recuperadas).length;
+    if (n > 0) {
+      toast.info(`Borrador recuperado: ${n} medida${n === 1 ? "" : "s"} ya evaluada${n === 1 ? "" : "s"}.`);
+    }
+  }, [borrador, borradorCargado]);
+
+  // La función de guardado va por ref: si entrara en las dependencias del
+  // efecto, cada cambio de estado de la mutación reprogramaría el temporizador
+  // y el autoguardado se perseguiría a sí mismo.
+  const guardarRef = useRef(saveAssessment.mutateAsync);
+  useEffect(() => {
+    guardarRef.current = saveAssessment.mutateAsync;
+  });
+
+  useEffect(() => {
+    if (!systemId || createdId || !sucioRef.current) return;
+    setAutoguardado("guardando");
+    const t = setTimeout(async () => {
+      try {
+        const { fila } = construirPayload(false);
+        const guardada = await guardarRef.current({ id: draftId, systemId, payload: fila });
+        setDraftId(guardada.id);
+        setBorradorCargado(guardada.id);
+        setAutoguardado("guardado");
+      } catch (err) {
+        // Se dice en pantalla. Un autoguardado que falla en silencio es peor
+        // que no tenerlo: da confianza para cerrar la pestaña.
+        setAutoguardado("error");
+        const msg = err instanceof Error ? err.message : String(err);
+        toast.error(`No se pudo guardar el borrador: ${msg}`);
+      }
+    }, AUTOGUARDADO_MS);
+    return () => clearTimeout(t);
+    // `construirPayload` cambia con cada pulsación: es lo que reinicia el margen.
+  }, [construirPayload, systemId, draftId, createdId]);
 
   const handleNextStep = () => {
     if (step === 1 && !systemId) {
@@ -208,22 +420,13 @@ export default function EvaluacionNueva() {
 
     // Lo no contestado NO se evalúa: ni genera finding ni da por conforme su
     // requisito. La construcción vive en `@/lib/aims/evaluacion-payload`.
-    const payload = buildEvaluationPayload(evaluations, allMeasures, requirements);
-
-    const assessmentPayload = {
-      system_id: systemId,
-      framework,
-      score: stats.maturityScore,
-      assessment_date: new Date().toISOString().slice(0, 10),
-      findings: payload.findings,
-      status: payload.status,
-      notes:
-        notes ||
-        `Autodiagnóstico de conformidad. Medidas evaluadas: ${payload.evaluadas}/${payload.totales}.`,
-    };
+    const { payload, fila } = construirPayload(true);
 
     try {
-      const createdAssessment = await createAssessment.mutateAsync(assessmentPayload);
+      // Se CIERRA el borrador en vez de insertar otra fila: si no, cada
+      // autodiagnóstico dejaría atrás un `BORRADOR` fantasma con el mismo
+      // trabajo dentro.
+      const createdAssessment = await saveAssessment.mutateAsync({ id: draftId, systemId, payload: fila });
 
       // Un requisito con medidas sin contestar queda NO_EVALUADO, no CONFORME.
       const checkPayloads = payload.checks.map((c) => ({ ...c, system_id: systemId }));
@@ -399,6 +602,37 @@ export default function EvaluacionNueva() {
               </p>
             </div>
 
+            {/* El estado del borrador se dice: un autoguardado silencioso da
+                confianza para cerrar la pestaña sin saber si guardó. */}
+            <div
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+              aria-live="polite"
+            >
+              {autoguardado === "error" ? (
+                <>
+                  <AlertTriangle className="w-3.5 h-3.5 text-[var(--status-error)]" />
+                  <span className="text-[var(--status-error)]">Borrador NO guardado</span>
+                </>
+              ) : autoguardado === "guardando" ? (
+                <>
+                  <Save className="w-3.5 h-3.5 text-[var(--g-text-secondary)]" />
+                  <span className="text-[var(--g-text-secondary)]">Guardando borrador…</span>
+                </>
+              ) : autoguardado === "guardado" ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-[var(--status-success)]" />
+                  <span className="text-[var(--g-text-primary)]">Borrador guardado</span>
+                </>
+              ) : (
+                <>
+                  <Info className="w-3.5 h-3.5 text-[var(--g-text-secondary)]" />
+                  <span className="text-[var(--g-text-secondary)]">
+                    El trabajo se guarda solo como borrador
+                  </span>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Requirement Tabs Layout */}
@@ -411,8 +645,13 @@ export default function EvaluacionNueva() {
               <div className="space-y-1">
                 {requirements.map((r, idx) => {
                   const isActive = r.code === activeReqCode;
-                  const reqMeasures = r.measures;
-                  const diagnosedInReq = reqMeasures.filter((m) => !!evaluations[m.id]?.maturity).length;
+                  // Las MA del requisito entran en el contador: si no, se leía
+                  // «11/11» con una medida adicional sin contestar debajo.
+                  const reqMeasures = [
+                    ...r.measures.map((m) => m.id),
+                    ...additionalMeasures.filter((ma) => ma.requirementCode === r.code).map((ma) => ma.id),
+                  ];
+                  const diagnosedInReq = reqMeasures.filter((id) => !!evaluations[id]?.maturity).length;
 
                   return (
                     <button
@@ -486,13 +725,7 @@ export default function EvaluacionNueva() {
               {/* List of Medidas Guía (MG) */}
               <div className="space-y-4">
                 {activeRequirement.measures.map((m) => {
-                  const state = evaluations[m.id] || {
-                    difficulty: "01",
-                    maturity: "",
-                    justification: "",
-                    evidence_url: "",
-                    notes: "",
-                  };
+                  const state = evaluations[m.id] || ESTADO_VACIO;
                   const plan = calculateAdaptationPlan(state.maturity);
                   const matMeta = MATURITY_LEVELS[state.maturity];
 
@@ -533,63 +766,10 @@ export default function EvaluacionNueva() {
                         </div>
                       </div>
 
-                      {/* Selectors: Dificultad + Madurez (L1-L8) */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-[var(--g-border-subtle)]">
-                        <div>
-                          <label className="block text-xs font-semibold text-[var(--g-text-primary)] mb-1">
-                            Nivel de Madurez (Escala Oficial L1–L8)
-                          </label>
-                          <select
-                            value={state.maturity}
-                            onChange={(e) => updateEvaluation(m.id, "maturity", e.target.value)}
-                            className={SELECT_CLASSES}
-                            style={{ borderRadius: "var(--g-radius-md)" }}
-                          >
-                            <option value="">Sin evaluar</option>
-                            {Object.values(MATURITY_LEVELS).map((lvl) => (
-                              <option key={lvl.level} value={lvl.level}>
-                                {lvl.level}: {lvl.title} → {lvl.planLabel}
-                              </option>
-                            ))}
-                          </select>
-                          <p className="text-[11px] text-[var(--g-text-secondary)] mt-1 italic">
-                            {matMeta?.description}
-                          </p>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-[var(--g-text-primary)] mb-1">
-                            Dificultad Percibida
-                          </label>
-                          <select
-                            value={state.difficulty}
-                            onChange={(e) => updateEvaluation(m.id, "difficulty", e.target.value)}
-                            className={SELECT_CLASSES}
-                            style={{ borderRadius: "var(--g-radius-md)" }}
-                          >
-                            <option value="02">02: Baja dificultad de implementación</option>
-                            <option value="01">01: Media dificultad de implementación</option>
-                            <option value="00">00: Alta dificultad de implementación</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Justificación obligatoria para L8 */}
-                      {state.maturity === "L8" && (
-                        <div className="p-3 bg-[var(--g-surface-subtle)] border-l-4 border-[var(--g-brand-3308)] space-y-1.5">
-                          <label className="block text-xs font-bold text-[var(--g-text-primary)]">
-                            Justificación Técnica Obligatoria *
-                          </label>
-                          <input
-                            type="text"
-                            value={state.justification}
-                            onChange={(e) => updateEvaluation(m.id, "justification", e.target.value)}
-                            placeholder="Explicar por qué esta medida no resulta necesaria para este sistema..."
-                            className={INPUT_CLASSES}
-                            style={{ borderRadius: "var(--g-radius-md)" }}
-                          />
-                        </div>
-                      )}
+                      <ControlesDeMedida
+                        state={state}
+                        onChange={(key, value) => updateEvaluation(m.id, key, value)}
+                      />
                     </div>
                   );
                 })}
@@ -597,31 +777,56 @@ export default function EvaluacionNueva() {
                 {/* Additional Measures in this requirement */}
                 {additionalMeasures
                   .filter((ma) => ma.requirementCode === activeReqCode)
-                  .map((ma) => (
-                    <div
-                      key={ma.id}
-                      className="p-5 bg-[var(--g-surface-subtle)] border-2 border-dashed border-[var(--g-brand-3308)]/40 space-y-3"
-                      style={{ borderRadius: "var(--g-radius-lg)" }}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <span className="font-mono text-xs font-bold text-[var(--g-brand-3308)] bg-[var(--g-surface-card)] px-2 py-0.5 border border-[var(--g-border-subtle)]" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                            MEDIDA ADICIONAL • {ma.id}
-                          </span>
-                          <h4 className="text-sm font-bold text-[var(--g-text-primary)] mt-1">{ma.description}</h4>
-                          <span className="text-xs text-[var(--g-text-secondary)]">Bloque: {subpartTitle(activeRequirement, ma.subpartId)}</span>
+                  .map((ma) => {
+                    const state = evaluations[ma.id] || ESTADO_VACIO;
+                    const plan = calculateAdaptationPlan(state.maturity);
+                    return (
+                      <div
+                        key={ma.id}
+                        className="p-5 bg-[var(--g-surface-subtle)] border-2 border-dashed border-[var(--g-brand-3308)]/40 space-y-4"
+                        style={{ borderRadius: "var(--g-radius-lg)" }}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <span className="font-mono text-xs font-bold text-[var(--g-brand-3308)] bg-[var(--g-surface-card)] px-2 py-0.5 border border-[var(--g-border-subtle)]" style={{ borderRadius: "var(--g-radius-sm)" }}>
+                              MEDIDA ADICIONAL • {ma.id}
+                            </span>
+                            <h4 className="text-sm font-bold text-[var(--g-text-primary)] mt-1">{ma.description}</h4>
+                            <span className="text-xs text-[var(--g-text-secondary)]">Bloque: {subpartTitle(activeRequirement, ma.subpartId)}</span>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <span
+                              className={`inline-block px-2.5 py-1 text-xs font-bold ${
+                                plan.code === "03" || plan.code === "05"
+                                  ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
+                                  : plan.code === "01"
+                                  ? "bg-[var(--status-error)] text-[var(--g-text-inverse)]"
+                                  : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
+                              }`}
+                              style={{ borderRadius: "var(--g-radius-full)" }}
+                            >
+                              {plan.label}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveMa(ma.id)}
+                              aria-label={`Eliminar la medida adicional ${ma.id}`}
+                              className="p-1 text-[var(--status-error)] hover:bg-[var(--g-surface-card)] transition-colors"
+                              style={{ borderRadius: "var(--g-radius-sm)" }}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveMa(ma.id)}
-                          className="p-1 text-[var(--status-error)] hover:bg-[var(--g-surface-card)] transition-colors"
-                          style={{ borderRadius: "var(--g-radius-sm)" }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {/* Los mismos controles que una MG: una MA sin nivel no
+                            es evaluable y su requisito queda PENDIENTE. */}
+                        <ControlesDeMedida
+                          state={state}
+                          onChange={(key, value) => updateEvaluation(ma.id, key, value)}
+                        />
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
 
               {/* Navigation buttons */}
@@ -723,7 +928,7 @@ export default function EvaluacionNueva() {
               <textarea
                 rows={3}
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                onChange={(e) => { sucioRef.current = true; setNotes(e.target.value); }}
                 placeholder="Observaciones técnicas o conclusiones del equipo evaluador..."
                 className={TEXTAREA_CLASSES}
                 style={{ borderRadius: "var(--g-radius-md)" }}
@@ -743,13 +948,13 @@ export default function EvaluacionNueva() {
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={createAssessment.isPending || createChecks.isPending}
+                disabled={saveAssessment.isPending || createChecks.isPending}
                 className="flex items-center gap-2 px-6 py-2.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-sm font-medium transition-colors disabled:opacity-50"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 <Save className="w-4 h-4" />
                 <span>
-                  {createAssessment.isPending || createChecks.isPending
+                  {saveAssessment.isPending || createChecks.isPending
                     ? "Registrando..."
                     : "Guardar autodiagnóstico"}
                 </span>

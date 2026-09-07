@@ -29,6 +29,8 @@
  * descripción del bloque, y para eso está `subpartTitle()`.
  */
 
+import { acreditaConformidad } from "./conformidad";
+
 export interface RequirementDef {
   code: string;
   title: string;
@@ -77,11 +79,31 @@ export interface DifficultyLevelDef {
   tone: "error" | "warning" | "success";
 }
 
+/**
+ * Los códigos van al revés de la intuición (`00` = ALTA dificultad) porque los
+ * hereda del cuadro de origen. Se conservan como valor persistido y **no se
+ * pintan**: en pantalla va sólo la etiqueta, vía `difficultyLabel`.
+ */
 export const DIFFICULTY_LEVELS: Record<string, DifficultyLevelDef> = {
   "00": { code: "00", label: "Alta dificultad", tone: "error" },
   "01": { code: "01", label: "Media dificultad", tone: "warning" },
   "02": { code: "02", label: "Baja dificultad", tone: "success" },
 };
+
+/**
+ * `SIN_EVALUAR` no es un código de la escala: es la ausencia de graduación.
+ *
+ * El desplegable venía con `"01"` (media) preseleccionado, así que las 84
+ * medidas nacían graduadas por nadie y ese dato espurio no se distinguía de una
+ * graduación real. Ahora el valor vacío es el inicial y significa lo que dice.
+ */
+export const DIFICULTAD_SIN_EVALUAR = "";
+
+export function difficultyLabel(code: string | null | undefined): string {
+  const c = (code ?? "").trim();
+  if (!c) return "Sin evaluar";
+  return DIFFICULTY_LEVELS[c]?.label ?? "Sin evaluar";
+}
 
 export const ADAPTATION_PLANS: Record<string, AdaptationPlanDef> = {
   "01": {
@@ -639,8 +661,8 @@ export interface AssessmentStats {
 }
 
 export function computeAssessmentStats(
-  measures: (MeasureGuideDef & { requirementCode: string })[],
-  assessmentsMap: Record<string, { maturity?: string | null; difficulty?: string | null }>
+  measures: { id: string; description: string; requirementCode: string }[],
+  assessmentsMap: Record<string, { maturity?: string | null; difficulty?: string | null; justification?: string | null }>
 ): AssessmentStats {
   const totalMeasures = measures.length;
   let diagnosedCount = 0;
@@ -657,8 +679,10 @@ export function computeAssessmentStats(
       if (plan.code !== "00") {
         planCounts[plan.code] = (planCounts[plan.code] || 0) + 1;
       }
-      // Consideramos conformes L5 (Adaptación completa) y L8 (No necesaria justificada)
-      if (maturity === "L5" || maturity === "L8") {
+      // El criterio vive en `./conformidad` y es el mismo que persiste el
+      // payload y que lee el KPI del dashboard. `L8` («no aplica») sólo
+      // acredita CON su justificación: la escala la declara obligatoria.
+      if (acreditaConformidad({ status: maturity, justification: entry?.justification })) {
         matureConformingCount++;
       } else if (maturity === "L1" || maturity === "L2" || maturity === "L6") {
         gapMeasures.push({ id: m.id, description: m.description, planCode: plan.code });

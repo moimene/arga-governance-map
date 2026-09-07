@@ -1,4 +1,4 @@
-import { NIVELES_CONFORMES } from "./evaluacion-payload";
+import { acreditaConformidad } from "./conformidad";
 
 export type AimsSourcePosture = "legacy-ai" | "aims-ready" | "local-derived";
 export type AimsReadinessStatus = "ready" | "watch" | "gap";
@@ -24,7 +24,7 @@ export interface AimsAssessmentLike {
   system_id?: string | null;
   status?: string | null;
   score?: number | null;
-  findings?: { code?: string | null; status?: string | null }[] | null;
+  findings?: { code?: string | null; status?: string | null; justification?: string | null }[] | null;
   assessment_date?: string | null;
 }
 
@@ -199,14 +199,15 @@ export const aimsScreenPostures: AimsScreenPosture[] = [
     route: "/ai-governance/evaluaciones/nuevo",
     screen: "Nuevo autodiagnóstico de conformidad",
     owner: "AIMS 360",
-    hooks: ["useAiSystemsList", "useCreateAssessment", "useCreateComplianceChecks"],
+    hooks: ["useAiSystemsList", "useDraftAssessment", "useSaveAssessment", "useCreateComplianceChecks"],
     tables: ["ai_risk_assessments", "ai_compliance_checks", "ai_systems"],
     posture: "legacy_write",
     sourceOfTruth: "ai_risk_assessments y ai_compliance_checks, scoped por ai_systems",
     operation: "owner-write",
     crossModuleHandoffs: ["No aplica; alta propietaria AIMS"],
     migrationRequired: false,
-    notes: "INSERT plano sin hash, sello ni bundle: registra el autodiagnóstico, no lo precinta.",
+    notes:
+      "Autoguarda como BORRADOR y lo cierra al enviar. Sin hash, sello ni bundle: registra el autodiagnóstico, no lo precinta.",
   },
   {
     route: "/ai-governance/evaluaciones/:id",
@@ -762,7 +763,11 @@ export function buildAimsReadiness({
   // conformidad se traen del propio camino de escritura, no se recopian aquí.
   const closedControlFindings = controlFindings.filter((finding) => {
     const st = normalizeAimsStatus(finding.status);
-    return ["CERRADO", "APROBADO", "CONFORME", "OK"].includes(st) || NIVELES_CONFORMES.has(st);
+    if (["CERRADO", "APROBADO", "CONFORME", "OK"].includes(st)) return true;
+    // Mismo criterio que el wizard y que el payload: `L8` sin justificación no
+    // cierra nada. Se pasa el finding ENTERO, no sólo su `status`, porque la
+    // regla necesita la justificación.
+    return acreditaConformidad({ status: st, justification: finding.justification });
   }).length;
 
   const inventoryCoverage = pct(activeSystems, totalSystems);

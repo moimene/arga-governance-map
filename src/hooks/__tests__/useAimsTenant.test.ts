@@ -151,15 +151,59 @@ describe("A1 — hooks AIMS aislados por tenant", () => {
   it("toda lectura y actualización filtra por tenant_id", () => {
     // Un `.eq()` detrás de un `.insert()` no filtra nada: en el alta el
     // aislamiento va en el payload, así que esas llamadas se cuentan aparte.
+    //
+    // Y en las tablas SIN columna de tenant, un `.update()` tampoco puede
+    // llevar el filtro: PostgREST no aplica a la MUTACIÓN el filtro sobre un
+    // recurso incrustado — sólo a la representación devuelta, que es peor que
+    // nada porque una escritura ajena diría «no se guardó» habiéndose
+    // guardado. Esas escrituras salen del conteo y entran en el invariante
+    // específico de abajo, que es MÁS estricto: no basta con no filtrar, hay
+    // que probar la pertenencia antes y comprobar el resultado después.
     for (const f of HOOKS) {
       const src = read(f);
       const accesos = (src.match(/\.from\(/g) ?? []).length;
       const altas = (src.match(/\.insert\(/g) ?? []).length;
+      const escriturasSinColumna = SCOPING_POR_JOIN.has(f)
+        ? (src.match(/\.update\(|\.delete\(/g) ?? []).length
+        : 0;
       const filtros = (src.match(/\.eq\("(?:[a-z_]+\.)?tenant_id", tenantId!?\)/g) ?? []).length;
       expect(
         filtros,
-        `${f}: ${accesos} accesos (${altas} altas) y solo ${filtros} filtros por tenant_id`,
-      ).toBeGreaterThanOrEqual(accesos - altas);
+        `${f}: ${accesos} accesos (${altas} altas, ${escriturasSinColumna} escrituras sin columna de tenant) y solo ${filtros} filtros por tenant_id`,
+      ).toBeGreaterThanOrEqual(accesos - altas - escriturasSinColumna);
+    }
+  });
+
+  it("las escrituras sin columna de tenant prueban la pertenencia y comprueban el resultado", () => {
+    // Contrapartida de la exención de arriba, y la parte que de verdad protege.
+    // Una tabla sin `tenant_id` no puede filtrar su UPDATE, así que el
+    // aislamiento tiene que estar en el CAMINO: comprobar antes que el sistema
+    // es del tenant, acotar la escritura a ese sistema, y verificar que vuelve
+    // fila — porque la RLS filtra a cero filas SIN error y un guardado fallido
+    // se daría por bueno.
+    for (const f of SCOPING_POR_JOIN) {
+      const src = read(f);
+      const escrituras = (src.match(/\.update\(|\.delete\(/g) ?? []).length;
+      expect(escrituras, `${f} ya no escribe: revisa si este invariante sigue teniendo sujeto`).toBeGreaterThan(0);
+
+      expect(
+        src,
+        `${f}: una escritura sin prueba previa de que el sistema es del tenant`,
+      ).toMatch(/from\("ai_systems"\)[\s\S]{0,300}?\.eq\("tenant_id", tenantId!?\)/);
+
+      // La acotación se exige PEGADA a la escritura. Contar el literal suelto
+      // en el fichero dejaba pasar la mutación: la consulta del borrador ya
+      // trae un `.eq("system_id", systemId)` y satisfacía el recuento sin que
+      // el UPDATE llevara ninguno.
+      expect(
+        (src.match(/\.update\([\s\S]{0,200}?\.eq\("system_id", systemId\)/g) ?? []).length,
+        `${f}: ${escrituras} escrituras y menos acotaciones al sistema comprobado`,
+      ).toBeGreaterThanOrEqual(escrituras);
+
+      expect(
+        src,
+        `${f}: no comprueba que la escritura devolviera fila (la RLS filtra sin error)`,
+      ).toMatch(/if \(!data\)[\s\S]{0,240}?throw new Error/);
     }
   });
 

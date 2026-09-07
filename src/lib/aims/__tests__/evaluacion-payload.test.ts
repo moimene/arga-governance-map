@@ -91,8 +91,8 @@ describe("A2 — no se imputa conformidad a lo no contestado", () => {
   it.each(["L1", "L2", "L3", "L4", "L6", "L7"])(
     "un requisito contestado con %s no acredita conformidad",
     (nivel) => {
-      // Sólo L5 (implementada) y L8 (no necesaria) acreditan. L3 es
-      // «documentada, NO implementada» y antes se persistía CONFORME.
+      // Sólo L5 (implementada) y L8 justificada (no necesaria) acreditan. L3
+      // es «documentada, NO implementada» y antes se persistía CONFORME.
       const out = buildEvaluationPayload(
         { M3: { maturity: nivel } },
         MEDIDAS,
@@ -102,14 +102,33 @@ describe("A2 — no se imputa conformidad a lo no contestado", () => {
     },
   );
 
-  it.each(["L5", "L8"])("un requisito contestado con %s sí acredita conformidad", (nivel) => {
+  it.each([
+    { nivel: "L5", justification: undefined },
+    { nivel: "L8", justification: "El sistema no genera contenido sintético." },
+  ])("un requisito contestado con $nivel sí acredita conformidad", ({ nivel, justification }) => {
     const out = buildEvaluationPayload(
-      { M3: { maturity: nivel } },
+      { M3: { maturity: nivel, justification } },
       MEDIDAS,
       [{ code: "R2", title: "Requisito dos", measures: [{ id: "M3" }] }],
     );
     expect(out.checks[0].status).toBe("CONFORME");
   });
+
+  it.each(["", "   ", undefined])(
+    "una L8 con justificación %p NO acredita: la exención se queda en blanco",
+    (justification) => {
+      // `MATURITY_LEVELS.L8` declara `requiresJustification: true` y el
+      // formulario la pide con asterisco, pero el texto se recogía y se
+      // descartaba al persistir. Una exención sin motivo era indistinguible de
+      // una motivada y contaba igual en el porcentaje.
+      const out = buildEvaluationPayload(
+        { M3: { maturity: "L8", justification } },
+        MEDIDAS,
+        [{ code: "R2", title: "Requisito dos", measures: [{ id: "M3" }] }],
+      );
+      expect(out.checks[0].status).toBe("NO_CONFORME");
+    },
+  );
 
   it("no se inventa evidencia de ningún proveedor", () => {
     const out = buildEvaluationPayload(
