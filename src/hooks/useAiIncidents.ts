@@ -14,6 +14,20 @@ export type AiIncident = {
   closed_at: string | null;
   root_cause: string | null;
   corrective_action: string | null;
+  /**
+   * Perímetro regulatorio (2026-09-07). `null` = NO DECLARADO, que no es «no»:
+   * el motor de relojes distingue los dos casos y con la clasificación sin
+   * registrar advierte en vez de ocultar un plazo que puede aplicar.
+   */
+  incident_type?: string | null;
+  ria_severity?: string | null;
+  affects_personal_data?: boolean | null;
+  high_risk_to_subjects?: boolean | null;
+  affected_count?: number | null;
+  ict_related?: boolean | null;
+  affects_critical_function?: boolean | null;
+  /** Cuándo se tuvo CONOCIMIENTO: es lo que arranca los plazos. */
+  knowledge_at?: string | null;
   ai_systems?: { name: string; risk_level?: string | null } | null;
 };
 

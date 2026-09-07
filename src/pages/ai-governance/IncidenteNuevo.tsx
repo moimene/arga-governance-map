@@ -14,7 +14,39 @@ type FormState = {
   description: string;
   root_cause: string;
   corrective_action: string;
+  /** Perímetro regulatorio: es lo que decide QUÉ relojes se cuentan. */
+  incident_type: string;
+  knowledge_at: string;
+  ria_severity: string;
+  afecta_datos: "" | "SI" | "NO";
+  alto_riesgo_interesados: "" | "SI" | "NO";
+  affected_count: string;
+  ict: "" | "SI" | "NO";
 };
+
+/**
+ * Tipos del cuadro que la validación regulatoria nombra. `OTRO` está para no
+ * forzar una categoría equivocada, que sería peor que no categorizar.
+ */
+const TIPOS_INCIDENTE: { code: string; label: string }[] = [
+  { code: "ALUCINACION", label: "Alucinación o respuesta incorrecta" },
+  { code: "FUGA_DATOS", label: "Fuga o exposición de datos" },
+  { code: "USO_INDEBIDO", label: "Uso indebido del sistema" },
+  { code: "SESGO", label: "Sesgo o trato discriminatorio" },
+  { code: "DECISION_ERRONEA", label: "Decisión errónea con efecto sobre personas" },
+  { code: "CAIDA_SERVICIO", label: "Caída o degradación del servicio" },
+  { code: "OTRO", label: "Otro" },
+];
+
+/** Vocabulario EXACTO de `RiaIncidentSeverity`: 15 días, 2 días, 10 días. */
+const GRAVEDAD_RIA: { code: string; label: string }[] = [
+  { code: "ORDINARY_SERIOUS", label: "Incidente grave ordinario — 15 días (art. 73)" },
+  { code: "WIDESPREAD_INFRINGEMENT", label: "Infracción generalizada — 2 días (art. 73)" },
+  { code: "DEATH_INCIDENT", label: "Con resultado de fallecimiento — 10 días (art. 73)" },
+];
+
+/** `""` es NO DECLARADO y no es lo mismo que «no». */
+const aBooleano = (v: string): boolean | null => (v === "SI" ? true : v === "NO" ? false : null);
 
 const INPUT_CLASSES =
   "h-10 w-full px-3 text-sm bg-[var(--g-surface-card)] text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)]/60 border border-[var(--g-border-subtle)] focus:border-[var(--g-brand-3308)] focus:outline-none transition-colors";
@@ -47,6 +79,13 @@ export default function IncidenteNuevo() {
     status: "ABIERTO",
     reported_at: nowForInput(),
     description: "",
+    incident_type: "",
+    knowledge_at: nowForInput(),
+    ria_severity: "ORDINARY_SERIOUS",
+    afecta_datos: "",
+    alto_riesgo_interesados: "",
+    affected_count: "",
+    ict: "",
     root_cause: "",
     corrective_action: "",
   });
@@ -81,6 +120,16 @@ export default function IncidenteNuevo() {
       description: emptyToNull(form.description),
       root_cause: emptyToNull(form.root_cause),
       corrective_action: emptyToNull(form.corrective_action),
+      // Perímetro regulatorio. Lo que aquí se declare enciende o apaga los
+      // relojes de la ficha: nada se presume.
+      incident_type: emptyToNull(form.incident_type),
+      knowledge_at: form.knowledge_at ? new Date(form.knowledge_at).toISOString() : null,
+      ria_severity: emptyToNull(form.ria_severity),
+      affects_personal_data: aBooleano(form.afecta_datos),
+      high_risk_to_subjects: aBooleano(form.alto_riesgo_interesados),
+      affected_count: form.affected_count.trim() === "" ? null : Number(form.affected_count),
+      ict_related: aBooleano(form.ict),
+      affects_critical_function: aBooleano(form.ict),
     };
 
     try {
@@ -234,6 +283,157 @@ export default function IncidenteNuevo() {
               className={INPUT_CLASSES}
               style={{ borderRadius: "var(--g-radius-md)" }}
             />
+          </div>
+
+          {/* -------------------------------------------------------------
+              Perímetro regulatorio.
+
+              El motor de relojes (`incident-clocks.ts`) sabe calcular los tres
+              plazos —15/2/10 días del art. 73 del Reglamento de IA y 72 horas
+              del art. 33 del RGPD— y estaba probado, pero la ficha lo
+              alimentaba con tres constantes a `false` porque no había dónde
+              declarar estos hechos. Un incidente activa regímenes distintos con
+              plazos distintos, y cuál aplica depende de hechos que se declaran,
+              no que se presumen.
+              ------------------------------------------------------------- */}
+          <div className="md:col-span-2 border-t border-[var(--g-border-subtle)] pt-5">
+            <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
+              Perímetro regulatorio
+            </h2>
+            <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+              Decide qué relojes se cuentan en la ficha. Dejar una respuesta en blanco significa
+              «no declarado», que no es lo mismo que «no»: el plazo se mostrará advertido en vez de
+              ocultarse.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="ai-incident-type" className={LABEL_CLASSES}>
+              Tipo de incidente
+            </label>
+            <select
+              id="ai-incident-type"
+              value={form.incident_type}
+              onChange={(event) => set("incident_type", event.target.value)}
+              className={SELECT_CLASSES}
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <option value="">Sin clasificar</option>
+              {TIPOS_INCIDENTE.map((t) => (
+                <option key={t.code} value={t.code}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="ai-incident-knowledge" className={LABEL_CLASSES}>
+              Fecha de conocimiento
+            </label>
+            <input
+              id="ai-incident-knowledge"
+              type="datetime-local"
+              value={form.knowledge_at}
+              onChange={(event) => set("knowledge_at", event.target.value)}
+              className={INPUT_CLASSES}
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            />
+            <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+              Es la que arranca los plazos, y no tiene por qué ser la del registro.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="ai-incident-ria" className={LABEL_CLASSES}>
+              Gravedad a efectos del art. 73
+            </label>
+            <select
+              id="ai-incident-ria"
+              value={form.ria_severity}
+              onChange={(event) => set("ria_severity", event.target.value)}
+              className={SELECT_CLASSES}
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              {GRAVEDAD_RIA.map((g) => (
+                <option key={g.code} value={g.code}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="ai-incident-affected" className={LABEL_CLASSES}>
+              Personas afectadas (si constan)
+            </label>
+            <input
+              id="ai-incident-affected"
+              type="number"
+              min={0}
+              value={form.affected_count}
+              onChange={(event) => set("affected_count", event.target.value)}
+              placeholder="Sin cuantificar"
+              className={INPUT_CLASSES}
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="ai-incident-pii" className={LABEL_CLASSES}>
+              ¿Afecta a datos personales?
+            </label>
+            <select
+              id="ai-incident-pii"
+              value={form.afecta_datos}
+              onChange={(event) => set("afecta_datos", event.target.value as FormState["afecta_datos"])}
+              className={SELECT_CLASSES}
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <option value="">No declarado</option>
+              <option value="SI">Sí — activa el art. 33 RGPD (72 horas)</option>
+              <option value="NO">No</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="ai-incident-pii-risk" className={LABEL_CLASSES}>
+              ¿Alto riesgo para los interesados?
+            </label>
+            <select
+              id="ai-incident-pii-risk"
+              value={form.alto_riesgo_interesados}
+              onChange={(event) =>
+                set("alto_riesgo_interesados", event.target.value as FormState["alto_riesgo_interesados"])
+              }
+              className={SELECT_CLASSES}
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <option value="">No declarado</option>
+              <option value="SI">Sí — comunicación a los interesados (art. 34 RGPD)</option>
+              <option value="NO">No</option>
+            </select>
+          </div>
+
+          <div className="md:col-span-2">
+            <label htmlFor="ai-incident-ict" className={LABEL_CLASSES}>
+              ¿Incidente TIC que afecta a una función crítica?
+            </label>
+            <select
+              id="ai-incident-ict"
+              value={form.ict}
+              onChange={(event) => set("ict", event.target.value as FormState["ict"])}
+              className={SELECT_CLASSES}
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <option value="">No declarado</option>
+              <option value="SI">Sí — activa los plazos de DORA</option>
+              <option value="NO">No</option>
+            </select>
+            <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+              DORA vincula a entidades financieras supervisadas. Si la entidad no lo es, la respuesta
+              es «No».
+            </p>
           </div>
 
           <div className="md:col-span-2">

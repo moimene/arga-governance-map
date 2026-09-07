@@ -476,6 +476,17 @@ export default function AiDashboard() {
   // un «Activo» en otra grafía no contaba. Hoy ARGA no cambia: sus 4 activos
   // ya están escritos como ACTIVO.
   const activos = systems.filter((s) => normalizeAimsStatus(s.status) === "ACTIVO").length;
+  // Un sistema «en evaluación» no es un sistema parado: en el piloto real es
+  // una herramienta en producción limitada, con usuarios y con exposición. El
+  // contador de ACTIVOS no se toca —dice la verdad de lo que cuenta— pero un
+  // tenant con 0 activos y 1 en evaluación leía «—» y parecía vacío.
+  const enEvaluacion = systems.filter((s) => normalizeAimsStatus(s.status) === "EN_EVALUACION").length;
+  const detalleInventario = [
+    `${systems.length} en inventario`,
+    enEvaluacion > 0 ? `${enEvaluacion} en evaluación` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const alto    = systems.filter((s) => s.risk_level === "Alto").length;
   const limitado = systems.filter((s) => s.risk_level === "Limitado").length;
   const minimo  = systems.filter((s) => s.risk_level === "Mínimo").length;
@@ -544,7 +555,7 @@ export default function AiDashboard() {
       body:
         systems.length === 0
           ? "Sin sistemas registrados en el inventario."
-          : `${systems.length} sistemas registrados; ${sistemasClasificados} con nivel de riesgo declarado.`,
+          : `${detalleInventario}; ${sistemasClasificados} con nivel de riesgo declarado.`,
       to: "/ai-governance/sistemas",
       icon: Cpu,
       tone: systems.length === 0 ? "text-[var(--g-text-secondary)]" : "text-[var(--status-info)]",
@@ -691,7 +702,7 @@ export default function AiDashboard() {
             <KpiCard
               label="Sistemas IA activos"
               value={systems.length === 0 ? "—" : activos}
-              sub={systems.length === 0 ? "Sin inventario registrado" : `${systems.length} total en inventario`}
+              sub={systems.length === 0 ? "Sin inventario registrado" : detalleInventario}
               icon={Cpu}
               tone={systems.length === 0 ? "neutral" : "info"}
               to="/ai-governance/sistemas"

@@ -118,9 +118,14 @@ describe("DORA no se afirma para un tenant que lo tiene oculto", () => {
   });
 
   it("la ficha no anuncia relojes que no está contando", () => {
-    // `affectsPii` / `isIctCritical` son constantes `false` sin ningún control
-    // en la UI, así que los relojes del RGPD y de DORA no se cuentan nunca. El
-    // banner afirmaba «Relojes regulatorios independientes activados».
+    // HISTORIA: `affectsPii` / `isIctCritical` arrancaron en `true` —todo
+    // incidente activaba los tres relojes— y se dejaron en `false` fijo porque
+    // no había dónde declararlos. El banner afirmaba «Relojes regulatorios
+    // independientes activados» sobre relojes que no se contaban.
+    //
+    // Desde `20260907220000` esos hechos SE DECLARAN en el alta y la ficha los
+    // lee, así que los relojes pueden encenderse de verdad. La invariante no
+    // cambia y es la que importa: se anuncian los que se cuentan, ni uno más.
     const src = read(FICHA);
     expect(
       /Relojes regulatorios independientes activados/.test(src),
@@ -137,5 +142,59 @@ describe("DORA no se afirma para un tenant que lo tiene oculto", () => {
       /\{regimenesEnCurso\.length > 0/.test(src) && /regimenesEnCurso\.join\(/.test(src),
       "el banner ya no se construye a partir de los regímenes realmente contados",
     ).toBe(true);
+  });
+});
+
+describe("los relojes se alimentan de lo DECLARADO, no de constantes", () => {
+  const src = readFileSync("src/pages/ai-governance/IncidenteDetalle.tsx", "utf8");
+
+  it("la ficha lee el perímetro del incidente y no lo presume", () => {
+    // Antes eran tres constantes en el fichero: `affectsPii = false`, etc. Una
+    // constante no es una declaración, y su valor —en un sentido o en el
+    // otro— era una presunción.
+    expect(src, "vuelven las constantes del perímetro").not.toMatch(
+      /const\s+(affectsPii|highRiskPii|isIctCritical)\s*=\s*(true|false)/,
+    );
+    for (const campo of [
+      "affects_personal_data",
+      "high_risk_to_subjects",
+      "ict_related",
+      "affects_critical_function",
+    ]) {
+      expect(src, `la ficha no lee incident.${campo}`).toContain(`incident.${campo}`);
+    }
+  });
+
+  it("el plazo arranca en la fecha de CONOCIMIENTO cuando consta", () => {
+    // Es la que dispara los plazos del art. 33 del RGPD y del art. 73 del RIA,
+    // y no tiene por qué coincidir con la de registro.
+    expect(src).toMatch(/knowledgeDate:\s*incident\.knowledge_at\s*\?\?\s*incident\.reported_at/);
+  });
+
+  it("«no declarado» llega al motor como no declarado, no como «no»", () => {
+    // El motor distingue los dos casos: con la clasificación sin registrar
+    // muestra el plazo ADVERTIDO, porque ocultar uno que puede aplicar es peor
+    // que mostrarlo con la cautela. Mapear `null` a `false` perdería eso.
+    expect(src).toMatch(/const declarado = \(v: boolean \| null \| undefined\) => \(v === null \? undefined : v\)/);
+  });
+
+  it("el alta captura lo que el motor necesita", () => {
+    const alta = readFileSync("src/pages/ai-governance/IncidenteNuevo.tsx", "utf8");
+    for (const campo of [
+      "incident_type",
+      "knowledge_at",
+      "ria_severity",
+      "affects_personal_data",
+      "high_risk_to_subjects",
+      "affected_count",
+      "ict_related",
+    ]) {
+      expect(alta, `el alta no escribe ${campo}`).toContain(campo);
+    }
+    // Y el vocabulario de gravedad es EXACTAMENTE el que el motor sabe leer:
+    // otro valor caería al plazo genérico sin decirlo.
+    for (const nivel of ["ORDINARY_SERIOUS", "WIDESPREAD_INFRINGEMENT", "DEATH_INCIDENT"]) {
+      expect(alta, `el alta no ofrece ${nivel}`).toContain(nivel);
+    }
   });
 });

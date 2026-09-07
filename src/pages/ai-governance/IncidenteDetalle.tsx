@@ -45,18 +45,6 @@ export default function AiIncidenteDetalle() {
   const [status, setStatus] = useState<string>("");
   const [severity, setSeverity] = useState<string>("");
   const [riaSeverity, setRiaSeverity] = useState<RiaIncidentSeverity>("ORDINARY_SERIOUS");
-  // Arrancaban en `true`, sin ningún control en la UI para cambiarlos: TODO
-  // incidente de TODO tenant activaba el reloj del RGPD y el de DORA. Que un
-  // incidente afecte a datos personales, y que la entidad esté sujeta a DORA,
-  // son afirmaciones — y una afirmación no se presume: se declara.
-  //
-  // Siguen sin control y sin columna donde declararse, así que son constantes y
-  // no `useState`: un estado con `setX` que nadie llama hace creer que existe
-  // un interruptor. Los relojes del RGPD y de DORA NO se cuentan hoy, y la
-  // pantalla lo dice en vez de anunciarlos como activados.
-  const affectsPii = false;
-  const highRiskPii = false;
-  const isIctCritical = false;
   const [rootCause, setRootCause] = useState<string>("");
   const [correctiveAction, setCorrectiveAction] = useState<string>("");
   const [isEditing, setIsEditing] = useState(false);
@@ -153,17 +141,29 @@ export default function AiIncidenteDetalle() {
   }
 
   // Cálculo en vivo de los relojes multirrégimen
+  // HISTORIA: estos tres arrancaron en `true` —TODO incidente de TODO tenant
+  // activaba los relojes del RGPD y de DORA— y el 2026-09-06 se dejaron en
+  // `false` fijo, porque no había dónde declararlos y presumirlos era peor.
+  // Desde `20260907220000` hay columnas: se LEEN, y `null` («no declarado») se
+  // pasa como `undefined` para que el motor advierta en vez de ocultar un plazo
+  // que puede aplicar. Una afirmación no se presume ni en un sentido ni en el
+  // otro: se declara.
+  const declarado = (v: boolean | null | undefined) => (v === null ? undefined : v);
   const clocks = evaluateMultiregimeIncident({
-    knowledgeDate: incident.reported_at,
+    // El plazo lo arranca el CONOCIMIENTO, no el registro. Sin él, el de
+    // registro es la mejor aproximación disponible y es lo que se usaba.
+    knowledgeDate: incident.knowledge_at ?? incident.reported_at,
     isAiRelated: true,
     // El art. 73 alcanza a sistemas de alto riesgo: se toma del sistema
     // asociado, no se presupone. `undefined` cuando no consta clasificación.
     isAiHighRisk: altoRiesgoDeclarado(incident.ai_systems?.risk_level),
-    riaSeverity: riaSeverity,
-    affectsPersonalData: affectsPii,
-    isHighRiskToSubjects: highRiskPii,
-    isIctRelated: isIctCritical,
-    affectsCriticalFunction: isIctCritical,
+    // La declarada en el alta manda; el desplegable de la ficha sólo la
+    // sustituye mientras se recalifica sin haber guardado.
+    riaSeverity: (incident.ria_severity as RiaIncidentSeverity | null) ?? riaSeverity,
+    affectsPersonalData: declarado(incident.affects_personal_data) ?? false,
+    isHighRiskToSubjects: declarado(incident.high_risk_to_subjects),
+    isIctRelated: declarado(incident.ict_related) ?? false,
+    affectsCriticalFunction: declarado(incident.affects_critical_function) ?? false,
   });
 
   const riaRemaining = clocks.ria ? formatRemainingTime(clocks.ria.deadlineDate) : null;
