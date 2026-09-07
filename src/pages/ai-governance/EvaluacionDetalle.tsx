@@ -6,9 +6,10 @@ import {
   ISO_42001_REQUIREMENTS,
   calculateAdaptationPlan,
   MATURITY_LEVELS,
-  DIFFICULTY_LEVELS,
+  difficultyLabel,
   subpartTitle,
 } from "@/lib/aims/catalog-aesia";
+import { MOTIVO_L8_SIN_JUSTIFICAR, NIVEL_NO_APLICABLE, acreditaConformidad } from "@/lib/aims/conformidad";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -16,6 +17,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  ClipboardList,
   Download,
   ExternalLink,
   FileCheck,
@@ -25,6 +27,106 @@ import {
 } from "lucide-react";
 import { assessmentAcreditaConformidad } from "@/lib/aims/readiness";
 import { toast } from "sonner";
+
+type FindingPintable = {
+  code: string;
+  status: string;
+  title?: string;
+  planCode?: string;
+  difficulty?: string | null;
+  justification?: string | null;
+  kind?: "MG" | "MA";
+  requirementCode?: string;
+};
+
+/**
+ * Notas y Plan de Adaptación.
+ *
+ * No se renderizaban ni en el informe ni al imprimir. En el piloto de Harvey el
+ * PDA —seis acciones con responsable, prioridad y fecha— vive entero en
+ * `notes`, así que el documento imprimible salía sin el plan que lo justifica.
+ *
+ * `whitespace-pre-line` porque el texto persistido lleva sus propios saltos de
+ * línea: renderizarlo en un párrafo normal los colapsaba y la lista numerada se
+ * leía como un chorro.
+ */
+function NotasYPlanDeAdaptacion({ notes }: { notes: string | null | undefined }) {
+  const texto = (notes ?? "").trim();
+  if (!texto) return null;
+  return (
+    <section
+      className="p-6 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] space-y-3 break-inside-avoid"
+      style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+    >
+      <div className="flex items-center gap-2 border-b border-[var(--g-border-subtle)] pb-3">
+        <ClipboardList className="w-4 h-4 text-[var(--g-brand-3308)]" />
+        <h2 className="text-sm font-bold text-[var(--g-text-primary)]">
+          Notas y Plan de Adaptación
+        </h2>
+      </div>
+      <p className="text-sm text-[var(--g-text-primary)] whitespace-pre-line leading-relaxed">
+        {texto}
+      </p>
+    </section>
+  );
+}
+
+/**
+ * Medidas Adicionales: las que quien evalúa añade porque el catálogo no las
+ * trae. Se pintan aparte porque no pertenecen a ningún requisito del marco y,
+ * si se mezclaran, el desglose por artículo dejaría de cuadrar.
+ *
+ * Hasta el 2026-09-07 no había ninguna que pintar: se perdían al enviar.
+ */
+function MedidasAdicionales({
+  findings,
+  catalogCodes,
+}: {
+  findings: FindingPintable[] | null | undefined;
+  catalogCodes: Set<string>;
+}) {
+  const adicionales = (findings ?? []).filter(
+    (f) => f.kind === "MA" || (!catalogCodes.has(f.code) && f.code?.startsWith("MA_")),
+  );
+  if (adicionales.length === 0) return null;
+  return (
+    <section
+      className="p-6 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] space-y-3 break-inside-avoid"
+      style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+    >
+      <div className="flex items-center gap-2 border-b border-[var(--g-border-subtle)] pb-3">
+        <Sliders className="w-4 h-4 text-[var(--g-brand-3308)]" />
+        <h2 className="text-sm font-bold text-[var(--g-text-primary)]">
+          Medidas adicionales ({adicionales.length})
+        </h2>
+      </div>
+      <table className="w-full text-left text-xs border-collapse">
+        <thead>
+          <tr className="border-b border-[var(--g-border-subtle)] text-[var(--g-text-secondary)]">
+            <th className="pb-2 font-semibold">Código</th>
+            <th className="pb-2 font-semibold">Descripción</th>
+            <th className="pb-2 font-semibold">Requisito</th>
+            <th className="pb-2 font-semibold">Madurez</th>
+            <th className="pb-2 font-semibold">Dificultad</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[var(--g-border-subtle)]">
+          {adicionales.map((f) => (
+            <tr key={f.code}>
+              <td className="py-2.5 font-mono text-[var(--g-brand-3308)] font-semibold">{f.code}</td>
+              <td className="py-2.5 pr-4 text-[var(--g-text-primary)]">{f.title || "—"}</td>
+              <td className="py-2.5 text-[var(--g-text-secondary)]">{f.requirementCode || "—"}</td>
+              <td className="py-2.5 text-[var(--g-text-primary)]">
+                {f.status ? `${f.status} — ${MATURITY_LEVELS[f.status]?.title ?? f.status}` : "Pendiente"}
+              </td>
+              <td className="py-2.5 text-[var(--g-text-secondary)]">{difficultyLabel(f.difficulty)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
 
 export default function EvaluacionDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -80,7 +182,7 @@ export default function EvaluacionDetalle() {
   const catalog = isIso ? ISO_42001_REQUIREMENTS : AESIA_RIA_REQUIREMENTS;
 
   // Mapear findings para lookup rápido por código de medida
-  const findingsMap: Record<string, { status: string; title?: string; planCode?: string }> = {};
+  const findingsMap: Record<string, FindingPintable> = {};
   (assessment.findings || []).forEach((f) => {
     findingsMap[f.code] = f;
   });
@@ -111,6 +213,9 @@ export default function EvaluacionDetalle() {
   const findingsPersistidos = (assessment.findings || []).length;
   const findingsSinReconciliar = findingsPersistidos > 0 && evaluatedCount === 0;
 
+  /** Códigos que el marco conoce: lo que quede fuera es medida adicional. */
+  const codigosDelCatalogo = new Set(catalog.flatMap((r) => r.measures.map((m) => m.id)));
+
   const handlePrint = () => {
     window.print();
   };
@@ -121,12 +226,15 @@ export default function EvaluacionDetalle() {
     downloadAnchor.setAttribute("href", dataStr);
     downloadAnchor.setAttribute(
       "download",
-      `informe-diagnostico-aesia-${assessment.system_id || "sistema"}-${new Date().toISOString().slice(0, 10)}.json`
+      // No es un informe A la AESIA: es un autodiagnóstico interno. El nombre
+      // anterior («informe-diagnostico-aesia») inducía a error sobre el estatus
+      // regulatorio del documento.
+      `autodiagnostico-aims-${assessment.system_id || "sistema"}-${new Date().toISOString().slice(0, 10)}.json`
     );
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
-    toast.success("Informe de diagnóstico exportado en formato JSON");
+    toast.success("Autodiagnóstico exportado en formato JSON");
   };
 
   return (
@@ -379,9 +487,11 @@ export default function EvaluacionDetalle() {
                 </div>
               </button>
 
-              {/* Accordion Body: Table of MGs */}
-              {isExpanded && (
-                <div className="p-4 overflow-x-auto">
+              {/* Accordion Body: Table of MGs
+                  Se OCULTA por CSS en vez de desmontarse: mientras dependía de
+                  `isExpanded &&`, lo plegado no llegaba al DOM y el PDF salía
+                  con las áreas colapsadas fuera del documento. */}
+              <div className={`p-4 overflow-x-auto ${isExpanded ? "" : "hidden print:block"}`}>
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="border-b border-[var(--g-border-subtle)] text-[var(--g-text-secondary)]">
@@ -389,6 +499,7 @@ export default function EvaluacionDetalle() {
                         <th className="pb-2 font-semibold">Descripción de la Medida (MG)</th>
                         <th className="pb-2 font-semibold">Bloque del requisito</th>
                         <th className="pb-2 font-semibold">Madurez</th>
+                        <th className="pb-2 font-semibold">Dificultad</th>
                         <th className="pb-2 font-semibold">Plan de Adaptación</th>
                       </tr>
                     </thead>
@@ -422,6 +533,22 @@ export default function EvaluacionDetalle() {
                               ) : (
                                 <span className="text-[var(--g-text-secondary)] italic">Pendiente</span>
                               )}
+                              {/* Una `L8` sin motivo no acredita no-aplicabilidad:
+                                  la escala declara la justificación obligatoria. Se
+                                  dice en la fila, que es donde se lee el nivel. */}
+                              {maturity === NIVEL_NO_APLICABLE && !acreditaConformidad(finding) && (
+                                <div className="mt-1 text-[10px] font-semibold text-[var(--status-error)]">
+                                  {MOTIVO_L8_SIN_JUSTIFICAR}
+                                </div>
+                              )}
+                              {finding?.justification && (
+                                <div className="mt-1 text-[10px] text-[var(--g-text-secondary)] italic max-w-md">
+                                  {finding.justification}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-2.5 text-[var(--g-text-secondary)]">
+                              {difficultyLabel(finding?.difficulty)}
                             </td>
                             <td className="py-2.5">
                               {plan.code !== "00" ? (
@@ -446,12 +573,15 @@ export default function EvaluacionDetalle() {
                       })}
                     </tbody>
                   </table>
-                </div>
-              )}
+              </div>
             </div>
           );
         })}
       </div>
+
+      <MedidasAdicionales findings={assessment.findings} catalogCodes={codigosDelCatalogo} />
+
+      <NotasYPlanDeAdaptacion notes={assessment.notes} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient, skipToken } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { checksVigentes } from "@/lib/aims/checks-vigentes";
 
 export type AiRiskAssessment = {
   id: string;
@@ -114,7 +115,10 @@ export function useComplianceChecksBySystem(systemId: string | undefined) {
         .eq("system_id", systemId)
         .order("created_at", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as AiComplianceCheck[];
+      // De cada requisito manda la comprobación MÁS RECIENTE: cada
+      // autodiagnóstico inserta una fila por requisito y reevaluar dejaba
+      // tantas como evaluaciones. El histórico se conserva en la tabla.
+      return checksVigentes((data ?? []) as AiComplianceCheck[]);
     } : skipToken,
   });
 }
@@ -130,7 +134,9 @@ export function useAllComplianceChecks() {
         .eq("ai_systems.tenant_id", tenantId!)
         .order("created_at", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as (AiComplianceCheck & { ai_systems: { tenant_id: string } | null })[];
+      return checksVigentes(
+        (data ?? []) as (AiComplianceCheck & { ai_systems: { tenant_id: string } | null })[],
+      );
     } : skipToken,
   });
 }
