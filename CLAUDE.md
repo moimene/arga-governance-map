@@ -320,6 +320,98 @@ Re-medición del cierre anterior **sin darlo por bueno**. Ledger:
 
 **No verificado, y se dice:** el probe en vivo del RPC `fn_aims_close_technical_file` lo bloqueó el clasificador de permisos por poder mutar. Le falta la aserción de tenant, pero el guard de `fn_secretaria_evidence_bundle_insert_guard` lo hace **inalcanzable para `authenticated`** (inserta con `status='SEALED'` sin poner el flag de RPC gobernada) — evidencia **estática**, no medida.
 
+### Módulo AIMS — corrección a fondo tras el primer alta real (2026-09-07)
+
+Origen: el primer alta y autodiagnóstico de un sistema de IA en el tenant
+Garrigues (Harvey, `2f877e8c…`) y su informe de validación regulatoria. Detalle
+completo: `docs/superpowers/reviews/2026-09-07-cierre-aims-piloto-harvey.md`.
+
+**El informe validó la solidez regulatoria, NO sus premisas técnicas** — lo
+declara él mismo: no localizó el código ni el esquema. Contrastadas: las 28
+tablas `aims_*` sí existen con RLS, Garrigues tiene 0 filas en las 28 (el alta
+escribe sólo en `ai_systems`), y `ai_risk_assessments`/`ai_compliance_checks` no
+tienen `tenant_id` — su aislamiento va por join, y eso condiciona toda escritura
+nueva sobre ellas.
+
+**Tres defectos que el informe no podía ver, del dato real:**
+1. Las **Medidas Adicionales** se añadían, se pintaban y **se perdían al
+   enviar**: no entraban en `buildEvaluationPayload`.
+2. `difficulty` y `justification` se recogían y **no se persistían**. La escala
+   declara la justificación de `L8` obligatoria y la pantalla la pide con
+   asterisco: la única L8 de Harvey (`MG_LOGG_07`) perdió su motivo. De ahí la
+   regla nueva — **una `L8` sin justificación no acredita no-aplicabilidad**—,
+   que no es criterio inventado sino el que el catálogo ya declaraba.
+3. Reevaluar **duplicaba** `ai_compliance_checks`: medido, «Motor de triaje» de
+   ARGA tiene **28 filas para 7 códigos**. El histórico no se borra; manda la
+   más reciente por requisito.
+
+**El hallazgo de fondo.** Las 84 medidas guía desarrollan los arts. 9-15, 17, 72
+y 73: son las obligaciones del **proveedor de un sistema de ALTO riesgo**.
+Garrigues es **responsable del despliegue de riesgo limitado**. El 49 % no dice
+que cumpla a medias: dice que se le midió contra deberes que no le vinculan. El
+perfil de aplicabilidad (`src/lib/aims/perfil-aplicabilidad.ts`) lo acota por rol
+y nivel y **FALLA ABIERTO**: sin rol declarado, catálogo completo y se dice por
+qué. Medir de más y decirlo es conservador; medir de menos por un dato que falta
+esconde obligaciones.
+
+**Dos decisiones del usuario:**
+- **Híbrido legacy/backbone**: `ai_systems` sigue siendo el inventario y se le
+  añaden columnas; `aims_*` sólo para lo que no tiene sitio en legacy
+  (evidencias). Cero migración de dato, cero cambio ARGA.
+- **Catálogo del desplegador provisional y marcado**: 43 medidas derivadas de las
+  fuentes que el informe nombra (art. 4, art. 50.1/50.4, RGPD 28/35, gestión de
+  proveedor, deontología, anexo A de ISO 42001), **cada una con su norma y su
+  carácter — `OBLIGACION` o `MARCO_OPERATIVO`**. Ningún control de ISO ni de
+  deontología se presenta como obligación jurídica autónoma, y el art. 26 va
+  como marco operativo porque vincula en ALTO riesgo. Su composición es criterio
+  del **Comité de IA**: hasta que la valide, «cobertura provisional».
+
+**Criterios únicos, en módulos HOJA** (evitan el ciclo TDZ que ya tumbó
+`/secretaria` una vez): `conformidad.ts` (¿acredita esta medida?),
+`checks-vigentes.ts` (¿cuál manda?), `plan-adaptacion.ts`,
+`rol-regulatorio.ts`. Los importan el wizard, el informe y `readiness`: es lo
+que evita que la corrección llegue a una pantalla y sus hermanas sigan pintando
+lo contrario.
+
+**Qué acredita cada huella, y qué no** — la pantalla lo dice:
+- `aims_evidence_items.content_hash`: **navegador**. Que el fichero no cambió.
+  No acredita fecha cierta, ni identidad, ni integridad contextual.
+- `ai_risk_assessments.content_hash`: **servidor**, `sha512` sobre la fila al
+  congelar. Integridad y autoría. **No acredita fecha cierta**: `now()` es la
+  hora del servidor, no un sello de tiempo cualificado.
+- `evidentiary_posture` sólo admite `REFERENCE` por CHECK. Ampliarla exige una
+  migración, que es la fricción que debe tener.
+
+**GOTCHA que se repite y que costó una migración extra:** al crear una tabla,
+**revocar explícitamente lo que no se concede**. `authenticated` heredó DELETE y
+**TRUNCATE** sobre `aims_evidence_items` del `ALTER DEFAULT PRIVILEGES` del
+esquema, porque un `grant` es aditivo. TRUNCATE **no pasa por RLS**: habría
+vaciado la tabla de todos los tenants. Misma trampa que se retiró el 06 de otras
+cinco tablas. Lo cazó la sonda de aislamiento, no la revisión.
+
+**Otros GOTCHAs nuevos:**
+- **PostgREST no aplica a la MUTACIÓN el filtro sobre un recurso incrustado**,
+  sólo a la representación devuelta. Un `UPDATE ... .eq("ai_systems.tenant_id",…)`
+  escribiría igual y devolvería vacío: peor que nada, porque parece que falló.
+  En tablas sin `tenant_id`, el aislamiento de una escritura va en el CAMINO —
+  probar la pertenencia, acotar al sistema comprobado, y **comprobar que vuelve
+  fila**, porque la RLS filtra a cero SIN error.
+- `supabase.storage.from(bucket)` no es acceso a tabla y no lleva filtro por
+  columna: su aislamiento va en la RUTA (primer segmento = tenant).
+- Un `Blob` como cuerpo de subida llega vacío bajo el runner («No content
+  provided»); un `Uint8Array` viaja.
+- Migraciones: **5 aplicadas y registradas** (`20260907180000` … `220000`), todas
+  con verificación que ABORTA y control positivo del instrumento.
+
+**Gates:** `bun test` **4320 pass / 151 skip / 3 todo / 0 fail** (línea base
+4259); typecheck, lint y build limpios.
+
+**Pendiente y de quién es:** la composición del catálogo del desplegador (Comité
+de IA); la EIPD del art. 35 RGPD para Harvey (responsable de cumplimiento; el
+módulo la pregunta y registra la respuesta); y **Harvey no declara rol
+regulatorio** — hasta que se declare desde su ficha se mide contra las 84 y la
+pantalla lo dice.
+
 ### Verificación última conocida (2026-09-07, cuarta tanda del cierre)
 
 - `bun test`: **4217 pass / 151 skip / 3 todo / 0 fail** (23 565 aserciones, 476 ficheros). Línea base del 05: 4020 / 152.
