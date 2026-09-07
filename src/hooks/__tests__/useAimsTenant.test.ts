@@ -36,6 +36,7 @@ const HOOKS_ESPERADOS = [
   "src/hooks/useAiAssessments.ts",
   "src/hooks/useAiIncidents.ts",
   "src/hooks/useAiSystems.ts",
+  "src/hooks/useAimsEvidence.ts",
   "src/hooks/useAimsFria.ts",
   "src/hooks/useAimsMultiregime.ts",
   "src/hooks/useAimsTechnicalFile.ts",
@@ -161,7 +162,12 @@ describe("A1 — hooks AIMS aislados por tenant", () => {
     // que probar la pertenencia antes y comprobar el resultado después.
     for (const f of HOOKS) {
       const src = read(f);
-      const accesos = (src.match(/\.from\(/g) ?? []).length;
+      // `supabase.storage.from(bucket)` NO es acceso a una tabla y no puede
+      // llevar un filtro por columna: su aislamiento va en la RUTA y lo
+      // comprueba la política de `storage.objects`. Se descuenta aquí y se
+      // exige aparte, en el invariante de más abajo.
+      const accesosStorage = (src.match(/storage\s*\n?\s*\.from\(/g) ?? []).length;
+      const accesos = (src.match(/\.from\(/g) ?? []).length - accesosStorage;
       const altas = (src.match(/\.insert\(/g) ?? []).length;
       const escriturasSinColumna = SCOPING_POR_JOIN.has(f)
         ? (src.match(/\.update\(|\.delete\(/g) ?? []).length
@@ -171,6 +177,23 @@ describe("A1 — hooks AIMS aislados por tenant", () => {
         filtros,
         `${f}: ${accesos} accesos (${altas} altas, ${escriturasSinColumna} escrituras sin columna de tenant) y solo ${filtros} filtros por tenant_id`,
       ).toBeGreaterThanOrEqual(accesos - altas - escriturasSinColumna);
+    }
+  });
+
+  it("todo objeto de storage se guarda bajo el tenant, que es lo que comprueba su política", () => {
+    // Contrapartida de descontar `storage.from(` del conteo de arriba. El
+    // bucket de evidencias comprueba `(storage.foldername(name))[1] =
+    // fn_current_tenant_id()`, así que la ruta TIENE que empezar por el tenant.
+    // Sin esto, un `storage.from(...)` con la ruta mal construida saldría del
+    // conteo sin que nada vigilara su aislamiento.
+    for (const f of HOOKS) {
+      const src = read(f);
+      const usaStorage = /storage\s*\n?\s*\.from\(/.test(src);
+      if (!usaStorage) continue;
+      expect(
+        src,
+        `${f}: usa storage y no construye la ruta con el tenant delante`,
+      ).toMatch(/=\s*`\$\{tenantId\}\//);
     }
   });
 

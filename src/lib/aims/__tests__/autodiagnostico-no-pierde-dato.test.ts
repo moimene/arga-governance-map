@@ -3,8 +3,12 @@ import { readFileSync } from "node:fs";
 import {
   buildEvaluationPayload,
   restoreEvaluationState,
+  acreditaConformidad,
+  motivoNoAcredita,
+  MOTIVO_L5_SIN_EVIDENCIA,
   type MedidaAdicionalRef,
 } from "../evaluacion-payload";
+import { evidenciaCaducada, evidenciasPorMedida } from "@/hooks/useAimsEvidence";
 
 /**
  * Tres campos que el formulario recogía y el guardado tiraba.
@@ -157,5 +161,88 @@ describe("la pantalla del wizard usa el camino que persiste", () => {
     // Se busca el literal en la construcción del estado, no en el `<option>`,
     // que sí tiene que seguir ofreciendo «01: Media».
     expect(fuente).not.toMatch(/difficulty:\s*"01"/);
+  });
+});
+
+describe("una medida declarada hecha sin evidencia no acredita", () => {
+  it("L5 con evidenceCount 0 no acredita; con 1 sí", () => {
+    // «Documentada e implementada» sin nada detrás es una autodeclaración, y un
+    // porcentaje construido con autodeclaraciones no vale ni para auditoría
+    // interna ni para certificación ISO 42001.
+    expect(acreditaConformidad({ status: "L5", evidenceCount: 0 })).toBe(false);
+    expect(motivoNoAcredita({ status: "L5", evidenceCount: 0 })).toBe(MOTIVO_L5_SIN_EVIDENCIA);
+    expect(acreditaConformidad({ status: "L5", evidenceCount: 1 })).toBe(true);
+    expect(motivoNoAcredita({ status: "L5", evidenceCount: 1 })).toBeNull();
+  });
+
+  it("«no medido» NO es «cero»: las filas antiguas no se degradan", () => {
+    // Las 8 evaluaciones que ya están en Cloud se hicieron cuando el módulo no
+    // tenía dónde guardar evidencia. `undefined` significa que nadie la midió,
+    // y el proyecto ya aplica esa regla a los KPI: un error de lectura se
+    // propaga como «no medido», nunca como cero.
+    expect(acreditaConformidad({ status: "L5" })).toBe(true);
+    expect(acreditaConformidad({ status: "L5", evidenceCount: null })).toBe(true);
+  });
+
+  it("el payload sólo escribe evidenceCount cuando el llamante lo ha medido", () => {
+    const sinMedir = buildEvaluationPayload({ MG_RISK_01: { maturity: "L5" } }, MEDIDAS, REQUISITOS);
+    expect("evidenceCount" in sinMedir.findings[0]).toBe(false);
+
+    const medido = buildEvaluationPayload(
+      { MG_RISK_01: { maturity: "L5" } },
+      MEDIDAS,
+      REQUISITOS,
+      undefined,
+      [],
+      { MG_RISK_01: 2 },
+    );
+    expect(medido.findings[0].evidenceCount).toBe(2);
+  });
+
+  it("un requisito con una L5 sin evidencia queda NO_CONFORME", () => {
+    const out = buildEvaluationPayload(
+      { MG_RISK_01: { maturity: "L5" }, MG_RISK_02: { maturity: "L5" } },
+      MEDIDAS,
+      REQUISITOS,
+      undefined,
+      [],
+      { MG_RISK_01: 1, MG_RISK_02: 0 },
+    );
+    expect(out.checks[0].status).toBe("NO_CONFORME");
+
+    // Y con evidencia en las dos, conforme: la diferencia es el dato.
+    const conAmbas = buildEvaluationPayload(
+      { MG_RISK_01: { maturity: "L5" }, MG_RISK_02: { maturity: "L5" } },
+      MEDIDAS,
+      REQUISITOS,
+      undefined,
+      [],
+      { MG_RISK_01: 1, MG_RISK_02: 1 },
+    );
+    expect(conAmbas.checks[0].status).toBe("CONFORME");
+  });
+});
+
+describe("una evidencia caducada deja de contar", () => {
+  const base = {
+    id: "e1", tenant_id: "t", system_id: "s", kind: "INFORME", title: "SOC 2",
+    storage_path: null, external_ref: "ref", content_hash: null,
+    hash_algorithm: "SHA-512", hash_computed_in: "CLIENTE", document_date: null,
+    uploaded_by: null, evidentiary_posture: "REFERENCE", created_at: "2026-01-01",
+    links: [{ tipo: "MEDIDA" as const, ref: "MG_RISK_01" }],
+  };
+  const HOY = new Date("2026-09-07T12:00:00Z");
+
+  it("las certificaciones tienen ciclo anual: caducada no vincula", () => {
+    expect(evidenciaCaducada({ expires_on: "2026-09-06" }, new Date(HOY))).toBe(true);
+    expect(evidenciaCaducada({ expires_on: "2026-09-08" }, new Date(HOY))).toBe(false);
+    expect(evidenciaCaducada({ expires_on: null }, new Date(HOY))).toBe(false);
+  });
+
+  it("evidenciasPorMedida excluye las caducadas", () => {
+    const vigente = { ...base, id: "vig", expires_on: "2027-01-01" };
+    const caducada = { ...base, id: "cad", expires_on: "2026-01-01" };
+    const mapa = evidenciasPorMedida([vigente, caducada], new Date(HOY));
+    expect(mapa.MG_RISK_01?.map((e) => e.id)).toEqual(["vig"]);
   });
 });

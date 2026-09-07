@@ -131,13 +131,37 @@ describe("A3 — sin sellos fabricados", () => {
     // de hash (verificado en Cloud, 2026-09-05) y ninguna pantalla calcula uno.
     // La ficha de sistema y la declaración de conformidad —que el usuario
     // DESCARGA— anunciaban «Registro interno con hash SHA-512».
+    //
+    // ESTRECHADO, NO RELAJADO (2026-09-07): desde
+    // `20260907190000_aims_evidencias_por_medida` hay UNA tabla que sí lo
+    // guarda — `aims_evidence_items.content_hash`, medido en Cloud junto con
+    // `hash_algorithm` y `hash_computed_in`. Nombrar el hash ahí no es
+    // fabricar: es describir una columna que existe. Lo que sigue prohibido es
+    // nombrarlo en cualquier otra superficie, y lo que se AÑADE es que donde se
+    // nombre haya que decir DÓNDE se calcula: un hash de navegador acredita
+    // integridad, no fecha cierta ni identidad, y presentarlo a secas sería la
+    // misma sobreafirmación por otra puerta.
+    const FICHERO_DE_LA_TABLA_CON_HASH = "src/hooks/useAimsEvidence.ts";
     for (const f of superficieAims()) {
       const src = read(f);
-      // Se permite nombrarlo para NEGARLO ("sin hash", "no lleva hash").
-      for (const m of src.match(/[^\n]*SHA-?512[^\n]*/gi) ?? []) {
+      const menciones = src.match(/[^\n]*SHA-?512[^\n]*/gi) ?? [];
+      if (f === FICHERO_DE_LA_TABLA_CON_HASH) {
+        expect(menciones.length, `${f} ya no menciona el hash: revisa este invariante`).toBeGreaterThan(0);
+        expect(
+          /hash_computed_in|calculada? en el navegador|en CLIENTE/i.test(src),
+          `${f}: nombra el hash sin decir dónde se calcula`,
+        ).toBe(true);
+        expect(
+          /No acredita fecha cierta|no prueba fecha cierta/i.test(src),
+          `${f}: presenta el hash sin decir lo que NO acredita`,
+        ).toBe(true);
+        continue;
+      }
+      // En el resto se permite nombrarlo sólo para NEGARLO.
+      for (const m of menciones) {
         expect(
           /\bsin hash\b|no lleva hash|no calcula|no tienen? columna/i.test(m),
-          `${f}: afirma un hash que ninguna tabla guarda → ${m.trim()}`,
+          `${f}: afirma un hash que su tabla no guarda → ${m.trim()}`,
         ).toBe(true);
       }
     }

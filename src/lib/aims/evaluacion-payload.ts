@@ -39,7 +39,9 @@ export {
   NIVELES_CONFORMES,
   NIVEL_NO_APLICABLE,
   MOTIVO_L8_SIN_JUSTIFICAR,
+  MOTIVO_L5_SIN_EVIDENCIA,
   acreditaConformidad,
+  motivoNoAcredita,
 } from "./conformidad";
 
 export type EstadoMedida = {
@@ -81,6 +83,13 @@ export type EvaluationFinding = {
   requirementCode: string;
   /** Sólo las `MA` lo llevan: el catálogo no las conoce y hay que recolocarlas. */
   subpartId?: string;
+  /**
+   * Evidencias VIGENTES atadas a la medida en el momento de guardar. Se
+   * persiste para que el read model del dashboard pueda aplicar la regla sin
+   * volver a consultar. `undefined` en las filas anteriores al 2026-09-07:
+   * entonces no había dónde guardar evidencia, así que es «no medido».
+   */
+  evidenceCount?: number;
 };
 
 export type EvaluationCheck = {
@@ -122,8 +131,10 @@ function aFinding(
   medida: { id: string; description: string; requirementCode?: string; subpartId?: string },
   estado: EstadoMedida & { maturity: string },
   kind: "MG" | "MA",
+  evidenceCount?: number,
 ): EvaluationFinding {
   return {
+    ...(typeof evidenceCount === "number" ? { evidenceCount } : {}),
     code: medida.id,
     title: medida.description,
     status: estado.maturity,
@@ -147,15 +158,23 @@ export function buildEvaluationPayload(
    * segunda ruta por la que se pierdan.
    */
   additionalMeasures: MedidaAdicionalRef[] = [],
+  /**
+   * Evidencias vigentes por código de medida. Se omite cuando el llamante no
+   * las ha medido: entonces el finding no lleva `evidenceCount` y la regla no
+   * degrada nada, que es lo correcto para «no medido».
+   */
+  evidenciasPorMedida?: Record<string, number>,
 ): EvaluationPayload {
+  const cuenta = (id: string) => (evidenciasPorMedida ? evidenciasPorMedida[id] ?? 0 : undefined);
+
   // Sólo las medidas efectivamente contestadas generan finding.
   const findingsMG: EvaluationFinding[] = allMeasures
     .filter((m) => contestada(evaluations[m.id]))
-    .map((m) => aFinding(m, evaluations[m.id] as EstadoMedida & { maturity: string }, "MG"));
+    .map((m) => aFinding(m, evaluations[m.id] as EstadoMedida & { maturity: string }, "MG", cuenta(m.id)));
 
   const findingsMA: EvaluationFinding[] = additionalMeasures
     .filter((ma) => contestada(evaluations[ma.id]))
-    .map((ma) => aFinding(ma, evaluations[ma.id] as EstadoMedida & { maturity: string }, "MA"));
+    .map((ma) => aFinding(ma, evaluations[ma.id] as EstadoMedida & { maturity: string }, "MA", cuenta(ma.id)));
 
   const findings = [...findingsMG, ...findingsMA];
 
@@ -173,7 +192,14 @@ export function buildEvaluationPayload(
     ];
     const estados = ids.map((id) => evaluations[id]);
     const completo = estados.length > 0 && estados.every(contestada);
-    const conBrecha = estados.some((e) => contestada(e) && !acreditaConformidad({ status: e.maturity, justification: e.justification }));
+    const conBrecha = estados.some((e, i) =>
+      contestada(e) &&
+      !acreditaConformidad({
+        status: e.maturity,
+        justification: e.justification,
+        evidenceCount: cuenta(ids[i]),
+      }),
+    );
     return {
       requirement_code: req.code,
       requirement_title: req.title,

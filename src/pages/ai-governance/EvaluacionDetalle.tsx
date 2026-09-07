@@ -9,7 +9,7 @@ import {
   difficultyLabel,
   subpartTitle,
 } from "@/lib/aims/catalog-aesia";
-import { MOTIVO_L8_SIN_JUSTIFICAR, NIVEL_NO_APLICABLE, acreditaConformidad } from "@/lib/aims/conformidad";
+import { motivoNoAcredita } from "@/lib/aims/conformidad";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -44,6 +44,7 @@ type FindingPintable = {
   justification?: string | null;
   kind?: "MG" | "MA";
   requirementCode?: string;
+  evidenceCount?: number;
 };
 
 /**
@@ -586,9 +587,9 @@ export default function EvaluacionDetalle() {
                               {/* Una `L8` sin motivo no acredita no-aplicabilidad:
                                   la escala declara la justificación obligatoria. Se
                                   dice en la fila, que es donde se lee el nivel. */}
-                              {maturity === NIVEL_NO_APLICABLE && !acreditaConformidad(finding) && (
+                              {motivoNoAcredita(finding) && (
                                 <div className="mt-1 text-[10px] font-semibold text-[var(--status-error)]">
-                                  {MOTIVO_L8_SIN_JUSTIFICAR}
+                                  {motivoNoAcredita(finding)}
                                 </div>
                               )}
                               {finding?.justification && (

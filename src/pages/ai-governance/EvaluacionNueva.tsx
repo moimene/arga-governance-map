@@ -46,6 +46,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
+import { useEvidenceBySystem, evidenciasPorMedida } from "@/hooks/useAimsEvidence";
+import EvidenciaDeMedida from "@/components/ai-governance/EvidenciaDeMedida";
 import {
   useCreateComplianceChecks,
   useDraftAssessment,
@@ -61,6 +63,7 @@ import {
   restoreEvaluationState,
   NIVEL_NO_APLICABLE,
   MOTIVO_L8_SIN_JUSTIFICAR,
+  MOTIVO_L5_SIN_EVIDENCIA,
   type MedidaAdicionalRef,
 } from "@/lib/aims/evaluacion-payload";
 import {
@@ -214,6 +217,8 @@ export default function EvaluacionNueva() {
 
   const [step, setStep] = useState(1);
   const [systemId, setSystemId] = useState(params.get("system_id") ?? "");
+  const { data: evidencias = [] } = useEvidenceBySystem(systemId || undefined);
+
   const [framework, setFramework] = useState<"EU_AI_ACT" | "ISO_42001">("EU_AI_ACT");
   const [activeReqCode, setActiveReqCode] = useState<string>("QUALITY_MGMT");
   const [overallStatus, setOverallStatus] = useState("COMPLETADA");
@@ -296,10 +301,26 @@ export default function EvaluacionNueva() {
     [allMeasures, additionalMeasures],
   );
 
-  // Estadísticas globales de madurez y cálculo de planes PDA
+  /** Evidencias VIGENTES atadas a cada medida. Las caducadas no cuentan. */
+  const evidenciasDe = useMemo(() => evidenciasPorMedida(evidencias), [evidencias]);
+  const cuentaEvidencias = useMemo(() => {
+    const out: Record<string, number> = {};
+    medidasEvaluables.forEach((m) => {
+      out[m.id] = (evidenciasDe[m.id] ?? []).length;
+    });
+    return out;
+  }, [medidasEvaluables, evidenciasDe]);
+
+  // Estadísticas globales de madurez y cálculo de planes PDA. Con la cuenta de
+  // evidencias dentro: una medida en `L5` sin nada detrás es una
+  // autodeclaración y no suma al porcentaje.
   const stats = useMemo(() => {
-    return computeAssessmentStats(medidasEvaluables, evaluations);
-  }, [medidasEvaluables, evaluations]);
+    const conEvidencia: Record<string, { maturity?: string; difficulty?: string; justification?: string; evidenceCount?: number }> = {};
+    Object.entries(evaluations).forEach(([id, e]) => {
+      conEvidencia[id] = { ...(e ?? {}), evidenceCount: cuentaEvidencias[id] ?? 0 };
+    });
+    return computeAssessmentStats(medidasEvaluables, conEvidencia);
+  }, [medidasEvaluables, evaluations, cuentaEvidencias]);
 
   const activeRequirement = useMemo(() => {
     return requirements.find((r) => r.code === activeReqCode) || requirements[0];
@@ -361,6 +382,7 @@ export default function EvaluacionNueva() {
         requirements,
         undefined,
         additionalMeasures,
+        cuentaEvidencias,
       );
       return {
         payload,
@@ -377,7 +399,7 @@ export default function EvaluacionNueva() {
         },
       };
     },
-    [evaluations, allMeasures, requirements, additionalMeasures, systemId, framework, stats.maturityScore, notes],
+    [evaluations, allMeasures, requirements, additionalMeasures, cuentaEvidencias, systemId, framework, stats.maturityScore, notes],
   );
 
   // Reanudar: el finding persistido es round-trippable a propósito (nivel,
@@ -850,6 +872,21 @@ export default function EvaluacionNueva() {
                         state={state}
                         onChange={(key, value) => updateEvaluation(m.id, key, value)}
                       />
+                      {systemId && (
+                        <EvidenciaDeMedida
+                          systemId={systemId}
+                          measureId={m.id}
+                          vinculadas={evidenciasDe[m.id] ?? []}
+                          delSistema={evidencias}
+                        />
+                      )}
+                      {/* `L5` sin nada detrás es una autodeclaración: se dice en
+                          la propia medida y no suma al porcentaje. */}
+                      {state.maturity === "L5" && (evidenciasDe[m.id] ?? []).length === 0 && (
+                        <p className="text-[11px] font-semibold text-[var(--status-warning)]">
+                          {MOTIVO_L5_SIN_EVIDENCIA}: no computa como acreditada.
+                        </p>
+                      )}
                     </div>
                   );
                 })}

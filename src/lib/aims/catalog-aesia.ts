@@ -662,7 +662,7 @@ export interface AssessmentStats {
 
 export function computeAssessmentStats(
   measures: { id: string; description: string; requirementCode: string }[],
-  assessmentsMap: Record<string, { maturity?: string | null; difficulty?: string | null; justification?: string | null }>
+  assessmentsMap: Record<string, { maturity?: string | null; difficulty?: string | null; justification?: string | null; evidenceCount?: number | null }>
 ): AssessmentStats {
   const totalMeasures = measures.length;
   let diagnosedCount = 0;
@@ -682,7 +682,13 @@ export function computeAssessmentStats(
       // El criterio vive en `./conformidad` y es el mismo que persiste el
       // payload y que lee el KPI del dashboard. `L8` («no aplica») sólo
       // acredita CON su justificación: la escala la declara obligatoria.
-      if (acreditaConformidad({ status: maturity, justification: entry?.justification })) {
+      if (
+        acreditaConformidad({
+          status: maturity,
+          justification: entry?.justification,
+          evidenceCount: entry?.evidenceCount,
+        })
+      ) {
         matureConformingCount++;
       } else if (maturity === "L1" || maturity === "L2" || maturity === "L6") {
         gapMeasures.push({ id: m.id, description: m.description, planCode: plan.code });

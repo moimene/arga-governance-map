@@ -30,6 +30,9 @@ export const NIVEL_NO_APLICABLE = "L8";
 /** Copy único para la medida que declara «no aplica» y no dice por qué. */
 export const MOTIVO_L8_SIN_JUSTIFICAR = "No aplicable declarada sin justificación";
 
+/** Copy único para la medida que se declara hecha y no aporta nada detrás. */
+export const MOTIVO_L5_SIN_EVIDENCIA = "Declarada sin evidencia";
+
 /**
  * ¿Esta medida acredita conformidad?
  *
@@ -39,12 +42,46 @@ export const MOTIVO_L8_SIN_JUSTIFICAR = "No aplicable declarada sin justificaci�
  * era indistinguible de una motivada y contaba igual en el porcentaje.
  */
 export function acreditaConformidad(
-  finding: { status?: string | null; justification?: string | null } | null | undefined,
+  finding:
+    | {
+        status?: string | null;
+        justification?: string | null;
+        /**
+         * Evidencias VIGENTES atadas a la medida.
+         *
+         * `undefined` y `0` NO son lo mismo, y la diferencia importa: las filas
+         * anteriores al 2026-09-07 no midieron evidencia (no había dónde
+         * guardarla), así que `undefined` significa «no medido» y no degrada
+         * nada. Un `0` sí es una medida que se declara hecha sin nada detrás.
+         *
+         * Es la misma regla que el proyecto ya aplica a los KPI: un error de
+         * lectura se propaga como «no medido», nunca como cero.
+         */
+        evidenceCount?: number | null;
+      }
+    | null
+    | undefined,
 ): boolean {
   const nivel = (finding?.status ?? "").trim().toUpperCase();
   if (!NIVELES_CONFORMES.has(nivel)) return false;
   if (nivel === NIVEL_NO_APLICABLE) {
     return Boolean(finding?.justification && finding.justification.trim().length > 0);
   }
+  // `L5` = «documentada e implementada». Sin nada detrás es una
+  // autodeclaración, y un porcentaje construido con autodeclaraciones no vale
+  // para auditoría interna ni para certificación.
+  if (typeof finding?.evidenceCount === "number" && finding.evidenceCount <= 0) {
+    return false;
+  }
   return true;
+}
+
+/** Por qué una medida de nivel conforme no acredita. `null` si acredita. */
+export function motivoNoAcredita(
+  finding: { status?: string | null; justification?: string | null; evidenceCount?: number | null } | null | undefined,
+): string | null {
+  const nivel = (finding?.status ?? "").trim().toUpperCase();
+  if (!NIVELES_CONFORMES.has(nivel)) return null;
+  if (acreditaConformidad(finding)) return null;
+  return nivel === NIVEL_NO_APLICABLE ? MOTIVO_L8_SIN_JUSTIFICAR : MOTIVO_L5_SIN_EVIDENCIA;
 }
