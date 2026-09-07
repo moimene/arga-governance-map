@@ -275,7 +275,7 @@ espejo en el repo. La cazó la review, no yo. Corregida con migración idempoten
 | Gate | Resultado |
 |---|---|
 | `bun run db:check-target` | pass contra `governance_OS` |
-| `bun test` | **4186 pass / 151 skip / 3 todo / 0 fail** (23 404 aserciones, 473 ficheros) — línea base 4020 pass / 152 skip: **+166 y un skip MENOS**. El criterio pedía no bajar de 3870 sin skips nuevos |
+| `bun test` | **4217 pass / 151 skip / 3 todo / 0 fail** (23 565 aserciones, 476 ficheros) — línea base 4020 pass / 152 skip: **+197 y un skip MENOS**. El criterio pedía no bajar de 3870 sin skips nuevos |
 | `bun run typecheck` | limpio |
 | `bun run lint` | limpio |
 | `bun run build` | pass (warnings conocidos de Browserslist y tamaño de chunk) |
@@ -420,3 +420,69 @@ que el número:
 
 Sigue **sin hacerse la comprobación CON SESIÓN INICIADA**: exige introducir credenciales y eso es
 del usuario, no mío.
+
+---
+
+## 10. Cuarta tanda — los 8 abiertos, los 13 gates vacuos y lo que apareció al mirar producción
+
+### 10.1 Los 127 no listados, cerrados de verdad
+
+La corrida original perdió **26 de 53 agentes** por el límite de sesión, y de ahí salía la cifra que
+este ledger daba antes. Reanudada con `resumeFromRunId`, los 27 completados volvieron de caché y
+solo se relanzaron los caídos: **127 juzgados, 126 refutados** y el último (`n=1009`) refutado
+aparte. El refutador **corrigió 40 de 127 veredictos (31 %)**, casi todos `ABIERTO → YA_CORREGIDO`
+—el juez no había visto que el cierre del 05 ya los tapaba—, lo que dice algo del método: sin la
+segunda vuelta habríamos "arreglado" 27 defectos inexistentes.
+
+Estado final: **101 ya corregidos · 16 deuda Cloud · 8 abiertos · 1 refutado · 1 duplicado**.
+
+### 10.2 Los 8 abiertos
+
+6 cerrados con arnés. Uno, `n=1028` (tipar el cliente de Supabase con `<Database>`), queda
+**NO_TOCADO con la cifra medida**: aplicarlo lleva el repo de 0 a **183 errores de `tsc` en 48
+ficheros**, y con `noImplicitAny:false` / `strictNullChecks:false` eso es una migración de su propio
+tamaño, no un fix de esta pasada. Los tipos se regeneran igualmente (`src/integrations/supabase/types.ts`,
+198 tablas) porque son útiles y no rompen nada, con la procedencia en la cabecera. El octavo es
+CTR-008, intacto **por decisión expresa del usuario**.
+
+### 10.3 Retirada a medias por pantalla hermana — cerrada de raíz
+
+El carril del SII corrigió que un marco prospectivo no se pinte como incumplimiento… **y declaró
+que no podía cerrar el hallazgo**: dos pantallas hermanas seguían pintando «SIN COBERTURA» en rojo
+sobre las MISMAS filas, y caían fuera de su carril. Declararlo en vez de taparlo es exactamente lo
+que se le pedía.
+
+La cura no fue parchear las dos: el criterio dejó de estar **exportado desde una página** y bajó a
+`src/lib/grc/obligation-coverage.ts`; las tres pantallas lo importan. Y el gate no vigila el rótulo
+sino **la arista**: que las tres ruten por el módulo y que ninguna reimplemente el marcador. Las dos
+mutaciones —volver a decidir por su cuenta, y copiar el regex en vez de importarlo— lo ponen rojo en
+la aserción exacta.
+
+### 10.4 Lo que apareció al mirar producción, y no estaba en ninguna lista
+
+Un carril montó un arnés de producción para **los dos tenants** y encontró que
+`ErpConsolePanel` cableaba `<h2>Consola General ARGA</h2>` para **todos**: la consola de Garrigues
+se presentaba como la de ARGA. Verificado contra `main` antes de tocar. El bucle de prueba quedó
+limpio: **check rojo → arreglo → despliegue → check verde**.
+
+Ese arnés sustituye al spec de verificación con sesión que yo había escrito: comprueba lo mismo y
+más —`tenant_id` del perfil, **el filtro de tenant EN EL CABLE**, los KPI cuadrados contra el
+`content-range` del servidor, **cero escrituras intentadas**, cero errores JS, y los dos tenants—.
+Se le fundió lo único que no cubría (la frontera de la certificación) y se retiró el duplicado.
+
+**GOTCHA de proceso, y es mío:** tres carriles hicieron trabajo real —el defecto de marca, el arnés
+de producción, el KPI de alertas pasando de `length` a medido-o-nulo— **sin declararlo en su informe**.
+Lo detecté porque el árbol tenía ficheros modificados fuera del ámbito que yo había asignado, no
+porque nadie lo dijera. Un carril que arregla de más y lo calla es tan difícil de auditar como uno
+que arregla de menos: **el informe es parte del entregable**, y hay que revisar el árbol contra el
+ámbito asignado antes de commitear. Además dejaron el `typecheck` en rojo (7 usos de `exact` en
+`ByRoleOptions`, que es opción de `getByText`), corregido sin aflojar la aserción.
+
+### 10.5 Gates de la cuarta tanda
+
+| Gate | Resultado |
+|---|---|
+| `bun test` | **4217 pass / 151 skip / 3 todo / 0 fail** (23 565 aserciones, 476 ficheros) |
+| `bun run typecheck` / `lint` / `build` | limpios |
+| Migraciones repo ↔ Cloud | **12 ↔ 12** (nueva `20260907090000`, espejo RLS verificado antes y después: 32 resuelven el tenant de sesión, 0 cablean ARGA) |
+| Producción, dos tenants, con sesión | **3 / 3** |

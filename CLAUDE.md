@@ -292,7 +292,21 @@ Re-medición del cierre anterior **sin darlo por bueno**. Ledger:
 
 **No verificado, y se dice:** el probe en vivo del RPC `fn_aims_close_technical_file` lo bloqueó el clasificador de permisos por poder mutar. Le falta la aserción de tenant, pero el guard de `fn_secretaria_evidence_bundle_insert_guard` lo hace **inalcanzable para `authenticated`** (inserta con `status='SEALED'` sin poner el flag de RPC gobernada) — evidencia **estática**, no medida.
 
-### Verificación última conocida (2026-09-06, tercera tanda del cierre)
+### Verificación última conocida (2026-09-07, cuarta tanda del cierre)
+
+- `bun test`: **4217 pass / 151 skip / 3 todo / 0 fail** (23 565 aserciones, 476 ficheros). Línea base del 05: 4020 / 152.
+- `typecheck`, `lint` y `build`: limpios. Migraciones **12 en repo, 12 en Cloud**.
+- **Producción con sesión iniciada y los DOS tenants: 3/3** (`bunx playwright test --config=playwright.production.config.ts` con `PLAYWRIGHT_BASE_URL` a la URL pública). Ese arnés no solo lee rótulos: contrasta el `tenant_id` del perfil autenticado, exige el filtro `tenant_id=eq.…` **en el cable** de cada petición PostgREST, cuadra los KPI de pantalla contra el `content-range` del servidor, y asierta **cero escrituras de dominio intentadas** y cero errores JS. Es SOLO LECTURA a propósito: producción no se compila con `VITE_E2E`, así que `isRealQTSPForbidden()` devuelve false y el cortafuegos del QTSP está APAGADO.
+- **Los 127 hallazgos no listados quedan cerrados con las dos vueltas**: 127 juzgados, 126 refutados (el último aparte). El refutador **corrigió 40 (31 %)**, casi todos `ABIERTO → YA_CORREGIDO`. Final: 101 corregidos / 16 deuda Cloud / 8 abiertos / 1 refutado / 1 duplicado.
+- **Defecto encontrado al mirar producción, y no estaba en ninguna lista:** `ErpConsolePanel` cableaba `<h2>Consola General ARGA</h2>` para TODOS los tenants — la consola de Garrigues se presentaba como la de ARGA. Cerrado con el bucle completo: check rojo → arreglo → despliegue → check verde.
+- **GOTCHA de orquestación:** tres carriles hicieron trabajo real **sin declararlo en su informe** (el defecto de marca, el arnés de producción, un KPI que pasó de `length` a medido-o-nulo), y además dejaron el typecheck en rojo. Se detectó revisando el ÁRBOL contra el ámbito asignado, no por el informe. **El informe es parte del entregable**: cotejar `git status` con el perímetro de cada carril antes de commitear.
+- **El criterio de cobertura de una obligación vive en `src/lib/grc/obligation-coverage.ts`**, no exportado desde una página. Estaba en `ObligacionesList.tsx` y por eso la corrección llegó a una pantalla y no a sus dos hermanas (`ObligacionDetalle`, `PoliticaDetalle`), que pintaban «SIN COBERTURA» en rojo sobre las mismas filas. El gate vigila la ARISTA (que las tres importen y llamen, y que ninguna reimplemente el marcador), no el rótulo.
+- Árbol git compartido con material AJENO que no se commitea nunca: `Gobernanza ia/`, `docs/architecture*`, `DOC GRC/para tirar*`, `pkcs11.txt`, `scripts/*platform-architecture*` y los hunks de Archify en `.gitignore`, `README.md` y `package.json`. Stagear siempre por rutas explícitas.
+
+<details>
+<summary>Histórico (2026-09-06, tercera tanda del cierre)</summary>
+
+### Verificación (2026-09-06, tercera tanda del cierre)
 
 - `bun run db:check-target`: pass contra `governance_OS`.
 - `bun test`: **4184 pass / 151 skip / 3 todo / 0 fail** (23 398 aserciones, 473 ficheros). Línea base del 05: 4020 / 152 → **+164 y un skip MENOS**.
@@ -300,6 +314,8 @@ Re-medición del cierre anterior **sin darlo por bueno**. Ledger:
 - `e2e/18` golden path: **verde**, y con arnés de mutación (quitar `disabled` del botón de custodia lo pone rojo en la aserción exacta).
 - Migraciones de la jornada: **11 en el repo, 11 en Cloud** — paridad exacta comprobada contra `supabase_migrations.schema_migrations`. No se afirma paridad global del historial: el drift histórico previo sigue ahí.
 - Árbol git compartido con material AJENO que no se commitea nunca: `Gobernanza ia/`, `docs/architecture*`, `DOC GRC/para tirar*`, `pkcs11.txt`, `scripts/*platform-architecture*` y los hunks de Archify en `.gitignore`, `README.md` y `package.json`. Stagear siempre por rutas explícitas.
+
+</details>
 
 <details>
 <summary>Histórico (2026-07-21, cierre convocatoria integral)</summary>
