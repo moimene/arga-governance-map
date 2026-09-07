@@ -16,6 +16,14 @@ export type AiSystem = {
   use_case: string | null;
   /** Código de referencia AIMS opcional (legacy `ai_systems`). Surfaced by `EvaluacionNueva.tsx`. */
   aims_reference_code?: string | null;
+  /**
+   * Posición regulatoria de la entidad respecto al sistema (arts. 3.3, 3.4,
+   * 3.6, 3.7 y 3.68 del Reglamento (UE) 2024/1689). Determina qué obligaciones
+   * aplican. `null` en los sistemas anteriores al 2026-09-07.
+   */
+  regulatory_role?: string | null;
+  /** Motivación con fecha y autor del rol y de la clasificación de riesgo. */
+  regulatory_profile?: Record<string, unknown> | null;
   created_at: string;
 };
 

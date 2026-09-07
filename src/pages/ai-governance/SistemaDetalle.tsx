@@ -50,6 +50,7 @@ import {
   systemStatusChipClass,
   systemStatusLabel,
 } from "@/lib/aims/readiness";
+import { ETIQUETA_ROL, ROLES_REGULATORIOS, type RolRegulatorio } from "@/lib/aims/rol-regulatorio";
 import { useBodiesList } from "@/hooks/useBodies";
 import { buildMeetingHandoffPath } from "@/lib/secretaria/cross-module-handoff";
 import DeclaracionConformidadModal from "@/components/ai-governance/DeclaracionConformidadModal";
@@ -217,6 +218,7 @@ export default function SistemaDetalle() {
   const [editUseCase, setEditUseCase] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editAimsCode, setEditAimsCode] = useState("");
+  const [editRegulatoryRole, setEditRegulatoryRole] = useState("");
 
   // Escalation Form State.
   // El órgano destino sale de `governing_bodies` del tenant. Antes eran tres
@@ -270,6 +272,7 @@ export default function SistemaDetalle() {
     setEditUseCase(system.use_case || "");
     setEditDescription(system.description || "");
     setEditAimsCode(system.aims_reference_code || "");
+    setEditRegulatoryRole(system.regulatory_role || "");
     setShowEditModal(true);
   };
 
@@ -288,6 +291,9 @@ export default function SistemaDetalle() {
           use_case: editUseCase,
           description: editDescription,
           aims_reference_code: editAimsCode,
+          // `null` y no `""`: la columna tiene CHECK sobre un vocabulario
+          // cerrado y la cadena vacía no está en él.
+          regulatory_role: editRegulatoryRole || null,
         },
       });
       toast.success("Ficha del sistema actualizada correctamente");
@@ -455,6 +461,19 @@ export default function SistemaDetalle() {
           <div>
             <span className="text-[var(--g-text-secondary)] block mb-0.5">Tipo de Sistema:</span>
             <span className="font-semibold text-[var(--g-text-primary)]">{system.system_type || "No declarado"}</span>
+          </div>
+          {/* El rol determina qué obligaciones aplican. Sin él, el
+              autodiagnóstico mide contra el catálogo de un proveedor de alto
+              riesgo aunque la entidad sólo despliegue. */}
+          <div>
+            <span className="text-[var(--g-text-secondary)] block mb-0.5">Rol regulatorio:</span>
+            <span
+              className={`font-semibold ${system.regulatory_role ? "text-[var(--g-text-primary)]" : "text-[var(--status-warning)]"}`}
+            >
+              {system.regulatory_role
+                ? ETIQUETA_ROL[system.regulatory_role as RolRegulatorio] ?? system.regulatory_role
+                : "No declarado"}
+            </span>
           </div>
           <div>
             <span className="text-[var(--g-text-secondary)] block mb-0.5">Proveedor / Responsable:</span>
@@ -1157,6 +1176,28 @@ export default function SistemaDetalle() {
                     className="w-full h-9 px-3 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   />
+                </div>
+                <div className="col-span-2">
+                  <label className="block font-semibold text-[var(--g-text-primary)] mb-1">
+                    Rol de la entidad respecto al sistema
+                  </label>
+                  <select
+                    value={editRegulatoryRole}
+                    onChange={(e) => setEditRegulatoryRole(e.target.value)}
+                    className="w-full h-9 px-3 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <option value="">No declarado</option>
+                    {ROLES_REGULATORIOS.map((r) => (
+                      <option key={r.code} value={r.code}>
+                        {r.label} ({r.articulo})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">
+                    Determina qué catálogo de medidas evalúa el autodiagnóstico. Sin rol se mide
+                    contra el del proveedor de un sistema de alto riesgo.
+                  </p>
                 </div>
                 <div>
                   <label className="block font-semibold text-[var(--g-text-primary)] mb-1">Nivel de Riesgo</label>

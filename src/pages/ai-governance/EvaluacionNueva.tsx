@@ -52,6 +52,11 @@ import {
   useSaveAssessment,
 } from "@/hooks/useAiAssessments";
 import {
+  perfilAplicable,
+  AVISO_COBERTURA_PROVISIONAL,
+  procedenciaDe,
+} from "@/lib/aims/perfil-aplicabilidad";
+import {
   buildEvaluationPayload,
   restoreEvaluationState,
   NIVEL_NO_APLICABLE,
@@ -219,10 +224,33 @@ export default function EvaluacionNueva() {
   const [autoguardado, setAutoguardado] = useState<"limpio" | "guardando" | "guardado" | "error">("limpio");
   const [borradorCargado, setBorradorCargado] = useState<string | null>(null);
 
-  // Requisitos del marco seleccionado
-  const requirements: RequirementDef[] = useMemo(() => {
-    return getRequirementsForFramework(framework);
-  }, [framework]);
+  const selectedSystem = systems.find((s) => s.id === systemId);
+
+  /**
+   * Qué catálogo se evalúa.
+   *
+   * Las 84 medidas guía desarrollan los arts. 9 a 15, 17, 72 y 73: son las
+   * obligaciones del PROVEEDOR de un sistema de alto riesgo. Medir con ellas a
+   * un responsable del despliegue de riesgo limitado produce un porcentaje que
+   * no dice si cumple, sino que se le ha medido contra deberes que no le
+   * vinculan. El perfil lo acota por rol y nivel, y FALLA ABIERTO: sin rol
+   * declarado se usa el catálogo completo.
+   */
+  const perfil = useMemo(
+    () =>
+      framework === "ISO_42001"
+        ? {
+            requirements: getRequirementsForFramework(framework),
+            etiqueta: "ISO/IEC 42001",
+            motivo: "Marco operativo de madurez y documentación, no obligación jurídica autónoma.",
+            provisional: false,
+            sinRolDeclarado: false,
+          }
+        : perfilAplicable(selectedSystem, getRequirementsForFramework(framework)),
+    [framework, selectedSystem],
+  );
+
+  const requirements: RequirementDef[] = perfil.requirements;
 
   // Lista plana de medidas guía (MG)
   const allMeasures = useMemo(() => {
@@ -442,8 +470,6 @@ export default function EvaluacionNueva() {
     }
   };
 
-  const selectedSystem = systems.find((s) => s.id === systemId);
-
   return (
     <div className="p-6 md:p-8 max-w-6xl mx-auto space-y-6">
       {/* Header & Stepper */}
@@ -635,6 +661,35 @@ export default function EvaluacionNueva() {
             </div>
           </div>
 
+          {/* El perfil se declara donde se evalúa: es lo que explica por qué
+              hay 43 medidas y no 84, y de qué norma sale cada una. */}
+          <div
+            className={`p-4 border-l-4 space-y-1.5 ${
+              perfil.sinRolDeclarado
+                ? "bg-[var(--g-surface-subtle)] border-[var(--status-warning)]"
+                : "bg-[var(--g-surface-subtle)] border-[var(--g-brand-3308)]"
+            }`}
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold text-[var(--g-text-primary)]">
+                Perfil de aplicabilidad: {perfil.etiqueta}
+              </span>
+              <span className="text-xs text-[var(--g-text-secondary)]">
+                {requirements.reduce((n, r) => n + r.measures.length, 0)} medidas
+              </span>
+              {perfil.provisional && (
+                <span
+                  className="px-2 py-0.5 text-[10px] font-bold bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
+                  style={{ borderRadius: "var(--g-radius-full)" }}
+                >
+                  {AVISO_COBERTURA_PROVISIONAL}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-[var(--g-text-secondary)] leading-relaxed">{perfil.motivo}</p>
+          </div>
+
           {/* Requirement Tabs Layout */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {/* Sidebar list of Requirements */}
@@ -745,6 +800,31 @@ export default function EvaluacionNueva() {
                             <span className="text-xs text-[var(--g-text-secondary)]">
                               {subpartTitle(activeRequirement, m.subpartId)}
                             </span>
+                            {(() => {
+                              const proc = procedenciaDe(m.id);
+                              if (!proc) return null;
+                              // «Obligación» y «marco operativo» no son lo
+                              // mismo, y presentar un control de ISO 42001 como
+                              // deber jurídico sería fabricar una obligación.
+                              return (
+                                <span
+                                  className={`px-1.5 py-0.5 text-[10px] font-semibold ${
+                                    proc.caracter === "OBLIGACION"
+                                      ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
+                                      : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
+                                  }`}
+                                  style={{ borderRadius: "var(--g-radius-sm)" }}
+                                  title={
+                                    proc.caracter === "OBLIGACION"
+                                      ? `Obligación — ${proc.norma}`
+                                      : `Marco operativo de madurez, no obligación jurídica autónoma — ${proc.norma}`
+                                  }
+                                >
+                                  {proc.caracter === "OBLIGACION" ? "Obligación" : "Marco operativo"} ·{" "}
+                                  {proc.norma}
+                                </span>
+                              );
+                            })()}
                           </div>
                           <h3 className="text-sm font-bold text-[var(--g-text-primary)]">{m.description}</h3>
                         </div>

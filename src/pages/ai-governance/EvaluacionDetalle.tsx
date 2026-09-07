@@ -26,6 +26,13 @@ import {
   Sliders,
 } from "lucide-react";
 import { assessmentAcreditaConformidad } from "@/lib/aims/readiness";
+import {
+  AVISO_COBERTURA_PROVISIONAL,
+  AVISO_ISO_NO_ES_OBLIGACION,
+  DESPLIEGUE_REQUIREMENTS,
+  catalogoDeLosFindings,
+  procedenciaDe,
+} from "@/lib/aims/perfil-aplicabilidad";
 import { toast } from "sonner";
 
 type FindingPintable = {
@@ -179,7 +186,15 @@ export default function EvaluacionDetalle() {
   }
 
   const isIso = assessment.framework === "ISO_42001";
-  const catalog = isIso ? ISO_42001_REQUIREMENTS : AESIA_RIA_REQUIREMENTS;
+  // El catálogo se resuelve por el DATO, no por la columna `framework`: desde
+  // que hay perfil por rol, dos evaluaciones `EU_AI_ACT` pueden venir de
+  // catálogos distintos, y pintar la de un responsable del despliegue contra
+  // las 84 del proveedor mostraría 84 «Pendiente» y ninguna de las respondidas.
+  const catalog = catalogoDeLosFindings(assessment.findings, [
+    isIso ? ISO_42001_REQUIREMENTS : AESIA_RIA_REQUIREMENTS,
+    DESPLIEGUE_REQUIREMENTS,
+    isIso ? AESIA_RIA_REQUIREMENTS : ISO_42001_REQUIREMENTS,
+  ]);
 
   // Mapear findings para lookup rápido por código de medida
   const findingsMap: Record<string, FindingPintable> = {};
@@ -370,6 +385,21 @@ export default function EvaluacionDetalle() {
         )}
       </div>
 
+      {catalog === DESPLIEGUE_REQUIREMENTS && (
+        <div
+          className="p-4 bg-[var(--g-surface-subtle)] border-l-4 border-[var(--status-warning)] space-y-1"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <p className="text-xs font-bold text-[var(--g-text-primary)]">
+            {AVISO_COBERTURA_PROVISIONAL}
+          </p>
+          <p className="text-xs text-[var(--g-text-secondary)]">
+            Este autodiagnóstico se ha medido contra el catálogo del responsable del despliegue, no
+            contra las 84 medidas del proveedor de un sistema de alto riesgo. {AVISO_ISO_NO_ES_OBLIGACION}
+          </p>
+        </div>
+      )}
+
       {/* KPI Cards: Plan de Adaptación Breakdown */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div
@@ -514,7 +544,27 @@ export default function EvaluacionDetalle() {
                           <tr key={m.id} className="hover:bg-[var(--g-surface-subtle)]/30 transition-colors">
                             <td className="py-2.5 font-mono text-[var(--g-brand-3308)] font-semibold">{m.id}</td>
                             <td className="py-2.5 pr-4 text-[var(--g-text-primary)]">{m.description}</td>
-                            <td className="py-2.5 text-[var(--g-text-secondary)]">{subpartTitle(req, m.subpartId)}</td>
+                            <td className="py-2.5 text-[var(--g-text-secondary)]">
+                              {subpartTitle(req, m.subpartId)}
+                              {(() => {
+                                const proc = procedenciaDe(m.id);
+                                if (!proc) return null;
+                                return (
+                                  <div className="mt-0.5 text-[10px]">
+                                    <span
+                                      className={
+                                        proc.caracter === "OBLIGACION"
+                                          ? "font-semibold text-[var(--g-brand-3308)]"
+                                          : "text-[var(--g-text-secondary)]"
+                                      }
+                                    >
+                                      {proc.caracter === "OBLIGACION" ? "Obligación" : "Marco operativo"}
+                                    </span>{" "}
+                                    · {proc.norma}
+                                  </div>
+                                );
+                              })()}
+                            </td>
                             <td className="py-2.5">
                               {maturity ? (
                                 <span
