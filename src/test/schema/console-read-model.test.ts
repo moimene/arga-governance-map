@@ -115,8 +115,14 @@ describe("console read model — cada número nace de una query que existe", () 
   });
 
   it("Garrigues ve la verdad de Cloud, no un número prestado de ARGA", async () => {
-    // Control discriminante: si el read model cruzara tenants, estos dos
-    // recuentos coincidirían. ARGA tiene eventos y links; Garrigues no.
+    // DISCRIMINANTE REESCRITO (2026-09-07). El anterior usaba la AUSENCIA de
+    // eventos en Garrigues —`count === 0`— como prueba de que el read model no
+    // cruza tenants. Eso ataba el gate a que el tenant siguiera vacío: el día
+    // que Garrigues tenga su primer evento, el test se pone rojo por haber
+    // crecido y la salida fácil es borrar el evento, no arreglar nada.
+    //
+    // El discriminante que no depende de que un tenant esté vacío es el CRUCE:
+    // cada cliente mide lo suyo, y el de Garrigues no alcanza lo de ARGA.
     const eventosArga = await arga
       .from("governance_module_events")
       .select("id", { count: "exact", head: true })
@@ -125,11 +131,22 @@ describe("console read model — cada número nace de una query que existe", () 
       .from("governance_module_events")
       .select("id", { count: "exact", head: true })
       .eq("tenant_id", GARRIGUES_TENANT);
+    const cruzado = await garr
+      .from("governance_module_events")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", DEMO_TENANT);
 
     expect(eventosArga.error).toBeNull();
     expect(eventosGarr.error).toBeNull();
+    expect(cruzado.error).toBeNull();
+    // Anti-vacuidad: sin eventos en ARGA, el cruce de abajo daría 0 por el
+    // motivo equivocado y el control no discriminaría nada.
     expect(eventosArga.count!).toBeGreaterThan(0);
-    expect(eventosGarr.count).toBe(0);
+    // Se MIDE: un error de PostgREST no puede volver a pasar por «no hay».
+    expect(eventosGarr.count, "el recuento de Garrigues vino a null").not.toBeNull();
+    // Y la sesión de Garrigues no alcanza los eventos de ARGA, tenga los suyos
+    // o no los tenga todavía.
+    expect(cruzado.count).toBe(0);
   });
 
   it("TODA columna que el hook consulta existe en Cloud (arista, no copia)", async () => {

@@ -9,31 +9,37 @@
 //   1. El acuse ramifica según el plazo REAL del art. 9.2.c. Antes anunciaba
 //      «emitido en plazo legal» sin comparar con nada, y un acuse tardío se
 //      celebraba igual que uno puntual.
-//   2. La marca `firmeza` se reaplica desde el catálogo al leer localStorage.
-//      Un navegador con la clave ya creada devolvía el JSON viejo SIN la marca
-//      y el badge «Simulado» desaparecía de la lista y de la ficha: la arista se
-//      rompía por CACHÉ, con el rótulo bien puesto.
+//   2. La marca `firmeza` se reaplica desde el catálogo al leer el almacén.
+//      Una fila ya escrita SIN la marca hacía desaparecer el badge «Simulado»
+//      de la lista y de la ficha: la arista se rompía por el dato guardado, con
+//      el rótulo bien puesto.
 //   3. El asiento del Libro-registro se asigna en el ALTA (PI-31, Anexo §4: el
 //      Instructor le da número de entrada y fecha de recepción dentro de los
 //      siete días) y el cierre solo lo COMPLETA. Antes solo existía al cerrar,
 //      y hasta entonces la tabla lo recalculaba en cada render.
 //
-// El canal es DEMO LOCAL por decisión de producto: aquí no se escribe en
-// Supabase, se ejercita el almacén de este navegador. Que es exactamente lo que
-// el producto hace.
+// Desde 2026-09-07 el canal PERSISTE en Cloud (`sii.reports`). Aquí se
+// ejercita contra el doble en memoria de esa tabla —los tests no salen a la
+// red—, que es el mismo camino de código que en producción: no hay respaldo a
+// `localStorage` ni rama por tenant.
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { mockearModulos } from "../garrigues/_mock-restaurable";
+import { mockearAlmacenSii, reiniciarAlmacen, sembrarFilas, filasDe } from "./_almacen-memoria";
 
 const ARGA = "00000000-0000-0000-0000-000000000001";
 
 const tenantActual: string | null = ARGA;
+const restaurarAlmacen = await mockearAlmacenSii();
 const restaurarMocks = await mockearModulos([
   ["@/context/TenantContext", () => ({ useTenantContext: () => ({ tenantId: tenantActual }) })],
 ]);
-afterAll(restaurarMocks);
+afterAll(() => {
+  restaurarMocks();
+  restaurarAlmacen();
+});
 
 const {
   getStoredReports,
@@ -42,14 +48,24 @@ const {
   useEmitAcknowledgment,
   useCloseRootCase,
 } = await import("@/hooks/useWhistleblowing");
-const { siiStorageKey } = await import("@/lib/sii/tenant-scope");
 type Expediente = ReturnType<typeof initialReportsFor>[number];
 
-/** Escribe el bucket de este tenant. `saveStoredReports` no se exporta, y no se
- *  exporta a propósito: el almacén se escribe desde las mutaciones. Aquí se
- *  monta el ESTADO DE PARTIDA, que es lo que un navegador ya tendría. */
-const sembrar = (reports: Expediente[]) =>
-  localStorage.setItem(siiStorageKey(ARGA), JSON.stringify(reports));
+/** Monta el ESTADO DE PARTIDA de la tabla. El almacén solo se escribe desde las
+ *  mutaciones, así que aquí se inserta directo. El `origen` se deduce igual que
+ *  en producción: del catálogo lo que el catálogo declara, y ALTA el resto. */
+const sembrar = (reports: Expediente[]) => {
+  const delCatalogo = new Set(initialReportsFor(ARGA).map((r) => r.code));
+  reiniciarAlmacen();
+  sembrarFilas(
+    reports.map((report, i) => ({
+      tenant_id: ARGA,
+      code: report.code,
+      origen: delCatalogo.has(report.code) ? "CATALOGO" : "ALTA",
+      orden: i,
+      report,
+    })),
+  );
+};
 
 function wrapper({ children }: { children: ReactNode }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -71,8 +87,8 @@ const ALTA = {
   detailedDescription: "Se describe una incidencia de procedimiento sin indicios penales.",
 };
 
-beforeEach(() => localStorage.clear());
-afterEach(() => localStorage.clear());
+beforeEach(() => reiniciarAlmacen());
+afterEach(() => reiniciarAlmacen());
 
 describe("SII — el acuse distingue en plazo, fuera de plazo y exceptuado", () => {
   it("dentro de los 7 días naturales: enPlazo = true y el mensaje lo dice", async () => {
@@ -129,10 +145,10 @@ describe("SII — la marca `firmeza` la fija el catálogo, no el almacén", () =
 
     // El bucket que dejó la versión anterior: mismos expedientes, sin `firmeza`.
     const viejos = catalogo.map(({ firmeza: _f, ...resto }) => resto);
-    localStorage.setItem(siiStorageKey(ARGA), JSON.stringify(viejos));
-    expect(JSON.parse(localStorage.getItem(siiStorageKey(ARGA))!)[0].firmeza).toBeUndefined();
+    sembrar(viejos as typeof catalogo);
+    expect(filasDe(ARGA)[0].report).not.toHaveProperty("firmeza");
 
-    const leidos = getStoredReports(ARGA);
+    const leidos = await getStoredReports(ARGA);
     for (const r of leidos) {
       expect(r.firmeza, `${r.code} vuelve a leerse sin marca de simulado`).toBe(
         catalogo.find((c) => c.code === r.code)!.firmeza,
@@ -146,11 +162,51 @@ describe("SII — la marca `firmeza` la fija el catálogo, no el almacén", () =
     const { result } = renderHook(() => useCreateWhistleblowingReport(), { wrapper });
     const { report } = await result.current.mutateAsync(ALTA);
 
-    const releido = getStoredReports(ARGA).find((r) => r.id === report.id);
+    const releido = (await getStoredReports(ARGA)).find((r) => r.id === report.id);
     expect(releido).toBeTruthy();
     expect(releido!.firmeza).toBeUndefined();
     // Y los del catálogo, en el mismo bucket, siguen marcados.
-    expect(getStoredReports(ARGA).filter((r) => !!r.firmeza).length).toBeGreaterThan(0);
+    expect((await getStoredReports(ARGA)).filter((r) => !!r.firmeza).length).toBeGreaterThan(0);
+  });
+});
+
+describe("SII — el alta persiste: correlativo, orden y aislamiento", () => {
+  it("el correlativo sale del MÁXIMO usado, no de contar filas", async () => {
+    // Contar filas repetía código en cuanto una serie tenía huecos —y con el
+    // almacén compartido entre equipos los tiene—. El índice único
+    // (tenant_id, code) convertiría la colisión en un error; el objetivo es no
+    // provocarla.
+    sembrar([
+      { ...initialReportsFor(ARGA)[0], code: "SII-2026-08-007", id: "rep-previo" } as Expediente,
+    ]);
+    const { result } = renderHook(() => useCreateWhistleblowingReport(), { wrapper });
+    const { code } = await result.current.mutateAsync(ALTA);
+    expect(code, "el correlativo ha reutilizado un número ya usado").toBe("SII-2026-08-008");
+  });
+
+  it("el alta se coloca DELANTE y ahí sigue al releer", async () => {
+    // El almacén anterior anteponía al array y el orden se perdía al recargar.
+    // `orden` es lo que lo conserva entre sesiones.
+    sembrar(initialReportsFor(ARGA));
+    const { result } = renderHook(() => useCreateWhistleblowingReport(), { wrapper });
+    const { code } = await result.current.mutateAsync(ALTA);
+
+    const enPantalla = (await getStoredReports(ARGA)).map((r) => r.code);
+    expect(enPantalla[0], "el expediente recién dado de alta no aparece el primero").toBe(code);
+    // Y los del catálogo conservan su orden relativo detrás.
+    expect(enPantalla.slice(1)).toEqual(initialReportsFor(ARGA).map((r) => r.code));
+  });
+
+  it("el alta queda ESCRITA en el almacén, no solo devuelta por la mutación", async () => {
+    // Es la diferencia entre persistir y no persistir, y la que un test que
+    // solo mire el valor de retorno no ve.
+    const { result } = renderHook(() => useCreateWhistleblowingReport(), { wrapper });
+    const { code } = await result.current.mutateAsync(ALTA);
+
+    const fila = filasDe(ARGA).find((f) => f.code === code);
+    expect(fila, "la mutación devolvió un expediente que no escribió").toBeDefined();
+    expect(fila!.tenant_id, "el expediente se ha escrito sin tenant o con otro").toBe(ARGA);
+    expect(fila!.origen, "un alta del usuario no es del catálogo").toBe("ALTA");
   });
 });
 
@@ -184,7 +240,7 @@ describe("SII — el asiento del Libro-registro se asigna al dar de alta", () =>
     // cierran en el almacén: lo que se prueba aquí es la identidad del asiento,
     // no el circuito de subexpedientes, que tiene sus propios tests.
     sembrar(
-      getStoredReports(ARGA).map((r) =>
+      (await getStoredReports(ARGA)).map((r) =>
         r.id === report.id
           ? { ...r, subcases: r.subcases.map((sub) => ({ ...sub, status: "CERRADO" as const })) }
           : r,
@@ -208,8 +264,9 @@ describe("SII — el asiento del Libro-registro se asigna al dar de alta", () =>
     expect(cierre.incorporadoAlCierre).toBe(true);
     expect(cierre.resultOutcome).toContain("Sin indicios");
 
-    await waitFor(() => {
-      expect(getStoredReports(ARGA).find((r) => r.id === report.id)?.closedAt).toBeTruthy();
+    await waitFor(async () => {
+      const releido = (await getStoredReports(ARGA)).find((r) => r.id === report.id);
+      expect(releido?.closedAt).toBeTruthy();
     });
   });
 });

@@ -8,7 +8,7 @@ import { useTenantBranding } from "@/context/TenantBrandContext";
 import { groupFullLabel } from "@/lib/tenant-brand-labels";
 import {
   ORDEN_BANDAS, COLOR_BANDA, ETIQUETA_BANDA, NOTA_ESCALA, tieneEjes,
-  riskScore, matchesScoreFilter, countSeverity,
+  riskScore, matchesScoreFilter, countSeverity, lecturaRiesgo,
 } from "@/lib/grc/assessed-band";
 
 const FILTER_ALL = "Todos";
@@ -122,7 +122,11 @@ function RiskCard({
   risk: RiskRow;
   scope: SecretariaScopeController;
 }) {
-  const score = riskScore(risk);
+  // Un riesgo puede traer banda Y ejes desde que se retiró la CHECK que lo
+  // impedía (20260907T2). El criterio de qué se pinta es del módulo, no de esta
+  // tarjeta: con las dos, se pintan las dos.
+  const lectura = lecturaRiesgo(risk);
+  const score = lectura.score;
 
   return (
     <article
@@ -154,27 +158,28 @@ function RiskCard({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {tieneEjes(risk) ? (
+        {lectura.muestraEjes && (
           <span
             className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[var(--g-surface-subtle)] text-[var(--g-text-primary)]"
             style={{ borderRadius: "var(--g-radius-full)" }}
           >
             Prob. {risk.probability} · Impacto {risk.impact}
           </span>
-        ) : risk.assessed_band ? (
+        )}
+        {lectura.muestraBanda && lectura.banda && (
           <span
             className="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
             style={{ borderRadius: "var(--g-radius-full)" }}
-            title={NOTA_ESCALA}
+            title={lectura.avisoDobleLectura ?? NOTA_ESCALA}
           >
             <span
               aria-hidden="true"
               className="inline-block h-2.5 w-2.5 border border-[var(--g-border-subtle)]"
-              style={{ backgroundColor: COLOR_BANDA[risk.assessed_band], borderRadius: "var(--g-radius-sm)" }}
+              style={{ backgroundColor: COLOR_BANDA[lectura.banda], borderRadius: "var(--g-radius-sm)" }}
             />
-            {ETIQUETA_BANDA[risk.assessed_band]}
+            {ETIQUETA_BANDA[lectura.banda]}
           </span>
-        ) : null}
+        )}
         {risk.residual_score !== null && (
           <span
             className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
@@ -269,7 +274,10 @@ export default function Risk360() {
     () =>
       ORDEN_BANDAS.map((b) => ({
         banda: b,
-        items: risks.filter((r) => !tieneEjes(r) && r.assessed_band === b),
+        // Un riesgo con banda pertenece a la tira de bandas AUNQUE tenga
+        // también ejes: el `!tieneEjes(r)` que había aquí lo sacaba del mapa
+        // que declara su banda, que es ocultar una de las dos lecturas.
+        items: risks.filter((r) => r.assessed_band === b),
       })).filter((g) => g.items.length > 0),
     [risks],
   );

@@ -6,7 +6,8 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTenantContext } from "@/context/TenantContext";
-import { siiStorageKey, siiQueryKey } from "@/lib/sii/tenant-scope";
+import { siiQueryKey } from "@/lib/sii/tenant-scope";
+import { selectReports, upsertReports, type FilaExpediente } from "@/lib/sii/store";
 import { toast } from "sonner";
 import {
   type WhistleblowingReport,
@@ -366,21 +367,17 @@ const ARGA_TENANT = "00000000-0000-0000-0000-000000000001";
 /**
  * Set inicial por tenant, y ÚNICO sitio donde se decide.
  *
- * getStoredReports tenía TRES caminos que devolvían las denuncias de ARGA:
- * el guard de SSR, el bucket vacío y el `catch` de JSON corrupto. Cambiar solo
- * la clave no habría cerrado la fuga: con bucket propio, Garrigues habría
- * estrenado uno vacío y el código le habría copiado dentro los casos de ARGA.
- * Y el `catch` los devuelve SIN sembrar, así que no deja rastro en el almacén
- * y es el más difícil de reproducir de los tres. Las tres puertas pasan por
- * aquí.
+ * Es la semilla del almacén: `leerFilas` la escribe la primera vez que un
+ * tenant abre el canal, y a partir de ahí manda la tabla. Un tenant sin
+ * expedientes declarados arranca VACÍO, que es lo honesto: no tiene ninguno.
+ * Que esta función sea el único sitio donde se decide es lo que impide que un
+ * tenant estrene el almacén con las denuncias de otro.
  *
- * Los expedientes demo de Garrigues (materia de despacho) los siembra la
- * Tarea 7; hasta entonces arranca vacío, que es honesto: no tiene ninguno.
+ * Exportada para poder PROBARLA invocándola. El guard de aislamiento anterior
+ * recortaba el cuerpo del lector y lo comparaba como texto: un
+ * `initialReportsFor` que devolviera siempre los casos de ARGA lo satisfacía.
+ * Ver `src/test/sii/sii-tenant-scope.test.ts`.
  */
-/* Exportadas para poder PROBARLAS invocándolas. El guard anterior de aislamiento
-   recortaba el cuerpo de `getStoredReports` y lo comparaba como texto: un
-   `initialReportsFor` que devolviera siempre los casos de ARGA lo satisfacía.
-   Ver `src/test/sii/sii-tenant-scope.test.ts`. */
 export function initialReportsFor(tenantId: string): WhistleblowingReport[] {
   if (tenantId === ARGA_TENANT) return INITIAL_SII_REPORTS;
   // Los tres de Garrigues son SIMULADOS y se dice en pantalla; su materia sí
@@ -397,40 +394,32 @@ export function initialReportsFor(tenantId: string): WhistleblowingReport[] {
 /**
  * Los campos que fija el CATÁLOGO, no el almacén.
  *
- * `getStoredReports` solo siembra cuando la clave no existe. Un navegador con la
- * clave ya creada devuelve el JSON viejo, así que **cualquier campo que el
- * catálogo decida y el almacén copie se queda congelado en el valor anterior**.
- * La arista se rompe por CACHÉ, no por criterio: el valor está bien puesto y
- * bien pintado, pero no llega. Ya pasó con `firmeza` (el badge «Simulado»
- * desaparecía) y volvió a pasar con `channel`: al corregir los dos casos
- * anónimos de `WEB_ANONIMO` a `POSTAL` —art. 3.c del PI-31, que reserva la vía
- * web a la modalidad confidencial— el navegador de la demo seguía pintando
- * «WEB ANONIMO» en el listado, en la ficha y en el asiento del Libro-registro.
+ * El catálogo puede corregirse después de sembrar —ya pasó con `firmeza`, cuyo
+ * badge «Simulado» desaparecía, y con `channel`, al pasar los dos casos
+ * anónimos de `WEB_ANONIMO` a `POSTAL` por el art. 3.c del PI-31—. Una fila ya
+ * escrita no se entera de esa corrección, así que se reaplica al leer.
  *
- * Por eso la lista es EXPLÍCITA y vive aquí: añadir un campo derivado de
- * política al catálogo obliga a añadirlo también a `CAMPOS_DEL_CATALOGO`, y el
- * gate de `sii-anonimo-via-postal.test.tsx` lo comprueba sobre una clave
- * PREEXISTENTE, que es el escenario que se escapaba.
- *
- * No se versiona la clave porque eso tiraría los expedientes que el usuario haya
- * dado de alta. Un expediente de alta NO está en el catálogo y por tanto no
- * recibe nada — que es lo correcto: ni es simulado ni su canal lo decide el
- * despacho.
+ * QUÉ CAMBIÓ AL PERSISTIR EN CLOUD (2026-09-07). Antes esto se aplicaba a
+ * CUALQUIER expediente cuyo `code` coincidiera con uno del catálogo. Que hoy no
+ * pisara nada era una coincidencia de dos hechos frágiles: los códigos de alta
+ * llevan el mes `08` y los del catálogo no, y ninguna mutación toca estos siete
+ * campos. Con el almacén compartido entre equipos ninguna de las dos cosas es
+ * garantía, así que la reaplicación se limita a las filas cuyo `origen` es
+ * `CATALOGO` — las que el catálogo posee de verdad—. Una edición sobre un
+ * expediente dado de alta ya no puede ser pisada, ni por coincidencia de código
+ * ni por un cambio futuro del catálogo.
  *
  * QUÉ ENTRA Y QUÉ NO. Entra lo que decide el CATÁLOGO y la aplicación no deja
  * cambiar: la marca de simulado, el canal, la modalidad de anonimato, la
- * categoría, la severidad y los dos textos. Ninguna mutación de este fichero
- * los toca, así que reaplicarlos no puede pisar trabajo de nadie.
+ * categoría, la severidad y los dos textos.
  *
  * NO entra `status`, aunque el catálogo lo declare: lo mueve el instructor
  * —`useEmitAcknowledgment` escribe ACUSE_EMITIDO, `useApproveExtension`
  * PRORROGA_ACTIVA y `useCloseRootCase` RESUELTO_MEDIDAS o ARCHIVADO_MOTIVADO—.
- * Reaplicarlo devolvería un expediente cerrado a
- * "en investigación", que es un daño mayor que el que se venía a evitar. Lo que
- * sí se descarta es un estado que el motor NO TIENE: eso no es tramitación, es
- * un valor viciado del almacén (`ADMITIDA` se sembró así y el dashboard lo
- * pinta crudo). Tampoco entra `assignedInvestigatorName`, que la recusación
- * sustituye.
+ * Reaplicarlo devolvería un expediente cerrado a "en investigación", que es un
+ * daño mayor que el que se venía a evitar. Lo que sí se descarta es un estado
+ * que el motor NO TIENE: eso no es tramitación, es un valor viciado del almacén.
+ * Tampoco entra `assignedInvestigatorName`, que la recusación sustituye.
  */
 const CAMPOS_DEL_CATALOGO = [
   "firmeza",
@@ -442,46 +431,60 @@ const CAMPOS_DEL_CATALOGO = [
   "detailedDescription",
 ] as const;
 
-function reaplicarCamposDelCatalogo(
-  tenantId: string,
-  almacenados: WhistleblowingReport[],
-): WhistleblowingReport[] {
+function reaplicarCamposDelCatalogo(tenantId: string, filas: FilaExpediente[]): FilaExpediente[] {
   const catalogo = new Map(initialReportsFor(tenantId).map((r) => [r.code, r]));
-  return almacenados.map((r) => {
-    const delCatalogo = catalogo.get(r.code);
-    if (!delCatalogo) return r;
+  return filas.map((fila) => {
+    // Solo las filas que el catálogo posee. Un alta del usuario no se toca.
+    if (fila.origen !== "CATALOGO") return fila;
+    const delCatalogo = catalogo.get(fila.code);
+    if (!delCatalogo) return fila;
     const parche: Partial<WhistleblowingReport> = {};
     for (const campo of CAMPOS_DEL_CATALOGO) {
       (parche as Record<string, unknown>)[campo] = delCatalogo[campo];
     }
     // El estado lo mueve el instructor y por eso no se reaplica; pero uno que
     // el motor no reconoce no es un estado avanzado, es basura del almacén.
-    if (!(WHISTLEBLOWING_STATUSES as readonly string[]).includes(r.status)) {
+    if (!(WHISTLEBLOWING_STATUSES as readonly string[]).includes(fila.report.status)) {
       parche.status = delCatalogo.status;
     }
-    return { ...r, ...parche };
+    return { ...fila, report: { ...fila.report, ...parche } };
   });
 }
 
-export function getStoredReports(tenantId: string): WhistleblowingReport[] {
-  if (typeof window === "undefined") return initialReportsFor(tenantId);   // puerta 1
-  const raw = localStorage.getItem(siiStorageKey(tenantId));
-  if (!raw) {                                                              // puerta 2
-    const inicial = initialReportsFor(tenantId);
-    localStorage.setItem(siiStorageKey(tenantId), JSON.stringify(inicial));
-    return inicial;
-  }
-  try {
-    return reaplicarCamposDelCatalogo(tenantId, JSON.parse(raw));
-  } catch {
-    return initialReportsFor(tenantId);                                    // puerta 3
-  }
+/**
+ * Lee las filas del tenant. Si no tiene ninguna, siembra el catálogo.
+ *
+ * La siembra es idempotente por `(tenant_id, code)` y se pide con
+ * `ignorarDuplicados`: dos pestañas abriendo el módulo a la vez no se pisan.
+ */
+export async function leerFilas(tenantId: string): Promise<FilaExpediente[]> {
+  const filas = await selectReports(tenantId);
+  if (filas.length > 0) return reaplicarCamposDelCatalogo(tenantId, filas);
+
+  const semilla: FilaExpediente[] = initialReportsFor(tenantId).map((report, i) => ({
+    code: report.code,
+    origen: "CATALOGO",
+    // El orden del catálogo es el orden en que está escrito: los tres de ARGA
+    // no están ordenados por fecha de entrada, así que ordenarlos por fecha
+    // movería de sitio las tres fichas de la demo.
+    orden: i,
+    report,
+  }));
+  if (semilla.length === 0) return [];
+  await upsertReports(tenantId, semilla, { ignorarDuplicados: true });
+  // Se relee en vez de devolver la semilla: si otra pestaña ganó la carrera,
+  // lo que vale es lo que hay en la tabla.
+  return reaplicarCamposDelCatalogo(tenantId, await selectReports(tenantId));
 }
 
-function saveStoredReports(tenantId: string, reports: WhistleblowingReport[]) {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(siiStorageKey(tenantId), JSON.stringify(reports));
-  }
+/** Los expedientes del tenant, en el orden en que la pantalla los espera. */
+export async function getStoredReports(tenantId: string): Promise<WhistleblowingReport[]> {
+  return (await leerFilas(tenantId)).map((f) => f.report);
+}
+
+/** Guarda UNA fila. Las mutaciones tocan un expediente, no la colección. */
+async function guardarFila(tenantId: string, fila: FilaExpediente): Promise<void> {
+  await upsertReports(tenantId, [fila]);
 }
 
 // ─── Hooks Principales ───────────────────────────────────────────────────────
@@ -492,7 +495,7 @@ export function useWhistleblowingReports() {
     queryKey: siiQueryKey(tenantId, "reports", "list"),
     enabled: !!tenantId,
     queryFn: async (): Promise<WhistleblowingReport[]> => {
-      return getStoredReports(tenantId!);
+      return await getStoredReports(tenantId!);
     },
   });
 }
@@ -503,7 +506,7 @@ export function useWhistleblowingReportById(idOrCode: string | undefined) {
     queryKey: siiQueryKey(tenantId, "report", idOrCode),
     enabled: !!idOrCode && !!tenantId,
     queryFn: async (): Promise<WhistleblowingReport | null> => {
-      const reports = getStoredReports(tenantId!);
+      const reports = await getStoredReports(tenantId!);
       return reports.find((r) => r.id === idOrCode || r.code === idOrCode) ?? null;
     },
   });
@@ -515,7 +518,7 @@ export function useWhistleblowingReportByToken(token: string | undefined) {
     queryKey: siiQueryKey(tenantId, "safe-inbox", token),
     enabled: !!token && token.trim().length > 0 && !!tenantId,
     queryFn: async (): Promise<WhistleblowingReport | null> => {
-      const reports = getStoredReports(tenantId!);
+      const reports = await getStoredReports(tenantId!);
       return reports.find((r) => r.trackingToken.toUpperCase() === token.trim().toUpperCase()) ?? null;
     },
   });
@@ -527,7 +530,7 @@ export function useWhistleblowingLibroRegistro() {
     queryKey: siiQueryKey(tenantId, "libro-registro"),
     enabled: !!tenantId,
     queryFn: async (): Promise<WhistleblowingLibroRegistroEntry[]> => {
-      const reports = getStoredReports(tenantId!);
+      const reports = await getStoredReports(tenantId!);
       return reports.map((r) => {
         if (r.libroRegistroEntry) return r.libroRegistroEntry;
         return generateLibroRegistroEntry(r);
@@ -560,8 +563,17 @@ export function useCreateWhistleblowingReport() {
       isBoardOrExecutiveTarget?: boolean;
       attachments?: Array<{ name: string; size: number }>;
     }): Promise<{ report: WhistleblowingReport; trackingToken: string; code: string }> => {
-      const reports = getStoredReports(tenantId!);
-      const nextNum = reports.length + 1;
+      const filas = await leerFilas(tenantId!);
+      // El correlativo se deriva del MÁXIMO ya usado, no del número de filas:
+      // con el almacén compartido entre equipos, contar filas repite código en
+      // cuanto dos altas se cruzan. Sigue habiendo carrera —dos altas
+      // simultáneas piden el mismo número—, pero el índice único
+      // `(tenant_id, code)` la convierte en un error visible en vez de en un
+      // duplicado silencioso.
+      const usados = filas
+        .map((f) => Number(f.code.match(/^SII-2026-08-(\d+)$/)?.[1] ?? 0))
+        .filter((n) => Number.isFinite(n));
+      const nextNum = Math.max(filas.length, ...usados, 0) + 1;
       const code = `SII-2026-08-${String(nextNum).padStart(3, "0")}`;
 
       // Identidad del circuito POR TENANT. Estaba cableada a una persona real
@@ -571,7 +583,7 @@ export function useCreateWhistleblowingReport() {
       // Código de seguimiento. Se generaba con Math.random(), que es
       // predecible: para un código que da acceso a un expediente, el generador
       // criptográfico del navegador cuesta lo mismo. Lo que NO cambia es que el
-      // expediente vive en localStorage, y eso lo dice la pantalla.
+      // expediente se guarda sin cifrar, y eso lo dice la pantalla.
       const bloque = () => {
         const b = new Uint8Array(3);
         globalThis.crypto.getRandomValues(b);
@@ -688,8 +700,15 @@ export function useCreateWhistleblowingReport() {
         numeroEntradaAsignadoAt: now.toISOString(),
       };
 
-      const updated = [newReport, ...reports];
-      saveStoredReports(tenantId!, updated);
+      // Delante de todo, como hacía el almacén anterior al anteponerlo al
+      // array. `orden` es lo que conserva esa colocación entre sesiones.
+      const primero = Math.min(0, ...filas.map((f) => f.orden));
+      await guardarFila(tenantId!, {
+        code,
+        origen: "ALTA",
+        orden: primero - 1,
+        report: newReport,
+      });
       queryClient.invalidateQueries({ queryKey: siiQueryKey(tenantId) });
 
       return { report: newReport, trackingToken, code };
@@ -713,9 +732,10 @@ export function useSendSafeInboxMessage() {
       sender: "INFORMANTE" | "INSTRUCTOR";
       senderAlias?: string;
     }) => {
-      const reports = getStoredReports(tenantId!);
-      const rep = reports.find((r) => r.id === reportId);
-      if (!rep) throw new Error("Expediente no encontrado.");
+      const filas = await leerFilas(tenantId!);
+      const fila = filas.find((f) => f.report.id === reportId);
+      if (!fila) throw new Error("Expediente no encontrado.");
+      const rep = fila.report;
 
       const newMsg: WhistleblowingMessage = {
         id: `msg-${Date.now()}`,
@@ -727,7 +747,7 @@ export function useSendSafeInboxMessage() {
       };
 
       rep.messages.push(newMsg);
-      saveStoredReports(tenantId!, reports);
+      await guardarFila(tenantId!, fila);
       queryClient.invalidateQueries({ queryKey: siiQueryKey(tenantId) });
       return newMsg;
     },
@@ -748,9 +768,10 @@ export function useEmitAcknowledgment() {
       isExempt?: boolean;
       exemptReason?: string;
     }) => {
-      const reports = getStoredReports(tenantId!);
-      const rep = reports.find((r) => r.id === reportId);
-      if (!rep) throw new Error("Expediente no encontrado.");
+      const filas = await leerFilas(tenantId!);
+      const fila = filas.find((f) => f.report.id === reportId);
+      if (!fila) throw new Error("Expediente no encontrado.");
+      const rep = fila.report;
 
       const now = new Date();
       let enPlazo: boolean | null = null;
@@ -779,7 +800,7 @@ export function useEmitAcknowledgment() {
         });
       }
 
-      saveStoredReports(tenantId!, reports);
+      await guardarFila(tenantId!, fila);
       queryClient.invalidateQueries({ queryKey: siiQueryKey(tenantId) });
       // `enPlazo` es `null` cuando el acuse quedó exceptuado: no hay plazo que
       // juzgar. Quien lo consuma no puede confundir "exceptuado" con "en plazo".
@@ -800,9 +821,10 @@ export function useApproveExtension() {
       reportId: string;
       reason: string;
     }) => {
-      const reports = getStoredReports(tenantId!);
-      const rep = reports.find((r) => r.id === reportId);
-      if (!rep) throw new Error("Expediente no encontrado.");
+      const filas = await leerFilas(tenantId!);
+      const fila = filas.find((f) => f.report.id === reportId);
+      if (!fila) throw new Error("Expediente no encontrado.");
+      const rep = fila.report;
 
       const now = new Date();
       rep.extensionApproved = true;
@@ -823,7 +845,7 @@ export function useApproveExtension() {
         sentAt: now.toISOString(),
       });
 
-      saveStoredReports(tenantId!, reports);
+      await guardarFila(tenantId!, fila);
       queryClient.invalidateQueries({ queryKey: siiQueryKey(tenantId) });
       return rep;
     },
@@ -846,9 +868,10 @@ export function useFormalizeRecusation() {
       details: string;
       substitutedByName: string;
     }) => {
-      const reports = getStoredReports(tenantId!);
-      const rep = reports.find((r) => r.id === reportId);
-      if (!rep) throw new Error("Expediente no encontrado.");
+      const filas = await leerFilas(tenantId!);
+      const fila = filas.find((f) => f.report.id === reportId);
+      if (!fila) throw new Error("Expediente no encontrado.");
+      const rep = fila.report;
 
       const recusation: WhistleblowingRecusation = {
         id: `rec-${Date.now()}`,
@@ -867,7 +890,7 @@ export function useFormalizeRecusation() {
       rep.recusations.push(recusation);
       rep.assignedInvestigatorName = substitutedByName;
 
-      saveStoredReports(tenantId!, reports);
+      await guardarFila(tenantId!, fila);
       queryClient.invalidateQueries({ queryKey: siiQueryKey(tenantId) });
       return recusation;
     },
@@ -892,9 +915,10 @@ export function useUpdateSubcaseStatus() {
       closingReason?: string;
       remediationPlanId?: string;
     }) => {
-      const reports = getStoredReports(tenantId!);
-      const rep = reports.find((r) => r.id === reportId);
-      if (!rep) throw new Error("Expediente no encontrado.");
+      const filas = await leerFilas(tenantId!);
+      const fila = filas.find((f) => f.report.id === reportId);
+      if (!fila) throw new Error("Expediente no encontrado.");
+      const rep = fila.report;
 
       const sub = rep.subcases.find((s) => s.id === subcaseId);
       if (!sub) throw new Error("Subexpediente no encontrado.");
@@ -906,7 +930,7 @@ export function useUpdateSubcaseStatus() {
         sub.remediationPlanId = remediationPlanId;
       }
 
-      saveStoredReports(tenantId!, reports);
+      await guardarFila(tenantId!, fila);
       queryClient.invalidateQueries({ queryKey: siiQueryKey(tenantId) });
       return sub;
     },
@@ -929,9 +953,10 @@ export function useCloseRootCase() {
       closingReason: string;
       actionsTaken: string[];
     }) => {
-      const reports = getStoredReports(tenantId!);
-      const rep = reports.find((r) => r.id === reportId);
-      if (!rep) throw new Error("Expediente no encontrado.");
+      const filas = await leerFilas(tenantId!);
+      const fila = filas.find((f) => f.report.id === reportId);
+      if (!fila) throw new Error("Expediente no encontrado.");
+      const rep = fila.report;
 
       const guard = validateCaseCloseoutGuard(rep);
       if (!guard.canClose) {
@@ -959,7 +984,7 @@ export function useCloseRootCase() {
           : {}),
       };
 
-      saveStoredReports(tenantId!, reports);
+      await guardarFila(tenantId!, fila);
       queryClient.invalidateQueries({ queryKey: siiQueryKey(tenantId) });
       return rep;
     },

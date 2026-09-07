@@ -21,6 +21,7 @@
 // el actual (pasa).
 import { describe, expect, it } from "vitest";
 import { sinComentarios } from "../helpers/sin-comentarios";
+import { SII_AVISO_PERSISTENCIA } from "@/lib/sii/whistleblowing-engine";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
@@ -196,20 +197,19 @@ describe("SII — lo que SÍ debe seguir dicho", () => {
     expect(/[Cc]onfidencialidad reforzada/.test(todo)).toBe(true);
   });
 
-  it("dice en pantalla que la persistencia es local y sin eficacia jurídica", () => {
-    // Decisión de producto: el canal no se conecta a Cloud, Y LA PANTALLA LO
-    // DICE. Si el aviso desaparece, el módulo vuelve a aparentar producción.
+  it("el aviso de persistencia se RENDERIZA en las cinco pantallas del canal", () => {
+    // Coverage, y control positivo del resto del bloque: una pantalla en blanco
+    // no tiene `{SII_AVISO_PERSISTENCIA}` en ningún sitio, así que no puede
+    // satisfacer esto. Si el aviso desaparece de una pantalla, el módulo vuelve
+    // a aparentar producción sin decir lo que es.
     //
     // El guard exigía solo que la constante APARECIERA en el fuente, y el
-    // `import` bastaba: borrar el `{SII_AVISO_PERSISTENCIA_LOCAL}` renderizado
+    // `import` bastaba: borrar el `{SII_AVISO_PERSISTENCIA}` renderizado
     // dejando el import mantenía el test en verde (derrotado por mutación en la
-    // review adversarial). Ahora se exige la aparición DENTRO de JSX —`{…}`—,
-    // que es la forma en que un texto llega a la pantalla, y no en la línea de
-    // import.
+    // review adversarial). Se exige la aparición DENTRO de JSX —`{…}`—, que es
+    // la forma en que un texto llega a la pantalla.
     const renderiza = (src: string) =>
-      /\{\s*SII_AVISO_PERSISTENCIA_LOCAL\s*\}/.test(
-        src.replace(/^import[^;]*;$/gm, ""),
-      );
+      /\{\s*SII_AVISO_PERSISTENCIA\s*\}/.test(src.replace(/^import[^;]*;$/gm, ""));
     const pantallas = superficie.filter(([f]) => f.startsWith("src/pages/sii/"));
     const conAviso = pantallas.filter(([, src]) => renderiza(src));
     expect(conAviso.map(([f]) => f).sort()).toEqual([
@@ -219,6 +219,80 @@ describe("SII — lo que SÍ debe seguir dicho", () => {
       "src/pages/sii/SiiPortalIntake.tsx",
       "src/pages/sii/SiiSafeInbox.tsx",
     ]);
+  });
+
+  it("ese aviso dice lo que HAY y lo que NO hay, y ninguna de las dos mitades sobra", () => {
+    // POR QUÉ ESTE TEST CAMBIÓ EL 2026-09-07. El anterior se llamaba «dice en
+    // pantalla que la persistencia es local» y solo comprobaba en qué ficheros
+    // aparecía la constante. Cuando el usuario derogó la decisión de no
+    // conectar el canal a Cloud, el TEXTO de esa constante pasó a ser falso
+    // —«no hay base de datos», «se borran al limpiar los datos del
+    // navegador»— y el gate no se enteraba: fijaba el reparto por pantallas y
+    // no la afirmación. Es el patrón «un gate que fija la afirmación en vez de
+    // prohibirla»: mientras el reparto no se moviera, la mentira pasaba.
+    //
+    // Ahora se juzga el TEXTO. Y las dos mitades, porque cada una protege de un
+    // fallo distinto: sin la primera el aviso puede volver a negar la base de
+    // datos que sí existe; sin la segunda puede empezar a prometer cifrado o
+    // custodia que no existen.
+    const aviso = SII_AVISO_PERSISTENCIA;
+    expect(aviso.length, "el aviso se ha vaciado").toBeGreaterThan(120);
+
+    // (a) Lo retirado: era cierto con `localStorage` y dejó de serlo.
+    for (const [patron, motivo] of [
+      [/únicamente en el navegador/i, "el expediente ya no vive solo en este equipo"],
+      [/no hay base de datos/i, "sí hay base de datos: `sii.reports`"],
+      [/se borran al limpiar los datos del navegador/i, "el dato persiste; ese era el encargo"],
+      [/no se guarda en ningún servidor/i, "se guarda en el servidor del prototipo"],
+    ] as Array<readonly [RegExp, string]>) {
+      expect(patron.test(aviso), `el aviso sigue diciendo ${patron} — ${motivo}`).toBe(false);
+    }
+
+    // (b) Lo que hay: base de datos y aislamiento por tenant. Se comprueba el
+    //     concepto, no la redacción: reformular el aviso no debe romper esto,
+    //     pero callarse el almacenamiento sí.
+    expect(/base de datos/i.test(aviso), "no dice que hay base de datos").toBe(true);
+    expect(/aislad[ao]|aislamiento/i.test(aviso), "no dice que está aislada por tenant").toBe(true);
+    expect(/tenant/i.test(aviso), "no nombra el tenant como frontera del aislamiento").toBe(true);
+
+    // (c) Lo que NO hay, y que persistir no ha traído. La lista es la del
+    //     alcance vigente de EAD Trust: sin firma, sin sello, sin custodia
+    //     cualificada y sin eficacia jurídica.
+    expect(/[Nn]o hay\b/.test(aviso), "el aviso ya no niega nada").toBe(true);
+    for (const [patron, que] of [
+      [/cifrado/i, "cifrado"],
+      [/sello de tiempo/i, "sello de tiempo"],
+      [/custodia/i, "custodia por un tercero cualificado"],
+      [/eficacia jurídica/i, "eficacia jurídica"],
+      [/demostración|demo\b/i, "que el dato es de demostración"],
+    ] as Array<readonly [RegExp, string]>) {
+      expect(patron.test(aviso), `el aviso deja de mencionar ${que}`).toBe(true);
+    }
+  });
+
+  it("ninguna pantalla del canal sigue diciendo que el expediente vive solo en este equipo", () => {
+    // La otra mitad del mismo defecto, y la que se escapa siempre: se corrige
+    // la constante y las seis frases sueltas que decían lo mismo sobreviven en
+    // toasts, subtítulos y rótulos. Pasó nueve veces en dos días en este repo.
+    const patrones: Array<readonly [RegExp, string]> = [
+      [/(?:solo|únicamente)\s+(?:funciona\s+)?(?:en\s+)?este\s+(?:mismo\s+)?navegador/i,
+        "el código de seguimiento abre el expediente desde cualquier equipo del tenant"],
+      [/en\s+este\s+navegador/i, "el expediente no se guarda en el navegador"],
+      [/no se guarda en ningún servidor/i, "se guarda en la base de datos del prototipo"],
+      [/[Dd]atos solo en este navegador/, "rótulo de la portada del módulo"],
+    ];
+    for (const [patron, motivo] of patrones) {
+      const infractores = superficie.filter(([, src]) => patron.test(src)).map(([f]) => f);
+      expect(infractores, `${patron} — ${motivo}`).toEqual([]);
+    }
+
+    // Control positivo del instrumento: el mismo barrido SÍ encuentra algo que
+    // el módulo dice de verdad. Sin esto, una `superficie` vacía —un `RUTAS`
+    // roto, un `leer` que devuelve ""— haría pasar los cuatro patrones sin
+    // mirar una sola línea. Se ancla en la ley que el módulo implementa, no en
+    // una palabra que este mismo barrido acaba de eliminar.
+    expect(superficie.filter(([, src]) => /Ley 2\/2023/.test(src)).length,
+      "el barrido no encuentra NADA: la superficie está vacía y el guard no mide").toBeGreaterThan(2);
   });
 
   it("el libro-registro distingue asiento incorporado, asignado y calculado al vuelo", () => {

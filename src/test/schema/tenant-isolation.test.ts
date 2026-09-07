@@ -33,7 +33,8 @@ const DOMAIN_TABLES = [
   // Carril CONSOLA (2026-09-05): el read model pasó a contarlas tenant-scoped.
   // Una tabla que la consola cuenta y el gate no vigila es el hueco por el que
   // un número cruza de tenant. Las direcciones vacuas van declaradas en
-  // aislamiento-declarado.ts con motivo y fuente, no silenciadas.
+  // aislamiento-declarado.ts —PENDIENTE, o NINGUNA con motivo y fuente— y
+  // contadas contra un techo, no silenciadas.
   "delegations", "notifications", "condiciones_persona",
   "incidents", "evidence_bundles",
   "governance_module_events", "governance_module_links",
@@ -78,13 +79,15 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
   // login para que los 50 tests del fichero pasaran a verde sin haber mirado
   // Cloud. Sin ellos, un fallo de sesión es un rojo, que es lo que debe ser.
   //
-  // 2026-09-07 (gate vacuo nº8): las 9 tablas `ai_*`/`aims_*` siguen siendo
-  // vacuas en la dirección «ARGA no ve filas Garrigues» —0 filas suyas, medido
-  // en Cloud— y su vacuidad sigue DECLARADA en `aislamiento-declarado.ts`. Lo
-  // que faltaba no era una aserción más aquí, sino una fila que aislar: la pone
-  // `src/test/schema/garrigues-ia-owner-write.test.ts`, que da de alta un
-  // sistema de IA propio del tenant, comprueba las dos direcciones contra él y
-  // lo borra.
+  // 2026-09-07 (gate vacuo nº8): las 8 tablas `ai_*`/`aims_*` que quedan siguen
+  // siendo vacuas en la dirección «ARGA no ve filas Garrigues» —0 filas suyas,
+  // medido en Cloud— y su vacuidad sigue DECLARADA en
+  // `aislamiento-declarado.ts`, ahora como `PENDIENTE` y bajo el techo del
+  // trinquete. Lo que faltaba no era una aserción más aquí, sino una fila que
+  // aislar: la pone `src/test/schema/garrigues-ia-owner-write.test.ts`, que da
+  // de alta un sistema de IA propio del tenant, comprueba las dos direcciones
+  // contra él y lo borra. `ai_systems` ya no la necesita — tiene fila propia
+  // persistente.
 
   it("el gate cubre de verdad las superficies que dice cubrir", () => {
     // Control positivo del INSTRUMENTO. Todas las aserciones del bucle son de
@@ -112,19 +115,18 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
   });
 
   // Las dos direcciones NO tienen la misma fuerza, y el gate no finge que sí:
-  //  - "Garrigues no ve filas ARGA": aserción real en las 7 tablas, porque
+  //  - "Garrigues no ve filas ARGA": aserción real en las 25 tablas, porque
   //    ARGA tiene filas en todas. Es además la dirección de riesgo real (el
   //    dato histórico y sensible es el de ARGA).
   //  - "ARGA no ve filas Garrigues": vacua en las tablas donde Garrigues aún
-  //    no tiene dato propio — al 2026-08-16, `document_templates` (0 filas) y
-  //    `agreements` (0 filas). Ahí se comprueba que ARGA no ve algo que no
-  //    existe.
-  // NO se siembran filas falsas para cerrar ese hueco: un gate honesto y más
-  // débil vale más que uno fuerte de mentira. En vez de eso, cada iteración
-  // pregunta a Garrigues si tiene dato propio y DECLARA la vacuidad en la
-  // salida del runner, de modo que el aviso desaparece solo el día que la
-  // tabla se siembre (el comentario no se queda desfasado).
-  // El bucle genera 14 tests (7 tablas × 2 direcciones), más los 5 fijos = 19.
+  //    no tiene dato propio. Ahí se comprueba que ARGA no ve algo que no existe.
+  //
+  // Nunca se han sembrado filas falsas para cerrar ese hueco, y sigue sin
+  // hacerse: la vacuidad se DECLARA por tabla (abajo) y se le pone TECHO en
+  // `aislamiento-declarado.ts`. Lo que cambió el 2026-09-07 es que ese hueco ya
+  // no se cierra fabricando dato sino sembrando el tenant de verdad, y cada
+  // tabla sembrada convierte su mitad vacua en aserción real SOLA, sin que
+  // nadie edite este fichero.
   for (const table of DOMAIN_TABLES) {
     it(`Garrigues no ve filas ARGA en ${table}`, async () => {
       const { data, error } = await garr.from(table).select("tenant_id").limit(500);
@@ -144,20 +146,28 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
       // se venía señalando con un `console.warn`, que es la forma más educada
       // de un gate que no lo es — nadie lee los warns de una suite verde.
       //
-      // Ahora ROMPE, salvo que la ausencia esté DECLARADA con su motivo y su
-      // fuente en `aislamiento-declarado.ts`. No se silencia la vacuidad: se le
-      // pone dueño. Y si una tabla declarada como vacía deja de estarlo, el
-      // test de esa declaración también rompe.
+      // Ahora ROMPE, salvo que la ausencia esté DECLARADA en
+      // `aislamiento-declarado.ts`, como decisión permanente (`NINGUNA`, con
+      // motivo y fuente) o como paso pendiente de la siembra (`PENDIENTE`).
+      // La vacuidad no se silencia: se le pone dueño aquí y se le pone TECHO
+      // allí, contando sobre el dato medido.
+      //
+      // 2026-09-07: `PENDIENTE` entra en esta lista blanca porque la orden
+      // vigente es que el tenant se vaya sembrando. Aflojar aquí no afloja el
+      // conjunto: cuando la tabla se siembre, esta rama deja de ejecutarse y la
+      // aserción de arriba pasa a probar aislamiento DE VERDAD, sin que nadie
+      // edite nada.
       const own = await garr.from(table).select("tenant_id").limit(1);
       expect(own.error, `${table}: la sonda de vacuidad no pudo consultar`).toBeNull();
       if ((own.data ?? []).length === 0) {
         const declarada = AISLAMIENTO_DECLARADO.find((t) => t.tabla === table);
         expect(
-          declarada?.garrigues,
-          `${table}: dirección VACUA sin declarar. Garrigues no tiene filas, así que esta ` +
-            "aserción no prueba aislamiento. Decláralo en aislamiento-declarado.ts con su " +
-            "motivo y su fuente, o averigua por qué falta el dato.",
-        ).toBe("NINGUNA");
+          ["NINGUNA", "PENDIENTE"],
+          `${table}: dirección VACUA declarada como ${declarada?.garrigues ?? "NADA"}. ` +
+            "Garrigues no tiene filas, así que esta aserción no prueba aislamiento. Decláralo " +
+            "en aislamiento-declarado.ts como PENDIENTE (se sembrará) o NINGUNA con motivo y " +
+            "fuente (decisión permanente), o averigua por qué falta el dato.",
+        ).toContain(declarada?.garrigues);
       }
     });
   }

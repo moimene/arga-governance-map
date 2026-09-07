@@ -5,9 +5,9 @@
 // no tiene filas en uno de los dos tenants, la aserción de aislamiento en esa
 // dirección pasa **sin comprobar nada**. Verde y vacía.
 //
-// Aquí la vacuidad no se tolera ni se prohíbe: se DECLARA, con su motivo y su
-// fuente, y la declaración se contrasta con lo que hay. Una ausencia esperada
-// que deja de serlo rompe igual que una presencia esperada que falta.
+// Aquí la vacuidad no se tolera ni se prohíbe: se MIDE y se cuenta contra un
+// techo commiteado (`VACUIDAD_MAXIMA`). Sembrar lo baja —progresar es verde—;
+// perder dato sembrado lo sube por encima del techo y rompe.
 import { beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sesionDe } from "../helpers/supabase-test-client";
@@ -16,58 +16,113 @@ import {
   ARGA,
   CON_AUSENCIA_DECLARADA,
   GARRIGUES,
+  VACUIDAD_MAXIMA,
+  direccionesVacuas,
+  type Conteo,
 } from "./aislamiento-declarado";
 import { verificarCita } from "./cita-verificable";
 
 describe("C3 Tarea 8 — la declaración de aislamiento cuadra con Cloud", () => {
   let arga: SupabaseClient;
   let garr: SupabaseClient;
+  /** Lo que hay de verdad. Se mide UNA vez y lo usan la declaración y el trinquete. */
+  const medido = new Map<string, Conteo>();
 
   beforeAll(async () => {
     // Sin graceful-skip. Una sonda que se salta a sí misma cuando no puede
     // autenticar es un gate verde que no asierta nada — que es justo el vicio
     // que este fichero existe para no repetir.
     [arga, garr] = await Promise.all([sesionDe("ARGA"), sesionDe("GARRIGUES")]);
-  }, 30_000);
 
-  it("cada presencia declarada es la que hay, en los dos tenants", async () => {
+    await Promise.all(
+      AISLAMIENTO_DECLARADO.map(async (t) => {
+        const [ra, rg] = await Promise.all([
+          arga.from(t.tabla).select("id").eq("tenant_id", ARGA).limit(1),
+          garr.from(t.tabla).select("id").eq("tenant_id", GARRIGUES).limit(1),
+        ]);
+        // Una medición fallida NO puede contarse como «cero filas»: eso
+        // convertiría un error de red en una vacuidad falsa, o peor, en un
+        // trinquete que baja solo. Se lanza y la suite se pone roja.
+        if (ra.error || rg.error) {
+          throw new Error(`${t.tabla}: medición fallida — ${(ra.error ?? rg.error)!.message}`);
+        }
+        medido.set(t.tabla, { arga: ra.data.length, garrigues: rg.data.length });
+      }),
+    );
+  }, 60_000);
+
+  it("cada presencia declarada es la que hay, en los dos tenants", () => {
     for (const t of AISLAMIENTO_DECLARADO) {
-      const { data: ra, error: ea } = await arga.from(t.tabla)
-        .select("id").eq("tenant_id", ARGA).limit(1);
-      const { data: rg, error: eg } = await garr.from(t.tabla)
-        .select("id").eq("tenant_id", GARRIGUES).limit(1);
-      expect(ea, `${t.tabla} (ARGA)`).toBeNull();
-      expect(eg, `${t.tabla} (Garrigues)`).toBeNull();
-
-      // `ALGUNA` que sale vacía = seed roto. `NINGUNA` que sale con filas =
-      // la decisión de no sembrar se revirtió sin actualizar la declaración.
-      // Las dos rompen, y es lo que convierte la declaración en aserción.
-      expect(ra.length > 0, `${t.tabla}: ARGA declarada ${t.arga}`).toBe(t.arga === "ALGUNA");
-      expect(rg.length > 0, `${t.tabla}: Garrigues declarada ${t.garrigues}`)
-        .toBe(t.garrigues === "ALGUNA");
+      const c = medido.get(t.tabla)!;
+      for (const [tenant, presencia, filas] of [
+        ["ARGA", t.arga, c.arga],
+        ["Garrigues", t.garrigues, c.garrigues],
+      ] as const) {
+        if (presencia === "ALGUNA") {
+          // LA PERSISTENCIA. Dato sembrado que desaparece es un defecto, no una
+          // limpieza: si esto se pone rojo, alguien borró o pisó filas del
+          // tenant y hay que recuperarlas, no bajar la declaración a PENDIENTE.
+          expect(filas, `${t.tabla}: ${tenant} declarada ALGUNA y no tiene NI UNA fila`)
+            .toBeGreaterThan(0);
+        } else if (presencia === "NINGUNA") {
+          // Ausencia permanente que deja de serlo: la decisión se revirtió sin
+          // decirlo. Rompe igual que la de arriba.
+          expect(filas, `${t.tabla}: ${tenant} declarada NINGUNA y tiene filas`).toBe(0);
+        }
+        // `PENDIENTE` no asierta el conteo A PROPÓSITO: con filas o sin ellas
+        // pasa, para que avanzar la siembra nunca ponga la corrida en rojo. Su
+        // vacuidad la vigila el trinquete, que mide y no cree a la etiqueta.
+      }
     }
   });
 
-  it("toda ausencia declarada trae motivo Y fuente", () => {
-    // Sin esto, «vacía a propósito» es indistinguible de «vacía porque alguien
-    // quería que el gate callara». Es el mismo corte que `INFERIDO` vs
-    // `no consta` en el resto del proyecto.
+  it("el trinquete: sembrar baja la vacuidad, perder dato la sube por encima del techo", () => {
+    const vacuas = direccionesVacuas(medido);
+    expect(
+      vacuas.length,
+      `Hay ${vacuas.length} direcciones de aislamiento vacuas y el techo commiteado es ` +
+        `${VACUIDAD_MAXIMA}. Vacuas ahora mismo:\n  - ${vacuas.join("\n  - ")}\n\n` +
+        "Si acabas de BORRAR dato de un tenant, eso es el defecto: recupéralo. Cambiar la " +
+        "declaración de ALGUNA a PENDIENTE no arregla esto — el conteo mide filas, no " +
+        "etiquetas. Si has AÑADIDO una tabla nueva cuya dirección es vacua, sube " +
+        "VACUIDAD_MAXIMA a mano con la medición al lado: una aserción vacua más es una " +
+        "decisión, no un descuido.",
+    ).toBeLessThanOrEqual(VACUIDAD_MAXIMA);
+
+    // Control del INSTRUMENTO: el trinquete tiene que estar contando algo. Con
+    // el mapa a medias, `direccionesVacuas` lanza; con el mapa completo pero
+    // todas las tablas llenas, este número sería 0 y el techo dejaría de tener
+    // sentido — habría que bajarlo. Se afirma lo que hoy es cierto.
+    expect(medido.size, "hay tablas declaradas sin medir").toBe(AISLAMIENTO_DECLARADO.length);
+    expect(vacuas.length, "si ya no queda vacuidad, baja VACUIDAD_MAXIMA a 0").toBeGreaterThan(0);
+  });
+
+  it("motivo y ausencia permanente van juntos, en los dos sentidos", () => {
+    // Un solo control, con las dos direcciones dentro y el arreglo en el
+    // mensaje. Antes eran dos tests: quien cambiaba solo el flag se comía un
+    // segundo rojo en otro sitio que no explicaba su causa.
     expect(CON_AUSENCIA_DECLARADA.length).toBeGreaterThan(0);
+    for (const t of AISLAMIENTO_DECLARADO) {
+      const permanente = t.arga === "NINGUNA" || t.garrigues === "NINGUNA";
+      expect(
+        !!t.motivo,
+        permanente
+          ? `${t.tabla} declara NINGUNA y no trae motivo. Sin motivo, «vacía a propósito» es ` +
+            "indistinguible de «vacía porque alguien quería que el gate callara»."
+          : `${t.tabla} arrastra un motivo sin declarar ninguna ausencia permanente ` +
+            `(arga=${t.arga}, garrigues=${t.garrigues}). Si acabas de cambiar el flag, QUITA ` +
+            "también el motivo aquí mismo: documenta una ausencia que ya no existe.",
+      ).toBe(permanente);
+    }
+
     for (const t of CON_AUSENCIA_DECLARADA) {
-      expect(t.motivo, `${t.tabla} declara una ausencia sin motivo`).toBeTruthy();
       expect(t.motivo!.texto.length).toBeGreaterThan(60);
       // La fuente tiene que apuntar a algo COMPROBABLE. Dos formas valen, y la
       // segunda es más fuerte que la primera:
       //
       //   - una cita localizable —política con apartado, artículo, commit—, o
-      //   - una `alternativa`, que no es prosa: el test de arriba va a Cloud y
+      //   - una `alternativa`, que no es prosa: el test de abajo va a Cloud y
       //     comprueba que el dato está donde la declaración dice.
-      //
-      // Se amplía el guard porque era estrecho de origen —lo escribí cuando
-      // todos mis motivos eran citas de política—, no porque me estorbara: un
-      // invariante que la máquina verifica es mejor fuente que una referencia
-      // que nadie sigue. Lo que NO se admite sigue siendo un motivo sin nada
-      // detrás.
       const citaLocalizable = /§|commit|art\./.test(t.motivo!.fuente);
       expect(citaLocalizable || !!t.alternativa,
         `${t.tabla}: motivo sin cita localizable NI alternativa comprobable`).toBe(true);
@@ -103,20 +158,15 @@ describe("C3 Tarea 8 — la declaración de aislamiento cuadra con Cloud", () =>
     }
   });
 
-  it("y ninguna tabla sin ausencia arrastra un motivo huérfano", () => {
-    // Control inverso: un motivo colgando en una tabla que sí tiene filas en
-    // los dos lados sería una excusa preparada para cuando haga falta.
-    const sinAusencia = AISLAMIENTO_DECLARADO.filter(
-      (t) => t.arga === "ALGUNA" && t.garrigues === "ALGUNA",
-    );
-    expect(sinAusencia.filter((t) => t.motivo)).toEqual([]);
-  });
-
   it("los marcadores existen donde se declaran y NO en el otro tenant", async () => {
     // La invariante de aislamiento, escrita a mano. No se comparan dos
     // conjuntos traídos con la misma consulta —eso probaría que la consulta es
     // determinista—: se pinan identificadores concretos y se exige que no
     // crucen.
+    //
+    // Es además la otra mitad de la PERSISTENCIA: un marcador es una fila
+    // concreta y sembrada. Si desaparece, esto rompe aunque la tabla siga
+    // teniendo otras filas y la presencia siga cuadrando.
     for (const t of AISLAMIENTO_DECLARADO) {
       for (const code of t.marcadores.garrigues ?? []) {
         const { data: propio } = await garr.from(t.tabla)

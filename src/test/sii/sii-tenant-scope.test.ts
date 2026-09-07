@@ -19,12 +19,19 @@
 //     Garrigues se quedaba fuera de su propio canal.
 //
 // Ahora se invocan las funciones y se comprueba el RESULTADO por tenant.
-import { describe, expect, it, beforeEach } from "vitest";
+import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { siiStorageKey, siiQueryKey } from "@/lib/sii/tenant-scope";
+import { siiQueryKey } from "@/lib/sii/tenant-scope";
 import { siiRolesPara } from "@/lib/sii/roles-por-tenant";
-import { getStoredReports, initialReportsFor, INITIAL_SII_REPORTS } from "@/hooks/useWhistleblowing";
+import { mockearAlmacenSii, reiniciarAlmacen, filasDe } from "./_almacen-memoria";
+
+const restaurarAlmacen = await mockearAlmacenSii();
+afterAll(restaurarAlmacen);
+
+const { getStoredReports, initialReportsFor, INITIAL_SII_REPORTS } = await import(
+  "@/hooks/useWhistleblowing"
+);
 import { isModuleEnabled } from "@/lib/tenant-modules";
 
 const ARGA = "00000000-0000-0000-0000-000000000001";
@@ -34,15 +41,7 @@ const OTRO = "00000000-0000-0000-0000-0000000000ff";
 const read = (rel: string) => readFileSync(join(process.cwd(), rel), "utf8");
 const codigos = (rs: Array<{ code: string }>) => rs.map((r) => r.code).sort();
 
-describe("SII — el almacén y las claves llevan tenant", () => {
-  it("dos tenants nunca comparten bucket", () => {
-    expect(siiStorageKey(ARGA)).not.toBe(siiStorageKey(GARR));
-  });
-
-  it("no hay forma de construir la clave sin tenant", () => {
-    expect(() => siiStorageKey("")).toThrow();
-  });
-
+describe("SII — las claves de caché llevan tenant", () => {
   it("dos tenants nunca comparten queryKey", () => {
     expect(siiQueryKey(ARGA, "reports", "list")).not.toEqual(siiQueryKey(GARR, "reports", "list"));
   });
@@ -76,31 +75,54 @@ describe("SII — la siembra por tenant, invocada (no leída)", () => {
   });
 });
 
-describe("SII — LAS TRES PUERTAS del almacén, ejecutadas con localStorage real", () => {
-  beforeEach(() => {
-    localStorage.clear();
-  });
+describe("SII — el almacén persistente, ejercitado", () => {
+  // Desde 2026-09-07 el canal NO vive en el navegador: `leerFilas` siembra en
+  // `sii.reports` la primera vez y a partir de ahí manda la tabla. Aquí se
+  // ejercita contra el doble en memoria; que la BASE DE DATOS además aísle por
+  // tenant lo fija la migración 20260907150000, no este fichero.
+  beforeEach(() => reiniciarAlmacen());
 
-  it("puerta 2 (bucket vacío): cada tenant estrena el suyo, no el de ARGA", () => {
-    const arga = codigos(getStoredReports(ARGA));
-    const garr = codigos(getStoredReports(GARR));
+  it("almacén vacío: cada tenant estrena el suyo, no el de ARGA", async () => {
+    const arga = codigos(await getStoredReports(ARGA));
+    const garr = codigos(await getStoredReports(GARR));
     expect(arga.length).toBeGreaterThan(0);
+    expect(garr.length).toBeGreaterThan(0);
     expect(garr.filter((c) => arga.includes(c))).toEqual([]);
-    expect(codigos(getStoredReports(OTRO))).toEqual([]);
+    // Un tenant sin expedientes declarados no estrena los de nadie.
+    expect(codigos(await getStoredReports(OTRO))).toEqual([]);
   });
 
-  it("puerta 3 (JSON corrupto): no cae a los expedientes de ARGA", () => {
-    // Es la más difícil de reproducir: devuelve SIN sembrar, así que no deja
-    // rastro en el almacén.
-    localStorage.setItem(siiStorageKey(GARR), "{ esto no es JSON");
-    const garr = codigos(getStoredReports(GARR));
-    expect(garr.filter((c) => codigos(INITIAL_SII_REPORTS).includes(c))).toEqual([]);
+  it("lo escrito por un tenant no lo lee el otro", async () => {
+    await getStoredReports(ARGA);
+    await getStoredReports(GARR);
+    const deArga = filasDe(ARGA).map((f) => f.code).sort();
+    const deGarr = filasDe(GARR).map((f) => f.code).sort();
+    expect(deArga).not.toEqual(deGarr);
+    expect(deArga.filter((c) => deGarr.includes(c))).toEqual([]);
+    // Y la lectura devuelve SOLO lo del tenant que se pide, no la tabla entera.
+    expect(codigos(await getStoredReports(GARR))).toEqual(deGarr);
   });
 
-  it("lo escrito por un tenant no lo lee el otro", () => {
-    getStoredReports(ARGA);
-    getStoredReports(GARR);
-    expect(localStorage.getItem(siiStorageKey(ARGA))).not.toBe(localStorage.getItem(siiStorageKey(GARR)));
+  it("la siembra ocurre UNA vez: releer no duplica ni reescribe el orden", async () => {
+    const primera = await getStoredReports(ARGA);
+    const filasTrasPrimera = filasDe(ARGA).map((f) => ({ code: f.code, orden: f.orden }));
+    const segunda = await getStoredReports(ARGA);
+    expect(codigos(segunda)).toEqual(codigos(primera));
+    expect(filasDe(ARGA).map((f) => ({ code: f.code, orden: f.orden }))).toEqual(filasTrasPrimera);
+  });
+
+  it("ARGA conserva EL ORDEN de sus tres fichas demo", async () => {
+    // Regresión de la demo: los tres de ARGA no están ordenados por fecha de
+    // entrada, así que cualquier criterio "natural" los movería de sitio.
+    const enPantalla = (await getStoredReports(ARGA)).map((r) => r.code);
+    expect(enPantalla).toEqual(INITIAL_SII_REPORTS.map((r) => r.code));
+  });
+
+  it("las filas sembradas quedan marcadas como del CATÁLOGO", async () => {
+    // De esto depende que `reaplicarCamposDelCatalogo` solo pueda reescribir lo
+    // que el catálogo posee, y nunca una edición del usuario.
+    await getStoredReports(GARR);
+    expect(filasDe(GARR).map((f) => f.origen)).toEqual(["CATALOGO", "CATALOGO", "CATALOGO"]);
   });
 });
 

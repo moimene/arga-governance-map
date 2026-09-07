@@ -8,7 +8,7 @@ import { useTenantContext } from "@/context/TenantContext";
 import { useAuth } from "@/context/AuthContext";
 import { siiOrgLabel } from "@/lib/tenant-brand-labels";
 import { siiRolesPara } from "@/lib/sii/roles-por-tenant";
-import { SII_AVISO_PERSISTENCIA_LOCAL } from "@/lib/sii/whistleblowing-engine";
+import { SII_AVISO_PERSISTENCIA } from "@/lib/sii/whistleblowing-engine";
 
 const STORAGE_KEY = "sii_access_confirmed";
 
@@ -57,7 +57,7 @@ export function SiiAccessGate({ children }: { children: React.ReactNode }) {
               El Sistema Interno de Información (SII) se presenta en una zona separada del resto de la aplicación. La identidad de los informantes está protegida por la Ley 2/2023.
             </p>
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              {SII_AVISO_PERSISTENCIA_LOCAL} Esta confirmación no queda registrada en ningún log.
+              {SII_AVISO_PERSISTENCIA} Esta confirmación no queda registrada en ningún log.
             </p>
             <div className="my-4 h-px w-full bg-border" />
             <div className="text-xs text-muted-foreground">Usted está accediendo como:</div>
@@ -107,10 +107,9 @@ export function SiiHeader() {
       </nav>
 
       {/* El badge afirmaba una traza de auditoría separada que no existe.
-          Lo que sí es cierto es que los expedientes viven en el navegador de
-          este equipo. */}
+          Lo que sí es cierto es que la confirmación del gate no deja rastro. */}
       <div className="ml-auto inline-flex items-center rounded-full border border-white/30 bg-white/10 px-3 py-1 text-[11px] font-semibold">
-        Zona separada · Datos solo en este navegador
+        Zona separada · Datos de demostración
       </div>
     </header>
   );

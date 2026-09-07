@@ -9,7 +9,7 @@ import {
   computeWhistleblowingDeadlines,
   describeDeadlineCountdown,
   SII_AVISO_EXPEDIENTE_SIMULADO,
-  SII_AVISO_PERSISTENCIA_LOCAL,
+  SII_AVISO_PERSISTENCIA,
   SII_ETIQUETA_SIMULADO,
 } from "@/lib/sii/whistleblowing-engine";
 import {
@@ -181,7 +181,7 @@ export default function SiiDashboard() {
                 : "Entorno de validación funcional"}
             </span>
             {simulados > 0 ? `${SII_AVISO_EXPEDIENTE_SIMULADO} ` : ""}
-            {SII_AVISO_PERSISTENCIA_LOCAL}
+            {SII_AVISO_PERSISTENCIA}
           </div>
         </div>
       </Card>

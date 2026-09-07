@@ -74,6 +74,28 @@ Regla de continuidad: un expediente emitido o rectificado es inmutable. Cualquie
 
 ### Tenant Garrigues — G0 fundación + G1 espejo societario
 
+#### ⚠️ Orden vigente desde el 2026-09-07 — el tenant SE SIEMBRA
+
+**Orden derogada:** «Garrigues no tiene inventario propio y NO se siembra, porque fabricar esos datos haría el dato demo indistinguible del real. La ausencia ES la decisión.»
+
+**Orden vigente:** «El tenant Garrigues **se va a ir sembrando, de forma progresiva**, con datos **simulados pero basados en la realidad**, y ese dato **debe persistir**.»
+
+Tres consecuencias, por orden de importancia:
+
+1. **Persistir es el requisito duro.** Cualquier camino que **borre, pise o duplique** dato sembrado de Garrigues es ahora un **defecto**, no una limpieza. Aplica a seeds no idempotentes, a `DELETE`/`TRUNCATE` de saneado, a re-seeds que reescriben en vez de completar y a migraciones de datos.
+2. **Sembrar no puede poner la corrida en rojo.** Un gate que se pone rojo cuando alguien siembra empuja al siguiente a revertir la siembra. Los que quedan de la orden vieja —del tipo «esta tabla de Garrigues está vacía y ese es el requisito»— están midiendo una decisión derogada. Inventario conocido a 2026-09-07: `src/test/garrigues/hallazgos-planes.test.ts` (`action_plans` vacío), `src/test/garrigues/aislamiento-declarado.ts` (direcciones declaradas vacuas por ausencia de dato) y la sonda de `tenant-isolation.test.ts` que exige que la lista blanca **no** contenga `dora`. No son excepciones concedidas: son deuda a dar la vuelta por su carril.
+3. **Perder dato sí tiene que ponerse rojo.** No se desarman los gates: se les da la vuelta. Donde vigilaban «sigue vacío», vigilan «no se ha perdido lo que había» y «la copia local no ha divergido del dato». Ejemplo ya aplicado: `src/test/grc/navegacion-por-tenant.test.ts` tenía una **copia congelada** de `tenants.branding->modules` y asertaba ausencias contra su propia copia —verde falso: abrir un módulo en Cloud no lo habría enterado—; ahora una sonda con login real compara copia y Cloud en cada corrida y cae con el mensaje de actualizar la copia, nunca de revertir Cloud.
+
+**Lo que NO cambia, y confundirlo sería un destrozo:**
+
+- El contrato **cero-cambio ARGA**. `…0001` sigue intocable: ni dato ni pantalla. Cuidado especial con `action_plans.tenant_id`, que se añadió con `DEFAULT '…0001'` (`20260419173010_b1_rls_all_domain_tables.sql:238`): un INSERT sin tenant explícito **contamina ARGA**.
+- El **etiquetado** del dato simulado donde ya se etiqueta: `entities.data_provenance`, `firmeza: "DEMO_PILOTO"`, badges de procedencia, marcas «Simulado». «Simulado pero basado en la realidad» **no** significa presentarlo como real.
+- Las **invariantes de modelo**, que no son la orden vieja sino coherencia del dato: una banda de riesgo publicada como color único no tiene ejes derivables (CHECK `risks_banda_sin_ejes_check`), WORM es append-only, una obligación necesita órgano responsable acreditado, el 8 de hallazgos penales es el resultado de contar y no un tamaño de demo. En la duda entre «orden vieja» e «invariante de modelo»: **dejarlo y declararlo**.
+
+Detalle de qué deroga y qué no, punto por punto: `docs/superpowers/reviews/2026-08-29-invariantes-g5-g6-garrigues.md` (§1 ya superado, §4 derogado en su parte decisoria, §2/§3/§5/§6 en pie).
+
+Los recuentos de G0–G4 de más abajo (33 entidades, 39 documentos normativos, 21 obligaciones, 0 planes de acción…) son **fotos de su fecha**, no techos ni requisitos: crecerán con la siembra.
+
 Segundo tenant activo en `governance_OS`: `00000000-0000-0000-0000-000000000002` (spec `docs/superpowers/specs/2026-08-02-garrigues-tenant-gobernanza-design.md`, plan `docs/superpowers/plans/2026-08-02-g0-tenant-garrigues-fundacion.md`). **ARGA (`…0001`) intacta.** Primera vez que el proyecto opera con dos tenants reales.
 
 - **Theming por tenant:** columna `tenants.branding jsonb` (migración `20260802120000`, aplicada vía MCP `execute_sql` + registro manual en `schema_migrations` por el drift de junio; **no `db push`**). `TenantBrandProvider` (`src/context/TenantBrandContext.tsx`) resuelve el branding tras el login y aplica ~31 tokens CSS (`--t-*`, `--primary`, `--sidebar-*`) sobre `document.documentElement`. `branding` NULL = defaults del producto (`src/lib/tenant-brand-labels.ts`, contrato **"cero cambio visual ARGA"** verificado en vivo: login ARGA pixel-idéntico).
@@ -1322,6 +1344,8 @@ Superficies server-side críticas del cierre: `supabase/functions/convocation-ar
 - No generar en navegador el DOCX final de convocatoria: el manifiesto inmutable debe renderizarse en servidor.
 - No inferir firma, QES, ERDS, envío, entrega ni interacción real con EAD Trust a partir de nombres o códigos legacy.
 - No mezclar `ai_*` con `aims_*` ni tablas legacy GRC con `grc_*` sin contrato aprobado.
+- No borrar, pisar ni duplicar dato ya sembrado del tenant Garrigues (`…0002`): desde el 2026-09-07 se siembra de forma progresiva y **la persistencia es requisito**. Seeds idempotentes y aditivos; nada de `DELETE`/`TRUNCATE` de saneado sobre su dato.
+- No escribir en tablas del tenant Garrigues sin `tenant_id` explícito: varias llevan `DEFAULT '…0001'` y el INSERT aterriza en ARGA.
 - No usar el nombre real del cliente en código, datos demo, seeds, docs de producto ni commits.
 - No usar colores Tailwind nativos (`text-white`, `bg-gray-*`, `bg-amber-*`, `bg-green-*`) en componentes Garrigues
 - No usar hex directamente en className o style — siempre tokens `var(--g-*)` o `var(--status-*)`

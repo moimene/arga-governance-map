@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useEntitiesList } from "@/hooks/useEntities";
 import { useCreateWhistleblowingReport } from "@/hooks/useWhistleblowing";
-import { sanitizeMetadata, SII_AVISO_PERSISTENCIA_LOCAL, type WhistleblowingChannel, type AnonymityMode, type WhistleblowingSeverity } from "@/lib/sii/whistleblowing-engine";
+import { sanitizeMetadata, SII_AVISO_PERSISTENCIA, type WhistleblowingChannel, type AnonymityMode, type WhistleblowingSeverity } from "@/lib/sii/whistleblowing-engine";
 import {
   ShieldCheck,
   Lock,
@@ -136,7 +136,7 @@ export default function SiiPortalIntake() {
       setCreatedCode(res.code);
       setCreatedToken(res.trackingToken);
       setStep(4);
-      toast.success("Comunicación registrada en este navegador. Conserve el código de seguimiento.");
+      toast.success("Comunicación registrada. Conserve el código de seguimiento.");
     } catch (err) {
       toast.error("Error al registrar la comunicación.");
     }
@@ -236,8 +236,8 @@ export default function SiiPortalIntake() {
             { n: 2, label: "2. Hechos & Canal" },
             { n: 3, label: "3. Evidencias & Saneamiento" },
             // «Credencial Segura» sobre 8 caracteres de Math.random(): el propio
-            // cuerpo del paso ya lo llama «código de seguimiento» y advierte de que
-            // solo funciona en este navegador. El rótulo decía otra cosa.
+            // cuerpo del paso ya lo llama «código de seguimiento». El rótulo decía
+            // otra cosa.
             { n: 4, label: "4. Código de seguimiento" },
           ].map((s) => (
             <div
@@ -302,7 +302,7 @@ export default function SiiPortalIntake() {
                 <h3 className="font-bold text-sm text-[var(--t-text-primary)]">Confidencial con Identificación</h3>
               </div>
               <p className="text-xs text-[var(--t-text-secondary)] leading-relaxed mb-3">
-                Su identidad queda reservada a la persona instructora conforme al art. 33 de la Ley 2/2023. <strong>No hay cifrado:</strong> el expediente se guarda en claro en este navegador. No se comunica a RR.HH., personas afectadas ni terceros sin su autorización expresa.
+                Su identidad queda reservada a la persona instructora conforme al art. 33 de la Ley 2/2023. <strong>No hay cifrado:</strong> el expediente se guarda en claro. No se comunica a RR.HH., personas afectadas ni terceros sin su autorización expresa.
               </p>
               <span className="text-[11px] font-semibold text-[var(--t-text-secondary)] flex items-center gap-1">
                 <ShieldCheck className="h-3 w-3" /> Protección legal Ley 2/2023
@@ -631,7 +631,7 @@ export default function SiiPortalIntake() {
             {/* Ni firma, ni sello, ni intervención de un tercero de confianza:
                 esta pantalla lo decía y no ocurría nada de eso. */}
             <p className="mx-auto mt-3 max-w-lg text-[11px] leading-relaxed text-[var(--t-text-secondary)]">
-              {SII_AVISO_PERSISTENCIA_LOCAL} El registro no lleva firma, ni sello de tiempo, ni intervención de un prestador de servicios de confianza.
+              {SII_AVISO_PERSISTENCIA} El registro no lleva firma, ni sello de tiempo, ni intervención de un prestador de servicios de confianza.
             </p>
           </div>
 
@@ -663,7 +663,7 @@ export default function SiiPortalIntake() {
             <div className="text-[11px] text-[var(--status-warning)] bg-[var(--status-warning)]/10 p-2.5 rounded flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
               <span>
-                <strong>Guarde este código.</strong> Es la única forma de abrir el Safe Inbox de este expediente. Solo funciona en este navegador: el expediente no se guarda en ningún servidor.
+                <strong>Guarde este código.</strong> Es la única forma de abrir el Safe Inbox de este expediente. Funciona desde cualquier equipo con acceso al canal de este tenant.
               </span>
             </div>
           </div>

@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useWhistleblowingReportByToken, useSendSafeInboxMessage } from "@/hooks/useWhistleblowing";
-import { SII_AVISO_PERSISTENCIA_LOCAL } from "@/lib/sii/whistleblowing-engine";
+import { SII_AVISO_PERSISTENCIA } from "@/lib/sii/whistleblowing-engine";
 import { siiRolesPara } from "@/lib/sii/roles-por-tenant";
 import { useTenantContext } from "@/context/TenantContext";
 import {
@@ -61,7 +61,7 @@ export default function SiiSafeInbox() {
         sender: "INFORMANTE",
       });
       setNewMessage("");
-      toast.success("Mensaje añadido al expediente. Se guarda en claro en este navegador, sin cifrar.");
+      toast.success("Mensaje añadido al expediente. Se guarda en claro, sin cifrar.");
     } catch (err) {
       toast.error("Error al enviar el mensaje.");
     }
@@ -78,7 +78,7 @@ export default function SiiSafeInbox() {
       });
       setShowRetaliationAlert(false);
       setRetaliationNote("");
-      toast.success("Alerta de represalia registrada en el expediente. Queda en este navegador: no se envía ni se notifica a nadie.");
+      toast.success("Alerta de represalia registrada en el expediente: no se envía ni se notifica a nadie.");
     } catch (err) {
       toast.error("Error al comunicar la represalia.");
     }
@@ -102,10 +102,10 @@ export default function SiiSafeInbox() {
                 ? " — PI-31 Anexo 1 §3.c reserva esa vía a la comunicación postal."
                 : "."}
             </p>
-            {/* El código son 12 hex del generador del navegador y el buzón vive
-                en localStorage: no se acredita fortaleza ni hay cifrado. */}
+            {/* El código son 12 hex del generador del navegador: no se acredita
+                fortaleza, y el expediente se guarda sin cifrar. */}
             <p className="mx-auto mt-2 max-w-md text-[11px] leading-relaxed text-[var(--t-text-secondary)]">
-              {SII_AVISO_PERSISTENCIA_LOCAL} El código solo abre expedientes registrados en este mismo navegador.
+              {SII_AVISO_PERSISTENCIA} El código abre el expediente desde cualquier equipo con acceso al canal de este mismo tenant.
             </p>
           </div>
 
@@ -151,7 +151,7 @@ export default function SiiSafeInbox() {
           <AlertTriangle className="h-10 w-10 text-[var(--status-error)] mx-auto" />
           <h2 className="text-lg font-bold text-[var(--t-text-primary)]">Código no encontrado</h2>
           <p className="text-xs text-[var(--t-text-secondary)]">
-            No se ha localizado ningún expediente con el código <code>{activeToken}</code> en este navegador. Verifique que no haya caracteres erróneos.
+            No se ha localizado ningún expediente con el código <code>{activeToken}</code> en el canal de este tenant. Verifique que no haya caracteres erróneos.
           </p>
           <Button variant="outline" onClick={() => setActiveToken("")}>
             Probar con otro Token
@@ -371,7 +371,7 @@ export default function SiiSafeInbox() {
                   className="bg-[var(--status-error)] text-white hover:bg-[var(--status-error)]/90"
                 >
                   {/* «Transmitir» prometía un envío que el párrafo de arriba niega:
-                      la mutación solo escribe en el expediente de este navegador. */}
+                      la mutación solo escribe en el expediente. */}
                   Registrar en el expediente
                 </Button>
               </div>

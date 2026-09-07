@@ -137,3 +137,74 @@ export function countSeverity(risks: readonly RiesgoPriorizable[]): {
   }
   return { criticos, altos, sinEjes };
 }
+
+// ─── Precedencia entre las DOS evaluaciones de un riesgo ─────────────────────
+//
+// Hasta el 2026-09-07 esta pregunta no existía: la CHECK `risks_banda_sin_ejes`
+// hacía imposible que una fila trajera banda y ejes a la vez, así que las tres
+// pantallas se conformaban con `tieneEjes(r) ? ejes : r.assessed_band ? banda :
+// null`. Ese ternario esconde una precedencia que nadie escribió: los ejes
+// ganan Y LA BANDA DESAPARECE. Retirada la CHECK (migración 20260907T2, por
+// decisión del usuario para poder sembrar Garrigues con dato simulado
+// persistente), esa celda pasa a ser alcanzable y el ternario deja de ser
+// inocente: un riesgo con banda ROJA y ejes 2x2 se pintaría "Mínimo" a secas.
+//
+// La regla, en un solo sitio y sin React para poder probarla:
+//
+//   1. Se pinta TODO lo que el riesgo trae. Con las dos evaluaciones se pintan
+//      LAS DOS, y la pantalla declara que son dos y que no se concilian.
+//      Ocultar una es la contradicción escondida, que es lo que no se tolera.
+//   2. La escala 1-25 —filtro de Prioridad, KPI de severidad, mapa de calor,
+//      orden— se alimenta SOLO de los ejes. Una banda no entra en ella ni
+//      cuando va sola (D-2, arriba) ni cuando acompaña a unos ejes.
+//   3. Ninguna de las dos se deriva de la otra en ningún sentido. Mapear un
+//      score a una banda, o una banda a un score, inventaría la leyenda que la
+//      fuente no publica. No hay conciliación posible, y por eso el aviso dice
+//      que no la hay en vez de fingir que las dos coinciden.
+//
+// Las pantallas IMPORTAN esto; no vuelven a decidirlo. Mismo patrón que
+// `src/lib/grc/obligation-coverage.ts`, que nació porque el criterio vivía en
+// una pantalla y el arreglo llegó a esa y no a sus dos hermanas.
+
+export const AVISO_DOBLE_LECTURA =
+  "Este riesgo trae dos evaluaciones a la vez: la banda de su mapa de origen y los ejes " +
+  "de probabilidad × impacto. No se concilian entre sí —la fuente de la banda no publica " +
+  "su leyenda— así que pueden discrepar. Se muestran las dos sin elegir por usted.";
+
+export type ModoLectura = "EJES" | "BANDA" | "AMBAS" | "SIN_EVALUAR";
+
+export type LecturaRiesgo = {
+  modo: ModoLectura;
+  /** Pintar el bloque de probabilidad × impacto. */
+  muestraEjes: boolean;
+  /** Pintar la banda. Con `AMBAS` es `true`: la banda NO se oculta tras los ejes. */
+  muestraBanda: boolean;
+  /** Score 1-25, o `null`. Único valor que alimenta filtros, KPIs y mapa de calor. */
+  score: number | null;
+  banda: Banda | null;
+  /** Texto que la pantalla DEBE pintar cuando hay dos evaluaciones; `null` si no las hay. */
+  avisoDobleLectura: string | null;
+};
+
+export function lecturaRiesgo(r: RiesgoPriorizable): LecturaRiesgo {
+  const ejes = tieneEjes(r);
+  const banda = (r.assessed_band ?? null) as Banda | null;
+  const score = riskScore(r);
+  if (ejes && banda) {
+    return {
+      modo: "AMBAS",
+      muestraEjes: true,
+      muestraBanda: true,
+      score,
+      banda,
+      avisoDobleLectura: AVISO_DOBLE_LECTURA,
+    };
+  }
+  if (ejes) {
+    return { modo: "EJES", muestraEjes: true, muestraBanda: false, score, banda: null, avisoDobleLectura: null };
+  }
+  if (banda) {
+    return { modo: "BANDA", muestraEjes: false, muestraBanda: true, score: null, banda, avisoDobleLectura: null };
+  }
+  return { modo: "SIN_EVALUAR", muestraEjes: false, muestraBanda: false, score: null, banda: null, avisoDobleLectura: null };
+}

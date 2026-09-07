@@ -30,19 +30,50 @@ import {
 } from "@/lib/grc/dashboard-readiness";
 import { GRC_NAV_ITEMS, getVisibleGrcNavItems } from "@/components/garrigues-shell/navigation";
 import { ESG_MODULO } from "../../../scripts/garrigues/esg/plan-sostenibilidad";
+import { GARRIGUES_TENANT, sesionDe } from "../helpers/supabase-test-client";
 
 const raiz = process.cwd();
 const leer = (rel: string) => sinComentarios(readFileSync(join(raiz, rel), "utf8"));
 
 const ARGA = "00000000-0000-0000-0000-000000000001";
-// Lista blanca REAL del tenant Garrigues, leída de `tenants.branding->modules`
-// en Cloud el 2026-09-06. No incluye dora, gdpr, cyber, audit ni esg.
-const GARRIGUES = {
-  modules: [
-    "secretaria", "grc", "ai-governance", "sii", "politicas", "obligaciones",
-    "delegaciones", "hallazgos", "conflictos", "governance-map", "entidades", "organos",
-  ],
-} as never;
+
+// COPIA de `tenants.branding->modules` de Garrigues. La fuente es Cloud, no
+// esto: la sonda de más abajo compara las dos en CADA corrida.
+//
+// Por qué existe la sonda. Hasta el 2026-09-07 esto era una copia congelada y
+// nada la contrastaba, así que el fichero afirmaba ausencias contra su propia
+// copia: el día que se abriera un módulo en Cloud, estos tests habrían seguido
+// verdes jurando que no estaba. Un gate que se mide a sí mismo es un VERDE
+// FALSO, no una salvaguarda — y con el tenant sembrándose de forma progresiva,
+// la copia va a quedarse atrás antes o después.
+const MODULOS_GARRIGUES = [
+  "secretaria", "grc", "ai-governance", "sii", "politicas", "obligaciones",
+  "delegaciones", "hallazgos", "conflictos", "governance-map", "entidades", "organos",
+];
+const GARRIGUES = { modules: MODULOS_GARRIGUES } as never;
+
+describe("la copia de la lista blanca no puede divergir del dato sin que esto caiga", () => {
+  it("`tenants.branding->modules` de Garrigues en Cloud coincide con la copia de este fichero", async () => {
+    const garr = await sesionDe("GARRIGUES");
+    const { data, error } = await garr
+      .from("tenants").select("branding").eq("id", GARRIGUES_TENANT).maybeSingle();
+    expect(error).toBeNull();
+    const modules = (data?.branding as { modules?: unknown } | null)?.modules;
+
+    // Control positivo: `isModuleEnabled` falla ABIERTO ante `null` y ante `[]`,
+    // así que un branding borrado dejaría todo visible y las aserciones de
+    // ocultación de abajo pasarían sin gatear nada.
+    expect(Array.isArray(modules), "Garrigues ya no declara lista blanca en Cloud").toBe(true);
+    expect((modules as string[]).length).toBeGreaterThan(0);
+
+    // Si esto cae, el dato de Cloud MANDA: se actualiza `MODULOS_GARRIGUES` y se
+    // revisan las aserciones ancladas de abajo. No se revierte nada en Cloud.
+    expect(
+      [...(modules as string[])].sort(),
+      "la lista blanca de Garrigues cambió en Cloud: actualiza MODULOS_GARRIGUES aquí (y las rutas ancladas de #72). El dato manda; no se toca Cloud",
+    ).toEqual([...MODULOS_GARRIGUES].sort());
+  });
+});
 
 // Reproduce el filtro del dashboard: es la composición que el propio
 // `Dashboard.tsx` aplica, y se comprueba abajo que la aplica.

@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import {
   ORDEN_BANDAS, ETIQUETA_BANDA, tieneEjes,
   matchesScoreFilter, countSeverity, PRIORIDAD_TODOS,
+  lecturaRiesgo, AVISO_DOBLE_LECTURA,
 } from "@/lib/grc/assessed-band";
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
@@ -50,9 +51,12 @@ describe("G5 — el editor no ofrece ejes que la fuente no publica", () => {
     expect(src).not.toMatch(/impact\s*\?\?\s*3/);
   });
 
-  it("decide por la banda si los ejes se ofrecen", () => {
-    expect(src).toContain("assessed_band");
-    expect(src).toMatch(/assessed_band\s*(\?|&&|==|!=)/);
+  it("no decide por su cuenta qué evaluación ofrece: delega en el módulo", () => {
+    expect(src).toContain("lecturaRiesgo(");
+    // El `!!risk?.assessed_band` que vivía aquí escondía los ejes de un riesgo
+    // que trae los dos Y LOS DEJABA SIN GUARDAR. La arista de verdad —que el
+    // formulario ofrezca y guarde las dos— es de comportamiento y vive abajo.
+    expect(src).not.toContain("evaluadoPorBanda");
   });
 });
 
@@ -129,7 +133,7 @@ describe("D-2 — una banda NUNCA cuenta como un nivel con nombre", () => {
 
   it("un riesgo sin ejes y sin banda tampoco cae en 'bajos'", () => {
     // Celda hoy despoblada en Cloud (0 filas en ambos tenants) pero ALCANZABLE:
-    // la CHECK permite (sin ejes, sin banda), solo prohíbe banda junto a ejes.
+    // ninguna CHECK ha exigido nunca que un riesgo traiga evaluación.
     expect(matchesScoreFilter({}, "bajos")).toBe(false);
     expect(countSeverity([{}])).toEqual({ criticos: 0, altos: 0, sinEjes: 1 });
   });
@@ -151,5 +155,94 @@ describe("D-2 — y Risk360 usa esas funciones, no una copia propia", () => {
 
   it("no define su propia versión de ninguna de las dos", () => {
     expect(/function\s+(countSeverity|matchesScoreFilter|riskScore)\b/.test(RISK360)).toBe(false);
+  });
+});
+
+
+describe("2026-09-07 — un riesgo puede traer DOS evaluaciones y ninguna se oculta", () => {
+  // La CHECK `risks_banda_sin_ejes` hacía esta celda inalcanzable. Retirada por
+  // decisión expresa del usuario (migración 20260907T2) para poder sembrar
+  // Garrigues con dato simulado persistente, la precedencia deja de ser
+  // implícita y pasa a estar escrita en un solo sitio. Estos son tests de
+  // COMPORTAMIENTO sobre la función pura: no dependen de cómo se escriba la
+  // pantalla que los consume.
+  const EJES = { probability: 2, impact: 2 };            // score 4
+  const BANDA = { assessed_band: "ROJO" as const };
+  const AMBAS = { ...EJES, ...BANDA };
+
+  it("solo ejes: se pintan los ejes y no hay banda que ocultar", () => {
+    const l = lecturaRiesgo(EJES);
+    expect(l.modo).toBe("EJES");
+    expect(l.muestraEjes).toBe(true);
+    expect(l.muestraBanda).toBe(false);
+    expect(l.score).toBe(4);
+    expect(l.banda).toBeNull();
+    expect(l.avisoDobleLectura).toBeNull();
+  });
+
+  it("solo banda: se pinta la banda y NO se inventa un score", () => {
+    const l = lecturaRiesgo(BANDA);
+    expect(l.modo).toBe("BANDA");
+    expect(l.muestraEjes).toBe(false);
+    expect(l.muestraBanda).toBe(true);
+    expect(l.score).toBeNull();
+    expect(l.banda).toBe("ROJO");
+    expect(l.avisoDobleLectura).toBeNull();
+  });
+
+  it("las dos: se pintan LAS DOS y se declara que son dos lecturas", () => {
+    const l = lecturaRiesgo(AMBAS);
+    expect(l.modo).toBe("AMBAS");
+    // Lo que el ternario anterior hacía mal: la banda desaparecía.
+    expect(l.muestraBanda, "la banda no puede ocultarse tras los ejes").toBe(true);
+    expect(l.muestraEjes).toBe(true);
+    expect(l.banda).toBe("ROJO");
+    expect(l.score).toBe(4);
+    expect(l.avisoDobleLectura).toBe(AVISO_DOBLE_LECTURA);
+  });
+
+  it("el aviso dice que NO se concilian, en vez de fingir que coinciden", () => {
+    expect(AVISO_DOBLE_LECTURA).toMatch(/no se concilian/i);
+    // Y no nombra un nivel que la fuente no publica, como el resto del módulo.
+    for (const prohibida of ["crítico", "alto", "medio", "bajo"])
+      expect(AVISO_DOBLE_LECTURA.toLowerCase()).not.toContain(prohibida);
+  });
+
+  it("sin nada: ni ejes ni banda ni aviso", () => {
+    const l = lecturaRiesgo({});
+    expect(l.modo).toBe("SIN_EVALUAR");
+    expect(l.muestraEjes).toBe(false);
+    expect(l.muestraBanda).toBe(false);
+    expect(l.score).toBeNull();
+    expect(l.avisoDobleLectura).toBeNull();
+  });
+
+  it("con las dos, la escala 1-25 sigue siendo SOLO de los ejes", () => {
+    // Banda ROJA + ejes 2x2. El riesgo entra por sus ejes (score 4 -> bajos) y
+    // la banda no lo asciende a crítico: la banda nunca entra en esta escala.
+    expect(matchesScoreFilter(AMBAS, "bajos")).toBe(true);
+    expect(matchesScoreFilter(AMBAS, "criticos")).toBe(false);
+    expect(countSeverity([AMBAS])).toEqual({ criticos: 0, altos: 0, sinEjes: 0 });
+    // Y al revés: unos ejes altos no degradan por llevar banda VERDE.
+    const verdeAlto = { probability: 5, impact: 5, assessed_band: "VERDE" as const };
+    expect(countSeverity([verdeAlto])).toEqual({ criticos: 1, altos: 0, sinEjes: 0 });
+  });
+
+  it("las tres pantallas importan el criterio; ninguna lo reimplementa", () => {
+    // BACKSTOP BARATO y capa débil declarada: es un grep. La arista real —que
+    // la pantalla PINTE las dos lecturas— se lee en el DOM en
+    // src/test/grc/perimetro-declarado.test.tsx.
+    for (const ruta of [
+      "src/pages/grc/RiskDetalle.tsx",
+      "src/pages/grc/Risk360.tsx",
+      "src/pages/grc/RiskEditor.tsx",
+    ]) {
+      const fuente = sinComentarios(read(ruta));
+      expect(fuente, ruta).toContain("lecturaRiesgo(");
+      expect(
+        /function\s+lecturaRiesgo\b/.test(fuente),
+        `${ruta} define su propia versión del criterio`,
+      ).toBe(false);
+    }
   });
 });

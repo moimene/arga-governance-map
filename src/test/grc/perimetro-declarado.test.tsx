@@ -258,3 +258,71 @@ describe("#1116 — la banda del detalle enseña su procedencia", () => {
     expect(screen.queryByText(/muestreo de píxel/)).toBeNull();
   });
 });
+
+describe("2026-09-07 — con banda Y ejes, la pantalla no elige por el lector", () => {
+  // Celda inalcanzable hasta hoy: la CHECK `risks_banda_sin_ejes` la prohibía.
+  // Retirada por decisión del usuario (migración 20260907T2), la pantalla se
+  // queda como única defensa, y el ternario que tenía —`tieneEjes ? ejes :
+  // banda ? banda : null`— ESCONDÍA LA BANDA. Se lee en el DOM: un grep del
+  // fuente da por arreglado lo que no se ha mirado.
+  const AMBAS = {
+    ...RIESGO_BASE,
+    probability: 2,
+    impact: 2,          // score 4: la banda dice ROJO y los ejes dicen otra cosa
+    assessed_band: "ROJO",
+    assessment_provenance: PROVENANCE,
+  };
+
+  it("la ficha pinta las dos evaluaciones y declara que son dos", async () => {
+    riesgoFicha = AMBAS;
+    await montarFicha(RIESGO_BASE.id);
+    expect(screen.getByText("Probabilidad x Impacto")).toBeTruthy();
+    // El valor va partido en varios nodos de texto; se lee crudo del body.
+    expect(document.body.textContent).toContain("2 x 2 (Score: 4)");
+    // Lo que el ternario ocultaba.
+    expect(screen.getByText("Banda evaluada en origen")).toBeTruthy();
+    expect(screen.getByText("Banda roja")).toBeTruthy();
+    // Y se dice en voz alta que hay dos y que no se concilian.
+    expect(screen.getByText(/dos evaluaciones a la vez/)).toBeTruthy();
+    expect(screen.getByText(/No se concilian/)).toBeTruthy();
+  });
+
+  it("control discriminante: con una sola evaluación no hay aviso que dar", async () => {
+    riesgoFicha = { ...RIESGO_BASE, probability: 2, impact: 2 };
+    await montarFicha(RIESGO_BASE.id);
+    expect(screen.getByText("Probabilidad x Impacto")).toBeTruthy();
+    expect(screen.queryByText("Banda evaluada en origen")).toBeNull();
+    expect(screen.queryByText(/dos evaluaciones a la vez/)).toBeNull();
+  });
+
+  it("un residual sobre un riesgo con banda se ve: alimenta el KPI del dashboard", async () => {
+    // Celda que la CHECK también prohibía. El residual colgaba de los ejes, así
+    // que habría quedado invisible justo en la ficha del riesgo que lo aporta.
+    riesgoFicha = { ...RIESGO_BASE, assessed_band: "ROJO", residual_score: 18 };
+    await montarFicha(RIESGO_BASE.id);
+    expect(screen.getByText("Score residual")).toBeTruthy();
+    expect(screen.getByText("18")).toBeTruthy();
+  });
+
+  it("control discriminante ARGA: solo banda, sin ejes ni aviso", async () => {
+    riesgoFicha = { ...RIESGO_BASE, assessed_band: "ROJO" };
+    await montarFicha(RIESGO_BASE.id);
+    expect(screen.getByText("Banda evaluada en origen")).toBeTruthy();
+    expect(screen.queryByText("Probabilidad x Impacto")).toBeNull();
+    expect(screen.queryByText(/dos evaluaciones a la vez/)).toBeNull();
+  });
+
+  it("en Risk 360 el riesgo sale en las dos superficies y cuenta por sus ejes", async () => {
+    listaRiesgos = [AMBAS];
+    await montarRisk360();
+    // La escala 1-25 manda para el recuento: 2x2 = 4, ni crítico ni fuera.
+    const criticos = tarjetaKpi("Críticos");
+    expect(valorDirecto(criticos)).toBe("0");
+    expect(criticos.textContent).not.toContain("fuera del recuento");
+    // Y las dos lecturas siguen visibles: chip de ejes, chip de banda, y el
+    // riesgo dentro del mapa de bandas que declara su banda.
+    expect(screen.getByText("Prob. 2 · Impacto 2")).toBeTruthy();
+    expect(screen.getByText("Mapa de riesgos evaluados por bandas")).toBeTruthy();
+    expect(screen.getAllByText("Banda roja").length).toBeGreaterThan(0);
+  });
+});

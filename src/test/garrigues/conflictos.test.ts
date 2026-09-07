@@ -1,5 +1,12 @@
 // Tarea 6 del carril C3 — conflictos de interés tipológicos, nunca nominales.
 //
+// CONJUNTO ABIERTO POR ARRIBA (2026-09-07). El tenant Garrigues se siembra de
+// forma PROGRESIVA con dato simulado basado en la realidad, así que exigir
+// igualdad exacta con el catálogo ponía en rojo la siembra misma y empujaba al
+// siguiente a revertirla. Lo que se vigila ahora es lo contrario: que no se
+// PIERDA lo que ya hay. «Al menos los del catálogo, y todos ellos» crece bien y
+// encoge mal.
+//
 // La aserción que de verdad protege no es «hay filas»: es que **ninguna
 // descripción contiene el nombre de una persona del censo**. El censo de
 // Garrigues son 406 personas físicas con nombre y apellidos reales de fuente
@@ -25,25 +32,36 @@ describe("C3 Tarea 6 — conflictos declarados y etiquetados", () => {
     [garr, arga] = await Promise.all([sesionDe("GARRIGUES"), sesionDe("ARGA")]);
   }, 30_000);
 
-  it("hay filas para Garrigues y son las del catálogo", async () => {
+  it("las filas del catálogo están TODAS en Cloud; puede haber más, no menos", async () => {
     const { data, error } = await garr.from("conflicts_of_interest")
       .select("code, conflict_type, description, person_id, tenant_id")
       .eq("tenant_id", GARRIGUES_TENANT).order("code");
     expect(error).toBeNull();
-    expect(data.map((c) => c.code)).toEqual(CONFLICTOS_DEMO.map((c) => c.code));
+    const enCloud = new Set((data ?? []).map((c) => c.code));
+    // Encoge mal: si desaparece una del catálogo, aquí sale nombrada.
+    expect(CONFLICTOS_DEMO.filter((c) => !enCloud.has(c.code)).map((c) => c.code)).toEqual([]);
+    // Y el catálogo no puede quedarse vacío, o lo de arriba no compara nada.
+    expect(CONFLICTOS_DEMO.length).toBeGreaterThan(0);
   });
 
-  it("NINGUNA lleva persona: `person_id` es NULL en todas", async () => {
+  it("las del catálogo NO llevan persona: `person_id` sigue NULL en las cinco", async () => {
+    // ACOTADO AL CATÁLOGO (2026-09-07). Antes se exigía a TODA fila del tenant,
+    // lo que prohibía justo lo que la siembra progresiva puede querer: un
+    // conflicto simulado atado a alguien. Lo que no se relaja es el guard de
+    // abajo —una fila que NO declara persona no puede nombrar a ninguna—, que
+    // es donde estaba el daño de verdad.
     const { data } = await garr.from("conflicts_of_interest")
       .select("code, person_id").eq("tenant_id", GARRIGUES_TENANT);
+    const codigos = new Set(CONFLICTOS_DEMO.map((c) => c.code));
+    const delCatalogo = (data ?? []).filter((c) => codigos.has(c.code));
     // Sin esto la aserción es VACUA: con el seed borrado, filtrar un conjunto
     // vacío da vacío y el test pasa sin haber mirado ninguna fila. Probado
     // apuntando a un tenant inexistente: 9 pass / 0 fail.
-    expect(data.length).toBe(CONFLICTOS_DEMO.length);
-    expect(data.filter((c) => c.person_id !== null)).toEqual([]);
+    expect(delCatalogo.length).toBe(CONFLICTOS_DEMO.length);
+    expect(delCatalogo.filter((c) => c.person_id !== null)).toEqual([]);
   });
 
-  it("y `conflict_type` queda NULL en Cloud, a propósito", async () => {
+  it("y `conflict_type` queda NULL en las del catálogo; la naturaleza de PI-02 no entra ahí nunca", async () => {
     // El CHECK de la columna solo admite 'Permanente' | 'Situacional', que
     // clasifica por DURACIÓN. PI-02 clasifica por naturaleza —«sentido
     // estricto» vs «comercial o de negocio»—. Son ejes distintos: escribir uno
@@ -51,16 +69,27 @@ describe("C3 Tarea 6 — conflictos declarados y etiquetados", () => {
     // que G5 aplicó a `findings.severity`.
     const { data } = await garr.from("conflicts_of_interest")
       .select("code, conflict_type").eq("tenant_id", GARRIGUES_TENANT);
-    expect(data.length).toBe(CONFLICTOS_DEMO.length);
-    expect(data.filter((c) => c.conflict_type !== null)).toEqual([]);
+    const codigos = new Set(CONFLICTOS_DEMO.map((c) => c.code));
+    const delCatalogo = (data ?? []).filter((c) => codigos.has(c.code));
+    expect(delCatalogo.length).toBe(CONFLICTOS_DEMO.length);
+    expect(delCatalogo.filter((c) => c.conflict_type !== null)).toEqual([]);
+    // Y esto sí vale para TODA fila, también las que siembre alguien mañana:
+    // la naturaleza de PI-02 nunca entra en la columna de la duración. Es la
+    // invariante de MODELO, y no se afloja porque el tenant crezca.
+    const naturalezas = new Set<string>(CATEGORIAS_PI02.map((c) => String(c.conflict_type)));
+    expect((data ?? []).filter((c) => c.conflict_type && naturalezas.has(String(c.conflict_type))))
+      .toEqual([]);
   });
 
   it("y el `status` que sí viaja es del vocabulario que el CHECK admite", async () => {
     const ADMITIDOS = new Set(["Declarado", "Pendiente", "Resuelto"]);
     const { data } = await garr.from("conflicts_of_interest")
       .select("code, status").eq("tenant_id", GARRIGUES_TENANT);
-    expect(data.length).toBe(CONFLICTOS_DEMO.length);
-    expect(data.filter((c) => !ADMITIDOS.has(c.status))).toEqual([]);
+    const codigos = new Set(CONFLICTOS_DEMO.map((c) => c.code));
+    // Anti-vacuidad: las del catálogo tienen que seguir estando…
+    expect((data ?? []).filter((c) => codigos.has(c.code)).length).toBe(CONFLICTOS_DEMO.length);
+    // …y el vocabulario lo cumple TODA fila, incluidas las que se siembren.
+    expect((data ?? []).filter((c) => !ADMITIDOS.has(c.status))).toEqual([]);
     // Y el término de la fuente —«en chequeo»— se conserva aparte, sin
     // pretender que la BD lo entiende.
     expect(CONFLICTOS_DEMO.some((c) => c.estadoTexto === "En chequeo")).toBe(true);
@@ -81,9 +110,15 @@ describe("C3 Tarea 6 — conflictos declarados y etiquetados", () => {
     // no lo veía. Verificado mutando: con solo Cloud, meter «Fernando Vives
     // Ruiz» en una descripción del catálogo NO hacía caer el test.
     const { data: filas } = await garr.from("conflicts_of_interest")
-      .select("code, description").eq("tenant_id", GARRIGUES_TENANT);
+      .select("code, description, person_id").eq("tenant_id", GARRIGUES_TENANT);
+    // Se juzgan las filas que NO declaran persona. Una fila que sí la declara
+    // habla de alguien a propósito y nombrarlo no es una fuga; el daño es la
+    // fila tipológica que se cuela nombrando a un socio del censo.
+    const sinPersona = (filas ?? []).filter((f) => f.person_id === null);
+    // Anti-vacuidad: al menos las cinco del catálogo son de este tipo.
+    expect(sinPersona.length).toBeGreaterThanOrEqual(CONFLICTOS_DEMO.length);
     const texto = [
-      ...filas.map((f) => f.description as string),
+      ...sinPersona.map((f) => f.description as string),
       ...CONFLICTOS_DEMO.map((c) => c.descripcion),
     ].join(" \n ").toLowerCase();
 
@@ -142,6 +177,9 @@ describe("C3 Tarea 6 — conflictos declarados y etiquetados", () => {
     const { data, error } = await arga.from("conflicts_of_interest")
       .select("code, tenant_id").eq("tenant_id", DEMO_TENANT);
     expect(error).toBeNull();
+    // EXACTO A PROPÓSITO: esto no es un conteo cerrado de los que estorban a la
+    // siembra, es el contrato cero-cambio de ARGA. Si sube o baja, alguien tocó
+    // el tenant que nadie puede tocar.
     expect(data.length).toBe(1);
     const codigos = new Set(CONFLICTOS_DEMO.map((c) => c.code));
     expect(data.filter((c) => codigos.has(c.code))).toEqual([]);

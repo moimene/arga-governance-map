@@ -80,15 +80,29 @@ describe("C3 Tarea 5 — hallazgos enlazados y planes etiquetados", () => {
     expect(new Set(original).size).toBe(CELDAS_BANDA_ALTA.length);
   });
 
-  it("NO hay planes de acción sembrados, y eso es el requisito", async () => {
-    // PPD-01 §4.2 describe el MECANISMO del Plan de acción y no publica la
-    // lista. Sembrar ocho planes verosímiles los haría indistinguibles de los
-    // reales, que es justo lo que este carril tiene prohibido. La aserción va
-    // en positivo: si alguien los siembra, esto cae.
+  it("todo plan de acción de Garrigues cuelga de un hallazgo del propio tenant", async () => {
+    // ANTES decía `expect(data).toEqual([])` — «no hay planes, y eso es el
+    // requisito». Eso era la orden vieja, la de no sembrar el tenant: el primer
+    // plan simulado ponía en rojo justo el avance que ahora se pide, y la
+    // salida fácil habría sido revertir la siembra en vez de tocar el gate.
+    //
+    // Queda vigilado lo que es defecto con cero planes y con doscientos: uno
+    // huérfano o colgado del hallazgo de otro tenant. Y que el recuento se MIDA
+    // —un error de PostgREST no puede volver a pasar por «no hay ninguno»—.
     const { data, error } = await garr.from("action_plans")
-      .select("id, title").eq("tenant_id", GARRIGUES_TENANT);
+      .select("id, title, finding_id").eq("tenant_id", GARRIGUES_TENANT);
     expect(error).toBeNull();
-    expect(data).toEqual([]);
+    expect(data, "la consulta de action_plans no devolvió ni filas ni error").not.toBeNull();
+
+    const { data: hallazgos, error: eH } = await garr.from("findings")
+      .select("id").eq("tenant_id", GARRIGUES_TENANT);
+    expect(eH).toBeNull();
+    // Control positivo: sin hallazgos, la comprobación de abajo se haría contra
+    // un conjunto vacío y cualquier plan pasaría por huérfano o por bueno según
+    // el azar de la consulta.
+    expect(hallazgos.length).toBeGreaterThan(0);
+    const propios = new Set(hallazgos.map((h) => h.id));
+    expect(data.filter((p) => !propios.has(p.finding_id)).map((p) => p.title)).toEqual([]);
   });
 
   it("y la ausencia se explica con su motivo y su fuente, no en blanco", () => {
@@ -101,11 +115,20 @@ describe("C3 Tarea 5 — hallazgos enlazados y planes etiquetados", () => {
     expect(PLAN_ACCION_AUSENCIA.controlesRelacionados.length).toBe(4);
   });
 
-  it("ningún hallazgo conserva el código por posición", async () => {
-    const { data } = await garr.from("findings")
+  it("los 8 códigos de las celdas altas siguen en Cloud, y ninguno es por posición", async () => {
+    // El conteo cerrado (`length === 8` sobre el prefijo) se rompía en cuanto
+    // alguien sembrase un noveno hallazgo penal. Se sustituye por la aserción
+    // que crece bien y encoge mal: los ocho conocidos tienen que estar —si
+    // falta uno, sale nombrado— y el esquema por posición no vuelve por ningún
+    // camino, tampoco por una fila nueva.
+    const { data, error } = await garr.from("findings")
       .select("code").eq("tenant_id", GARRIGUES_TENANT).like("code", "FND-GARR-PEN-%");
-    expect(data.length).toBe(8);
-    expect(data.filter((h) => ES_CODIGO_POR_POSICION.test(h.code))).toEqual([]);
+    expect(error).toBeNull();
+    const enCloud = new Set((data ?? []).map((h) => h.code));
+    const esperados = CELDAS_BANDA_ALTA.map(codigoHallazgo);
+    expect(esperados).toHaveLength(8);
+    expect(esperados.filter((c) => !enCloud.has(c))).toEqual([]);
+    expect((data ?? []).filter((h) => ES_CODIGO_POR_POSICION.test(h.code))).toEqual([]);
   });
 
   it("ARGA no cambia: sigue sin hallazgos ni planes del prefijo de Garrigues", async () => {

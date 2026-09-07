@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { useWhistleblowingLibroRegistro } from "@/hooks/useWhistleblowing";
-import { SII_AVISO_PERSISTENCIA_LOCAL } from "@/lib/sii/whistleblowing-engine";
+import { SII_AVISO_PERSISTENCIA } from "@/lib/sii/whistleblowing-engine";
 import {
   Gavel,
   Download,
@@ -88,15 +88,18 @@ export default function SiiLibroRegistro() {
         </div>
       </Card>
 
-      {/* Qué es realmente esta pantalla. Los asientos NO están incorporados. */}
+      {/* Qué es realmente esta pantalla. El texto decía que NINGÚN asiento se
+          conserva desde la recepción, y desde que el alta asigna número de
+          entrada (PI-31, Anexo §4) eso contradice a la propia columna de estado,
+          que ya pintaba tres rótulos distintos. */}
       <Card className="border-[var(--status-warning)] bg-[var(--t-surface-card)] p-5 text-xs text-[var(--t-text-secondary)] leading-relaxed">
         <div className="flex items-start gap-3">
           <AlertTriangle className="h-5 w-5 text-[var(--status-warning)] shrink-0 mt-0.5" />
           <div>
             <span className="font-bold text-[var(--t-text-primary)] block mb-1">
-              Asientos generados al vuelo — no hay libro-registro incorporado
+              No hay libro-registro incorporado: tres clases de asiento en la misma tabla
             </span>
-            Salvo los expedientes ya cerrados, los asientos de esta tabla se <strong>calculan al mostrarlos</strong> a partir del expediente: no hay número de entrada ni fecha de registro asignados y conservados en el momento de la recepción, ni orden de asiento estable. {SII_AVISO_PERSISTENCIA_LOCAL}
+            La columna de estado distingue tres cosas que no son iguales: los expedientes <strong>cerrados</strong> tienen el asiento incorporado con su resultado; los dados de <strong>alta</strong> tienen número de entrada y fecha conservados desde la recepción, pero todavía sin resultado; y los que solo dicen <strong>«Calculado»</strong> se generan al mostrar la tabla, sin número de entrada ni fecha conservados. En ningún caso hay orden de asiento estable. {SII_AVISO_PERSISTENCIA}
           </div>
         </div>
       </Card>

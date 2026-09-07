@@ -7,6 +7,7 @@ import { describe, expect, it, beforeAll } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { extraerMapa, AREAS_NEGOCIO, DEPARTAMENTOS_INTERNOS, PDF_AREAS, PDF_DEPTOS } from "../../../scripts/garrigues/penal/extract-mapa";
 import { MAPA_PENAL, CELDAS_BANDA_ALTA } from "../../../scripts/garrigues/penal/mapa-penal";
+import { codigoHallazgo } from "../../../scripts/garrigues/hallazgos/hallazgos-penales";
 import { sesionDe } from "../helpers/supabase-test-client";
 
 const haySrc = existsSync(PDF_AREAS) && existsSync(PDF_DEPTOS);
@@ -154,6 +155,12 @@ describe("G5 — datos penales en Cloud (Supabase)", () => {
     }
   });
 
+  // CONTEO EXACTO CONSERVADO A PROPÓSITO. El mapa penal es una extracción
+  // CONGELADA de 82 delitos: el prefijo `RSK-GARR-PEN-` es su espacio de
+  // nombres y el histograma de bandas es la medida de esa extracción. Un 83º
+  // riesgo con este prefijo no sería «siembra progresiva», sería el mapa
+  // degradando en silencio, que es el P0 nº2 de G4 volviendo por la ventana.
+  // Sembrar riesgos de OTRA fuente no toca este gate: usarían otro prefijo.
   it("Garrigues tiene los 82 riesgos penales con banda y desglose", async () => {
     if (!garr) return;
     const { data, error } = await garr.from("risks")
@@ -202,8 +209,14 @@ describe("G5 — datos penales en Cloud (Supabase)", () => {
     const { data, error } = await garr.from("findings")
       .select("code, title, severity, status, origin, due_date, owner_id").like("code", "FND-GARR-PEN-%");
     expect(error).toBeNull();
-    const rows = (data ?? []) as Array<Record<string, unknown>>;
-    expect(rows).toHaveLength(8);
+    const todas = (data ?? []) as Array<Record<string, unknown>>;
+    // ACOTADO A LAS OCHO CELDAS ALTAS (2026-09-07). El conteo cerrado sobre el
+    // prefijo ponía en rojo cualquier hallazgo penal que se sembrase después.
+    // Lo que se exige es que ESTAS ocho sigan estando y sigan sin severidad
+    // —la fuente no publica escala—; una fila futura responderá a la suya.
+    const esperados = CELDAS_BANDA_ALTA.map(codigoHallazgo);
+    const rows = todas.filter((r) => esperados.includes(r.code as string));
+    expect(rows.map((r) => r.code as string).sort()).toEqual([...esperados].sort());
     for (const r of rows) {
       expect(r.severity, `${r.code}`).toBeNull();
       expect(r.status).toBe("Abierto");
@@ -222,19 +235,28 @@ describe("G5 — datos penales en Cloud (Supabase)", () => {
     expect((data ?? [])).toHaveLength(4);
   });
 
-  it("action_plans sigue vacío para Garrigues: la fuente no publica la lista", async () => {
+  it("los planes de los hallazgos penales se MIDEN: el recuento no puede volver a ser un 0 falso", async () => {
     if (!garr) return;
     // Anclado: antes este test pasaba aunque la consulta fallase (`count ?? 0`
     // sin mirar `error`) y aunque no hubiera ni un hallazgo (`return` mudo).
-    // Justo los dos escenarios que deberían ponerlo rojo.
-    const { data, error: eF } = await garr.from("findings").select("id").like("code", "FND-GARR-PEN-%");
+    // Justo los dos escenarios que deberían ponerlo rojo. Eso se conserva.
+    //
+    // LO QUE SE RETIRA es el `expect(count).toBe(0)`: exigía que Garrigues no
+    // tuviera NUNCA un plan de acción, que era la orden vieja de no sembrar el
+    // tenant, y estaba duplicado con `src/test/garrigues/hallazgos-planes.test.ts`
+    // por otro camino —corregir uno solo dejaba el otro rojo—. La comprobación
+    // estructural que sí sobrevive a la siembra (ningún plan huérfano ni de
+    // otro tenant) vive ahora allí, una sola vez.
+    const { data, error: eF } = await garr.from("findings").select("id, code").like("code", "FND-GARR-PEN-%");
     expect(eF).toBeNull();
-    const ids = ((data ?? []) as Array<{ id: string }>).map((r) => r.id);
-    expect(ids.length, "no hay hallazgos penales: el seed no está aplicado").toBe(8);
+    const esperados = CELDAS_BANDA_ALTA.map(codigoHallazgo);
+    const filas = ((data ?? []) as Array<{ id: string; code: string }>)
+      .filter((r) => esperados.includes(r.code));
+    expect(filas.map((r) => r.code).sort(), "faltan hallazgos penales: el seed no está aplicado")
+      .toEqual([...esperados].sort());
     const { count, error } = await garr.from("action_plans")
-      .select("id", { count: "exact", head: true }).in("finding_id", ids);
+      .select("id", { count: "exact", head: true }).in("finding_id", filas.map((r) => r.id));
     expect(error).toBeNull();
     expect(count, "la consulta de action_plans no devolvió recuento").not.toBeNull();
-    expect(count).toBe(0);
   });
 });

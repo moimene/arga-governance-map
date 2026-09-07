@@ -739,6 +739,29 @@ export function useOpenMeeting(meetingId: string | undefined) {
   });
 }
 
+/**
+ * Cuántas filas de asistencia se perderían si se guardara `entrantes` sobre
+ * `existentes`. `useReplaceAttendees` es delete-all + re-insert: borra TODA la
+ * asistencia de la reunión y reinserta lo que la pantalla tenga cargado. Si el
+ * censo que alimenta la pantalla devuelve menos filas de las que hay guardadas
+ * —porque el origen del censo cambió, porque una consulta se truncó, o porque
+ * el paso se abrió antes de que cargara— el guardado destruye en silencio lo
+ * que nadie vio. Medido el 2026-09-07 sobre la Junta de socios de Garrigues:
+ * 346 asistentes sembrados (3 presenciales + 343 representados con sus
+ * derechos de voto), ningún camino que los proteja.
+ *
+ * Una fila existente está cubierta si la pantalla envía su `person_id`: marcar
+ * a alguien AUSENTE es un valor de `attendance_type`, no una baja. Por eso no
+ * enviar a un asistente sólo puede significar que la pantalla no lo tenía.
+ */
+export function contarAsistentesQueSePerderian(
+  existentes: Array<{ person_id?: string | null }>,
+  entrantes: Array<{ person_id: string }>,
+): number {
+  const cubiertos = new Set(entrantes.map((r) => r.person_id));
+  return existentes.filter((a) => !a.person_id || !cubiertos.has(a.person_id)).length;
+}
+
 export function useReplaceAttendees(meetingId: string | undefined) {
   const { tenantId } = useTenantContext();
   const qc = useQueryClient();
@@ -763,10 +786,26 @@ export function useReplaceAttendees(meetingId: string | undefined) {
       // FK violation 23503. Bug detectado en e2e/18 golden path.
       const { data: existingIds, error: idErr } = await supabase
         .from("meeting_attendees")
-        .select("id")
+        .select("id, person_id")
         .eq("meeting_id", meetingId)
         .eq("tenant_id", tenantId);
       if (idErr) throw idErr;
+
+      // Antes de destruir nada: si la pantalla no traía a alguien que ya está
+      // registrado, el guardado lo borraría sin que nadie lo haya visto. Se
+      // niega y lo dice, que es lo contrario de fusionar a ciegas.
+      const perdidas = contarAsistentesQueSePerderian(
+        (existingIds ?? []) as Array<{ person_id?: string | null }>,
+        rows,
+      );
+      if (perdidas > 0) {
+        throw new Error(
+          `Guardar ahora borraría ${perdidas} de los ${(existingIds ?? []).length} asistentes ya ` +
+            `registrados en esta reunión, porque la pantalla no los ha cargado (envía ${rows.length}). ` +
+            "Recarga la reunión y comprueba que el censo aparece completo antes de guardar.",
+        );
+      }
+
       const ids = (existingIds ?? []).map((r) => r.id);
       if (ids.length > 0) {
         const { error: votesErr } = await supabase

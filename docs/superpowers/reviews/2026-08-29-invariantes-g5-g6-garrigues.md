@@ -1,17 +1,51 @@
-# Invariantes de diseño de G5 y G6 — lo que no se puede «arreglar»
+# Invariantes de diseño de G5 y G6 — qué sigue en pie y qué derogó la orden del 2026-09-07
 
-- **Fecha:** 2026-08-29
+- **Fecha:** 2026-08-29 · **revisado el 2026-09-07** (cambio de orden: el tenant Garrigues se
+  siembra; §1 ya estaba superado y §4 queda derogado en su parte decisoria)
 - **Origen:** la conversación que diseñó G5 y G6, a petición de la orquestación del programa
 - **Para qué:** G5 y G6 se cerraron **sin ledger SDD**. El código está en git; el porqué no
   estaba en ninguna parte. Esto es el porqué.
 
-Cada punto describe algo que **parece un defecto y no lo es**. Todos han estado a punto de
-ser «corregidos» al menos una vez, y corregirlos destruiría dato correcto.
+Cada punto describía algo que **parecía un defecto y no lo era**. Todos han estado a punto de
+ser «corregidos» al menos una vez.
 
 > **El §1 está SUPERADO** desde el 2026-08-29 por una fuente que apareció después. Se deja
 > escrito con su refutación en vez de borrarlo. Un invariante desmentido que se queda escrito
 > como invariante es peor que no tenerlo: se lee como comprobado y el siguiente lector ya no
 > vuelve a mirar.
+
+> ## ⚠️ Cambio de orden del 2026-09-07 — leer antes que nada
+>
+> El usuario ha derogado la premisa de la que colgaban varios de estos puntos:
+>
+> - **Orden derogada:** «Garrigues no tiene inventario propio y NO se siembra, porque fabricar
+>   esos datos haría el dato demo indistinguible del real. La ausencia ES la decisión.»
+> - **Orden vigente:** «El tenant Garrigues SE VA A IR SEMBRANDO, de forma PROGRESIVA, con datos
+>   SIMULADOS PERO BASADOS EN LA REALIDAD, y ese dato DEBE PERSISTIR.»
+>
+> Consecuencias, por orden de importancia:
+>
+> 1. **Persistir es el requisito duro.** Borrar, pisar o duplicar dato sembrado de Garrigues es
+>    ahora un DEFECTO, no una limpieza.
+> 2. **Sembrar no puede poner la corrida en rojo.** Un gate que se pone rojo cuando alguien
+>    siembra empuja al siguiente a revertir la siembra.
+> 3. **Perder dato sí tiene que ponerse rojo.** Los gates no se desarman: se les da la vuelta.
+>    Donde vigilaban «sigue vacío», vigilan «no se ha perdido lo que había».
+>
+> **Qué deroga y qué no, punto por punto de este documento:**
+>
+> | § | Estado tras el 2026-09-07 |
+> |---|---|
+> | 1 | Ya estaba SUPERADO por fuente sobrevenida. Sin cambio. |
+> | 2 | **SIGUE EN PIE.** Es invariante de MODELO, no de la orden vieja: una banda de riesgo publicada como color único no tiene P e I derivables. El CHECK `risks_banda_sin_ejes_check` sigue siendo la red. Sembrar simulado no autoriza a inventar los ejes de un riesgo cuya fuente publica solo el nivel compuesto. |
+> | 3 | **SIGUE EN PIE.** El 8 es «el resultado de contar» las celdas de banda alta del mapa, no un tamaño de demo elegido: si tras un reseed salen ≠ 8, cambió la fuente o se rompió el extractor. |
+> | 4 | **DEROGADO en su parte decisoria.** Ver el apartado, reescrito abajo. El aviso de pantalla y el peligro del `DEFAULT` a ARGA siguen vigentes. |
+> | 5 | **SIGUE EN PIE.** Es criterio jurídico con fuente, no ausencia de dato. |
+> | 6 | **SIGUE EN PIE.** Es criterio de evidencia, no ausencia de dato. |
+>
+> Lo que **no** cambia en ningún caso: el contrato **cero-cambio ARGA**, y que el dato simulado
+> se **etiquete** donde ya se etiqueta (`data_provenance`, `firmeza: "DEMO_PILOTO"`, badges de
+> procedencia). «Simulado pero basado en la realidad» no autoriza a presentarlo como real.
 
 ---
 
@@ -103,7 +137,26 @@ elegido ni un tamaño de demo: es el resultado de contar.
 `findings.severity` queda NULL por la misma razón del punto 1: el CHECK solo admite cuatro
 nombres castellanos y la escala de la fuente no tiene nombres.
 
-## 4. `action_plans` vacío es una ausencia con fuente
+## 4. ~~`action_plans` vacío es una ausencia con fuente~~ — DEROGADO en su parte decisoria
+
+> **⚠️ Derogado el 2026-09-07 por el cambio de orden.** No se borra, por lo mismo que el §1: el
+> orden en que se supo importa, y este apartado se citó como prohibición durante nueve días.
+>
+> - **Cae:** que el vacío de `action_plans` en Garrigues sea una decisión firme. Sembrar planes
+>   de acción SIMULADOS y etiquetados como tales pasa a estar permitido, y lo sembrado tiene que
+>   persistir. Un gate que exija `action_plans` vacío para Garrigues está midiendo la orden
+>   vieja: hay uno así en `src/test/garrigues/hallazgos-planes.test.ts` («NO hay planes de acción
+>   sembrados, y eso es el requisito», `expect(data).toEqual([])`), y otro declarado en
+>   `src/test/garrigues/aislamiento-declarado.ts`. Se dejan anotados aquí porque son de otro
+>   carril, no porque estén bien.
+> - **Sigue en pie, y ahora importa MÁS:** el peligro del `DEFAULT` a ARGA de más abajo. Un
+>   INSERT sin tenant explícito contamina ARGA, y ahora sí va a haber INSERTs.
+> - **Sigue en pie:** que PPD-01 no publique la lista. Eso no prohíbe sembrar; determina que lo
+>   que se siembre es **simulado** y hay que etiquetarlo, no trasladado literalmente de la fuente.
+> - **Sigue en pie:** el aviso de `/grc/m/audit/action-plans`, reescrito para decir «todavía no
+>   incorporados» en vez de «se decidió no sembrarlos». Está gateado por `plans.length === 0`, así
+>   que desaparece solo con el primer plan; lo fija
+>   `src/test/garrigues/plan-accion-siembra-progresiva.test.ts`.
 
 > **Corrección 2026-08-30.** Este apartado citaba «PPD-01 §246» y «§350-356». **Esos apartados
 > no existen.** El índice de PPD-01 va de «1. Introducción» a «10. Control de versiones» con

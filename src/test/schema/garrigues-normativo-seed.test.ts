@@ -5,6 +5,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { GARRIGUES_DEMO_EMAIL, sesionDe } from "../helpers/supabase-test-client";
+// El catálogo congelado es la ÚNICA fuente de verdad de lo que tiene que estar
+// sembrado. Se contrasta contra él, no contra un número escrito a mano que
+// habría que subir cada vez que el tenant crece.
+import { NORMATIVO_CATALOG } from "../../../scripts/garrigues/normativo/catalogo-normativo";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
 // Fallback con la clave publicable (mismo patrón que
@@ -51,19 +55,32 @@ describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta"
     expect(seeded, "Garrigues tiene menos de 39 políticas: el seed no está aplicado").toBe(true);
   });
 
-  it("Garrigues ve exactamente 39 documentos normativos", async () => {
+  // ABIERTO POR ARRIBA (2026-09-07). `count === 39` era un conteo cerrado: el
+  // día que alguien siembre un documento normativo más, el gate se pone rojo
+  // por haber avanzado. Lo que importa es que NO SE PIERDA ninguno de los 39
+  // del catálogo congelado, y eso se comprueba por código, no por cardinal.
+  it("los 39 documentos del catálogo están TODOS en Cloud", async () => {
     expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     if (!seeded) return;
-    const { count, error } = await garr.from("policies").select("id", { count: "exact", head: true });
+    const { data, error } = await garr.from("policies").select("policy_code").limit(2000);
     expect(error).toBeNull();
-    expect(count).toBe(39);
+    const enCloud = new Set((data ?? []).map((p) => p.policy_code as string));
+    // Encoge mal: el que falte sale nombrado, no escondido tras un número.
+    expect(NORMATIVO_CATALOG.filter((e) => !enCloud.has(e.policy_code)).map((e) => e.policy_code))
+      .toEqual([]);
+    // Anti-vacuidad: si el catálogo se vaciara, lo de arriba no compararía nada.
+    expect(NORMATIVO_CATALOG).toHaveLength(39);
   });
 
-  it("las 32 PI están completas", async () => {
+  it("las 32 PI del catálogo están completas", async () => {
     expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     if (!seeded) return;
-    const { data } = await garr.from("policies").select("policy_code").like("policy_code", "PI-%");
-    expect(data).toHaveLength(32);
+    const { data, error } = await garr.from("policies").select("policy_code").like("policy_code", "PI-%");
+    expect(error).toBeNull();
+    const enCloud = new Set((data ?? []).map((p) => p.policy_code as string));
+    const pi = NORMATIVO_CATALOG.filter((e) => e.policy_code.startsWith("PI-"));
+    expect(pi).toHaveLength(32);
+    expect(pi.filter((e) => !enCloud.has(e.policy_code)).map((e) => e.policy_code)).toEqual([]);
   });
 
   it("el ownership acreditado apunta a órganos reales del tenant", async () => {
@@ -104,12 +121,21 @@ describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta"
     }
   });
 
-  it("solo 4 documentos tienen órgano responsable; el resto queda NULL", async () => {
+  // ACOTADO AL CATÁLOGO: son SUS 39 documentos los que tienen 4 ownerships
+  // acreditados por la fuente. Un documento normativo futuro traerá el suyo o
+  // no lo traerá, y eso no puede poner en rojo el criterio de éste.
+  it("de los 39 del catálogo, solo 4 tienen órgano responsable; el resto queda NULL", async () => {
     expect(authed && garr, "sin sesión de Garrigues no se puede asertar nada").toBeTruthy();
     if (!seeded) return;
-    const { count } = await garr
-      .from("policies").select("id", { count: "exact", head: true }).not("owner_body_id", "is", null);
-    expect(count).toBe(4);
+    const { data, error } = await garr
+      .from("policies").select("policy_code, owner_body_id").limit(2000);
+    expect(error).toBeNull();
+    const codigos = new Set(NORMATIVO_CATALOG.map((e) => e.policy_code));
+    const delCatalogo = (data ?? []).filter((p) => codigos.has(p.policy_code as string));
+    // Anti-vacuidad: sin las 39 filas, «solo 4» se cumpliría con 0.
+    expect(delCatalogo).toHaveLength(NORMATIVO_CATALOG.length);
+    expect(delCatalogo.filter((p) => p.owner_body_id !== null).map((p) => p.policy_code).sort())
+      .toHaveLength(4);
   });
 
   it("PPD-02 y el Código de Conducta del Socio quedan etiquetados sin contenido", async () => {
@@ -133,6 +159,8 @@ describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta"
     expect(data?.current_version).toBe(3);
   });
 
+  // EXACTO A PROPÓSITO: contrato cero-cambio de ARGA, no conteo cerrado de los
+  // que estorban a la siembra de Garrigues.
   it("ARGA sigue con sus 25 políticas y sin ownership por órgano", async () => {
     expect(argaAuthed && arga, "sin sesión de ARGA no se puede asertar nada").toBeTruthy();
     const { count } = await arga.from("policies").select("id", { count: "exact", head: true });

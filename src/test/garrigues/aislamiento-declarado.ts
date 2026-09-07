@@ -2,38 +2,61 @@
 //
 // Qué se espera encontrar en cada tabla, por tenant, y POR QUÉ.
 //
-// Existe porque «no hay filas» tiene dos causas que se ven idénticas y no lo
-// son:
+// ─── CAMBIO DE ORDEN, 2026-09-07 ────────────────────────────────────────────
 //
-//   - **Vacía por defecto**: el seed falló, la migración no entró, RLS las
-//     tapa. Un gate que la tolera es un gate roto.
-//   - **Vacía por procedencia**: la fuente no publica esos datos. Un gate que
-//     la rompe empuja a fabricarlos para que calle — que es exactamente lo que
-//     la decisión de no fabricarlos quería impedir.
+// Este fichero nació bajo una orden que ya NO rige: «Garrigues no tiene
+// inventario propio y no se siembra, porque fabricar esos datos haría el dato
+// demo indistinguible del real; la ausencia ES la decisión». La orden vigente
+// es la contraria: el tenant SE VA A IR SEMBRANDO, de forma progresiva, con
+// dato simulado pero basado en la realidad, y ese dato DEBE PERSISTIR.
 //
-// La declaración va como DATO y no como comentario a propósito. Un motivo en
-// un comentario lo borra quien se encuentre el gate rojo dentro de tres
-// semanas; un motivo que el test recorre le obliga a decidir conscientemente
-// qué está cambiando.
+// Eso invierte lo que hay que vigilar, sin aflojarlo:
 //
-// Y no es una exención: es un estado pinado. Si `action_plans` de Garrigues
-// deja de estar vacía, la declaración deja de cuadrar y el gate **también
-// rompe**. No se silencia la vacuidad — se le pone dueño.
+//   - Antes: «sigue vacío» era la invariante, y sembrar una fila ponía el gate
+//     ROJO. Un gate así empuja al siguiente a revertir la siembra para callarlo.
+//   - Ahora: la invariante es «no se ha perdido lo que había». Sembrar es
+//     VERDE; borrar dato sembrado es ROJO.
+//
+// Lo que NO cambia, y era el motivo real de este fichero: una aserción de
+// aislamiento no puede pasar POR CONJUNTO VACÍO. Si Garrigues no tiene filas,
+// «Garrigues no ve las de ARGA» no prueba nada. Ese verde vacío sigue siendo el
+// vicio contra el que se escribió todo esto — y por eso la vacuidad no se
+// tolera: se cuenta, con un techo (ver `VACUIDAD_MAXIMA`).
 
 export const ARGA = "00000000-0000-0000-0000-000000000001";
 export const GARRIGUES = "00000000-0000-0000-0000-000000000002";
 
-/** Qué se espera del conteo de un tenant en una tabla. */
-export type Presencia = "ALGUNA" | "NINGUNA";
+/**
+ * Qué se espera del conteo de un tenant en una tabla.
+ *
+ *   - `ALGUNA`   — hay filas y TIENEN QUE SEGUIR HABIÉNDOLAS. Si se vacía, ROJO.
+ *                  Es la persistencia: dato sembrado que desaparece es un
+ *                  defecto, no una limpieza.
+ *   - `PENDIENTE`— aún sin sembrar, se sembrará. Con filas o sin ellas NO rompe,
+ *                  de modo que avanzar la siembra nunca pone la corrida en rojo.
+ *                  Su vacuidad la vigila el trinquete, no esta declaración.
+ *   - `NINGUNA`  — ausencia que es DECISIÓN PERMANENTE, no un paso pendiente.
+ *                  Exige motivo Y fuente, y si aparecen filas, ROJO: la decisión
+ *                  se habrá revertido sin decirlo.
+ *
+ * `PENDIENTE` no es una exención disfrazada. Degradar una entrada de `ALGUNA` a
+ * `PENDIENTE` para callar un rojo NO funciona: el trinquete de abajo cuenta
+ * sobre el DATO MEDIDO, no sobre esta declaración, así que el número no se
+ * mueve y el techo sigue roto.
+ */
+export type Presencia = "ALGUNA" | "PENDIENTE" | "NINGUNA";
 
 export type TablaDeclarada = {
   readonly tabla: string;
   readonly arga: Presencia;
   readonly garrigues: Presencia;
   /**
-   * Obligatorio en cuanto alguno de los dos sea `NINGUNA`. Y con FUENTE: un
-   * «a propósito» sin referencia es indistinguible del «a propósito» de quien
-   * quería que el gate callara.
+   * Obligatorio en cuanto alguno de los dos sea `NINGUNA`, y PROHIBIDO en
+   * cualquier otro caso — un motivo colgando de una tabla que no declara
+   * ausencia permanente es una excusa preparada para cuando haga falta.
+   *
+   * Y con FUENTE: un «a propósito» sin referencia es indistinguible del «a
+   * propósito» de quien quería que el gate callara.
    */
   readonly motivo?: {
     readonly texto: string;
@@ -63,46 +86,18 @@ export type TablaDeclarada = {
 };
 
 /**
- * El motivo de las tablas `ai_*` / `aims_*`, escrito una vez.
+ * Las tablas del backbone de IA que tienen dato de ARGA.
  *
- * Medido en `governance_OS` el 2026-09-06: de las 26 tablas del backbone de IA
- * que llevan `tenant_id`, el tenant Garrigues tiene CERO filas en las 26. No es
- * un seed a medias — es que ninguno de sus carriles (G0 a G4: fundación,
- * espejo societario, gobierno de la matriz, motor SLP y sistema normativo)
- * incluía inventario de sistemas de IA. Fabricar sistemas verosímiles para un
- * despacho los haría indistinguibles de los reales, que es exactamente lo que
- * la política de datos del tenant impide.
+ * Solo estas entran en el gate: en ellas la dirección de riesgo real
+ * —«Garrigues no ve las filas de ARGA»— asierta de verdad, porque hay filas que
+ * ver. Las otras diecisiete tablas `ai_…` / `aims_…` están vacías en LOS DOS
+ * tenants, así que vigilarlas sería teatro: dos direcciones vacuas y ninguna
+ * información.
  *
- * Se declara UNA vez y se reutiliza porque el motivo es literalmente el mismo:
- * repetirlo nueve veces con distinta redacción invitaría a que nueve copias se
- * desincronizaran, y la primera que dejara de ser cierta pasaría inadvertida.
- */
-const SIN_INVENTARIO_IA = {
-  texto:
-    "El tenant no tiene inventario de IA: cero filas propias en las 26 tablas ai_*/aims_* con " +
-    "tenant_id, medido en Cloud. Ninguno de sus carriles sembró sistemas, evaluaciones ni " +
-    "expediente técnico, y fabricarlos haría indistinguible el dato demo del real. La ausencia " +
-    "es la decisión, no un seed roto — y por eso la dirección ARGA→Garrigues de estas tablas se " +
-    "declara vacua en vez de asertarse como si probara aislamiento.",
-  fuente:
-    "medición directa en governance_OS 2026-09-06 (0 filas del tenant en las 26 tablas); " +
-    "carriles G0-G4 sin alcance AIMS, CLAUDE.md §Tenant Garrigues",
-} as const;
-
-/**
- * Las tablas del backbone de IA que SÍ tienen dato de ARGA.
- *
- * Solo estas entran: en ellas la dirección de riesgo real —«Garrigues no ve las
- * filas de ARGA»— es una aserción de verdad, porque hay filas que ver. Las
- * otras diecisiete tablas `ai_…` / `aims_…` están vacías en LOS DOS tenants,
- * así que
- * vigilarlas sería teatro: dos direcciones vacuas y ninguna información.
- * Entrarán solas el día que alguien las siembre, porque entonces la medición de
- * arriba dejará de ser cierta y este comentario habrá que rehacerlo.
+ * `ai_systems` SALIÓ de esta lista el 2026-09-07: Garrigues ya tiene inventario
+ * propio y su aislamiento se asierta entero, en las dos direcciones.
  */
 export const TABLAS_IA_CON_DATO_ARGA = [
-  // `ai_systems` SALIÓ de esta lista el 2026-09-07: Garrigues ya tiene
-  // inventario propio y su aislamiento pasa a ser aserción REAL (abajo).
   "ai_incidents",
   "aims_system_versions",
   "aims_technical_file_sections",
@@ -139,44 +134,6 @@ export const AISLAMIENTO_DECLARADO: readonly TablaDeclarada[] = [
     },
   },
   {
-    // Está en DOMAIN_TABLES del gate de aislamiento y su dirección
-    // ARGA→Garrigues es vacua: el `console.warn` de ese fichero la venía
-    // señalando sin asertarla.
-    tabla: "document_templates",
-    arga: "ALGUNA",
-    garrigues: "NINGUNA",
-    motivo: {
-      texto:
-        "Este tenant no usa esta superficie: sus plantillas viven en " +
-        "`plantillas_protegidas`, donde G3 dejó las 6 del núcleo en estado ACTIVA. La " +
-        "ausencia aquí no es un seed roto, es que el dato está en otro sitio — y por eso se " +
-        "declara con su alternativa, para que la afirmación sea comprobable y no una " +
-        "suposición.",
-      fuente: "G3, 6 plantillas núcleo del tenant (CLAUDE.md, sección Tenant Garrigues)",
-    },
-    alternativa: { tabla: "plantillas_protegidas", minimo: 1 },
-    marcadores: {},
-  },
-  {
-    tabla: "action_plans",
-    arga: "ALGUNA",
-    // NINGUNA, y no es un fallo de siembra.
-    garrigues: "NINGUNA",
-    motivo: {
-      texto:
-        "El Manual del Sistema de Gestión de Riesgos Penales describe el mecanismo del Plan de " +
-        "acción y no publica los planes concretos. Sembrar planes verosímiles los haría " +
-        "indistinguibles de los reales, así que la decisión del carril fue no sembrar ninguno y " +
-        "explicar la ausencia en pantalla.",
-      fuente: "PPD-01 §4.2; decisión de la Tarea 5 del carril C3 (commit 22d0579)",
-    },
-    marcadores: {},
-  },
-  // ── Tablas añadidas por el carril CONSOLA (2026-09-05) ──────────────────
-  // El read model de la consola pasó a leerlas tenant-scoped, así que entran
-  // en el gate de aislamiento: una tabla que la consola cuenta y el gate no
-  // vigila es exactamente el hueco por el que un número cruza de tenant.
-  {
     tabla: "delegations",
     arga: "ALGUNA",
     garrigues: "ALGUNA",
@@ -197,31 +154,31 @@ export const AISLAMIENTO_DECLARADO: readonly TablaDeclarada[] = [
     marcadores: {},
   },
   {
-    tabla: "incidents",
+    // Garrigues tiene inventario de IA propio desde el 2026-09-07 (medido en
+    // Cloud: ARGA 8 filas, Garrigues 1). Su aislamiento dejó de ser vacuo.
+    tabla: "ai_systems",
     arga: "ALGUNA",
-    garrigues: "NINGUNA",
-    motivo: {
-      texto:
-        "El carril GRC de este tenant se sembró con el mapa de riesgos penales, los hallazgos " +
-        "enlazados y los controles del PPD, pero NO con incidentes: el despacho no ha declarado " +
-        "ninguno y fabricar incidentes verosímiles los haría indistinguibles de los reales. La " +
-        "ausencia es la decisión, no un seed a medias.",
-      fuente: "carril C3, seeds de Garrigues sin incidentes (commit 22d0579)",
-    },
+    garrigues: "ALGUNA",
     marcadores: {},
   },
+
+  // ── AUSENCIAS PERMANENTES (`NINGUNA`) ───────────────────────────────────
+  // Solo tres, y ninguna es la orden vieja: no son «todavía no se ha sembrado»
+  // sino «este tenant no puede tener filas aquí sin romper otra cosa».
   {
-    tabla: "evidence_bundles",
+    tabla: "document_templates",
     arga: "ALGUNA",
     garrigues: "NINGUNA",
     motivo: {
       texto:
-        "Este tenant no ha producido todavía ningún artefacto documental propio (0 actas, 0 " +
-        "certificaciones, 0 artefactos), así que no hay nada de lo que emitir bundle. Y el " +
-        "backbone probatorio sigue en HOLD, de modo que tampoco se emitiría por conveniencia " +
-        "de la demo: la ausencia es coherente con la postura declarada del carril de evidencia.",
-      fuente: "migración 000049 en HOLD; informe de revisión 2026-09-02 §2.1 (commit 45809dd)",
+        "Este tenant no usa esta superficie: sus plantillas viven en " +
+        "`plantillas_protegidas`, donde G3 dejó las 6 del núcleo en estado ACTIVA. La " +
+        "ausencia aquí no es un seed roto ni un paso pendiente, es que el dato está en otro " +
+        "sitio — y por eso se declara con su alternativa, para que la afirmación sea " +
+        "comprobable y no una suposición.",
+      fuente: "G3, 6 plantillas núcleo del tenant (CLAUDE.md, sección Tenant Garrigues)",
     },
+    alternativa: { tabla: "plantillas_protegidas", minimo: 1 },
     marcadores: {},
   },
   {
@@ -232,8 +189,8 @@ export const AISLAMIENTO_DECLARADO: readonly TablaDeclarada[] = [
       texto:
         "Los handoffs cross-module son read-only por navegación y ninguna superficie escribe en " +
         "esta tabla (0 inserts en src/). Las filas de ARGA son históricas. Que Garrigues tenga " +
-        "cero no es un seed roto: es que el producto no emite eventos, y esa prohibición es " +
-        "precisamente el contrato vigente.",
+        "cero no es un paso pendiente de la siembra: es que el producto TIENE PROHIBIDO emitir " +
+        "eventos, y sembrarlos rompería el guardrail vigente.",
       fuente: "contrato read-only de src/lib/secretaria/cross-module-handoff.ts (commit 45809dd)",
     },
     marcadores: {},
@@ -246,54 +203,126 @@ export const AISLAMIENTO_DECLARADO: readonly TablaDeclarada[] = [
       texto:
         "Mismo motivo que los eventos: la escritura en links está prohibida por el guardrail " +
         "vigente y ninguna superficie del producto la ejerce. Las tres filas de ARGA son " +
-        "históricas y el tenant nuevo no puede generar ninguna sin romper ese contrato.",
+        "históricas y el tenant nuevo no puede generar ninguna sin romper ese contrato, así " +
+        "que esta ausencia no la resuelve ninguna siembra futura.",
       fuente: "contrato read-only de src/lib/secretaria/cross-module-handoff.ts (commit 45809dd)",
     },
     marcadores: {},
   },
-  // ── Backbone de IA (2026-09-06) ─────────────────────────────────────────
-  // `DOMAIN_TABLES` del gate de aislamiento no cubría NINGUNA tabla ai_*/aims_*
-  // pese a que el módulo AI Governance escribe en `ai_systems` y `ai_incidents`
-  // como owner. Se añaden con su vacuidad declarada, no silenciada: si Garrigues
-  // llega a tener un sistema de IA, la declaración deja de cuadrar y el gate
-  // rompe — que es cuando hay que convertirla en aserción real.
+
+  // ── PENDIENTES DE SIEMBRA (`PENDIENTE`) ─────────────────────────────────
+  // Aquí vivía la orden vieja: cada una de estas entradas llevaba un motivo
+  // que decía «fabricar dato verosímil lo haría indistinguible del real, la
+  // ausencia es la decisión». Ya no. Se sembrarán, y cuando lo hagan este
+  // fichero no debe ponerse rojo — solo el trinquete se mueve, hacia abajo.
+  //
+  // Los motivos se han RETIRADO, no reescritos: describían una decisión
+  // derogada, y dejarlos aquí como prosa desactualizada es peor que no tener
+  // nada. Lo que queda es el estado, que la máquina comprueba.
+  //
+  // La prueba de que esto no es teoría: `ai_systems` estuvo en este grupo hasta
+  // hoy, alguien sembró una fila, y bajo la regla anterior el gate se puso rojo
+  // por haber PROGRESADO.
+  {
+    // El PPD describe el mecanismo del plan de acción; los planes concretos aún
+    // no se han sembrado.
+    tabla: "action_plans",
+    arga: "ALGUNA",
+    garrigues: "PENDIENTE",
+    marcadores: {},
+  },
+  {
+    // El carril GRC sembró riesgos penales, hallazgos y controles del PPD; los
+    // incidentes van después.
+    tabla: "incidents",
+    arga: "ALGUNA",
+    garrigues: "PENDIENTE",
+    marcadores: {},
+  },
+  {
+    // Depende de que el tenant produzca artefactos: sin acta ni certificación
+    // no hay de qué emitir bundle. Se sembrará detrás de `minutes`.
+    tabla: "evidence_bundles",
+    arga: "ALGUNA",
+    garrigues: "PENDIENTE",
+    marcadores: {},
+  },
+  // Backbone de IA. Medido en Cloud el 2026-09-07: Garrigues tiene 0 filas en
+  // estas ocho. `ai_systems` ya no está aquí — se sembró, y es el precedente.
   ...TABLAS_IA_CON_DATO_ARGA.map((tabla) => ({
     tabla,
     arga: "ALGUNA" as const,
-    garrigues: "NINGUNA" as const,
-    motivo: SIN_INVENTARIO_IA,
+    garrigues: "PENDIENTE" as const,
     marcadores: {},
   })),
+  // Secretaría. Entran aquí —y no solo en el smoke del carril— para que su
+  // vacuidad la cuente el MISMO trinquete que la de todas las demás: un ledger,
+  // un techo. Garrigues tiene 1 reunión y 0 actas; el día que cierre una, estas
+  // dos bajan el conteo solas, sin que nadie edite una lista.
   {
-    // 2026-09-07 — LA VACUIDAD DECLARADA SE ACABÓ, Y LA CAZÓ ESTE GATE.
-    //
-    // El comentario de arriba prometía que estas tablas «entrarán solas el día
-    // que alguien las siembre». Pasó: `ai_systems` tiene desde hoy una fila del
-    // tenant Garrigues, y el gate se puso ROJO sin que nadie avisara —que es
-    // exactamente para lo que se escribió—. Medido en Cloud el 2026-09-07:
-    // ARGA 8 filas, Garrigues 1. Las otras 8 tablas de IA siguen sin dato de
-    // Garrigues y por eso siguen arriba, con su vacuidad declarada.
-    //
-    // Con esto la dirección ARGA→Garrigues de `ai_systems` deja de ser vacua:
-    // ya no pasa por conjunto vacío, sino porque la RLS aísla de verdad.
-    //
-    // SALVEDAD, dicha y no disimulada: la siembra está A MEDIAS. El catálogo
-    // `scripts/garrigues/ia/catalogo-ia.ts` lleva 7 sistemas y en Cloud hay 1.
-    // No se completa ni se borra desde aquí: el dato es de otra sesión y
-    // `scripts/seed-garrigues-ia.ts` es el camino con su contrato cero-cambio
-    // ARGA. Lo que sí queda es que la presencia esté DECLARADA en vez de
-    // romper el gate en silencio.
-    // Sin `motivo`: ese campo documenta una AUSENCIA declarada, y aquí ya no
-    // hay ninguna. Ponerlo sería un motivo huérfano, y el gate de al lado lo
-    // rechaza — con razón.
-    tabla: "ai_systems",
-    arga: "ALGUNA" as const,
-    garrigues: "ALGUNA" as const,
+    tabla: "minutes",
+    arga: "ALGUNA",
+    garrigues: "PENDIENTE",
+    marcadores: {},
+  },
+  {
+    tabla: "certifications",
+    arga: "ALGUNA",
+    garrigues: "PENDIENTE",
     marcadores: {},
   },
 ] as const;
 
-/** Las tablas cuya ausencia está declarada, para poder afirmarlo en el gate. */
+/** Las tablas cuya ausencia se declara PERMANENTE, para poder exigirles motivo. */
 export const CON_AUSENCIA_DECLARADA = AISLAMIENTO_DECLARADO.filter(
   (t) => t.arga === "NINGUNA" || t.garrigues === "NINGUNA",
 );
+
+/** Presencia medida en Cloud: cuántas filas propias ve cada tenant. */
+export type Conteo = { readonly arga: number; readonly garrigues: number };
+
+/**
+ * Las direcciones de aislamiento que hoy NO prueban nada, calculadas del dato.
+ *
+ * «X no ve filas de Y en T» es vacua cuando Y no tiene filas en T: se filtra un
+ * conjunto vacío y sale vacío. Se devuelven etiquetadas para que un rojo diga
+ * exactamente qué mitad se quedó sin sujeto.
+ */
+export function direccionesVacuas(medido: ReadonlyMap<string, Conteo>): string[] {
+  const vacuas: string[] = [];
+  for (const t of AISLAMIENTO_DECLARADO) {
+    const c = medido.get(t.tabla);
+    if (!c) throw new Error(`${t.tabla}: sin medir. El conteo de vacuidad no sería válido.`);
+    if (c.garrigues === 0) vacuas.push(`ARGA no ve filas Garrigues en ${t.tabla}`);
+    if (c.arga === 0) vacuas.push(`Garrigues no ve filas ARGA en ${t.tabla}`);
+  }
+  return vacuas;
+}
+
+/**
+ * EL TRINQUETE. Cuántas direcciones vacuas se toleran, como techo commiteado.
+ *
+ * Por qué un número y no una lista: porque el número se calcula del DATO MEDIDO
+ * (`direccionesVacuas`), no de la declaración de arriba. Eso es lo que lo hace
+ * fuerte —y es la propiedad que hay que preservar si alguien lo reescribe—:
+ *
+ *   - Sembrar una tabla que estaba vacía BAJA el conteo. 16 → 15 ≤ 16: verde.
+ *     Progresar nunca pone la corrida en rojo, que es el requisito de la orden
+ *     nueva.
+ *   - Borrar dato sembrado lo SUBE por encima del techo: ROJO. Ahí está la
+ *     persistencia, y no depende de que nadie se acuerde de nada.
+ *   - Degradar una entrada de `ALGUNA` a `PENDIENTE` para callar ese rojo NO
+ *     sirve: el conteo mide filas, no etiquetas. El techo sigue roto.
+ *   - Añadir una tabla nueva con una dirección vacua también lo sube, y toca
+ *     subir el techo A MANO, con su medición al lado. Eso es deliberado: una
+ *     aserción vacua más es una decisión, no un descuido.
+ *
+ * Bajar este número cuando la siembra avance es OPCIONAL y bienvenido; lo que
+ * no vale es subirlo sin haber medido.
+ *
+ * Medido en `governance_OS` el 2026-09-07 sobre las 23 tablas declaradas: 16
+ * direcciones vacuas, todas del lado Garrigues (las 3 ausencias permanentes +
+ * las 13 pendientes de siembra). Ninguna del lado ARGA: ARGA tiene filas en las
+ * 23.
+ */
+export const VACUIDAD_MAXIMA = 16;

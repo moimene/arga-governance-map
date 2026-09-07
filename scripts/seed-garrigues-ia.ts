@@ -24,10 +24,13 @@
  *     discriminante de abajo cierra el conjunto: total de la tabla MÁS desglose.
  *     Contar sólo "ARGA sigue en 8" y "Garrigues sube a 6" no detecta una
  *     séptima fila colgada de un UUID inexistente.
- *  2. **`aims_reference_code` NO es único.** Re-ejecutar duplicaría EN SILENCIO.
- *     La idempotencia es de este script y no tiene red debajo — mismo defecto
- *     que `policies.policy_code` en G4. Deuda declarada: la unicidad por tenant
- *     es superficie compartida y no se abre aquí.
+ *  2. **`aims_reference_code` NO es único, y además puede ser NULL.** El alta
+ *     desde la aplicación no lo pone, así que indexar sólo por código dejaba
+ *     invisibles esas filas y sembraba un duplicado encima (medido 2026-09-07:
+ *     el tenant ya tenía un «Harvey» sin código). La idempotencia es de este
+ *     script y no tiene red debajo — mismo defecto que `policies.policy_code`
+ *     en G4. Deuda declarada: la unicidad por tenant es superficie compartida
+ *     y no se abre aquí.
  *  3. **`status` no tiene CHECK.** Acepta cualquier texto. Se siembra el literal
  *     del catálogo y no se confía en validación del servidor.
  *
@@ -44,6 +47,14 @@
  * pinta. `humanOversight` y `owner_body_slug` no se siembran: el primero no tiene
  * dónde ir, y el segundo apunta a un COMITÉ mientras `owner_id` referencia
  * `persons`. Colgar el comité de una persona sería inventar una atribución.
+ *
+ * SIEMBRA PROGRESIVA (2026-09-07)
+ * ------------------------------
+ * El tenant Garrigues se va poblando con dato simulado que DEBE PERSISTIR, y
+ * parte de él no lo escribe este script. De ahí tres reglas: reconoce lo que ya
+ * existe (por código y, si no lo tiene, por nombre), no borra nunca lo que no
+ * creó, y su discriminante final admite que el tenant tenga MÁS sistemas que el
+ * catálogo. Sólo caza que falte alguno del catálogo o que quede duplicado.
  *
  * Contrato cero-cambio ARGA: este script NUNCA escribe fuera del tenant
  * Garrigues, y aborta si detecta que fuera a hacerlo.
@@ -103,6 +114,90 @@ function aFila(s: SistemaIA) {
   };
 }
 
+/**
+ * Clave de reconocimiento para filas SIN `aims_reference_code`, que es lo que
+ * deja el alta desde la propia aplicación (/ai-governance/sistemas/nuevo) y lo
+ * que dejó otra sesión: medido 2026-09-07, el tenant tenía ya «Harvey –
+ * Plataforma de IA generativa legal» con código NULL. Indexar sólo por código
+ * hacía esa fila invisible para el seed y sembraba un segundo Harvey.
+ *
+ * Se compara el nombre hasta el primer separador descriptivo, sin acentos ni
+ * mayúsculas: «Harvey – Plataforma…» y «Harvey» son el mismo sistema; «Copilot»
+ * y «Garrigues GA_IA» no colisionan con nada. Es una heurística, así que
+ * cualquier ambigüedad aborta ANTES de escribir en vez de elegir por su cuenta.
+ */
+function claveNombre(name: string): string {
+  return name
+    .split(/[–—:|(]|\s-\s/)[0]
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export type FilaSistemaIA = {
+  id: string; aims_reference_code: string | null; name: string | null;
+  vendor: string | null; use_case: string | null; description: string | null;
+  status: string | null; system_type: string | null;
+};
+
+export type PasoSiembra = {
+  s: SistemaIA;
+  /** `adopta` = la fila ya existía SIN código: se le estampa y se respeta. */
+  accion: "alta" | "actualiza" | "adopta";
+  fila?: FilaSistemaIA;
+};
+
+/**
+ * Decide qué hacer con cada sistema del catálogo ANTES de escribir nada. Una
+ * ambigüedad resuelta a mitad de la escritura deja el tenant a medias, que es
+ * justo lo que la siembra progresiva no puede permitirse: por eso devuelve
+ * `problemas` en vez de escribir y luego arrepentirse.
+ *
+ * Reconoce por `aims_reference_code` y, para las filas que no lo tienen —las
+ * que deja el alta desde la aplicación—, por nombre. Lo que no reconoce ni
+ * toca ni borra: sobrar filas no es un defecto en un tenant que se puebla poco
+ * a poco.
+ */
+export function planificarSiembra(
+  existentes: FilaSistemaIA[],
+  catalogo: SistemaIA[],
+): { plan: PasoSiembra[]; problemas: string[] } {
+  const problemas: string[] = [];
+
+  const porCodigo = new Map<string, FilaSistemaIA>();
+  const duplicados = new Set<string>();
+  for (const r of existentes) {
+    if (!r.aims_reference_code) continue;
+    if (porCodigo.has(r.aims_reference_code)) duplicados.add(r.aims_reference_code);
+    porCodigo.set(r.aims_reference_code, r);
+  }
+  for (const c of duplicados)
+    problemas.push(`el tenant ya tiene ${c} duplicado: hay que decidir cuál es la fila buena`);
+
+  const sinCodigoPorNombre = new Map<string, FilaSistemaIA[]>();
+  for (const r of existentes) {
+    if (r.aims_reference_code || !r.name) continue;
+    const k = claveNombre(r.name);
+    sinCodigoPorNombre.set(k, [...(sinCodigoPorNombre.get(k) ?? []), r]);
+  }
+
+  const plan: PasoSiembra[] = catalogo.map((s) => {
+    const porCod = porCodigo.get(s.code);
+    if (porCod) return { s, accion: "actualiza" as const, fila: porCod };
+    const candidatos = sinCodigoPorNombre.get(claveNombre(s.name)) ?? [];
+    if (candidatos.length > 1) {
+      problemas.push(
+        `${s.code} «${s.name}»: hay ${candidatos.length} filas sin código con ese nombre ` +
+          `(${candidatos.map((c) => c.id).join(", ")}). No se elige por su cuenta.`,
+      );
+      return { s, accion: "alta" as const };
+    }
+    if (candidatos.length === 1) return { s, accion: "adopta" as const, fila: candidatos[0] };
+    return { s, accion: "alta" as const };
+  });
+
+  return { plan, problemas };
+}
+
 /** Cierra el conjunto: total de la tabla MÁS desglose por tenant. */
 async function censo(db: AdminClient) {
   const { count: total, error: e1 } = await db
@@ -142,53 +237,90 @@ async function main() {
 
   const argaAntes = antes.porTenant[ARGA_TENANT] ?? 0;
 
-  // Idempotencia: por (tenant_id, aims_reference_code). No hay unicidad en BD
-  // detrás, así que la comprobación es de este script y ha de ser explícita.
   const { data: existentes, error } = await db
-    .from("ai_systems").select("id, aims_reference_code")
+    .from("ai_systems")
+    .select("id, aims_reference_code, name, vendor, use_case, description, status, system_type")
     .eq("tenant_id", GARRIGUES_TENANT);
   if (error) fail(`no se pudieron leer los sistemas del tenant: ${error.message}`);
-  const porCodigo = new Map<string, string>();
-  for (const r of (existentes ?? []) as { id: string; aims_reference_code: string | null }[]) {
-    if (r.aims_reference_code) porCodigo.set(r.aims_reference_code, r.id);
-  }
 
-  let altas = 0, actualizaciones = 0;
-  for (const s of SISTEMAS_IA) {
-    const fila = aFila(s);
-    const existente = porCodigo.get(s.code);
-    const accion = existente ? "actualiza" : "alta     ";
-    console.log(`  ${accion} ${s.code.padEnd(12)} ${s.name.padEnd(24)} [${s.provenance}]`);
-    if (!COMMIT) { if (existente) actualizaciones++; else altas++; continue; }
+  const { plan, problemas: problemasPlan } = planificarSiembra(
+    (existentes ?? []) as FilaSistemaIA[],
+    SISTEMAS_IA,
+  );
+  if (problemasPlan.length)
+    fail(`no se escribe nada:\n     - ${problemasPlan.join("\n     - ")}`);
 
-    if (existente) {
-      const { error: e } = await db.from("ai_systems").update(fila)
-        .eq("tenant_id", GARRIGUES_TENANT).eq("id", existente);
+  let altas = 0, actualizaciones = 0, adopciones = 0;
+  for (const { s, accion, fila } of plan) {
+    console.log(`  ${accion.padEnd(10)} ${s.code.padEnd(12)} ${s.name.padEnd(24)} [${s.provenance}]` +
+      (accion === "adopta" ? `  ← fila existente «${fila!.name}»` : ""));
+    if (!COMMIT) {
+      if (accion === "alta") altas++; else if (accion === "adopta") adopciones++; else actualizaciones++;
+      continue;
+    }
+
+    if (accion === "alta") {
+      const { error: e } = await db.from("ai_systems").insert(aFila(s));
+      if (e) fail(`${s.code}: ${e.message}`);
+      altas++;
+    } else if (accion === "actualiza") {
+      const { error: e } = await db.from("ai_systems").update(aFila(s))
+        .eq("tenant_id", GARRIGUES_TENANT).eq("id", fila!.id);
       if (e) fail(`${s.code}: ${e.message}`);
       actualizaciones++;
     } else {
-      const { error: e } = await db.from("ai_systems").insert(fila);
+      // Adoptar NO es pisar: la fila la escribió otro, así que sólo se le
+      // estampa el código —para que la próxima pasada la reconozca sin
+      // heurística— y se rellena lo que esté vacío. Lo que ya tiene valor se
+      // respeta, incluido un `status` distinto al del catálogo.
+      const completo = aFila(s);
+      const parche: Record<string, unknown> = { aims_reference_code: s.code };
+      for (const col of ["name", "vendor", "use_case", "description", "status", "system_type"] as const) {
+        const actual = fila![col];
+        if (actual === null || actual === undefined || actual === "") parche[col] = completo[col];
+      }
+      const { error: e } = await db.from("ai_systems").update(parche)
+        .eq("tenant_id", GARRIGUES_TENANT).eq("id", fila!.id);
       if (e) fail(`${s.code}: ${e.message}`);
-      altas++;
+      adopciones++;
     }
   }
 
-  console.log(`\n  ${altas} altas, ${actualizaciones} actualizaciones${COMMIT ? "" : " (simuladas)"}\n`);
+  console.log(`\n  ${altas} altas, ${adopciones} adopciones, ${actualizaciones} actualizaciones` +
+    `${COMMIT ? "" : " (simuladas)"}\n`);
 
   const despues = await censo(db);
   pintarCenso("DESPUÉS", despues);
 
   // Discriminante. Se comprueban las TRES cosas, no sólo que Garrigues suba:
-  // que ARGA no se mueva, que Garrigues quede exactamente en el catálogo, y que
-  // el total suba EXACTAMENTE lo que subió Garrigues — esto último es lo único
-  // que detecta una fila colgada de un tenant que no existe, porque `tenant_id`
-  // no tiene FK.
+  // que ARGA no se mueva, que todo el catálogo esté presente y sin duplicar, y
+  // que el total suba EXACTAMENTE lo que subió Garrigues — esto último es lo
+  // único que detecta una fila colgada de un tenant que no existe, porque
+  // `tenant_id` no tiene FK.
+  //
+  // Lo que NO se comprueba, y es deliberado: que Garrigues acabe con
+  // EXACTAMENTE el tamaño del catálogo. El tenant se siembra de forma
+  // progresiva y tiene altas propias hechas desde la aplicación, así que
+  // "sobran filas" no es un defecto — exigirlo aquí convertiría cada alta
+  // legítima en un abort y empujaría a borrarla. Lo que sí se caza es que
+  // FALTE alguno del catálogo o que haya quedado duplicado.
   const argaDespues = despues.porTenant[ARGA_TENANT] ?? 0;
   const garrDespues = despues.porTenant[GARRIGUES_TENANT] ?? 0;
   const problemas: string[] = [];
   if (argaDespues !== argaAntes) problemas.push(`ARGA se movió: ${argaAntes} → ${argaDespues}`);
-  if (COMMIT && garrDespues !== SISTEMAS_IA.length)
-    problemas.push(`Garrigues quedó en ${garrDespues}, el catálogo tiene ${SISTEMAS_IA.length}`);
+  if (COMMIT) {
+    const { data: finales, error: eFin } = await db
+      .from("ai_systems").select("aims_reference_code").eq("tenant_id", GARRIGUES_TENANT);
+    if (eFin) fail(`no se pudo releer el tenant: ${eFin.message}`);
+    const cuenta = new Map<string, number>();
+    for (const r of (finales ?? []) as { aims_reference_code: string | null }[])
+      if (r.aims_reference_code) cuenta.set(r.aims_reference_code, (cuenta.get(r.aims_reference_code) ?? 0) + 1);
+    for (const s of SISTEMAS_IA) {
+      const n = cuenta.get(s.code) ?? 0;
+      if (n === 0) problemas.push(`falta ${s.code} en el tenant`);
+      if (n > 1) problemas.push(`${s.code} quedó duplicado (${n} filas)`);
+    }
+  }
   if (despues.total - antes.total !== garrDespues - (antes.porTenant[GARRIGUES_TENANT] ?? 0))
     problemas.push(`el total subió ${despues.total - antes.total} y Garrigues ` +
       `${garrDespues - (antes.porTenant[GARRIGUES_TENANT] ?? 0)}: hay filas en otro tenant`);
@@ -205,11 +337,17 @@ async function main() {
     if (despues.total !== antes.total)
       fail(`el DRY-RUN escribió: total ${antes.total} → ${despues.total}`);
     console.log(`\n  DRY-RUN verificado: la tabla sigue en ${despues.total} filas, no se ha escrito nada.`);
-    console.log(`  El discriminante real (ARGA intacta + Garrigues = ${SISTEMAS_IA.length} + total coherente)`);
+    console.log(`  El discriminante real (ARGA intacta + los ${SISTEMAS_IA.length} del catálogo presentes`);
+    console.log("  y sin duplicar + total coherente)");
     console.log("  sólo puede comprobarse con --commit, desde el árbol canónico.\n");
     return;
   }
   console.log(`\n  Discriminante OK: ARGA intacta en ${argaAntes}, Garrigues ${garrDespues}, sin tenants ajenos.\n`);
 }
 
-main().catch((e) => fail(e instanceof Error ? e.message : String(e)));
+// Sólo se ejecuta cuando se invoca como script. Sin esto, importar este fichero
+// desde un test dispararía `main()` y mataría la corrida con `process.exit(1)`
+// por falta de service-role key.
+if (import.meta.main) {
+  main().catch((e) => fail(e instanceof Error ? e.message : String(e)));
+}

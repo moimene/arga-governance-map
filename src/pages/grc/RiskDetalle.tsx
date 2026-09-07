@@ -8,7 +8,7 @@ import {
   COLOR_CELDA,
   ETIQUETA_CELDA,
   NOTA_ESCALA,
-  tieneEjes,
+  lecturaRiesgo,
   type Celda,
 } from "@/lib/grc/assessed-band";
 
@@ -30,6 +30,10 @@ export default function RiskDetalle() {
   } | null;
   const cautelaProcedencia =
     procedencia?.escala?.advertencia ?? procedencia?.metodo_extraccion ?? null;
+  // Qué se pinta —y qué NO se oculta— cuando el riesgo trae banda, ejes o las
+  // dos. La decisión no es de esta pantalla: es la del módulo, que la comparte
+  // con Risk 360 y con el editor.
+  const lectura = lecturaRiesgo(risk ?? {});
 
   if (isLoading) {
     return (
@@ -121,27 +125,36 @@ export default function RiskDetalle() {
           </div>
         </div>
 
-        {tieneEjes(risk) ? (
+        {lectura.muestraEjes && (
           <>
             <div>
               <div className="text-xs font-semibold uppercase text-[var(--g-text-secondary)]">
                 Probabilidad x Impacto
               </div>
               <div className="mt-1 text-base font-bold text-[var(--g-text-primary)]">
-                {risk.probability} x {risk.impact} (Score: {risk.probability! * risk.impact!})
-              </div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase text-[var(--g-text-secondary)]">
-                Score residual
-              </div>
-              <div className="mt-1 text-base font-bold text-[var(--g-text-primary)]">
-                {risk.residual_score ?? "—"}
+                {risk.probability} x {risk.impact} (Score: {lectura.score})
               </div>
             </div>
           </>
-        ) : risk.assessed_band ? (
-          <div className="sm:col-span-2">
+        )}
+
+        {/* El residual es su propio dato y ya no cuelga de los ejes: retirada la
+            CHECK, un riesgo con banda puede traerlo, y el KPI de riesgos
+            críticos del dashboard lo cuenta. Un número que alimenta un KPI no
+            puede ser invisible en la ficha del riesgo que lo aporta. */}
+        {risk.residual_score != null && (
+          <div>
+            <div className="text-xs font-semibold uppercase text-[var(--g-text-secondary)]">
+              Score residual
+            </div>
+            <div className="mt-1 text-base font-bold text-[var(--g-text-primary)]">
+              {risk.residual_score}
+            </div>
+          </div>
+        )}
+
+        {lectura.muestraBanda && lectura.banda && (
+          <div className={lectura.muestraEjes ? "sm:col-span-3" : "sm:col-span-2"}>
             <div className="text-xs font-semibold uppercase text-[var(--g-text-secondary)]">
               Banda evaluada en origen
             </div>
@@ -149,12 +162,12 @@ export default function RiskDetalle() {
               <span
                 className="inline-block h-3 w-3 border border-[var(--g-border-subtle)]"
                 style={{
-                  backgroundColor: COLOR_BANDA[risk.assessed_band],
+                  backgroundColor: COLOR_BANDA[lectura.banda],
                   borderRadius: "var(--g-radius-sm)",
                 }}
               />
               <span className="text-base font-bold text-[var(--g-text-primary)]">
-                {ETIQUETA_BANDA[risk.assessed_band]}
+                {ETIQUETA_BANDA[lectura.banda]}
               </span>
               {procedencia?.firmeza && (
                 <span
@@ -171,7 +184,19 @@ export default function RiskDetalle() {
               </p>
             )}
           </div>
-        ) : null}
+        )}
+
+        {/* Las dos evaluaciones a la vez. Se dice en voz alta: ocultar una
+            —que es lo que hacía el ternario anterior— convierte una discrepancia
+            en un dato firme falso. */}
+        {lectura.avisoDobleLectura && (
+          <p
+            className="sm:col-span-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] px-3 py-2 text-xs leading-5 text-[var(--g-text-secondary)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            {lectura.avisoDobleLectura}
+          </p>
+        )}
       </section>
 
       {/* Desglose por las 18 columnas del mapa */}

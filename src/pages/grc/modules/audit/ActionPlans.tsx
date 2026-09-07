@@ -40,8 +40,11 @@ function useAuditActionPlans(tenantId: string | null) {
 export default function ActionPlans() {
   const { tenantId } = useTenantContext();
   const { data: plans = [], isLoading } = useAuditActionPlans(tenantId);
-  // Un vacío con procedencia declarada NO es un vacío: es una decisión, y se
-  // explica. Los demás tenants conservan su texto genérico sin cambio alguno.
+  // Un vacío con procedencia declarada NO es un vacío mudo: dice de qué fuente
+  // se está poblando el tenant y que los planes aún no se han incorporado. Se
+  // renderiza SOLO mientras `plans.length === 0`, así que en cuanto se siembre
+  // el primero desaparece solo y la pantalla lista lo sembrado, sin tocar nada.
+  // Los demás tenants conservan su texto genérico sin cambio alguno.
   // (El comentario va aquí y no dentro del JSX: el escáner de literales de
   // marca de los milestone-challenger no reconoce `{/* … */}` como comentario
   // y lo contaba como texto visible.)

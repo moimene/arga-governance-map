@@ -1,6 +1,6 @@
 // scripts/garrigues/hallazgos/hallazgos-penales.ts
 //
-// Dos cosas, y la segunda es una AUSENCIA deliberada.
+// Dos cosas, y la segunda es un hueco TODAVÍA no sembrado (no una prohibición).
 //
 // 1) El código de cada hallazgo se deriva de la celda que lo origina
 //    (`codigo` del riesgo + `columna` del área), NO de su posición en el
@@ -8,12 +8,16 @@
 //    catálogo del mapa penal reasignaba los ocho hallazgos en silencio, sin
 //    tocar una línea de código y sin que ningún gate lo notara.
 //
-// 2) NO hay planes de acción sembrados, y no es un olvido. PPD-01 §4.2
-//    describe el mecanismo del Plan de acción y **no publica la lista**. La
-//    regla del carril es que lo que la fuente no dice no se afirma, así que
-//    la pantalla muestra la ausencia con su motivo y su fuente en vez de
-//    ocho planes verosímiles que nadie ha escrito. Un estado vacío explicado
-//    es contenido; uno relleno es ruido con apariencia de dato.
+// 2) TODAVÍA no hay planes de acción sembrados, y el aviso de abajo lo dice.
+//    ORDEN VIGENTE desde el 2026-09-07: el tenant Garrigues SE SIEMBRA de
+//    forma progresiva con dato simulado a partir de fuentes reales, y ese
+//    dato PERSISTE. La orden anterior —«no se siembra, porque fabricarlo
+//    haría el dato demo indistinguible del real»— queda derogada.
+//    Lo que sí sigue: PPD-01 §4.2 describe el mecanismo del Plan de acción y
+//    **no publica la lista**, así que no hay nada que copiar de la fuente; lo
+//    que se siembre será simulado y hay que ETIQUETARLO como tal. Mientras no
+//    haya ninguno, la pantalla explica el hueco en vez de dejarlo mudo, y el
+//    aviso desaparece solo en cuanto exista el primer plan (`plans.length`).
 
 /** Una celda de banda alta del mapa penal, tal como la sirve `mapa-penal.ts`. */
 export type CeldaBandaAlta = {
@@ -48,8 +52,11 @@ export const PREFIJO_HALLAZGO_PENAL = "FND-GARR-PEN-";
 export const ES_CODIGO_POR_POSICION = /^FND-GARR-PEN-\d{2}$/;
 
 /**
- * Lo que la pantalla dice donde irían los planes de acción. Se sirve como
- * texto y no como dato porque no hay dato: es la razón de que no lo haya.
+ * Lo que la pantalla dice MIENTRAS no haya planes. Se sirve como texto y no
+ * como dato porque todavía no hay dato; el día que se siembre el primero,
+ * `ActionPlans` lista los planes y este bloque deja de renderizarse sin que
+ * nadie tenga que tocarlo. No es una prohibición de sembrar: es el estado
+ * intermedio, escrito para que no se lea como un cero real.
  */
 export const PLAN_ACCION_AUSENCIA = {
   // El catalogo declara a QUE tenant pertenece, y la pantalla lo compara con
@@ -57,14 +64,15 @@ export const PLAN_ACCION_AUSENCIA = {
   // tenant tenga su propia procedencia, esto sigue siendo correcto sin tocarlo,
   // y ARGA nunca ve un texto que habla de una fuente que no es suya.
   tenantId: "00000000-0000-0000-0000-000000000002",
-  titulo: "Sin planes de acción publicados",
+  titulo: "Sin planes de acción registrados todavía",
   motivo:
     "El Manual del Sistema de Gestión de Riesgos Penales describe el mecanismo del Plan de " +
     "acción y el seguimiento de su desarrollo, pero no publica los planes concretos ni sus " +
-    "responsables o plazos.",
+    "responsables o plazos, así que no hay lista que trasladar literalmente de la fuente.",
   consecuencia:
-    "No se muestran planes porque no consta ninguno en la fuente. Rellenar este espacio con " +
-    "planes verosímiles los haría indistinguibles de los reales.",
+    "Este entorno se está poblando de forma progresiva con datos simulados a partir de fuentes " +
+    "reales, y los planes de acción aún no se han incorporado. Hoy no consta ninguno, y por eso " +
+    "no se muestra ninguno; los que se incorporen irán identificados como simulados.",
   // §4.2 «Plan de acción» y §8 «Supervisión y seguimiento del programa», que
   // son los apartados REALES del índice del documento. Antes citaba «§246 y
   // §350-356», que son posiciones de párrafo del volcado, no apartados.

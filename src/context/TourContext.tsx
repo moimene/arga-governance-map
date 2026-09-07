@@ -224,11 +224,11 @@ export const tourSteps: TourStep[] = [
     route: "/sii",
     title: "El canal de integridad: segregado por diseño",
     description:
-      "El Sistema Interno de Información no es una función dentro de TGMS — es un entorno visualmente separado. El diseño diferenciado y el modal de acceso transmiten la segregación que exige la Ley 2/2023. En esta demo los expedientes son simulados y viven solo en este navegador: no hay registro de auditoría separado ni cifrado de evidencias.",
+      "El Sistema Interno de Información no es una función dentro de TGMS — es un entorno visualmente separado. El diseño diferenciado y el modal de acceso transmiten la segregación que exige la Ley 2/2023. En esta demo los expedientes son simulados y se guardan en la base de datos del prototipo, aislada por tenant: no hay registro de auditoría separado ni cifrado de evidencias.",
     bullets: [
       "Diseño diferenciado: fondo, header y colores propios — el usuario entiende que ha cambiado de entorno.",
       "Expedientes simulados que ilustran la correlación con un hallazgo sin exponer datos protegidos.",
-      "Demo: el ciclo (alta, acuse, prórroga, cierre) se modela completo, pero no se persiste fuera del navegador.",
+      "Demo: el ciclo (alta, acuse, prórroga, cierre) se modela completo y persiste, pero sin sello, sin custodia cualificada y sin eficacia jurídica.",
     ],
     badges: [
       { label: "Expediente simulado", tone: "pending" },

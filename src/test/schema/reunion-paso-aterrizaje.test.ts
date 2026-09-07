@@ -2,6 +2,11 @@ import { describe, expect, it, beforeAll } from "bun:test";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { deriveReunionInitialStep } from "@/lib/secretaria/reunion-paso-aterrizaje";
 import { GARRIGUES_TENANT, sesionDe } from "../helpers/supabase-test-client";
+// El ESPÉCIMEN, por slug. Antes se pedía «la única reunión del tenant» con un
+// `maybeSingle()` filtrado solo por `tenant_id`: la segunda reunión que se
+// siembre tumba el `beforeAll` con un PGRST116 cuya causa real no aparece por
+// ningún sitio, y el fichero entero se cae sin decir por qué.
+import { MEETING_SLUG } from "../../../scripts/garrigues/junta-2026/orden-del-dia";
 
 /**
  * El aviso de acreditación del acta se pinta en los pasos 1 y 6. La doctrina de
@@ -26,8 +31,10 @@ describe("C1 — la reunión aterriza siempre en un paso que explica el hueco de
   beforeAll(async () => {
     garr = await sesionDe("GARRIGUES");
     const { data: m, error } = await garr.from("meetings")
-      .select("id, status, quorum_data").eq("tenant_id", GARRIGUES_TENANT).maybeSingle();
-    if (error || !m) throw new Error(`no se pudo leer la reunión: ${error?.message}`);
+      .select("id, status, quorum_data")
+      .eq("tenant_id", GARRIGUES_TENANT).eq("slug", MEETING_SLUG).maybeSingle();
+    if (error) throw new Error(`no se pudo leer la reunión ${MEETING_SLUG}: ${error.message}`);
+    if (!m) throw new Error(`no existe la reunión ${MEETING_SLUG} para el login Garrigues.`);
     status = String(m.status);
     hasQuorum = Boolean((m.quorum_data as Record<string, unknown> | null)?.quorum);
     const { count: nAsis } = await garr.from("meeting_attendees")

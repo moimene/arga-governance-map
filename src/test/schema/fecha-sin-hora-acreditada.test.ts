@@ -6,6 +6,11 @@ import {
   horaNoAcreditadaEn,
 } from "@/lib/secretaria/fecha-sin-hora-acreditada";
 import { DEMO_TENANT, GARRIGUES_TENANT, sesionDe } from "../helpers/supabase-test-client";
+// El ESPÉCIMEN, por slug y por fecha. Antes se pedía «la única reunión» y «la
+// única convocatoria» del tenant con `maybeSingle()` filtrado solo por
+// `tenant_id`: la segunda que se siembre revienta el caso con un PGRST116 que
+// no dice nada de la causa real. Se selecciona lo que se quiere medir.
+import { FECHA_JUNTA, MEETING_SLUG, ORGANO_SLUG } from "../../../scripts/garrigues/junta-2026/orden-del-dia";
 
 describe("C1 — la hora que no consta no se pinta como si constara", () => {
   it("con bandera: día sí, hora no", () => {
@@ -125,19 +130,31 @@ describe("C1 — la bandera está donde la leen las cuatro superficies, y ARGA n
 
   it("la reunión y la convocatoria de la Junta la declaran", async () => {
     const { data: m, error: eM } = await garr.from("meetings")
-      .select("quorum_data").eq("tenant_id", GARRIGUES_TENANT).maybeSingle();
+      .select("quorum_data")
+      .eq("tenant_id", GARRIGUES_TENANT).eq("slug", MEETING_SLUG).maybeSingle();
     expect(eM).toBeNull();
+    expect(m, `no existe la reunión ${MEETING_SLUG}`).not.toBeNull();
     expect(horaNoAcreditadaEn(m!.quorum_data)).toBe(true);
 
     // `convocatorias.rule_trace`: sin esto, la lista y el detalle seguían
     // pintando «2:00» aunque la reunión ya lo declarase. Son dos tablas y hacen
     // falta las dos banderas.
-    const { data: c, error: eC } = await garr.from("convocatorias")
-      .select("rule_trace").eq("tenant_id", GARRIGUES_TENANT).maybeSingle();
+    //
+    // `convocatorias` no tiene slug ni código, así que el espécimen se resuelve
+    // por su órgano (por slug, nunca por UUID) y su fecha.
+    const { data: body } = await garr.from("governing_bodies")
+      .select("id").eq("slug", ORGANO_SLUG).maybeSingle();
+    expect(body, `no existe el órgano ${ORGANO_SLUG}`).not.toBeNull();
+    const { data: convs, error: eC } = await garr.from("convocatorias")
+      .select("fecha_1, rule_trace").eq("tenant_id", GARRIGUES_TENANT).eq("body_id", body!.id);
     expect(eC).toBeNull();
+    const c = (convs ?? []).find((x) => String(x.fecha_1).slice(0, 10) === FECHA_JUNTA);
+    expect(c, `no existe la convocatoria de la Junta del ${FECHA_JUNTA}`).toBeTruthy();
     expect(horaNoAcreditadaEn(c!.rule_trace)).toBe(true);
   });
 
+  // EXACTO/GLOBAL A PROPÓSITO: aquí no hay conteo cerrado que estorbe, es el
+  // contrato cero-cambio de ARGA. Ninguna de sus filas puede ganar la bandera.
   it("ARGA no la lleva en ninguna fila — y sus expedientes existen", async () => {
     const { data: reunionesArga } = await arga.from("meetings")
       .select("quorum_data").eq("tenant_id", DEMO_TENANT).limit(50);

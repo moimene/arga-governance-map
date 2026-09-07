@@ -15,6 +15,18 @@ const migration = readFileSync(
   "utf8",
 );
 
+// El contrato VIGENTE del borrado, que ya no es el del fichero retirado: desde
+// 2026-09-07 sólo alcanza los `agenda_item_index` que el cliente envía, para que
+// guardar un punto no se lleve por delante las resoluciones que la pantalla no
+// cargó (la Junta de Garrigues tiene 10, todas con su `agreement_id`).
+const vigente = readFileSync(
+  join(
+    process.cwd(),
+    "supabase/migrations/20260907120000_save_meeting_resolutions_borrado_acotado_a_puntos_enviados.sql",
+  ),
+  "utf8",
+);
+
 const hook = readFileSync(
   join(process.cwd(), "src/hooks/useReunionSecretaria.ts"),
   "utf8",
@@ -34,6 +46,12 @@ describe("Secretaria P0 meeting resolutions transactional RPC", () => {
     expect(migration).toMatch(/UPDATE agreements/i);
     expect(migration).toMatch(/DELETE FROM meeting_votes/i);
     expect(migration).toMatch(/DELETE FROM meeting_resolutions/i);
+    // OJO AL LEER LO DE ARRIBA: `migration` es el fichero RETIRADO de 2026-05-05,
+    // o sea la foto de un contrato que YA NO ES EL VIGENTE. Se conserva porque
+    // la deuda G8 sigue abierta, pero sin lo de abajo este bloque documentaría
+    // como actual un borrado que hoy sería pérdida de dato.
+    expect(vigente, "el parche de 2026-09-07 no acota el borrado por punto")
+      .toMatch(/AND mr\.agenda_item_index IN \(/);
     expect(migration).toMatch(/INSERT INTO meeting_resolutions/i);
     expect(migration).toMatch(/INSERT INTO meeting_votes/i);
     expect(migration).toMatch(/INSERT INTO rule_evaluation_results/i);

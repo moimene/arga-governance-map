@@ -6,7 +6,7 @@ import { useCreateRisk, useRiskById, useUpdateRisk, type RiskWriteInput } from "
 import { useGrcModules } from "@/hooks/useGrcDashboard";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { RISK_STATUS_OPTIONS } from "@/lib/grc/status-labels";
-import { ETIQUETA_BANDA, NOTA_ESCALA, type Banda } from "@/lib/grc/assessed-band";
+import { ETIQUETA_BANDA, NOTA_ESCALA, lecturaRiesgo, type Banda } from "@/lib/grc/assessed-band";
 
 type FormState = {
   code: string;
@@ -95,7 +95,12 @@ export default function RiskEditor() {
     assessed_band: null,
   });
 
-  const evaluadoPorBanda = !!risk?.assessed_band;
+  // Qué evaluación ofrece este formulario. Desde que se retiró la CHECK
+  // `risks_banda_sin_ejes` (20260907T2) un riesgo puede traer las dos, y el
+  // `!!risk?.assessed_band` que había aquí escondía los ejes Y LOS DEJABA SIN
+  // GUARDAR: se editaba la banda y los ejes contradictorios se congelaban en la
+  // fila. Un riesgo NUEVO se crea por ejes, que es la escala del producto.
+  const lectura = lecturaRiesgo(isEdit && risk ? risk : { probability: 3, impact: 3 });
 
   useEffect(() => {
     if (!risk) return;
@@ -139,9 +144,9 @@ export default function RiskEditor() {
       module_id: emptyToNull(form.module_id),
       status: form.status,
       entity_id: isEdit ? risk?.entity_id ?? null : scopedEntityId,
-      ...(evaluadoPorBanda
-        ? { assessed_band: form.assessed_band }
-        : { probability: form.probability, impact: form.impact }),
+      // Se guarda exactamente lo que se ofreció editar, ni más ni menos.
+      ...(lectura.muestraBanda ? { assessed_band: form.assessed_band } : {}),
+      ...(lectura.muestraEjes ? { probability: form.probability, impact: form.impact } : {}),
     };
 
     try {
@@ -325,7 +330,7 @@ export default function RiskEditor() {
             </select>
           </div>
 
-          {evaluadoPorBanda ? (
+          {lectura.muestraBanda && (
             <div
               className="md:col-span-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-4"
               style={{ borderRadius: "var(--g-radius-md)" }}
@@ -334,10 +339,14 @@ export default function RiskEditor() {
                 Nivel evaluado en origen: {ETIQUETA_BANDA[form.assessed_band!]}
               </p>
               <p className="mt-1 text-xs leading-5 text-[var(--g-text-secondary)]">
-                {NOTA_ESCALA} Este riesgo no se edita por probabilidad e impacto: su fuente no los descompone.
+                {NOTA_ESCALA}{" "}
+                {lectura.muestraEjes
+                  ? lectura.avisoDobleLectura
+                  : "Este riesgo no se edita por probabilidad e impacto: su fuente no los descompone."}
               </p>
             </div>
-          ) : (
+          )}
+          {lectura.muestraEjes && (
             <>
               <div>
                 <label htmlFor="grc-risk-probability" className={LABEL_CLASSES}>

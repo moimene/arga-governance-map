@@ -175,17 +175,25 @@ describe("C1 — la convocatoria de la Junta de Socios en Cloud", () => {
   // sin autenticar a todas las sondas que corran después.
 
   async function convocatoria() {
+    // ESPÉCIMEN, no «la única fila del tenant» (2026-09-07). El filtro anterior
+    // era solo `tenant_id`: la segunda convocatoria que se siembre —otra Junta,
+    // otro ejercicio— rompía TODOS los casos de este bloque a la vez y por un
+    // motivo que no tiene nada que ver con lo que cada uno mide. Se acota por el
+    // órgano (resuelto por slug, nunca por UUID) y por la fecha de la sesión.
     const { data, error } = await garr.from("convocatorias")
       .select("id, body_id, estado, fecha_emision, fecha_1, tipo_convocatoria, modalidad, junta_universal, is_second_call, agenda_items, lugar, statutory_basis, publication_channels, publication_evidence_url, convocatoria_text")
-      .eq("tenant_id", GARRIGUES_TENANT);
+      .eq("tenant_id", GARRIGUES_TENANT).eq("body_id", bodyId);
     expect(error).toBeNull();
+    const delDia = (data ?? []).filter((c) => String(c.fecha_1).slice(0, 10) === FECHA_JUNTA);
     // Lista, no maybeSingle: una segunda ejecución del seed que duplicara la fila
     // se vería aquí como 2 en vez de esconderse tras un error de cardinalidad.
-    expect(data).toHaveLength(1);
-    return data[0];
+    // Ese guard anti-duplicado se CONSERVA; lo que deja de contarse es el resto
+    // del tenant.
+    expect(delDia).toHaveLength(1);
+    return delDia[0];
   }
 
-  it("existe una sola convocatoria del tenant, del órgano resuelto por slug y para el 06/05/2026", async () => {
+  it("existe una sola convocatoria de esta Junta, del órgano resuelto por slug y para el 06/05/2026", async () => {
     const c = await convocatoria();
     expect(c.body_id).toBe(bodyId);
     // La fecha debe leerse correcta TANTO en la cadena UTC como en hora local:
@@ -418,7 +426,10 @@ describe("C1 — la reunión, la asistencia del acta y el censo WORM en Cloud", 
   it("la reunión existe con la mesa real del acta y en un estado que no afirma de más", async () => {
     const { data, error } = await garr.from("meetings")
       .select("id, slug, body_id, meeting_type, scheduled_start, scheduled_end, status, president_id, secretary_id, location")
-      .eq("tenant_id", GARRIGUES_TENANT);
+      // Por SLUG, no «la única reunión del tenant»: la segunda que se siembre
+      // rompería este caso sin que tenga nada que ver con lo que mide. El
+      // guard anti-duplicado sigue siendo la lista de longitud 1.
+      .eq("tenant_id", GARRIGUES_TENANT).eq("slug", MEETING_SLUG);
     expect(error).toBeNull();
     expect(data).toHaveLength(1);
     const m = data[0];
@@ -441,6 +452,9 @@ describe("C1 — la reunión, la asistencia del acta y el censo WORM en Cloud", 
     expect(sec.full_name).toBe(MESA_SECRETARIO);
   });
 
+  // CARDINAL EXACTO CONSERVADO: `CENSO_TOTAL` no es un conteo de siembra, es el
+  // censo de socios que cuadra con el capital y con la base de cómputo del art.
+  // 7. Aflojarlo dejaría pasar una asistencia que no cuadra con el censo.
   it("la asistencia es la del acta: 3 presenciales y 343 representados por una sola persona", async () => {
     expect(meetingId).not.toBeNull();
     const { data, error } = await garr.from("meeting_attendees")
@@ -495,9 +509,15 @@ describe("C1 — la reunión, la asistencia del acta y el censo WORM en Cloud", 
     // sigue vigente». La razón dejó de estar vigente con la migración
     // 20260829160000, el gate falló como estaba escrito para fallar, y aquí está
     // lo que exigía a cambio: la aserción del snapshot bien ponderado.
+    // POR `meeting_id`, obligatoriamente (2026-09-07). `censo_snapshot` es WORM
+    // append-only: el snapshot de la SIGUIENTE junta que se siembre no se podrá
+    // borrar, así que un filtro por tenant convertía este caso —y el `.single()`
+    // de abajo— en una bomba de relojería que solo se puede desactivar
+    // reescribiendo el test. Se selecciona el censo de ESTA reunión.
+    expect(meetingId, "sin meetingId el filtro no acota nada").not.toBeNull();
     const { data, error } = await garr.from("censo_snapshot")
-      .select("id, session_kind, snapshot_type, body_id, total_partes, capital_total_base, audit_worm_id, payload")
-      .eq("tenant_id", GARRIGUES_TENANT);
+      .select("id, meeting_id, session_kind, snapshot_type, body_id, total_partes, capital_total_base, audit_worm_id, payload")
+      .eq("tenant_id", GARRIGUES_TENANT).eq("meeting_id", meetingId);
     expect(error).toBeNull();
     expect(data).toHaveLength(1);
     const censo = data[0];
@@ -513,8 +533,11 @@ describe("C1 — la reunión, la asistencia del acta y el censo WORM en Cloud", 
   });
 
   it("el payload del censo pondera por votos: A/B = 50, el ratio del art. 7", async () => {
-    const { data } = await garr.from("censo_snapshot")
-      .select("payload, capital_total_base").eq("tenant_id", GARRIGUES_TENANT).single();
+    const { data, error } = await garr.from("censo_snapshot")
+      .select("payload, capital_total_base")
+      .eq("tenant_id", GARRIGUES_TENANT).eq("meeting_id", meetingId).maybeSingle();
+    expect(error).toBeNull();
+    expect(data, "no hay censo WORM de esta reunión").not.toBeNull();
     const pesos = (data.payload as Array<{ voting_weight: number | string }>)
       .map((r) => Number(r.voting_weight)).filter((w) => w > 0);
     // 346 socios con voto; la autocartera pesa 0 y queda fuera.
@@ -826,9 +849,12 @@ describe("C1 — los 10 acuerdos de la Junta en Cloud", () => {
     const { data: m } = await garr.from("meetings").select("id").eq("slug", MEETING_SLUG).maybeSingle();
     meetingId = m?.id ?? null;
 
+    // Acotado a ESTA reunión: `toHaveLength(10)` sobre todos los acuerdos del
+    // tenant se rompía con el primer acuerdo que se sembrase en otro
+    // expediente, y el fallo no diría nada de esta Junta.
     const { data, error } = await garr.from("agreements")
       .select("id, entity_id, body_id, code, agreement_kind, matter_class, inscribable, adoption_mode, status, decision_date, parent_meeting_id, agenda_item_id, rule_pack_id, rule_pack_version, required_majority_code, statutory_basis, proposal_text, decision_text, compliance_explain")
-      .eq("tenant_id", GARRIGUES_TENANT);
+      .eq("tenant_id", GARRIGUES_TENANT).eq("parent_meeting_id", meetingId);
     if (error) throw new Error(`agreements Garrigues: ${error.message}`);
     acuerdos = data ?? [];
   }, 30_000);
@@ -848,7 +874,9 @@ describe("C1 — los 10 acuerdos de la Junta en Cloud", () => {
     expect(acuerdos.every((a) => a.adoption_mode === "MEETING")).toBe(true);
     expect(acuerdos.every((a) => a.status === "ADOPTED")).toBe(true);
     expect(acuerdos.every((a) => String(a.decision_date).slice(0, 10) === FECHA_JUNTA)).toBe(true);
-    expect(acuerdos.every((a) => a.parent_meeting_id === meetingId)).toBe(true);
+    // La pertenencia a la reunión ya la impone el filtro de la consulta; lo que
+    // hay que asertar es que ese filtro acota de verdad.
+    expect(meetingId, "sin meetingId el filtro por reunión no acota nada").not.toBeNull();
     expect(acuerdos.every((a) => a.entity_id === MATRIZ)).toBe(true);
     expect(acuerdos.every((a) => a.rule_pack_id !== null)).toBe(true);
   });
@@ -1527,6 +1555,10 @@ describe("C1 — resoluciones, votos y evaluación de la Junta en Cloud", () => 
     expect(resoluciones.every((r) => r.required_majority_code === null)).toBe(true);
   });
 
+  // VACÍA CONSERVADO, y no es la orden vieja: la consulta ya está acotada a las
+  // resoluciones de ESTA Junta, así que sembrar votos en cualquier otra reunión
+  // no la toca. Lo que sigue prohibido es transcribir un desglose nominal que
+  // el acta no trae, porque atribuiría un voto a 346 personas identificadas.
   it("meeting_votes está VACÍA para esta Junta, y el expediente dice por qué", async () => {
     const { data, error } = await garr.from("meeting_votes").select("id")
       .in("resolution_id", resoluciones.map((r) => r.id));
@@ -1791,9 +1823,12 @@ describe("C1 — el ciclo registral de la Junta en Cloud", () => {
     // inventario no es invariante.
     inscribiblesEnCloud = (ags ?? []).filter((a) => a.inscribable).map((a) => a.id);
 
+    // Acotado a los acuerdos de ESTA Junta: «un expediente por acuerdo
+    // inscribible» se comparaba contra TODOS los filings del tenant, así que el
+    // primer expediente registral de otro asunto lo ponía rojo.
     const { data: fs, error: eF } = await garr.from("registry_filings")
       .select("id, agreement_id, status, filing_via, workflow_version, filing_number, presentation_date, inscription_number, borme_ref, registered_at, published_at, publication_reference, qualification_outcome, notary_name, protocol_number, deed_date, elevated_at, procedure_snapshot")
-      .eq("tenant_id", GARRIGUES_TENANT);
+      .eq("tenant_id", GARRIGUES_TENANT).in("agreement_id", [...puntoPorAcuerdo.keys()]);
     if (eF) throw new Error(`registry_filings: ${eF.message}`);
     filings = (fs ?? []) as Filing[];
   }, 30_000);

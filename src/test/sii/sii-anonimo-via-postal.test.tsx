@@ -19,6 +19,7 @@ import { afterAll, afterEach, describe, expect, it } from "bun:test";
 import { render, screen, cleanup, fireEvent, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { mockearModulos } from "../garrigues/_mock-restaurable";
+import { mockearAlmacenSii, reiniciarAlmacen, sembrarFilas } from "./_almacen-memoria";
 import { SII_TENANT } from "../../../scripts/garrigues/sii/canal-interno";
 import { CASOS_DEMO_GARRIGUES } from "../../../scripts/garrigues/sii/casos-demo";
 
@@ -34,6 +35,7 @@ if (typeof globalThis.getComputedStyle === "undefined" && typeof window !== "und
 let tenantActual: string | null = SII_TENANT;
 let altaRecibida: Record<string, unknown> | null = null;
 
+const restaurarAlmacen = await mockearAlmacenSii();
 const restaurarMocks = await mockearModulos([
   ["@/context/TenantContext", () => ({ useTenantContext: () => ({ tenantId: tenantActual }) })],
   [
@@ -58,7 +60,28 @@ const restaurarMocks = await mockearModulos([
     }),
   ],
 ]);
-afterAll(restaurarMocks);
+afterAll(() => {
+  restaurarMocks();
+  restaurarAlmacen();
+});
+
+/** Estado de partida de `sii.reports` para el tenant del despacho. `origen`
+ *  distingue lo que el catálogo posee de lo que dio de alta el usuario: es lo
+ *  único que autoriza a `reaplicarCamposDelCatalogo` a reescribir una fila. */
+const sembrarFilasGarrigues = (
+  reports: Array<Record<string, unknown> & { code: string }>,
+  origen: "CATALOGO" | "ALTA" = "CATALOGO",
+) => {
+  sembrarFilas(
+    reports.map((report, i) => ({
+      tenant_id: SII_TENANT,
+      code: report.code,
+      origen,
+      orden: i,
+      report,
+    })),
+  );
+};
 afterEach(() => {
   cleanup();
   altaRecibida = null;
@@ -148,7 +171,7 @@ describe("SII Garrigues — los casos demo se siembran por la vía que les corre
   });
 });
 
-describe("SII Garrigues — el canal corregido atraviesa el caché del navegador", () => {
+describe("SII Garrigues — el canal corregido atraviesa las filas ya escritas", () => {
   // ESTE es el bloque que faltaba, y lo señaló la review adversarial de rama.
   // Los dos de arriba comprueban el CATÁLOGO y el formulario de alta; ninguno
   // toca `getStoredReports`, que solo siembra cuando la clave NO existe. Un
@@ -156,42 +179,68 @@ describe("SII Garrigues — el canal corregido atraviesa el caché del navegador
   // seguía devolviendo `WEB_ANONIMO` desde localStorage, y ese canal viciado
   // se pinta en el listado, en la ficha y en el asiento del Libro-registro.
   // Es el mismo patrón de arista rota por CACHÉ que ya ocurrió con `firmeza`.
-  const sembrarClaveVieja = async () => {
-    const { siiStorageKey } = await import("@/lib/sii/tenant-scope");
-    const previos = CASOS_DEMO_GARRIGUES.map((c) => ({ ...c, channel: "WEB_ANONIMO" }));
-    localStorage.setItem(siiStorageKey(SII_TENANT), JSON.stringify(previos));
-  };
+  const sembrarFilasViejas = () =>
+    sembrarFilasGarrigues(CASOS_DEMO_GARRIGUES.map((c) => ({ ...c, channel: "WEB_ANONIMO" })));
 
-  afterEach(() => localStorage.clear());
+  afterEach(() => reiniciarAlmacen());
 
-  it("con la clave YA creada, los anónimos se leen como POSTAL", async () => {
-    await sembrarClaveVieja();
+  it("con las filas YA escritas, los anónimos se leen como POSTAL", async () => {
+    sembrarFilasViejas();
     const { getStoredReports } = await import("@/hooks/useWhistleblowing");
-    const leidos = getStoredReports(SII_TENANT);
+    const leidos = await getStoredReports(SII_TENANT);
 
     const anonimos = leidos.filter((r) => r.anonymityMode === "ANONIMO_ESTRICTO");
     expect(anonimos.length, "sin anónimos la aserción sería vacua").toBeGreaterThan(0);
-    for (const r of anonimos) expect(r.channel, `${r.code} sigue viniendo del caché`).toBe("POSTAL");
+    for (const r of anonimos) expect(r.channel, `${r.code} sigue viniendo del almacén`).toBe("POSTAL");
   });
 
   it("CONTROL: la reaplicación no arrasa los expedientes dados de alta", async () => {
     // Sin esto, «reaplicar el catálogo entero» pasaría el caso anterior
     // borrando lo que el usuario haya registrado.
-    const { siiStorageKey } = await import("@/lib/sii/tenant-scope");
     const propio = { ...CASOS_DEMO_GARRIGUES[0], code: "SII-ALTA-PROPIA", channel: "WEB_ANONIMO" };
-    localStorage.setItem(
-      siiStorageKey(SII_TENANT),
-      JSON.stringify([...CASOS_DEMO_GARRIGUES, propio]),
-    );
+    sembrarFilasGarrigues([...CASOS_DEMO_GARRIGUES]);
+    sembrarFilasGarrigues([propio], "ALTA");
     const { getStoredReports } = await import("@/hooks/useWhistleblowing");
-    const propioLeido = getStoredReports(SII_TENANT).find((r) => r.code === "SII-ALTA-PROPIA");
+    const propioLeido = (await getStoredReports(SII_TENANT)).find((r) => r.code === "SII-ALTA-PROPIA");
     expect(propioLeido, "el expediente de alta desapareció").toBeDefined();
     expect(propioLeido!.channel, "no está en el catálogo: nadie decide su canal").toBe("WEB_ANONIMO");
+  });
+
+  it("CONTROL DISCRIMINANTE: un alta que COMPARTE código con el catálogo tampoco se pisa", async () => {
+    // El caso anterior pasaría igual sin la columna `origen`, porque
+    // "SII-ALTA-PROPIA" no está en el catálogo y el `Map` no lo encuentra. Aquí
+    // el código SÍ coincide, que es la única forma de que la reaplicación
+    // llegue a tocar la fila. Con el almacén compartido entre equipos, que los
+    // códigos de alta lleven el mes 08 y los del catálogo no dejó de ser
+    // garantía de nada: lo que separa las dos cosas es el `origen`.
+    const codigoDelCatalogo = CASOS_DEMO_GARRIGUES[0].code;
+    sembrarFilasGarrigues(
+      [{ ...CASOS_DEMO_GARRIGUES[0], channel: "WEB_ANONIMO", summary: "Redactado por el instructor" }],
+      "ALTA",
+    );
+    const { getStoredReports } = await import("@/hooks/useWhistleblowing");
+    const leido = (await getStoredReports(SII_TENANT)).find((r) => r.code === codigoDelCatalogo);
+
+    expect(leido, "la fila desapareció").toBeDefined();
+    expect(leido!.channel, "el catálogo pisó una fila que no es suya").toBe("WEB_ANONIMO");
+    expect(leido!.summary, "el catálogo pisó el texto del instructor").toBe("Redactado por el instructor");
+
+    // Y la contraprueba, en la MISMA aserción de comportamiento: marcada como
+    // del catálogo, la misma fila sí se corrige. Sin esto, «no se pisa» sería
+    // indistinguible de «la reaplicación no funciona».
+    reiniciarAlmacen();
+    sembrarFilasGarrigues([
+      { ...CASOS_DEMO_GARRIGUES[0], channel: "WEB_ANONIMO", summary: "Redactado por el instructor" },
+    ]);
+    const corregido = (await getStoredReports(SII_TENANT)).find((r) => r.code === codigoDelCatalogo);
+    expect(corregido!.channel, "la reaplicación del catálogo dejó de funcionar").toBe(
+      CASOS_DEMO_GARRIGUES[0].channel,
+    );
   });
 });
 
 
-describe("SII Garrigues — qué reaplica el catálogo sobre el caché y qué NO", () => {
+describe("SII Garrigues — qué reaplica el catálogo sobre lo ya escrito y qué NO", () => {
   // n=1086. El catálogo ya está corregido y tipado, pero la corrección viajaba
   // solo para `firmeza` y `channel`: `CAMPOS_DEL_CATALOGO` era una lista de dos.
   // Un navegador que ya hubiera abierto /sii —el de la demo— seguía sirviendo
@@ -203,23 +252,21 @@ describe("SII Garrigues — qué reaplica el catálogo sobre el caché y qué NO
   // catálogo se reaplica; lo que decide el instructor, no. El tercer caso es el
   // que separa las dos cosas y el que se pondría rojo si alguien "arreglara"
   // esto metiendo `status` en la lista.
-  const sembrarClave = async (reports: unknown[]) => {
-    const { siiStorageKey } = await import("@/lib/sii/tenant-scope");
-    localStorage.setItem(siiStorageKey(SII_TENANT), JSON.stringify(reports));
-  };
+  const sembrarClave = (reports: Array<Record<string, unknown> & { code: string }>) =>
+    sembrarFilasGarrigues(reports);
   const catalogo = async () => {
     const { casosDemoGarrigues } = await import("../../../scripts/garrigues/sii/casos-demo");
     return casosDemoGarrigues("J&A Garrigues, S.L.P.");
   };
 
-  afterEach(() => localStorage.clear());
+  afterEach(() => reiniciarAlmacen());
 
-  it("un estado que el motor NO tiene no sobrevive al caché", async () => {
+  it("un estado que el motor NO tiene no sobrevive al almacén", async () => {
     const { WHISTLEBLOWING_STATUSES } = await import("@/lib/sii/whistleblowing-engine");
-    await sembrarClave((await catalogo()).map((r) => ({ ...r, status: "ADMITIDA" })));
+    sembrarClave((await catalogo()).map((r) => ({ ...r, status: "ADMITIDA" })));
 
     const { getStoredReports } = await import("@/hooks/useWhistleblowing");
-    const leidos = getStoredReports(SII_TENANT);
+    const leidos = await getStoredReports(SII_TENANT);
 
     expect(leidos.length, "sin expedientes la aserción sería vacua").toBeGreaterThan(0);
     for (const r of leidos) {
@@ -228,19 +275,19 @@ describe("SII Garrigues — qué reaplica el catálogo sobre el caché y qué NO
     }
   });
 
-  it("la modalidad de anonimato la decide el catálogo, no el caché", async () => {
+  it("la modalidad de anonimato la decide el catálogo, no el almacén", async () => {
     const delCatalogo = await catalogo();
     const identificados = delCatalogo.filter((r) => r.anonymityMode === "CONFIDENCIAL_IDENTIFICADO");
     expect(identificados.length, "sin identificados no habría nada que corregir").toBeGreaterThan(0);
     // El caché de la demo los tenía todos como anónimos estrictos, que es lo
     // que arrastraba el canal web al Libro-registro.
-    await sembrarClave(delCatalogo.map((r) => ({ ...r, anonymityMode: "ANONIMO_ESTRICTO" })));
+    sembrarClave(delCatalogo.map((r) => ({ ...r, anonymityMode: "ANONIMO_ESTRICTO" })));
 
     const { getStoredReports } = await import("@/hooks/useWhistleblowing");
-    const leidos = getStoredReports(SII_TENANT);
+    const leidos = await getStoredReports(SII_TENANT);
     for (const esperado of identificados) {
       const leido = leidos.find((r) => r.code === esperado.code);
-      expect(leido?.anonymityMode, `${esperado.code} sigue viniendo del caché`)
+      expect(leido?.anonymityMode, `${esperado.code} sigue viniendo del almacén`)
         .toBe("CONFIDENCIAL_IDENTIFICADO");
     }
   });
@@ -249,10 +296,10 @@ describe("SII Garrigues — qué reaplica el catálogo sobre el caché y qué NO
     // `useCloseRootCase` escribe ARCHIVADO_MOTIVADO sobre estos mismos códigos.
     // Si `status` entrara en `CAMPOS_DEL_CATALOGO`, abrir la pantalla
     // devolvería el expediente a EN_INVESTIGACION: se perdería el cierre.
-    await sembrarClave((await catalogo()).map((r) => ({ ...r, status: "ARCHIVADO_MOTIVADO" })));
+    sembrarClave((await catalogo()).map((r) => ({ ...r, status: "ARCHIVADO_MOTIVADO" })));
 
     const { getStoredReports } = await import("@/hooks/useWhistleblowing");
-    const leidos = getStoredReports(SII_TENANT);
+    const leidos = await getStoredReports(SII_TENANT);
     expect(leidos.length).toBeGreaterThan(0);
     for (const r of leidos) {
       expect(r.status, `${r.code} perdió el cierre del instructor`).toBe("ARCHIVADO_MOTIVADO");

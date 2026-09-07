@@ -204,14 +204,25 @@ export const SII_AVISO_EXPEDIENTE_SIMULADO =
   "Expediente simulado: los hechos no han ocurrido. Está sembrado para la demostración del canal.";
 
 /**
- * Lo que este módulo ES, dicho en la pantalla. Decisión de producto de
- * 2026-09-05: el canal NO se conecta a base de datos; se queda con persistencia
- * local y se dice.
+ * Lo que este módulo ES, dicho en la pantalla.
+ *
+ * Sustituye a `SII_AVISO_PERSISTENCIA_LOCAL`, que fue correcto mientras el
+ * canal vivía en el navegador y dejó de serlo el 2026-09-07, cuando el usuario
+ * derogó aquella decisión y ordenó que el dato persista. La mitad de aquel
+ * texto —«no hay base de datos», «se borran al limpiar los datos del
+ * navegador»— pasó a ser falsa en cuanto hubo tabla.
+ *
+ * Lo que SÍ hay se dice: base de datos con aislamiento por tenant. Lo que NO
+ * hay se sigue diciendo, porque tampoco lo hay ahora: cifrado, sello de tiempo,
+ * custodia por un tercero cualificado y eficacia jurídica. El nombre no lleva
+ * «LOCAL» a propósito: era lo que hacía que la constante mintiera por su
+ * propio identificador.
  */
-export const SII_AVISO_PERSISTENCIA_LOCAL =
-  "Entorno de validación funcional. Los expedientes de este canal se guardan únicamente en el " +
-  "navegador de este equipo: no hay base de datos, ni cifrado, ni custodia por un tercero, ni " +
-  "eficacia jurídica. Se borran al limpiar los datos del navegador.";
+export const SII_AVISO_PERSISTENCIA =
+  "Entorno de validación funcional. Los expedientes de este canal se guardan en la base de datos " +
+  "del prototipo, aislada por tenant, y permanecen disponibles entre sesiones y equipos. No hay " +
+  "cifrado, ni sello de tiempo, ni custodia por un tercero cualificado, ni eficacia jurídica: son " +
+  "datos de demostración.";
 
 export interface WhistleblowingReport {
   id: string;
@@ -767,8 +778,8 @@ export function evaluateAntiRetaliationRisk(params: {
       riskLevel: "BAJO",
       recommendedMeasures: [
         // No se promete anonimato: el portal de alta se abre desde una sesión
-        // YA AUTENTICADA y el expediente vive en claro en localStorage. Lo
-        // único que el sistema sostiene es que no pide ni guarda contacto.
+        // YA AUTENTICADA y el expediente se guarda sin cifrar. Lo único que el
+        // sistema sostiene es que no pide ni guarda datos de contacto.
         "El expediente no recoge datos de contacto del informante",
         "Canal activo para reporte de sospechas de represalia indirecta",
       ],
