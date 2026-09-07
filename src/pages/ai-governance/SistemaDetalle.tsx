@@ -300,8 +300,16 @@ export default function SistemaDetalle() {
 
   const handleOpenEscalation = () => {
     setEscalateMatter(`Propuesta de aprobación del Expediente Técnico para el Sistema de IA: ${system.name}`);
-    setEscalateRationale(`Se solicita al Consejo evaluar la conformidad del sistema ${system.name} bajo el marco RIA / AESIA.`);
-    setEscalateCommittee(bodies[0]?.name ?? "");
+    // La justificación la escribe quien escala. El prerrelleno nombraba «el
+    // Consejo» (órgano que nadie había elegido) y encuadraba la propuesta «bajo
+    // el marco RIA / AESIA»: AESIA es la autoridad de vigilancia, no un marco
+    // normativo, y esa atribución VIAJABA al intake de Secretaría como
+    // `rationale`, o sea al expediente. Se deja vacío: sin texto, el handoff no
+    // lleva el parámetro.
+    setEscalateRationale("");
+    // Y sin órgano preseleccionado: `bodies[0]` es el primero que devuelve la
+    // consulta, no una elección. El selector ya ofrece «Sin órgano indicado».
+    setEscalateCommittee("");
     setShowEscalationModal(true);
   };
 
@@ -1316,6 +1324,7 @@ export default function SistemaDetalle() {
                 <textarea
                   rows={3}
                   value={escalateRationale}
+                  placeholder="Motivo de la propuesta. Este texto viaja al intake de Secretaría."
                   onChange={(e) => setEscalateRationale(e.target.value)}
                   className="w-full p-2.5 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]"
                   style={{ borderRadius: "var(--g-radius-md)" }}

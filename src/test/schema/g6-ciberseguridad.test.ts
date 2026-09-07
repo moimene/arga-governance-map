@@ -5,6 +5,9 @@ import { describe, expect, it, beforeAll } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { GARRIGUES_TENANT, DEMO_TENANT, sesionDe } from "../helpers/supabase-test-client";
 import { OBLIGACIONES_CIBER, CONTROLES_CIBER } from "../../../scripts/garrigues/normativo/obligaciones-ciber";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { sinComentarios } from "../helpers/sin-comentarios";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
 // GOTCHA: `VITE_SUPABASE_ANON_KEY` NO EXISTE en este repo — el .env nombra la
@@ -30,14 +33,41 @@ describe("G6 — Catálogo congelado Ciberseguridad y SGSI", () => {
     expect(codes).toContain("OBL-GARR-NIS2-01");
   });
 
-  it("las obligaciones NIS2 están explícitamente marcadas como prospectivas y asignadas a EAD Trust", () => {
-    const nis2 = OBLIGACIONES_CIBER.filter((o) => o.code.includes("NIS2"));
-    expect(nis2).toHaveLength(2);
-    for (const o of nis2) {
-      expect(o.prospectiva).toBe(true);
-      expect(o.sujeto_obligado).toContain("EAD Trust");
-      expect(o.title).toContain("Prospectivo");
+  // GATE VACUO CORREGIDO (nº13 del inventario). Este bloque asertaba
+  // `o.prospectiva === true` y `o.sujeto_obligado` SOBRE LA CONSTANTE DEL
+  // PROPIO MÓDULO que declara esos campos: comprobaba que el catálogo dice lo
+  // que dice. Era exactamente el defecto que venía a cubrir —n=1101, campos
+  // write-only— fijado por un test incapaz de detectarlo.
+  //
+  // `prospectiva`, `sujeto_obligado`, `procedencia_cualificacion` y `quote` NO
+  // TIENEN COLUMNA en `obligations` (medido read-only contra Cloud el
+  // 2026-09-07: 14 columnas, ninguna es esa) y ninguna pantalla los lee. Esa
+  // mitad sigue siendo deuda Cloud y se dice, no se disimula.
+  //
+  // Lo que sí llega es el prefijo del TÍTULO, y por ahí se prueba: la bandera
+  // del catálogo tiene que coincidir con el marcador que la pantalla lee, y la
+  // consecuencia en pantalla tiene que cambiar. Poner `prospectiva: false` en
+  // una de las dos, o quitarle el prefijo al título, pone esto rojo.
+  it("lo que el catálogo declara prospectivo es lo que la pantalla lee, y cambia lo que pinta", async () => {
+    const { isProspectiveTitle, obligationCoverage } = await import("@/lib/grc/obligation-coverage");
+
+    const declaradas = OBLIGACIONES_CIBER.filter((o) => o.prospectiva === true);
+    const exigibles = OBLIGACIONES_CIBER.filter((o) => o.prospectiva !== true);
+    expect(declaradas, "sin prospectivas el bloque sería vacuo").toHaveLength(2);
+    expect(exigibles.length, "sin exigibles no habría control discriminante").toBeGreaterThan(0);
+
+    for (const o of declaradas) {
+      expect(isProspectiveTitle(o.title), `${o.code}: la pantalla no lo ve prospectivo`).toBe(true);
     }
+    for (const o of exigibles) {
+      expect(isProspectiveTitle(o.title), `${o.code}: exigible marcada como prospectiva`).toBe(false);
+    }
+
+    // La consecuencia, que es el hallazgo: SIN CONTROLES, una prospectiva ya no
+    // se pinta como incumplimiento crítico, y una exigible sigue haciéndolo.
+    expect(obligationCoverage(declaradas[0].title, []).label).toBe("MARCO PROSPECTIVO");
+    expect(obligationCoverage(declaradas[0].title, []).tone).not.toBe("critical");
+    expect(obligationCoverage(exigibles[0].title, []).label).toBe("SIN CONTROL");
   });
 
   it("tiene 7 controles operativos reales (CTR-GARR-29..35) trazados a sus políticas", () => {
@@ -118,6 +148,35 @@ describe("G6 — Ciberseguridad y SGSI en Cloud (Supabase)", () => {
     }
   });
 
+  it("el marcador prospectivo está EN EL DATO de Cloud, no solo en el catálogo local", async () => {
+    // Sin esto, el gate de arriba solo probaría el fichero: la pantalla lee el
+    // título que devuelve Supabase, y si el seed pierde el prefijo la
+    // obligación vuelve a pintarse como incumplimiento crítico.
+    if (!garr) return;
+    const { data, error } = await garr
+      .from("obligations")
+      .select("code, title")
+      .in("code", OBLIGACIONES_CIBER.map((o) => o.code));
+    expect(error).toBeNull();
+    const rows = (data ?? []) as Array<{ code: string; title: string }>;
+    expect(rows).toHaveLength(7);
+
+    const { isProspectiveTitle } = await import("@/lib/grc/obligation-coverage");
+    const esperadas = new Set(
+      OBLIGACIONES_CIBER.filter((o) => o.prospectiva === true).map((o) => o.code),
+    );
+    expect(esperadas.size).toBe(2);
+    let comprobadas = 0;
+    for (const r of rows) {
+      comprobadas++;
+      expect(
+        isProspectiveTitle(r.title),
+        `${r.code}: el título sembrado ${esperadas.has(r.code) ? "perdió" : "ganó"} el marcador`,
+      ).toBe(esperadas.has(r.code));
+    }
+    expect(comprobadas, "el bucle no examinó ninguna fila").toBe(7);
+  });
+
   it("las obligaciones ciber sincronizan al backbone como módulo 'cyber' y no 'risk'", async () => {
     if (!garr) return;
     const { data, error } = await garr
@@ -182,5 +241,41 @@ describe("G6 — Ciberseguridad y SGSI en Cloud (Supabase)", () => {
       .in("code", CONTROLES_CIBER.map((c) => c.code));
     expect(eCtr).toBeNull();
     expect(ctrArga ?? []).toHaveLength(0);
+  });
+});
+
+describe("2026-09-07 — el criterio de cobertura no vuelve a divergir entre pantallas hermanas", () => {
+  // LA CAPA DÉBIL QUE FALTABA, y la declaro: los tests de arriba prueban que la
+  // FUNCIÓN decide bien, no que las pantallas la llamen. Ese hueco es
+  // exactamente por donde se coló el defecto: el listado se corrigió y sus dos
+  // hermanas —la ficha de la obligación y la pestaña Obligaciones de la ficha
+  // de política— siguieron pintando «SIN COBERTURA» en rojo sobre las MISMAS
+  // dos filas. Esto vigila la arista, no el rótulo.
+  const PANTALLAS = [
+    "src/pages/ObligacionesList.tsx",
+    "src/pages/ObligacionDetalle.tsx",
+    "src/pages/PoliticaDetalle.tsx",
+  ] as const;
+
+  it("las tres pantallas que puntúan cobertura resuelven por el módulo compartido", () => {
+    for (const ruta of PANTALLAS) {
+      const src = sinComentarios(readFileSync(join(process.cwd(), ruta), "utf8"));
+      expect(src, `${ruta}: no importa el criterio compartido`).toContain(
+        'from "@/lib/grc/obligation-coverage"',
+      );
+      expect(src, `${ruta}: importa el criterio pero no lo llama`).toMatch(/obligationCoverage\s*\(/);
+    }
+  });
+
+  it("y ninguna vuelve a decidir la cobertura por su cuenta", () => {
+    // Control discriminante: la marca del marco prospectivo NO puede estar
+    // reimplementada en una pantalla. Si alguien copia el regex en vez de
+    // importar la función, esto se pone rojo aunque el import siga ahí.
+    for (const ruta of PANTALLAS) {
+      const src = sinComentarios(readFileSync(join(process.cwd(), ruta), "utf8"));
+      expect(src, `${ruta}: reimplementa el marcador en vez de importarlo`).not.toMatch(
+        /\[\s*Marco\s+Prospectivo\s*\\?\]/i,
+      );
+    }
   });
 });

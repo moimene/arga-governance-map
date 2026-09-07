@@ -36,15 +36,25 @@ export type WhistleblowingSeverity =
   | "MUY_GRAVE"
   | "DELITO_FLAGRANTE";
 
-export type WhistleblowingStatus = 
-  | "RECIBIDO"
-  | "ACUSE_EMITIDO"
-  | "EN_TRIAGE"
-  | "EN_INVESTIGACION"
-  | "PRORROGA_ACTIVA"
-  | "REMITIDO_FISCALIA"
-  | "RESUELTO_MEDIDAS"
-  | "ARCHIVADO_MOTIVADO";
+/** Los estados que el motor reconoce, EN TIEMPO DE EJECUCIÓN.
+ *
+ *  Era solo un tipo, y un tipo no está cuando hace falta: el almacén de
+ *  `localStorage` devuelve JSON sin comprobar, así que un estado que se sembró
+ *  mal en su día —`ADMITIDA`, que nunca estuvo en esta unión— sobrevivía en el
+ *  navegador y `SiiDashboard` lo pintaba crudo (`r.status.replace(/_/g," ")`).
+ *  Con la lista en runtime, `getStoredReports` puede descartarlo. */
+export const WHISTLEBLOWING_STATUSES = [
+  "RECIBIDO",
+  "ACUSE_EMITIDO",
+  "EN_TRIAGE",
+  "EN_INVESTIGACION",
+  "PRORROGA_ACTIVA",
+  "REMITIDO_FISCALIA",
+  "RESUELTO_MEDIDAS",
+  "ARCHIVADO_MOTIVADO",
+] as const;
+
+export type WhistleblowingStatus = (typeof WHISTLEBLOWING_STATUSES)[number];
 
 // RETENCION_3M_NO_INVESTIGACION (art. 32.4: supresión a los 3 meses de la
 // recepción si no se iniciaron actuaciones) estaba DECLARADO aquí y no lo

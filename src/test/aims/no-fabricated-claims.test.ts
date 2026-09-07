@@ -354,7 +354,15 @@ describe("A3 — el documento descargable no afirma lo que no consta", () => {
   });
 });
 
-describe("A3 — contrato de columnas real", () => {
+// RENOMBRADO (2026-09-07, gate vacuo nº11): se llamaba «contrato de columnas
+// real» y no consulta Cloud ni una vez — compara contra la lista congelada de
+// abajo. Eso caza la REINTRODUCCIÓN de un fantasma conocido, que es útil y
+// barato, pero no el defecto de 1028: un fantasma NUEVO en un hook nuevo. Ese
+// lo cubre `src/test/aims/aims-column-contract.test.ts`, que pregunta a Cloud
+// por cada columna declarada (PostgREST responde 42703 antes de aplicar RLS).
+// Comprobado por mutación: declarar `qtsp_custody_ref` en un tipo del hook deja
+// este fichero en verde y pone el otro en rojo.
+describe("A3 — los 19 fantasmas conocidos no vuelven (lista congelada, no cotejo)", () => {
   // Columnas declaradas que NO existen en Cloud (verificado contra
   // information_schema el 2026-08-29).
   const FANTASMAS = [
@@ -1077,5 +1085,94 @@ describe("2026-09-06 — la ausencia de dato se dice, no se rellena", () => {
     // bucle: si el enlace desapareciera, pasarían por vacuidad.
     const src = sinComentarios(read(EVAL_DETALLE));
     expect(/risk-360\?source=aims/.test(src), "ha desaparecido el escalado a Risk 360").toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2026-09-07 — n=1011: la afirmación sobrevivía por PROSA FIJA.
+//
+// Los dos literales del hallazgo se corrigieron (el rótulo de readiness pasó a
+// leer `readiness.standaloneReady` y «sin schema nuevo» a «No medido»), y la
+// MISMA afirmación seguía viva en el componente hermano de la misma pantalla:
+// `ScreenPostureTable` imprimía «Sin migración ni escrituras cross-module.» en
+// las diez filas, incluidas las dos que declaran `migrationRequired: true`.
+// Ningún gate miraba ahí.
+describe("2026-09-07 — la postura de pantalla se pinta del dato, no de un párrafo", () => {
+  const DASHBOARD = "src/pages/ai-governance/Dashboard.tsx";
+
+  it("el dato discrimina: hay pantallas con migración y sin ella", async () => {
+    // Control positivo del hallazgo. Si TODAS las filas fueran
+    // `migrationRequired: false`, la prosa fija sería cierta y este bloque
+    // estaría vigilando un no-problema. Que las dos ramas existan es lo que
+    // convierte la frase única en una afirmación falsa para alguien.
+    const { aimsScreenPostures } = await import("@/lib/aims/readiness");
+    expect(aimsScreenPostures.length, "la tabla de posturas se ha quedado vacía").toBeGreaterThan(5);
+    expect(
+      aimsScreenPostures.some((s) => s.migrationRequired),
+      "ninguna pantalla declara migración: el gate ya no vigila nada",
+    ).toBe(true);
+    expect(
+      aimsScreenPostures.some((s) => !s.migrationRequired),
+      "todas declaran migración: el gate ya no vigila nada",
+    ).toBe(true);
+  });
+
+  it("ninguna prosa fija niega la migración por todas las filas a la vez", () => {
+    // `sinComentarios` porque el comentario que EXPLICA la retirada cita la
+    // frase retirada, y sin esto el gate se dispara contra su justificación.
+    const src = sinComentarios(read(DASHBOARD));
+    expect(
+      /Sin migraci[óo]n ni escrituras cross-module/i.test(src),
+      "vuelve la prosa fija que declara por las diez filas lo que sólo vale para ocho",
+    ).toBe(false);
+    // Y la celda tiene que LEER el campo de la fila. Sin esto, sustituir la
+    // frase por otra igual de fija («No requiere migración») pasaría el gate.
+    const i = src.indexOf("aimsScreenPostures.map");
+    expect(i, "ha desaparecido la tabla de posturas de pantalla").toBeGreaterThan(0);
+    const tabla = src.slice(i, src.indexOf("</table>", i));
+    expect(
+      /screen\.migrationRequired/.test(tabla),
+      "la celda de operación no lee `migrationRequired` de la fila",
+    ).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2026-09-07 — n=1008: el WRITE PATH del escalado.
+//
+// El selector de órgano se corrigió, pero el prerrelleno de la justificación
+// seguía redactando en nombre del oficial —«Se solicita al Consejo evaluar la
+// conformidad … bajo el marco RIA / AESIA»— y ese texto VIAJA al intake de
+// Secretaría como `rationale` del handoff. AESIA es la autoridad de vigilancia
+// de mercado, no un marco normativo; el marco es el Reglamento.
+describe("2026-09-07 — el escalado no redacta la justificación por el oficial", () => {
+  it("ninguna superficie AIMS encuadra una propuesta en un «marco AESIA»", () => {
+    for (const f of superficieAims()) {
+      const src = sinComentarios(read(f));
+      expect(
+        /marco\s+RIA\s*\/\s*AESIA|marco\s+AESIA/i.test(src),
+        `${f}: vuelve a presentarse AESIA como marco normativo`,
+      ).toBe(false);
+    }
+  });
+
+  it("el prerrelleno del escalado no inventa ni justificación ni órgano", () => {
+    const src = sinComentarios(read(DETALLE));
+    const i = src.indexOf("const handleOpenEscalation");
+    expect(i, "ha desaparecido el abridor del modal de escalado").toBeGreaterThan(0);
+    const cuerpo = src.slice(i, src.indexOf("};", i));
+    expect(
+      /setEscalateRationale\(\s*""\s*\)/.test(cuerpo),
+      "el escalado vuelve a prerrellenar la justificación que viaja al expediente",
+    ).toBe(true);
+    expect(
+      /setEscalateCommittee\(\s*bodies\[0\]/.test(cuerpo),
+      "vuelve el órgano preseleccionado por posición: nadie lo ha elegido",
+    ).toBe(false);
+    // Control positivo: el campo sigue existiendo y sigue viajando. Si el
+    // handoff dejara de llevar `rationale`, las dos aserciones de arriba
+    // pasarían por vacuidad.
+    expect(/rationale:\s*escalateRationale/.test(src),
+      "el escalado ya no manda la justificación: este bloque no vigila nada").toBe(true);
   });
 });

@@ -339,9 +339,13 @@ fichadas:
   separada, que la política vigente de EAD Trust en `CLAUDE.md` reserva expresamente. Mientras no
   esté, **ninguna certificación puede emitirse**, y el producto lo dice en pantalla en vez de
   fingirlo.
-- **91 de los 127 hallazgos no listados recibieron juez pero no refutador**, porque dos corridas
-  toparon con el límite de sesión. Sus veredictos valen menos que los 257 listados, que sí llevan
-  las dos vueltas, y se dice aquí en lugar de contarlos como equivalentes.
+- **Los 127 hallazgos no listados: CERRADOS con las dos vueltas.** La corrida original perdió 26 de
+  53 agentes por el límite de sesión, y de ahí salió la cifra que este ledger daba antes —«91 sin
+  refutador»—. Reanudada con `resumeFromRunId`, los 27 agentes completados volvieron de caché y
+  solo se relanzaron los caídos: **127 juzgados y 126 refutados**; el único que quedó sin segunda
+  vuelta (`n=1009`) se refutó aparte. El refutador **corrigió 40 de 127 veredictos (31 %)**, casi
+  todos `ABIERTO → YA_CORREGIDO`: el juez no había visto que el cierre del 05 ya los tapaba.
+  Estado final: **101 ya corregidos, 16 deuda Cloud, 8 abiertos, 1 refutado, 1 duplicado**.
 - **6 hallazgos de la tercera tanda quedaron NO_TOCADOS con motivo**: 3 por caer fuera del perímetro
   de ficheros de su carril (`n=1004`, `n=1028`, `n=1092`), 1 porque su corrección estaba prohibida
   en ese carril (`n=1002`), 1 duplicado, y **`n=1100` (CTR-008) por decisión expresa del usuario**

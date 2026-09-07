@@ -11,11 +11,17 @@ import { applyVisibleDataClass } from "@/lib/secretaria/data-class";
  */
 
 export interface DashboardKpis {
-  entidades: number;
-  mandatosVencimiento: number;
-  politicasPendientes: number;
-  hallazgosAbiertos: number;
-  delegacionesCaducadas: number;
+  entidades: number | null;
+  mandatosVencimiento: number | null;
+  politicasPendientes: number | null;
+  hallazgosAbiertos: number | null;
+  delegacionesCaducadas: number | null;
+}
+
+function measuredCount(result: PromiseSettledResult<{ count: number | null; error: unknown }>): number | null {
+  return result.status === "fulfilled" && !result.value.error
+    ? result.value.count ?? null
+    : null;
 }
 
 export function useDashboardKpis() {
@@ -28,7 +34,7 @@ export function useDashboardKpis() {
       in90.setDate(in90.getDate() + 90);
       const in90Iso = in90.toISOString().slice(0, 10);
 
-      const [ent, man, pol, fnd, del] = await Promise.all([
+      const [ent, man, pol, fnd, del] = await Promise.allSettled([
         applyVisibleDataClass(
           supabase
             .from("entities")
@@ -64,11 +70,11 @@ export function useDashboardKpis() {
       ]);
 
       return {
-        entidades: ent.count ?? 0,
-        mandatosVencimiento: man.count ?? 0,
-        politicasPendientes: pol.count ?? 0,
-        hallazgosAbiertos: fnd.count ?? 0,
-        delegacionesCaducadas: del.count ?? 0,
+        entidades: measuredCount(ent),
+        mandatosVencimiento: measuredCount(man),
+        politicasPendientes: measuredCount(pol),
+        hallazgosAbiertos: measuredCount(fnd),
+        delegacionesCaducadas: measuredCount(del),
       };
     },
   });
@@ -84,21 +90,26 @@ export interface NotificationRow {
   created_at: string;
 }
 
+export interface DashboardAlerts {
+  items: NotificationRow[];
+  total: number | null;
+}
+
 export function useDashboardAlerts() {
   const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: ["dashboard", "alerts", tenantId],
     enabled: !!tenantId,
-    queryFn: async (): Promise<NotificationRow[]> => {
-      const { data, error } = await supabase
+    queryFn: async (): Promise<DashboardAlerts> => {
+      const { data, error, count } = await supabase
         .from("notifications")
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("tenant_id", tenantId!)
         .eq("is_read", false)
         .order("created_at", { ascending: false })
         .limit(7);
       if (error) throw error;
-      return (data ?? []) as NotificationRow[];
+      return { items: (data ?? []) as NotificationRow[], total: count ?? null };
     },
   });
 }

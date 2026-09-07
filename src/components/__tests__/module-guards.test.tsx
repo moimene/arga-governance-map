@@ -103,11 +103,23 @@ describe("RequireGrcModule", () => {
     expect(screen.getByText("vista-del-modulo")).toBeTruthy();
   });
 
-  it("mientras el branding carga no redirige (evita el falso negativo)", () => {
+  it("mientras el branding carga ni redirige ni pinta el módulo", () => {
+    // La aserción de «no redirige» por sí sola no puede fallar por el defecto
+    // que cubre: un guard que MONTARA el hijo durante la carga también deja
+    // "dashboard" a null. Durante la carga se pinta el fallback: ninguno de
+    // los dos.
     brandingActual = null;
     cargando = true;
+    const { unmount } = montarEn("gdpr");
+    expect(screen.queryByText("dashboard"), "redirigió sin saber el branding").toBeNull();
+    expect(screen.queryByText("vista-del-modulo"), "pintó el módulo sin saber el branding").toBeNull();
+    unmount();
+
+    // Control discriminante: el mismo módulo con el branding ya cargado sí se
+    // pinta. Sin esto, un guard que cerrara siempre pasaría lo de arriba.
+    cargando = false;
     montarEn("gdpr");
-    expect(screen.queryByText("dashboard")).toBeNull();
+    expect(screen.getByText("vista-del-modulo")).toBeTruthy();
   });
 
   it("mientras el TENANT se resuelve tampoco se pinta el módulo", () => {

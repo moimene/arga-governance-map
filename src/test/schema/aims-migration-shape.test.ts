@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 /**
  * B1 — Forma de la migración multirrégimen/FRIA antes de aplicarla.
@@ -140,6 +140,94 @@ describe("B1 — las FK llevan coherencia de tenant", () => {
       expect(i, `no se referencia ${t}`).toBeGreaterThan(0);
       expect(/DEUDA DECLARADA/.test(conComentarios.slice(Math.max(0, i - 500), i)),
         `la FK a ${t} no declara su deuda de coherencia de tenant`).toBe(true);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2026-09-07 — n=1005 / gate vacuo nº9.
+//
+// El bloque de arriba se titula «la migración aísla por el tenant de la sesión»
+// pero su RUTA es UN fichero. No podía ponerse rojo por los 16 literales de
+// ARGA que seguían vivos en `20260418154408_fase4_ai_governance_tables.sql` y
+// `20260426151000_000043_aims360_core.sql`, que es donde estaba el defecto: el
+// repo decía una cosa y Cloud —medido el 2026-09-07 en `pg_policies`— otra.
+//
+// El historial es forward-only: esos dos ficheros SIGUEN teniendo el literal y
+// no se reescriben. Lo que se vigila es lo que el repo AFIRMA hoy, o sea la
+// ÚLTIMA definición de cada política: si la última cablea un tenant, el repo
+// está diciendo que el aislamiento de esa tabla es de ARGA y de nadie más.
+const MIGRACIONES = "supabase/migrations";
+
+interface DefinicionPolitica {
+  fichero: string;
+  tabla: string;
+  politica: string;
+  cuerpo: string;
+}
+
+/** Última definición de cada política `ai_*`/`aims_*` en el orden del historial. */
+function ultimasPoliticasIa(): Map<string, DefinicionPolitica> {
+  const ficheros = readdirSync(MIGRACIONES).filter((f) => f.endsWith(".sql")).sort();
+  const ultima = new Map<string, DefinicionPolitica>();
+  for (const fichero of ficheros) {
+    const sql = readFileSync(`${MIGRACIONES}/${fichero}`, "utf8").replace(/^\s*--.*$/gm, "");
+    for (const m of sql.matchAll(/CREATE POLICY\s+"?([\w]+)"?\s+ON\s+(?:public\.)?"?(\w+)"?/g)) {
+      const [, politica, tabla] = m;
+      if (!/^(ai|aims)_/.test(tabla)) continue;
+      // Sin `;` fiable: 000043 separa sentencias por línea en blanco. Se corta
+      // por lo primero que aparezca.
+      const resto = sql.slice(m.index!);
+      const fin = Math.min(
+        ...[resto.indexOf(";"), resto.search(/\n[ \t]*\n/)].filter((i) => i > 0),
+      );
+      ultima.set(`${tabla}.${politica}`, {
+        fichero,
+        tabla,
+        politica,
+        cuerpo: resto.slice(0, Number.isFinite(fin) ? fin : resto.length),
+      });
+    }
+  }
+  return ultima;
+}
+
+describe("2026-09-07 — el repo dice de las RLS de IA lo que dice Cloud", () => {
+  it("el barrido ve el historial que dice ver (control positivo)", () => {
+    // Aserción de ausencia dentro de un bucle: si el barrido dejara de
+    // encontrar políticas, «ninguna cablea un tenant» pasaría por ceguera.
+    const todas = ultimasPoliticasIa();
+    expect(todas.size, "el barrido no encuentra políticas ai_*/aims_*").toBeGreaterThanOrEqual(16);
+    for (const clave of [
+      "ai_systems.tenant_isolation",
+      "ai_incidents.tenant_isolation",
+      "aims_technical_file_sections.aims_technical_file_sections_tenant_isolation",
+    ]) {
+      expect([...todas.keys()], `${clave} ha salido del barrido`).toContain(clave);
+    }
+    // Y el barrido tiene que ver el HISTORIAL, no un fichero: las definiciones
+    // vigentes salen de más de un `.sql`.
+    expect(new Set([...todas.values()].map((d) => d.fichero)).size).toBeGreaterThan(1);
+  });
+
+  it("ninguna política vigente de ai_*/aims_* cablea un tenant", () => {
+    const culpables = [...ultimasPoliticasIa().values()].filter((d) =>
+      /'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'/i.test(d.cuerpo),
+    );
+    expect(
+      culpables.map((d) => `${d.tabla}.${d.politica} (${d.fichero})`),
+      "la última definición de estas políticas cablea un tenant: el tenant nuevo queda " +
+        "fuera de sus propias tablas y el repo deja de decir lo que Cloud dice",
+    ).toEqual([]);
+  });
+
+  it("y toda política vigente resuelve el tenant de la sesión", () => {
+    // Quitar el literal no basta: `USING (true)` también lo quita.
+    for (const d of ultimasPoliticasIa().values()) {
+      expect(
+        /fn_current_tenant_id\(\)/.test(d.cuerpo),
+        `${d.tabla}.${d.politica} (${d.fichero}) no resuelve el tenant de la sesión`,
+      ).toBe(true);
     }
   });
 });

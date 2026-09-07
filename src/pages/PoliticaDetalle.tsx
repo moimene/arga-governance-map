@@ -28,6 +28,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTenantContext } from "@/context/TenantContext";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { Link as RouterLink } from "react-router-dom";
+import { obligationCoverage } from "@/lib/grc/obligation-coverage";
 
 // G4 Task 3: forma de policies.data_provenance, distinta de
 // entities.data_provenance (G1, src/lib/entity-provenance.ts) — por eso no
@@ -358,7 +359,12 @@ export default function PoliticaDetalle() {
                         {excl
                           ? <StatusBadge label={`${exclusionKind(o.title)} — no cubierta`} tone="neutral" />
                           : noCoverage
-                          ? <StatusBadge label="SIN COBERTURA" tone="critical" />
+                          // Misma corrección que en el listado y en la ficha: un
+                          // marco aún no exigible no es un incumplimiento.
+                          ? <StatusBadge
+                              label={obligationCoverage(o.title, []).label === "MARCO PROSPECTIVO"
+                                ? "MARCO PROSPECTIVO" : "SIN COBERTURA"}
+                              tone={obligationCoverage(o.title, []).tone} />
                           : <StatusBadge label={controlStatusLabel(obCtrls[0].status)} tone={controlStatusTone(obCtrls[0].status)} />}
                       </TableCell>
                     </TableRow>

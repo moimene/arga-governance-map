@@ -233,12 +233,25 @@ describe("console read model — cada número nace de una query que existe", () 
       .select("id", { count: "exact", head: true })
       .eq("tenant_id", GARRIGUES_TENANT);
 
-    if (res.error) {
-      // Con error, el contrato exige «no medido»; jamás 0.
-      expect(res.count ?? null).toBeNull();
-    } else {
-      // Sin error, el canal no tiene ni un caso en Cloud: 0 es una medición real.
-      expect(res.count).toBe(0);
-    }
+    // Antes esto aceptaba LAS DOS ramas (con error, `count` es null; sin error,
+    // 0), así que no podía fallar: documentaba en vez de gatear. Postura MEDIDA
+    // el 2026-09-07 con la sesión de Garrigues: 403 y `count` null. Si algún
+    // día se concede el permiso, esto rompe y hay que revisar esa tarjeta.
+    expect(
+      res.status,
+      "sii_cases_view dejó de denegar a Garrigues: la tarjeta del SII ya puede medirse",
+    ).toBe(403);
+    expect(res.count ?? null, "denegado exige «no medido», jamás 0").toBeNull();
+
+    // Y el porqué, que el HEAD no puede dar: una petición `head:true` viaja sin
+    // cuerpo, así que supabase-js devuelve `{ message: "" }` SIN `code`. El
+    // código real solo se ve pidiendo filas. Es justo la forma del defecto
+    // histórico: un `count ?? 0` sobre un error mudo pinta un 0 que nadie midió.
+    const conCuerpo = await garr.from("sii_cases_view" as "evidence_bundles").select("id").limit(1);
+    expect((res.error as { code?: string } | null)?.code, "el HEAD no trae código").toBeUndefined();
+    expect(
+      (conCuerpo.error as { code?: string } | null)?.code,
+      "`sii.cases` ya no deniega SELECT a authenticated",
+    ).toBe("42501");
   });
 });

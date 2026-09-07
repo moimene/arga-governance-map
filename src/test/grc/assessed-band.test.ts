@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import { sinComentarios } from "../helpers/sin-comentarios";
 import { resolve } from "node:path";
 import {
   ORDEN_BANDAS, ETIQUETA_BANDA, tieneEjes,
@@ -71,8 +72,14 @@ describe("G5 — el detalle del riesgo lee el desglose, no solo la banda", () =>
     expect(src).toContain("NO_EVALUADA");
   });
 
-  it("declara la limitación de la escala", () => {
-    expect(src).toContain("NOTA_ESCALA");
+  it("declara la limitación de la escala EN EL RENDER, no solo en el import", () => {
+    // `toContain("NOTA_ESCALA")` lo satisfacía la línea de import: el revisor
+    // sustituyó `{NOTA_ESCALA}` por texto fijo en el único render (:186) y el
+    // test siguió verde. Se exige la constante en posición de render JSX y
+    // sobre el fuente sin comentarios, para que la prosa que lo explica no
+    // satisfaga el propio guard. Sigue siendo un guard de texto: la lectura en
+    // el DOM de esta ficha vive en src/test/grc/perimetro-declarado.test.tsx.
+    expect(sinComentarios(src)).toMatch(/\{\s*NOTA_ESCALA\s*\}/);
   });
 });
 

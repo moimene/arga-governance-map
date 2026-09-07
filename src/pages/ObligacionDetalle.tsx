@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { useTenantBranding } from "@/context/TenantBrandContext";
 import { isModuleEnabled } from "@/lib/tenant-modules";
+import { obligationCoverage } from "@/lib/grc/obligation-coverage";
 
 const fmtDate = (d: string | null | undefined) => {
   if (!d) return "—";
@@ -100,13 +101,14 @@ export default function ObligacionDetalle() {
   const kind = exclusionKind(obligation.title);
   const { title: displayTitle, pending: firmezaPending } = splitFirmeza(obligation.title);
 
-  const noCoverage = controls.length === 0;
-  const coverageLabel = noCoverage
-    ? "SIN COBERTURA"
-    : controls.some((c) => c.status === "Deficiente") ? "DEFICIENTE"
-    : controls.some((c) => c.status === "Parcial") ? "PARCIAL"
-    : "COMPLETA";
-  const coverageTone = noCoverage ? "critical" : coverageLabel === "COMPLETA" ? "active" : "warning";
+  // Esta ficha pintaba «SIN COBERTURA» en rojo sobre las MISMAS filas que el
+  // listado ya trataba como marco prospectivo: la corrección había llegado a
+  // una pantalla y no a su hermana. Ahora las dos resuelven por el mismo
+  // criterio, que no vive en ninguna de ellas.
+  const cobertura = obligationCoverage(obligation.title, controls.map((c) => c.status));
+  const noCoverage = cobertura.label === "SIN CONTROL";
+  const coverageLabel = cobertura.label === "SIN CONTROL" ? "SIN COBERTURA" : cobertura.label;
+  const coverageTone = cobertura.tone;
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">

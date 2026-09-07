@@ -19,9 +19,11 @@ import { useTenantContext } from "@/context/TenantContext";
  * `as never` solo servía para aparentar que había una razón de tipos detrás.
  * Comprobado: `bun run typecheck` pasa igual sin los casts.
  *
- * Lo que de verdad protege el shape de estas consultas son las sondas de
- * `src/test/aims/no-fabricated-claims.test.ts`, que comparan las columnas
- * declaradas con las que existen en Cloud. El día que el cliente reciba su
+ * Lo que de verdad protege el shape de estas consultas es
+ * `src/test/aims/aims-column-contract.test.ts`, que pregunta a Cloud por cada
+ * columna declarada aquí. (Hasta el 2026-09-07 este comentario apuntaba a
+ * `no-fabricated-claims.test.ts`, que no consulta Cloud: compara contra una
+ * lista congelada de 19 fantasmas conocidos y no puede ver uno nuevo.) El día que el cliente reciba su
  * genérico, este comentario sobra.
  */
 export interface FriaAssessment {

@@ -22,11 +22,16 @@ import {
 import { useTenantBranding } from "@/context/TenantBrandContext";
 import { AlertTriangle, CheckCircle, AlertCircle, XCircle, ClipboardList, ShieldCheck, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+// El criterio de cobertura vive en src/lib/grc/obligation-coverage.ts para que
+// esta pantalla y sus dos hermanas (ObligacionDetalle, PoliticaDetalle) no
+// puedan volver a divergir.
+import { obligationCoverage, type ObligationCoverage } from "@/lib/grc/obligation-coverage";
 
 // El criterio de exclusión y la extracción de la cautela de firmeza viven en
 // el hook (usePoliciesObligations), compartidos con la ficha de obligación y
 // con la pestaña "Obligaciones" de la ficha de política.
 const isExclusion = (o: ObligationWithPolicy) => isExclusionTitle(o.title);
+
 
 interface KpiProps { label: string; value: number; icon: typeof ClipboardList; tone: "primary" | "success" | "warning" | "critical"; }
 const toneMap = {
@@ -77,21 +82,11 @@ export default function ObligacionesList() {
     return m;
   }, [controls]);
 
-  const obligationStatus = useCallback((o: ObligationWithPolicy): { label: string; tone: "active" | "warning" | "critical"; pulse: boolean } => {
-    const cs = ctrlsByObl.get(o.id) ?? [];
-    if (cs.length === 0) return { label: "SIN CONTROL", tone: "critical", pulse: true };
-    // Deuda conocida y consciente (decisión del usuario, round 2 de Task 7):
-    // "Deficiente" no es un valor real del CHECK de controls.status (real:
-    // Efectivo | Parcial | Inefectivo) — este branch nunca se activa. ARGA
-    // tiene un control real con status="Inefectivo" (CTR-008) que por eso cae
-    // en el fallback "EN PROCESO" de abajo en vez de mostrarse como estado
-    // crítico propio. Se conserva deliberadamente para no alterar la demo del
-    // 21/07; no reportar como hallazgo nuevo.
-    if (cs.some((c) => c.status === "Deficiente")) return { label: "DEFICIENTE", tone: "critical", pulse: false };
-    if (cs.some((c) => c.status === "Parcial")) return { label: "EN REMEDIACIÓN", tone: "warning", pulse: false };
-    if (cs.every((c) => c.status === "Efectivo")) return { label: "CUBIERTA", tone: "active", pulse: false };
-    return { label: "EN PROCESO", tone: "warning", pulse: false };
-  }, [ctrlsByObl]);
+  const obligationStatus = useCallback(
+    (o: ObligationWithPolicy): ObligationCoverage =>
+      obligationCoverage(o.title, (ctrlsByObl.get(o.id) ?? []).map((c) => c.status ?? "")),
+    [ctrlsByObl],
+  );
 
   // Marcos derivados del dato: reemplaza los 3 grupos cableados (dora/sol/others)
   // y el <Select> DORA/Solv/GDPR/LGPD fijo. Para Garrigues da 1 marco real
@@ -269,7 +264,7 @@ export default function ObligacionesList() {
 interface ObligationTableProps {
   rows: ObligationWithPolicy[];
   ctrlsByObl: Map<string, ControlWithOwner[]>;
-  obligationStatus: (o: ObligationWithPolicy) => { label: string; tone: "active" | "warning" | "critical"; pulse: boolean };
+  obligationStatus: (o: ObligationWithPolicy) => ObligationCoverage;
 }
 
 function ObligationTable({ rows, ctrlsByObl, obligationStatus }: ObligationTableProps) {

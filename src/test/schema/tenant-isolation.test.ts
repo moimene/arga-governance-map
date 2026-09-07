@@ -53,20 +53,33 @@ function anonClient(): SupabaseClient {
 }
 
 describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
-  let arga: SupabaseClient | null = null;
-  let garr: SupabaseClient | null = null;
-  let authed = false;
+  let arga: SupabaseClient;
+  let garr: SupabaseClient;
 
   beforeAll(async () => {
     // Sesión COMPARTIDA y memoizada: la suite entera hace 2 logins en vez de
     // ~40. `sesionDe` LANZA si no puede autenticar, así que el gate se pone
     // rojo en vez de saltarse en silencio.
     [arga, garr] = await Promise.all([sesionDe("ARGA"), sesionDe("GARRIGUES")]);
-    authed = true;
   }, 30_000);
 
   // SIN afterAll con signOut: la sesión es COMPARTIDA. Cerrarla aquí dejaría
   // sin autenticar a todas las sondas que corran después de esta.
+
+  // 2026-09-07 (gate vacuo nº10): se retiraron los ocho
+  // `if (!authed || !garr) { expect(true).toBe(true); return; }`. Eran
+  // aserciones sobre una constante. Hoy eran inalcanzables porque `sesionDe`
+  // lanza y el `beforeAll` tumba la suite — pero bastaba un try/catch en el
+  // login para que los 50 tests del fichero pasaran a verde sin haber mirado
+  // Cloud. Sin ellos, un fallo de sesión es un rojo, que es lo que debe ser.
+  //
+  // 2026-09-07 (gate vacuo nº8): las 9 tablas `ai_*`/`aims_*` siguen siendo
+  // vacuas en la dirección «ARGA no ve filas Garrigues» —0 filas suyas, medido
+  // en Cloud— y su vacuidad sigue DECLARADA en `aislamiento-declarado.ts`. Lo
+  // que faltaba no era una aserción más aquí, sino una fila que aislar: la pone
+  // `src/test/schema/garrigues-ia-owner-write.test.ts`, que da de alta un
+  // sistema de IA propio del tenant, comprueba las dos direcciones contra él y
+  // lo borra.
 
   it("el gate cubre de verdad las superficies que dice cubrir", () => {
     // Control positivo del INSTRUMENTO. Todas las aserciones del bucle son de
@@ -86,7 +99,6 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
   });
 
   it("el perfil del usuario Garrigues resuelve a su tenant", async () => {
-    if (!authed || !garr) { expect(true).toBe(true); return; }
     const { data, error } = await garr
       .from("user_profiles").select("tenant_id, role_code").maybeSingle();
     expect(error).toBeNull();
@@ -110,7 +122,6 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
   // El bucle genera 14 tests (7 tablas × 2 direcciones), más los 5 fijos = 19.
   for (const table of DOMAIN_TABLES) {
     it(`Garrigues no ve filas ARGA en ${table}`, async () => {
-      if (!authed || !garr) { expect(true).toBe(true); return; }
       const { data, error } = await garr.from(table).select("tenant_id").limit(500);
       expect(error).toBeNull();
       const foreign = (data ?? []).filter((r) => r.tenant_id !== GARRIGUES_TENANT);
@@ -118,7 +129,6 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
     });
 
     it(`ARGA no ve filas Garrigues en ${table}`, async () => {
-      if (!authed || !arga || !garr) { expect(true).toBe(true); return; }
       const { data, error } = await arga.from(table).select("tenant_id").limit(500);
       expect(error).toBeNull();
       const foreign = (data ?? []).filter((r) => r.tenant_id === GARRIGUES_TENANT);
@@ -148,7 +158,6 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
   }
 
   it("ARGA sí ve su propio dato (la sonda no pasa por lista vacía global)", async () => {
-    if (!authed || !arga) { expect(true).toBe(true); return; }
     const { data, error } = await arga
       .from("entities").select("id, tenant_id").limit(500);
     expect(error).toBeNull();
@@ -157,7 +166,6 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
   });
 
   it("write cross-tenant: Garrigues no muta una entity ARGA (0 filas, sin error)", async () => {
-    if (!authed || !arga || !garr) { expect(true).toBe(true); return; }
     const before = await arga
       .from("entities").select("common_name").eq("id", DEMO_ENTITY_ARGA).maybeSingle();
     expect(before.error).toBeNull();
@@ -178,7 +186,6 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
   });
 
   it("write cross-tenant: Garrigues no muta el tenant ARGA (branding, 0 filas, sin error)", async () => {
-    if (!authed || !arga || !garr) { expect(true).toBe(true); return; }
     const before = await arga
       .from("tenants").select("branding").eq("id", DEMO_TENANT).maybeSingle();
     expect(before.error).toBeNull();
@@ -204,7 +211,6 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
     // Son dos hechos distintos y este proyecto ya ha visto divergir uno del
     // otro (el branding se aplicó a mano por MCP durante el drift de junio).
     // Aquí se comprueba el que gatea de verdad las rutas y el tour.
-    if (!authed || !garr) { expect(true).toBe(true); return; }
     const { data, error } = await garr
       .from("tenants").select("branding").eq("id", GARRIGUES_TENANT).maybeSingle();
     expect(error).toBeNull();
@@ -224,7 +230,6 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
   });
 
   it("excepción documentada: tenants es lectura pública (branding no es secreto)", async () => {
-    if (!authed || !garr) { expect(true).toBe(true); return; }
     const { data, error } = await garr.from("tenants").select("id").limit(50);
     expect(error).toBeNull();
     const ids = (data ?? []).map((r) => r.id);

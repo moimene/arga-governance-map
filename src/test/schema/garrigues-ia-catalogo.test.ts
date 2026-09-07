@@ -64,13 +64,18 @@ describe("Catálogo de IA — no se clasifica lo que no se ha clasificado", () =
     }
   });
 
-  it("la supervisión humana consta como regla de la propia política", () => {
-    // PI-30 §3.2(c): los outputs "deben ser revisados, ajustados y validados"
-    // y la IA "no es un sustituto" del trabajo. Es dato de la fuente, no
-    // opinión, y sostiene el carácter asistivo de las herramientas.
-    const corporativas = SISTEMAS_IA.filter((s) => s.provenance === "PI-30_ART_3_1_1");
-    expect(corporativas.every((s) => s.humanOversight)).toBe(true);
-  });
+  // RETIRADO (2026-09-07, gate vacuo nº12): «la supervisión humana consta como
+  // regla de la propia política» asertaba `corporativas.every(s =>
+  // s.humanOversight)` sobre un campo declarado en el propio módulo del
+  // catálogo. No podía ponerse rojo por ningún defecto del producto:
+  //   * `ai_systems` no tiene columna para él (medido en Cloud, `information_schema`),
+  //   * `scripts/seed-garrigues-ia.ts:44-46` declara expresamente que no se siembra, y
+  //   * ninguna pantalla lo lee (0 referencias en `src/` fuera de este test).
+  // O sea: comprobaba que una constante seguía escrita como estaba, y de paso
+  // presentaba como cubierta una regla de PI-30 §3.2(c) que el producto no
+  // pinta en ninguna parte. El campo se conserva en el catálogo porque es dato
+  // de la fuente para quien lo siembre algún día; el día que una superficie lo
+  // LEA, el test que toca es el de esa superficie.
 });
 
 describe("Catálogo de IA — restricciones y ownership", () => {

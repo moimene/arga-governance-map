@@ -189,3 +189,73 @@ describe("SII Garrigues — el canal corregido atraviesa el caché del navegador
     expect(propioLeido!.channel, "no está en el catálogo: nadie decide su canal").toBe("WEB_ANONIMO");
   });
 });
+
+
+describe("SII Garrigues — qué reaplica el catálogo sobre el caché y qué NO", () => {
+  // n=1086. El catálogo ya está corregido y tipado, pero la corrección viajaba
+  // solo para `firmeza` y `channel`: `CAMPOS_DEL_CATALOGO` era una lista de dos.
+  // Un navegador que ya hubiera abierto /sii —el de la demo— seguía sirviendo
+  // el estado y la modalidad viejos, y `SiiDashboard` pinta el estado CRUDO
+  // (`{r.status.replace(/_/g, " ")}`), así que `ADMITIDA` —que nunca estuvo en
+  // `WhistleblowingStatus`— se leía como un estado real del expediente.
+  //
+  // La lista explícita es el diseño: hace visible el hueco. Lo que decide el
+  // catálogo se reaplica; lo que decide el instructor, no. El tercer caso es el
+  // que separa las dos cosas y el que se pondría rojo si alguien "arreglara"
+  // esto metiendo `status` en la lista.
+  const sembrarClave = async (reports: unknown[]) => {
+    const { siiStorageKey } = await import("@/lib/sii/tenant-scope");
+    localStorage.setItem(siiStorageKey(SII_TENANT), JSON.stringify(reports));
+  };
+  const catalogo = async () => {
+    const { casosDemoGarrigues } = await import("../../../scripts/garrigues/sii/casos-demo");
+    return casosDemoGarrigues("J&A Garrigues, S.L.P.");
+  };
+
+  afterEach(() => localStorage.clear());
+
+  it("un estado que el motor NO tiene no sobrevive al caché", async () => {
+    const { WHISTLEBLOWING_STATUSES } = await import("@/lib/sii/whistleblowing-engine");
+    await sembrarClave((await catalogo()).map((r) => ({ ...r, status: "ADMITIDA" })));
+
+    const { getStoredReports } = await import("@/hooks/useWhistleblowing");
+    const leidos = getStoredReports(SII_TENANT);
+
+    expect(leidos.length, "sin expedientes la aserción sería vacua").toBeGreaterThan(0);
+    for (const r of leidos) {
+      expect(WHISTLEBLOWING_STATUSES as readonly string[], `${r.code} sirve un estado inventado`)
+        .toContain(r.status);
+    }
+  });
+
+  it("la modalidad de anonimato la decide el catálogo, no el caché", async () => {
+    const delCatalogo = await catalogo();
+    const identificados = delCatalogo.filter((r) => r.anonymityMode === "CONFIDENCIAL_IDENTIFICADO");
+    expect(identificados.length, "sin identificados no habría nada que corregir").toBeGreaterThan(0);
+    // El caché de la demo los tenía todos como anónimos estrictos, que es lo
+    // que arrastraba el canal web al Libro-registro.
+    await sembrarClave(delCatalogo.map((r) => ({ ...r, anonymityMode: "ANONIMO_ESTRICTO" })));
+
+    const { getStoredReports } = await import("@/hooks/useWhistleblowing");
+    const leidos = getStoredReports(SII_TENANT);
+    for (const esperado of identificados) {
+      const leido = leidos.find((r) => r.code === esperado.code);
+      expect(leido?.anonymityMode, `${esperado.code} sigue viniendo del caché`)
+        .toBe("CONFIDENCIAL_IDENTIFICADO");
+    }
+  });
+
+  it("CONTROL: un estado LEGÍTIMO puesto por el instructor no se revierte", async () => {
+    // `useCloseRootCase` escribe ARCHIVADO_MOTIVADO sobre estos mismos códigos.
+    // Si `status` entrara en `CAMPOS_DEL_CATALOGO`, abrir la pantalla
+    // devolvería el expediente a EN_INVESTIGACION: se perdería el cierre.
+    await sembrarClave((await catalogo()).map((r) => ({ ...r, status: "ARCHIVADO_MOTIVADO" })));
+
+    const { getStoredReports } = await import("@/hooks/useWhistleblowing");
+    const leidos = getStoredReports(SII_TENANT);
+    expect(leidos.length).toBeGreaterThan(0);
+    for (const r of leidos) {
+      expect(r.status, `${r.code} perdió el cierre del instructor`).toBe("ARCHIVADO_MOTIVADO");
+    }
+  });
+});

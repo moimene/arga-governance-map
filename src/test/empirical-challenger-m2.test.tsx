@@ -193,7 +193,13 @@ describe("Milestone 2 — Empirical Challenger Verification Suite", () => {
           const content = fs.readFileSync(`${dir}/${file}`, "utf8");
 
           expect(content).not.toContain('from "@/components/shell/ShellLayout"');
-          expect(content).not.toContain('from "@/components/shell/Sidebar"');
+          // RETIRADO (2026-09-07): aquí había un `not.toContain` del import de
+          // "@/components/shell/Sidebar". Ese fichero no existe desde d5b5dde,
+          // así que ningún fichero puede importarlo —un import de esa ruta
+          // rompería el build antes de llegar al test— y el guard no podía
+          // caer por el motivo por el que se escribió. El criterio vivo
+          // (ningún módulo Garrigues cuelga del shell TGMS) lo cubre la línea
+          // de arriba con ShellLayout, que sí existe.
           if (dir === "src/components/garrigues-shell") {
             expect(content).not.toContain("ShellLayout");
           }

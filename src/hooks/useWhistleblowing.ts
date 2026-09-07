@@ -17,6 +17,7 @@ import {
   type WhistleblowingStatus,
   type WhistleblowingSubcase,
   type SubcaseRegime,
+  WHISTLEBLOWING_STATUSES,
   computeWhistleblowingDeadlines,
   evaluateSubcasePerimeter,
   sanitizeMetadata,
@@ -415,8 +416,31 @@ export function initialReportsFor(tenantId: string): WhistleblowingReport[] {
  * dado de alta. Un expediente de alta NO está en el catálogo y por tanto no
  * recibe nada — que es lo correcto: ni es simulado ni su canal lo decide el
  * despacho.
+ *
+ * QUÉ ENTRA Y QUÉ NO. Entra lo que decide el CATÁLOGO y la aplicación no deja
+ * cambiar: la marca de simulado, el canal, la modalidad de anonimato, la
+ * categoría, la severidad y los dos textos. Ninguna mutación de este fichero
+ * los toca, así que reaplicarlos no puede pisar trabajo de nadie.
+ *
+ * NO entra `status`, aunque el catálogo lo declare: lo mueve el instructor
+ * —`useEmitAcknowledgment` escribe ACUSE_EMITIDO, `useApproveExtension`
+ * PRORROGA_ACTIVA y `useCloseRootCase` RESUELTO_MEDIDAS o ARCHIVADO_MOTIVADO—.
+ * Reaplicarlo devolvería un expediente cerrado a
+ * "en investigación", que es un daño mayor que el que se venía a evitar. Lo que
+ * sí se descarta es un estado que el motor NO TIENE: eso no es tramitación, es
+ * un valor viciado del almacén (`ADMITIDA` se sembró así y el dashboard lo
+ * pinta crudo). Tampoco entra `assignedInvestigatorName`, que la recusación
+ * sustituye.
  */
-const CAMPOS_DEL_CATALOGO = ["firmeza", "channel"] as const;
+const CAMPOS_DEL_CATALOGO = [
+  "firmeza",
+  "channel",
+  "anonymityMode",
+  "category",
+  "severity",
+  "summary",
+  "detailedDescription",
+] as const;
 
 function reaplicarCamposDelCatalogo(
   tenantId: string,
@@ -429,6 +453,11 @@ function reaplicarCamposDelCatalogo(
     const parche: Partial<WhistleblowingReport> = {};
     for (const campo of CAMPOS_DEL_CATALOGO) {
       (parche as Record<string, unknown>)[campo] = delCatalogo[campo];
+    }
+    // El estado lo mueve el instructor y por eso no se reaplica; pero uno que
+    // el motor no reconoce no es un estado avanzado, es basura del almacén.
+    if (!(WHISTLEBLOWING_STATUSES as readonly string[]).includes(r.status)) {
+      parche.status = delCatalogo.status;
     }
     return { ...r, ...parche };
   });

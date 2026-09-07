@@ -386,8 +386,15 @@ function ScreenPostureTable() {
                   >
                     {screen.operation}
                   </span>
+                  {/* Era PROSA FIJA en las diez filas y contradecía al dato de
+                      la propia fila: dos pantallas declaran
+                      `migrationRequired: true`. Y «ni escrituras cross-module»
+                      no se mide aquí: la columna de handoffs ya dice lo que
+                      hay. Se pinta el campo, no una afirmación general. */}
                   <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">
-                    Sin migración ni escrituras cross-module.
+                    {screen.migrationRequired
+                      ? "Con migración declarada pendiente."
+                      : "Sin migración declarada."}
                   </p>
                 </td>
                 <td className="px-4 py-3 align-top">

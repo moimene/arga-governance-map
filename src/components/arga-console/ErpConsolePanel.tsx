@@ -13,7 +13,6 @@ import {
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { NotificationRow } from "@/hooks/useDashboardData";
 import type { ModuleStatus } from "@/hooks/useModuleStatus";
 import {
   consoleDataContracts,
@@ -21,6 +20,9 @@ import {
   type ConsoleSourcePosture,
 } from "@/lib/arga-console/contracts";
 import { formatMeasuredShort, hasMeasuredItems, isUnmeasured } from "@/lib/arga-console/measured";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { brandName } from "@/lib/tenant-brand-labels";
+import { useTenantContext } from "@/context/TenantContext";
 
 type WorkTone = "danger" | "warning" | "success" | "neutral";
 
@@ -37,7 +39,7 @@ interface ConsoleWorkItem {
 
 interface ErpConsolePanelProps {
   moduleStatus: ModuleStatus | undefined;
-  alerts: NotificationRow[];
+  unreadAlertsCount: number | null | undefined;
   /** D-5: el sub-rótulo DORA solo se muestra a los tenants con ese módulo. */
   doraEnabled?: boolean;
 }
@@ -73,10 +75,9 @@ function measuredTone(count: number | null | undefined, whenPositive: WorkTone):
 
 function buildWorkItems(
   moduleStatus: ModuleStatus | undefined,
-  alerts: NotificationRow[],
+  unreadAlertsCount: number | null | undefined,
   doraEnabled = false,
 ): ConsoleWorkItem[] {
-  const unreadAlerts = alerts.length;
   const acuerdos = moduleStatus?.secretaria.acuerdosPendientes;
   const incidentesMayores = moduleStatus?.grc.incidentesMayoresAbiertos;
   const ai = moduleStatus?.aiGovernance.altosNoAprobados;
@@ -85,12 +86,14 @@ function buildWorkItems(
     {
       id: "core-alerts",
       label: "Alertas no leídas",
-      detail: "Prioridad desde notifications, con ruta al owner.",
+      detail: isUnmeasured(unreadAlertsCount)
+        ? "Alertas no medidas; no se puede afirmar ausencia de avisos."
+        : "Total de notificaciones no leídas, con ruta al owner.",
       owner: "TGMS Core",
       source: "notifications",
       route: "/notificaciones",
-      count: unreadAlerts,
-      tone: unreadAlerts > 0 ? "warning" : "success",
+      count: unreadAlertsCount,
+      tone: measuredTone(unreadAlertsCount, "warning"),
     },
     {
       id: "secretaria-registry",
@@ -129,8 +132,14 @@ function buildWorkItems(
   ];
 }
 
-export function ErpConsolePanel({ moduleStatus, alerts, doraEnabled = false }: ErpConsolePanelProps) {
-  const workItems = buildWorkItems(moduleStatus, alerts, doraEnabled);
+export function ErpConsolePanel({ moduleStatus, unreadAlertsCount, doraEnabled = false }: ErpConsolePanelProps) {
+  const branding = useTenantBranding();
+  const { tenantId } = useTenantContext();
+  // null también significa marca pendiente o consulta fallida. Solo el tenant
+  // ARGA identificado puede recibir su título histórico como fallback.
+  const consoleBrand = branding ? brandName(branding)
+    : tenantId === "00000000-0000-0000-0000-000000000001" ? "ARGA" : null;
+  const workItems = buildWorkItems(moduleStatus, unreadAlertsCount, doraEnabled);
   const visibleContracts = consoleDataContracts.filter((contract) =>
     ["core-identity", "secretaria-agreements", "grc-incidents", "aims-systems", "cross-module-contracts"].includes(contract.id)
   );
@@ -143,7 +152,7 @@ export function ErpConsolePanel({ moduleStatus, alerts, doraEnabled = false }: E
           <div>
             <div className="flex items-center gap-2">
               <Database className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold text-foreground">Consola General ARGA</h2>
+              <h2 className="text-sm font-semibold text-foreground">Consola General{consoleBrand ? ` ${consoleBrand}` : ""}</h2>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
               Bandeja ERP derivada de owners canónicos. {consoleSourceNotes.readModel}

@@ -39,7 +39,6 @@ import {
   Search,
 } from "lucide-react";
 import { recentActivity } from "@/data/dashboard";
-import { scopeData } from "@/data/scopeData";
 import { esgGroupScore, esgTotals } from "@/data/esg";
 import { socialAverages } from "@/data/esgSocial";
 import { Leaf } from "lucide-react";
@@ -47,22 +46,24 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { consoleJourneys } from "@/lib/arga-console/contracts";
 
-// Fallback cuando el scope activo (p.ej. un scope Garrigues) no tiene entrada
-// en scopeData (lista demo ARGA). Ceros = estado de carga honesto; los KPIs
-// reales del tenant (useDashboardKpis()) mandan sobre este fallback.
-const EMPTY_SCOPE_KPIS = { entidades: 0, mandatosVencimiento: 0, politicasPendientes: 0, hallazgosAbiertos: 0, excepcionesActivas: 0, alertas: [] };
-
 export default function Dashboard() {
   const { start, step, completed } = useTour();
   const { scope } = useScope();
   const branding = useTenantBranding();
-  const data = scopeData[scope as keyof typeof scopeData] ?? EMPTY_SCOPE_KPIS;
   const navigate = useNavigate();
 
-  const { data: kpis } = useDashboardKpis();
-  const { data: alerts = [] } = useDashboardAlerts();
+  const kpisQuery = useDashboardKpis();
+  const alertsQuery = useDashboardAlerts();
   const { data: meetings = [] } = useUpcomingMeetings();
   const { tenantId } = useTenantContext();
+  // Un error de refetch invalida también los datos retenidos en caché.
+  const kpis = tenantId && kpisQuery.isSuccess ? kpisQuery.data : undefined;
+  const kpisLoading = !!tenantId && kpisQuery.isLoading;
+  const alertsValid = !!tenantId && alertsQuery.isSuccess && !!alertsQuery.data;
+  const alerts = alertsValid ? alertsQuery.data.items : [];
+  const unreadAlertsCount = alertsValid ? alertsQuery.data.total : null;
+  const alertsLoading = !!tenantId && alertsQuery.isLoading;
+  const alertsEmptyMeasured = alertsValid && unreadAlertsCount === 0 && alerts.length === 0;
   const { data: moduleStatus, isPending: moduleStatusPending } = useModuleStatus();
   const { data: readModel } = useConsoleReadModel();
 
@@ -104,7 +105,16 @@ export default function Dashboard() {
   const label = step > 0 ? "Continuar tour" : completed ? "↺ Repetir Tour" : "Iniciar Tour del Sistema";
   const firstAlert = alerts[0];
   const executivePriorities = [
-    firstAlert
+    !alertsValid || (!firstAlert && !alertsEmptyMeasured)
+      ? {
+          id: "alerts-unmeasured",
+          tone: alertsLoading ? "Cargando" : "No medido",
+          title: `Alertas: ${formatMeasured(null, alertsLoading)}`,
+          body: "No hay una lectura disponible para determinar el estado de las alertas.",
+          to: "/notificaciones",
+          icon: AlertTriangle,
+        }
+      : firstAlert
       ? {
           id: "alert",
           tone: firstAlert.type === "error" ? "Crítico" : "Atención",
@@ -274,7 +284,7 @@ export default function Dashboard() {
       </div>
 
       <div className="mb-6">
-        <ErpConsolePanel moduleStatus={moduleStatus} alerts={alerts} doraEnabled={isModuleEnabled(branding, "dora")} />
+        <ErpConsolePanel moduleStatus={moduleStatus} unreadAlertsCount={unreadAlertsCount} doraEnabled={isModuleEnabled(branding, "dora")} />
       </div>
 
       <div className="mb-6">
@@ -290,11 +300,11 @@ export default function Dashboard() {
         <h2 className="text-sm font-semibold text-[var(--t-text-primary)]">Indicadores esenciales</h2>
       </div>
       <div key={animKey} className="grid grid-cols-2 gap-4 animate-fade-in sm:grid-cols-3 lg:grid-cols-5">
-        <KpiCard label="Entidades activas" value={kpis?.entidades ?? data.entidades} icon={Building} tone="primary" to="/entidades" />
-        <KpiCard label="Mandatos próximos a vencer" value={kpis?.mandatosVencimiento ?? data.mandatosVencimiento} icon={Clock} tone="warning" to="/organos" />
-        <KpiCard label="Políticas pendientes de revisión" value={kpis?.politicasPendientes ?? data.politicasPendientes} icon={FileWarning} tone="warning" to="/politicas" />
-        <KpiCard label="Hallazgos abiertos" value={kpis?.hallazgosAbiertos ?? data.hallazgosAbiertos} icon={AlertTriangle} tone="critical" to="/hallazgos" />
-        <KpiCard label="Excepciones / Delegaciones caducadas" value={kpis?.delegacionesCaducadas ?? data.excepcionesActivas} icon={ShieldAlert} tone="critical" to="/delegaciones" />
+        <KpiCard label="Entidades activas" value={formatMeasured(kpis?.entidades, kpisLoading)} icon={Building} tone="primary" to="/entidades" />
+        <KpiCard label="Mandatos próximos a vencer" value={formatMeasured(kpis?.mandatosVencimiento, kpisLoading)} icon={Clock} tone="warning" to="/organos" />
+        <KpiCard label="Políticas pendientes de revisión" value={formatMeasured(kpis?.politicasPendientes, kpisLoading)} icon={FileWarning} tone="warning" to="/politicas" />
+        <KpiCard label="Hallazgos abiertos" value={formatMeasured(kpis?.hallazgosAbiertos, kpisLoading)} icon={AlertTriangle} tone="critical" to="/hallazgos" />
+        <KpiCard label="Excepciones / Delegaciones caducadas" value={formatMeasured(kpis?.delegacionesCaducadas, kpisLoading)} icon={ShieldAlert} tone="critical" to="/delegaciones" />
       </div>
 
       {/* Mid row */}
@@ -302,18 +312,22 @@ export default function Dashboard() {
         {/* Alertas críticas */}
         <Card className={cn(
           "overflow-hidden lg:col-span-8",
-          alerts.length > 0 ? "border-l-4 border-l-destructive" : "border-l-4 border-l-status-active",
+          alerts.length > 0 ? "border-l-4 border-l-destructive" : alertsEmptyMeasured ? "border-l-4 border-l-status-active" : "border-l-4 border-l-border",
         )}>
           <div className="flex items-center justify-between border-b border-border px-5 py-3">
             <div className="flex items-center gap-2">
-              <AlertTriangle className={cn("h-4 w-4", alerts.length > 0 ? "text-destructive" : "text-status-active")} />
+              <AlertTriangle className={cn("h-4 w-4", alerts.length > 0 ? "text-destructive" : alertsEmptyMeasured ? "text-status-active" : "text-muted-foreground")} />
               <h2 className="text-sm font-semibold">Alertas críticas</h2>
             </div>
             {alerts.length > 0 && (
               <Link to="/notificaciones" className="text-xs font-medium text-primary hover:underline">Ver todas</Link>
             )}
           </div>
-          {alerts.length === 0 ? (
+          {!alertsValid || (!alertsEmptyMeasured && alerts.length === 0) ? (
+            <div className="px-5 py-12 text-center text-sm text-muted-foreground" role="status">
+              Alertas: {formatMeasured(null, alertsLoading)}
+            </div>
+          ) : alertsEmptyMeasured ? (
             <div className="flex flex-col items-center justify-center gap-2 bg-status-active-bg/50 px-5 py-12 text-center">
               <CheckCircle className="h-10 w-10 text-status-active" />
               <p className="text-sm font-medium text-foreground">No hay alertas críticas en este ámbito.</p>
