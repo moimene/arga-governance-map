@@ -108,7 +108,13 @@ describe("el plan y la custodia llegan a las pantallas", () => {
   });
 
   it("el informe pinta el plan y dice lo que la huella NO acredita", () => {
-    const src = readFileSync("src/pages/ai-governance/EvaluacionDetalle.tsx", "utf8");
+    // El informe se descompuso el 2026-09-08: el plan lo pinta `PlanYNotas` y
+    // la huella `CabeceraInforme`. Se leen las tres piezas, no una ruta fija.
+    const src = [
+      "src/pages/ai-governance/EvaluacionDetalle.tsx",
+      "src/components/ai-governance/evaluacion-detalle/PlanYNotas.tsx",
+      "src/components/ai-governance/evaluacion-detalle/CabeceraInforme.tsx",
+    ].map((f) => readFileSync(f, "utf8")).join("\n");
     expect(src).toMatch(/PlanDeAdaptacionEstructurado/);
     // Un hash de servidor acredita integridad y autoría, no fecha cierta:
     // presentarlo a secas sería la misma sobreafirmación que el módulo ya tuvo

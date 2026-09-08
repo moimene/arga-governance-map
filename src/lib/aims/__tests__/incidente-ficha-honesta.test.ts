@@ -126,7 +126,9 @@ describe("DORA no se afirma para un tenant que lo tiene oculto", () => {
     // Desde `20260907220000` esos hechos SE DECLARAN en el alta y la ficha los
     // lee, así que los relojes pueden encenderse de verdad. La invariante no
     // cambia y es la que importa: se anuncian los que se cuentan, ni uno más.
-    const src = read(FICHA);
+    // El banner se pinta en `CabeceraIncidente` desde la descomposición del
+    // 2026-09-08; el cálculo sigue en la página. Se leen las dos mitades.
+    const src = read(FICHA) + read("src/components/ai-governance/incidente/CabeceraIncidente.tsx");
     expect(
       /Relojes regulatorios independientes activados/.test(src),
       "la ficha vuelve a anunciar tres relojes activados que no está contando",
@@ -179,7 +181,11 @@ describe("los relojes se alimentan de lo DECLARADO, no de constantes", () => {
   });
 
   it("el alta captura lo que el motor necesita", () => {
-    const alta = readFileSync("src/pages/ai-governance/IncidenteNuevo.tsx", "utf8");
+    // El payload sigue en la página; los campos, en `FormularioIncidente`.
+    const alta = [
+      "src/pages/ai-governance/IncidenteNuevo.tsx",
+      "src/components/ai-governance/incidente/FormularioIncidente.tsx",
+    ].map((f) => readFileSync(f, "utf8")).join("\n");
     for (const campo of [
       "incident_type",
       "knowledge_at",

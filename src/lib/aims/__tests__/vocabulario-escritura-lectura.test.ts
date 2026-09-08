@@ -171,7 +171,10 @@ describe("vocabulario de severidad de incidentes: escritura ↔ lectura", () => 
     // antes de que la lectura se quede sorda otra vez. Desde el 2026-09-08 el
     // `<select>` se genera del módulo hoja, así que el ancla son las dos
     // mitades: el array y la arista que lo recorre.
-    const alta = readFileSync("src/pages/ai-governance/IncidenteNuevo.tsx", "utf8");
+    // Los campos del alta se extrajeron el 2026-09-08 a `FormularioIncidente`;
+    // la página se quedó con la validación y el payload.
+    const alta = readFileSync(
+      "src/components/ai-governance/incidente/FormularioIncidente.tsx", "utf8");
     expect(alta, "el alta ya no genera sus opciones del vocabulario").toContain("SEVERIDADES_INCIDENTE.map");
     expect([...SEVERIDADES_INCIDENTE]).toEqual(QUE_SE_ESCRIBE);
   });
