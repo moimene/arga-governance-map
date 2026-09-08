@@ -165,13 +165,20 @@ describe("las pantallas declaran el perfil", () => {
   it("el wizard y el informe avisan de la cobertura provisional", () => {
     // Cargar un catálogo no validado por el Comité de IA sin decirlo lo
     // convertiría en un dictamen que nadie ha firmado.
+    // El wizard se descompuso el 2026-09-08: el aviso lo pinta su banner y la
+    // página sólo lo monta. Se apunta a donde vive el literal.
     for (const f of [
-      "src/pages/ai-governance/EvaluacionNueva.tsx",
-      "src/pages/ai-governance/EvaluacionDetalle.tsx",
+      "src/components/ai-governance/evaluacion/PerfilAplicabilidadBanner.tsx",
+      "src/components/ai-governance/evaluacion-detalle/CabeceraInforme.tsx",
     ]) {
       const src = readFileSync(f, "utf8");
       expect(src, `${f} no declara la cobertura provisional`).toContain("AVISO_COBERTURA_PROVISIONAL");
     }
+    // ARISTA. Repuntar sólo el literal dejaría verde un banner que nadie monta:
+    // el aviso estaría escrito y no llegaría a ninguna pantalla.
+    const wizard = readFileSync("src/pages/ai-governance/EvaluacionNueva.tsx", "utf8");
+    expect(wizard, "el wizard ya no monta el banner del perfil: el aviso no llega a pantalla")
+      .toContain("<PerfilAplicabilidadBanner");
     expect(AVISO_COBERTURA_PROVISIONAL).toMatch(/Comité de IA/);
   });
 

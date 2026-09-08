@@ -25,17 +25,24 @@ import { sinComentarios } from "@/test/helpers/sin-comentarios";
  *      va sola.
  */
 
+// El alta de incidentes se descompuso el 2026-09-08: los campos —y con ellos
+// el vocabulario— viven en `FormularioIncidente`, y la página se quedó con la
+// validación y el payload. Se apunta a donde está el código: seguir leyendo
+// `IncidenteNuevo.tsx` habría dejado el bucle de opciones sin nada que barrer,
+// que es exactamente el gate vacuo que este fichero previene.
 const PANTALLAS = [
   "src/pages/ai-governance/Sistemas.tsx",
   "src/pages/ai-governance/Evaluaciones.tsx",
   "src/pages/ai-governance/Incidentes.tsx",
-  "src/pages/ai-governance/IncidenteNuevo.tsx",
+  "src/components/ai-governance/incidente/FormularioIncidente.tsx",
   "src/pages/ai-governance/SistemaNuevo.tsx",
   "src/pages/ai-governance/Dashboard.tsx",
-  "src/pages/ai-governance/SistemaDetalle.tsx",
+  // Mismo motivo, misma fecha: la ficha del sistema se descompuso y el chip de
+  // nivel lo pinta su cabecera. `SistemaDetalle.tsx` sólo compone.
+  "src/components/ai-governance/sistema/CabeceraSistema.tsx",
 ];
 
-const ALTA_INCIDENTE = "src/pages/ai-governance/IncidenteNuevo.tsx";
+const ALTA_INCIDENTE = "src/components/ai-governance/incidente/FormularioIncidente.tsx";
 
 const read = (f: string) => readFileSync(f, "utf8");
 
