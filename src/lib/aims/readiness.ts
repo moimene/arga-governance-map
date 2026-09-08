@@ -1,4 +1,5 @@
 import { acreditaConformidad } from "./conformidad";
+import { etiqueta, isMaterialSeverity, normalizeAimsStatus } from "./vocabulario";
 
 export type AimsSourcePosture = "legacy-ai" | "aims-ready" | "local-derived";
 export type AimsReadinessStatus = "ready" | "watch" | "gap";
@@ -331,64 +332,19 @@ function domainStatus(value: number, watchAt: number, readyAt: number): AimsRead
 }
 
 /**
- * Normaliza un estado para compararlo: mayúsculas, sin tildes y con el espacio
- * unificado al guion bajo.
- *
- * `ai_compliance_checks.status` convive en Cloud con SEIS grafías del mismo
- * puñado de estados —`CONFORME` y `Conforme`, `NO_CONFORME` y `No conforme`,
- * `EN_CURSO` y `En revisión`—, y las tablas `ai_*` no tienen CHECK que lo
- * impida. Comparar contra literales en mayúsculas dejaba «No conforme» fuera de
- * `GAP_STATUSES` y `statusFromChecks` devolvía «Vigilancia»: una no conformidad
- * real pintada como amarilla.
+ * El vocabulario (valores, etiquetas, chips y los dos predicados de estado)
+ * vive en `./vocabulario`, un módulo HOJA que también importan las pantallas.
+ * Se re-exporta con los nombres de siempre para no partir a los llamadores.
  */
-export function normalizeAimsStatus(status: string | null | undefined): string {
-  return (status ?? "")
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase()
-    .replace(/[\s-]+/g, "_");
-}
+export {
+  normalizeAimsStatus,
+  isMaterialSeverity,
+  chipClaseEstadoSistema as systemStatusChipClass,
+} from "./vocabulario";
 
-/**
- * Vocabulario de `ai_systems.status`: chip y etiqueta, en UN solo sitio.
- *
- * La columna NO tiene CHECK y en Cloud conviven cinco grafías ('ACTIVO',
- * 'EN_EVALUACION', 'En revision', 'Pendiente', 'Conforme'). La lista y el
- * dashboard ya toleraban lo desconocido —chip neutro y literal crudo—, pero la
- * ficha del sistema conservaba su propia comparación contra 'ACTIVO' y pintaba
- * de AVISO los otros cuatro valores: un sistema 'Conforme' salía en ámbar sólo
- * por no estar en la lista de dos entradas de esa pantalla.
- *
- * Se resuelve donde ya vive `normalizeAimsStatus`, que existe por este mismo
- * problema, para que no vuelva a haber dos vocabularios.
- */
-const SYSTEM_STATUS_CHIP_NEUTRO =
-  "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
-
-const SYSTEM_STATUS_CHIP: Record<string, string> = {
-  ACTIVO: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-  EN_EVALUACION: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  RETIRADO: SYSTEM_STATUS_CHIP_NEUTRO,
-};
-
-const SYSTEM_STATUS_LABEL: Record<string, string> = {
-  ACTIVO: "Activo",
-  EN_EVALUACION: "En evaluación",
-  RETIRADO: "Retirado",
-};
-
-/** Clase del chip. Un valor fuera del vocabulario conocido va en neutro: no se
- *  le atribuye ni bondad ni alarma que nadie ha declarado. */
-export function systemStatusChipClass(status: string | null | undefined): string {
-  return SYSTEM_STATUS_CHIP[status ?? ""] ?? SYSTEM_STATUS_CHIP_NEUTRO;
-}
-
-/** Etiqueta. Sin traducción conocida se pinta el literal tal cual está escrito
- *  en la base: renombrarlo sería inventar un estado. */
+/** Sin estado no se pinta un literal vacío: se dice que falta. */
 export function systemStatusLabel(status: string | null | undefined): string {
-  if (!status) return "Sin estado";
-  return SYSTEM_STATUS_LABEL[status] ?? status;
+  return status ? etiqueta("estadoSistema", status) : "Sin estado";
 }
 
 /**
@@ -406,16 +362,6 @@ const ASSESSMENT_COMPLIANT_STATUSES = new Set(["APROBADO", "CONFORME"]);
 
 export function assessmentAcreditaConformidad(status: string | null | undefined): boolean {
   return ASSESSMENT_COMPLIANT_STATUSES.has(normalizeAimsStatus(status));
-}
-
-/**
- * Severidad material de un incidente. El alta (`IncidenteNuevo`) y la lista
- * escriben `CRITICO | ALTO | MEDIO | BAJO`; la ficha comparaba con `CRITICA` y
- * `ALTA`, que nadie escribe, así que el banner de incidente material y el chip
- * de severidad nunca se encendían. Único predicado para todos los llamadores.
- */
-export function isMaterialSeverity(severity: string | null | undefined): boolean {
-  return ["CRITICO", "ALTO"].includes(normalizeAimsStatus(severity));
 }
 
 export function isAimsTechnicalFileGapCandidate(assessment: AimsAssessmentLike) {

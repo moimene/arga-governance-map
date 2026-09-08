@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, ClipboardCheck, FileWarning, Route, Search, SlidersHorizontal, PlusCircle } from "lucide-react";
 import { useAllAssessments } from "@/hooks/useAiAssessments";
 import { assessmentAcreditaConformidad, isAimsTechnicalFileGapCandidate } from "@/lib/aims/readiness";
+import { etiqueta, opcionesFiltro } from "@/lib/aims/vocabulario";
 import { cn } from "@/lib/utils";
 
 const ASSESSMENT_STATUS_CHIP: Record<string, string> = {
@@ -15,35 +16,6 @@ const FRAMEWORK_BADGE: Record<string, string> = {
   EU_AI_ACT:  "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]",
   ISO_42001:  "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]",
 };
-
-const ASSESSMENT_STATUS_LABEL: Record<string, string> = {
-  APROBADO: "Aprobada",
-  CONFORME: "Conforme",
-  CON_GAPS: "Con brechas",
-  NO_CONFORME: "No conforme",
-  EN_REVISION: "En revisión",
-  BORRADOR: "Borrador",
-};
-
-const FRAMEWORK_LABEL: Record<string, string> = {
-  EU_AI_ACT: "EU AI Act",
-  ISO_42001: "ISO 42001",
-};
-
-const STATUS_OPTIONS = [
-  { value: "Todos", label: "Todas" },
-  { value: "CONFORME", label: "Conformes" },
-  { value: "CON_GAPS", label: "Con brechas" },
-  { value: "APROBADO", label: "Aprobadas (legado)" },
-  { value: "EN_REVISION", label: "En revisión" },
-  { value: "BORRADOR", label: "Borrador" },
-];
-
-const FRAMEWORK_OPTIONS = [
-  { value: "Todos", label: "Todos" },
-  { value: "EU_AI_ACT", label: "EU AI Act" },
-  { value: "ISO_42001", label: "ISO 42001" },
-];
 
 const ACTION_OPTIONS = [
   { value: "Todos", label: "Todas" },
@@ -64,13 +36,11 @@ function formatDate(value: string | null) {
 }
 
 function frameworkLabel(framework: string | null | undefined) {
-  if (!framework) return "Sin marco";
-  return FRAMEWORK_LABEL[framework] ?? framework;
+  return framework ? etiqueta("marco", framework) : "Sin marco";
 }
 
 function assessmentStatusLabel(status: string | null | undefined) {
-  if (!status) return "Sin estado";
-  return ASSESSMENT_STATUS_LABEL[status] ?? status;
+  return status ? etiqueta("estadoEvaluacion", status) : "Sin estado";
 }
 
 function scoreTone(score: number | null) {
@@ -248,8 +218,8 @@ export default function Evaluaciones() {
               />
             </div>
           </div>
-          <FilterGroup label="Marco" options={FRAMEWORK_OPTIONS} value={frameworkFilter} onChange={setFrameworkFilter} />
-          <FilterGroup label="Estado" options={STATUS_OPTIONS} value={statusFilter} onChange={setStatusFilter} />
+          <FilterGroup label="Marco" options={opcionesFiltro("marco")} value={frameworkFilter} onChange={setFrameworkFilter} />
+          <FilterGroup label="Estado" options={opcionesFiltro("estadoEvaluacion")} value={statusFilter} onChange={setStatusFilter} />
           <FilterGroup label="Acción" options={ACTION_OPTIONS} value={actionFilter} onChange={setActionFilter} />
         </div>
       </section>

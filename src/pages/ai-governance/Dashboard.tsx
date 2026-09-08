@@ -38,17 +38,11 @@ import { useTenantContext } from "@/context/TenantContext";
 import { useBodyBySlug } from "@/hooks/useBodies";
 import { aiGovernanceBodySlug } from "@/lib/aims/governing-body";
 import { normalizeAimsStatus } from "@/lib/aims/readiness";
-
-const RISK_COLORS: Record<string, string> = {
-  Inaceptable: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  Alto:        "bg-[var(--status-error)]/80 text-[var(--g-text-inverse)]",
-  Limitado:    "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  Mínimo:      "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-};
+import { claseNivelRiesgo } from "@/lib/aims/vocabulario";
 
 function RiskBadge({ level }: { level: string | null }) {
   if (!level) return null;
-  const cls = RISK_COLORS[level] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]";
+  const cls = claseNivelRiesgo(level);
   return (
     <span
       className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${cls}`}

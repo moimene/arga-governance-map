@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { AlertTriangle, PlusCircle, Route, Search, ShieldAlert, SlidersHorizontal } from "lucide-react";
 import { useAiIncidentsList } from "@/hooks/useAiIncidents";
 import { isAimsMaterialIncidentCandidate } from "@/lib/aims/readiness";
+import { etiqueta, opcionesFiltro } from "@/lib/aims/vocabulario";
 import { cn } from "@/lib/utils";
 
 const SEVERITY_CHIP: Record<string, string> = {
@@ -18,34 +19,6 @@ const STATUS_CHIP: Record<string, string> = {
   CERRADO:          "bg-[var(--status-success)]/10 text-[var(--status-success)] border border-[var(--status-success)]/30",
 };
 
-const SEVERITY_LABEL: Record<string, string> = {
-  CRITICO: "Crítico",
-  ALTO: "Alto",
-  MEDIO: "Medio",
-  BAJO: "Bajo",
-};
-
-const INCIDENT_STATUS_LABEL: Record<string, string> = {
-  ABIERTO: "Abierto",
-  EN_INVESTIGACION: "En investigación",
-  CERRADO: "Cerrado",
-};
-
-const SEVERITY_OPTIONS = [
-  { value: "Todos", label: "Todas" },
-  { value: "CRITICO", label: "Crítica" },
-  { value: "ALTO", label: "Alta" },
-  { value: "MEDIO", label: "Media" },
-  { value: "BAJO", label: "Baja" },
-];
-
-const STATUS_OPTIONS = [
-  { value: "Todos", label: "Todos" },
-  { value: "ABIERTO", label: "Abiertos" },
-  { value: "EN_INVESTIGACION", label: "En investigación" },
-  { value: "CERRADO", label: "Cerrados" },
-];
-
 const FILTER_BUTTON =
   "px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-page)]";
 
@@ -59,13 +32,11 @@ function formatDate(value: string | null) {
 }
 
 function severityLabel(severity: string | null | undefined) {
-  if (!severity) return "Sin severidad";
-  return SEVERITY_LABEL[severity] ?? severity;
+  return severity ? etiqueta("severidad", severity) : "Sin severidad";
 }
 
 function incidentStatusLabel(status: string | null | undefined) {
-  if (!status) return "Sin estado";
-  return INCIDENT_STATUS_LABEL[status] ?? status;
+  return status ? etiqueta("estadoIncidente", status) : "Sin estado";
 }
 
 function FilterGroup({
@@ -226,8 +197,8 @@ export default function AiIncidentes() {
               />
             </div>
           </div>
-          <FilterGroup label="Estado" options={STATUS_OPTIONS} value={statusFilter} onChange={setStatusFilter} />
-          <FilterGroup label="Severidad" options={SEVERITY_OPTIONS} value={severityFilter} onChange={setSeverityFilter} />
+          <FilterGroup label="Estado" options={opcionesFiltro("estadoIncidente")} value={statusFilter} onChange={setStatusFilter} />
+          <FilterGroup label="Severidad" options={opcionesFiltro("severidad")} value={severityFilter} onChange={setSeverityFilter} />
         </div>
       </section>
 

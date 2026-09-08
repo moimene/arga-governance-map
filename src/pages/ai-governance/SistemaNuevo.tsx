@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useCreateAiSystem, type AiSystem } from "@/hooks/useAiSystems";
 import { usePersonasCanonical } from "@/hooks/usePersonasCanonical";
 import { useAuth } from "@/context/AuthContext";
+import { ESTADOS_SISTEMA, etiqueta } from "@/lib/aims/vocabulario";
 import {
   PREGUNTAS_CLASIFICACION,
   PREGUNTAS_ROL,
@@ -305,9 +306,9 @@ export default function SistemaNuevo() {
               className={SELECT_CLASSES}
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
-              <option value="EN_EVALUACION">En evaluación</option>
-              <option value="ACTIVO">Activo</option>
-              <option value="RETIRADO">Retirado</option>
+              {ESTADOS_SISTEMA.map((v) => (
+                <option key={v} value={v}>{etiqueta("estadoSistema", v)}</option>
+              ))}
             </select>
           </div>
 

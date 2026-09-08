@@ -5,43 +5,7 @@ import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { cn } from "@/lib/utils";
 import { useScope } from "@/context/ScopeContext";
 import { filterSystemsByScope, systemStatusChipClass, systemStatusLabel } from "@/lib/aims/readiness";
-
-const RISK_COLORS: Record<string, string> = {
-  Inaceptable: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  Alto:        "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  Limitado:    "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  Mínimo:      "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-};
-
-// `ai_systems.status` no tiene CHECK y en Cloud hay valores fuera de esta lista
-// ('En revision', 'Pendiente', 'Conforme'). El chip y la etiqueta ya toleran lo
-// desconocido —se pinta el literal crudo con estilo neutro—, pero el FILTRO era
-// una lista fija: tres de los ocho sistemas del inventario no eran alcanzables
-// por ningún filtro. Las opciones se derivan del dato presente, sin renombrar
-// nada: un valor sin etiqueta conocida se ofrece tal cual está escrito.
-const SYSTEM_STATUS_BASE_OPTIONS = [
-  { value: "Todos", label: "Todos" },
-  { value: "ACTIVO", label: "Activos" },
-  { value: "EN_EVALUACION", label: "En evaluación" },
-  { value: "RETIRADO", label: "Retirados" },
-];
-
-function systemStatusOptions(systems: { status: string | null }[]) {
-  const conocidos = new Set(SYSTEM_STATUS_BASE_OPTIONS.map((o) => o.value));
-  const extra = [...new Set(systems.map((s) => s.status).filter((v): v is string => !!v))]
-    .filter((v) => !conocidos.has(v))
-    .sort()
-    .map((v) => ({ value: v, label: v }));
-  return [...SYSTEM_STATUS_BASE_OPTIONS, ...extra];
-}
-
-const RISK_LEVELS = [
-  { value: "Todos", label: "Todos" },
-  { value: "Inaceptable", label: "Inaceptable" },
-  { value: "Alto", label: "Alto" },
-  { value: "Limitado", label: "Limitado" },
-  { value: "Mínimo", label: "Mínimo" },
-];
+import { claseNivelRiesgo, opcionesFiltro } from "@/lib/aims/vocabulario";
 
 const FILTER_BUTTON =
   "px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-page)]";
@@ -212,8 +176,8 @@ export default function Sistemas() {
             </div>
           </div>
 
-          <FilterGroup label="Riesgo" options={RISK_LEVELS} value={riskFilter} onChange={setRiskFilter} />
-          <FilterGroup label="Estado" options={systemStatusOptions(systems)} value={statusFilter} onChange={setStatusFilter} />
+          <FilterGroup label="Riesgo" options={opcionesFiltro("nivel")} value={riskFilter} onChange={setRiskFilter} />
+          <FilterGroup label="Estado" options={opcionesFiltro("estadoSistema", systems.map((s) => s.status))} value={statusFilter} onChange={setStatusFilter} />
         </div>
       </section>
 
@@ -249,7 +213,7 @@ export default function Sistemas() {
                 </thead>
                 <tbody className="divide-y divide-[var(--g-border-subtle)]">
                   {filtered.map((sys) => {
-                    const riskCls = RISK_COLORS[sys.risk_level ?? ""] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
+                    const riskCls = claseNivelRiesgo(sys.risk_level);
                     const statusCls = systemStatusChipClass(sys.status);
                     return (
                       <tr
@@ -298,7 +262,7 @@ export default function Sistemas() {
 
             <div className="divide-y divide-[var(--g-border-subtle)] lg:hidden" role="list" aria-label="Lista móvil de sistemas IA">
               {filtered.map((sys) => {
-                const riskCls = RISK_COLORS[sys.risk_level ?? ""] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
+                const riskCls = claseNivelRiesgo(sys.risk_level);
                 const statusCls = systemStatusChipClass(sys.status);
                 return (
                   <article key={sys.id} role="listitem" className="p-4">

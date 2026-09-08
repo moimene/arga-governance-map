@@ -50,6 +50,7 @@ import {
   systemStatusChipClass,
   systemStatusLabel,
 } from "@/lib/aims/readiness";
+import { claseNivelRiesgo } from "@/lib/aims/vocabulario";
 import { ETIQUETA_ROL, ROLES_REGULATORIOS, type RolRegulatorio } from "@/lib/aims/rol-regulatorio";
 import { useBodiesList } from "@/hooks/useBodies";
 import { buildMeetingHandoffPath } from "@/lib/secretaria/cross-module-handoff";
@@ -122,16 +123,6 @@ function FriaBlock({
     </div>
   );
 }
-
-const RISK_COLORS: Record<string, string> = {
-  Inaceptable: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  Alto: "bg-[var(--status-error)]/80 text-[var(--g-text-inverse)]",
-  Limitado: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  Mínimo: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-  HIGH: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  LIMITED: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  MINIMAL: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-};
 
 /**
  * `aims_technical_file_sections.status` no tiene CHECK y en Cloud conviven dos
@@ -356,9 +347,7 @@ export default function SistemaDetalle() {
     }
   };
 
-  const riskCls =
-    RISK_COLORS[system.risk_level ?? ""] ??
-    "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
+  const riskCls = claseNivelRiesgo(system.risk_level);
 
   const currentVersion = versions[0];
   const isTechnicalFileSealed = currentVersion?.technical_file_status === "SEALED";

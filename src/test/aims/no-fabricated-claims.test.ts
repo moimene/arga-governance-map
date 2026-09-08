@@ -838,9 +838,10 @@ describe("2026-09-06 — un solo vocabulario para el estado de un sistema", () =
 
   it("ninguna pantalla se monta su propio mapa de estados", () => {
     // Dos vocabularios divergen: es literalmente lo que pasó. El mapa vive en
-    // `readiness.ts`, junto a `normalizeAimsStatus`, que existe por esto mismo.
+    // el módulo HOJA `vocabulario.ts`, junto a `normalizeAimsStatus`, que
+    // existe por esto mismo; `readiness.ts` lo re-exporta.
     for (const f of superficieAims()) {
-      if (f === "src/lib/aims/readiness.ts") continue;
+      if (f === "src/lib/aims/vocabulario.ts" || f === "src/lib/aims/readiness.ts") continue;
       const src = sinComentarios(read(f));
       // Se busca la CLAVE de un mapa (`EN_EVALUACION:` al principio de línea),
       // no el nombre de la constante: `Incidentes.tsx` tiene su propio

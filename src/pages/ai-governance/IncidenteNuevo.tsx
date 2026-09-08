@@ -4,6 +4,7 @@ import { AlertTriangle, ChevronLeft, Save, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { useCreateAiIncident, type AiIncident } from "@/hooks/useAiIncidents";
+import { ESTADOS_INCIDENTE, SEVERIDADES_INCIDENTE, etiqueta } from "@/lib/aims/vocabulario";
 
 type FormState = {
   system_id: string;
@@ -247,10 +248,9 @@ export default function IncidenteNuevo() {
               className={SELECT_CLASSES}
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
-              <option value="CRITICO">Crítico</option>
-              <option value="ALTO">Alto</option>
-              <option value="MEDIO">Medio</option>
-              <option value="BAJO">Bajo</option>
+              {SEVERIDADES_INCIDENTE.map((v) => (
+                <option key={v} value={v}>{etiqueta("severidad", v)}</option>
+              ))}
             </select>
           </div>
 
@@ -265,9 +265,9 @@ export default function IncidenteNuevo() {
               className={SELECT_CLASSES}
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
-              <option value="ABIERTO">Abierto</option>
-              <option value="EN_INVESTIGACION">En investigación</option>
-              <option value="CERRADO">Cerrado</option>
+              {ESTADOS_INCIDENTE.map((v) => (
+                <option key={v} value={v}>{etiqueta("estadoIncidente", v)}</option>
+              ))}
             </select>
           </div>
 
