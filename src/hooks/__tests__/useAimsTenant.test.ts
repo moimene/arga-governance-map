@@ -38,7 +38,6 @@ const HOOKS_ESPERADOS = [
   "src/hooks/useAiSystems.ts",
   "src/hooks/useAimsClasificacion.ts",
   "src/hooks/useAimsEvidence.ts",
-  "src/hooks/useAimsFria.ts",
   "src/hooks/useAimsMultiregime.ts",
   "src/hooks/useAimsTechnicalFile.ts",
 ];

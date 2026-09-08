@@ -47,21 +47,11 @@ const TIPO_A_TABLA: Record<string, string> = {
   AimsTechnicalFileSection: "aims_technical_file_sections",
   AimsSystemVersion: "aims_system_versions",
   AimsMonitoringIndicator: "aims_monitoring_indicators",
-  AimsModelRegistryItem: "aims_model_registry",
-  AimsDatasetRegistryItem: "aims_dataset_registry",
-  FriaAssessment: "aims_fria_assessments",
-  FriaProcessMapItem: "aims_fria_process_map",
-  FriaUseProfile: "aims_fria_use_profile",
-  FriaAffectedGroup: "aims_fria_affected_groups",
-  FriaRightsRisk: "aims_fria_fundamental_rights_risks",
-  FriaRemediationGovernance: "aims_fria_remediation_governance",
-  FriaDpiaCrossReference: "aims_fria_dpia_cross_references",
   IncidentRegimeCase: "aims_incident_regimes",
 };
 
 const HOOKS = [
   "src/hooks/useAimsTechnicalFile.ts",
-  "src/hooks/useAimsFria.ts",
   "src/hooks/useAimsMultiregime.ts",
 ];
 
@@ -117,7 +107,10 @@ describe("n=1028 — las columnas declaradas por los hooks AIMS existen en Cloud
 
   it("todo tipo de fila exportado por los hooks declara de qué tabla sale", () => {
     const tipos = tiposDeclarados();
-    expect(tipos.length, "el barrido no encuentra tipos en los hooks AIMS").toBeGreaterThanOrEqual(13);
+    // Cuatro y no trece: la frontera del backbone (2026-09-08) retiró el hook de
+    // FRIA entero y los dos tipos de registro de modelos y datasets, tablas de
+    // destino (b) sin ninguna superficie que las lea ni las escriba.
+    expect(tipos.length, "el barrido no encuentra tipos en los hooks AIMS").toBeGreaterThanOrEqual(4);
     const huerfanos = tipos.filter((t) => !TIPO_A_TABLA[t.nombre]);
     expect(
       huerfanos.map((t) => `${t.nombre} (${t.fichero})`),
@@ -144,7 +137,9 @@ describe("n=1028 — las columnas declaradas por los hooks AIMS existen en Cloud
       if (err) fallos.push(`${t.nombre} → ${tabla}: ${err}`);
     }
     // Un bucle con un `continue` puede recorrer cero columnas y pasar por verde.
-    expect(examinadas, "no se ha comprobado ni una columna").toBeGreaterThan(80);
+    // 40 y no 80 por la misma razón: los cuatro tipos que quedan declaran 55
+    // columnas entre todos, y el ancla sigue cazando un bucle que no mira nada.
+    expect(examinadas, "no se ha comprobado ni una columna").toBeGreaterThan(40);
     expect(fallos, "columnas declaradas que Cloud no tiene").toEqual([]);
   }, 60_000);
 });
