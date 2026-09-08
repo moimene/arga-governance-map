@@ -174,6 +174,10 @@ describe("A3 — sin sellos fabricados", () => {
       // Y la clasificación regulatoria vigente, desde la misma descomposición.
       "src/components/ai-governance/sistema/ClasificacionVigentePanel.tsx":
         /SHA-512 de servidor|EN SERVIDOR/i,
+      // El historial pinta la misma huella y hasta el 2026-09-08 no decía qué
+      // acredita: la columna «Huella» a secas se lee como sello de tiempo.
+      "src/components/ai-governance/clasificacion/HistorialClasificaciones.tsx":
+        /SHA-512 de servidor|EN SERVIDOR/i,
     };
     for (const f of superficieAims()) {
       const src = sinComentarios(read(f));
@@ -751,7 +755,9 @@ describe("2026-09-06 — el alta de la evaluación no atribuye el método a una 
     expect(/ISO\/IEC 42001/.test(t), "se ha perdido el marco ISO").toBe(true);
     // El catálogo se sigue consumiendo: lo que se retiró es la procedencia, no
     // los 12 requisitos ni las 84 medidas.
-    expect(read(ALTA_EVAL)).toContain("AESIA_RIA_REQUIREMENTS");
+    // El catálogo se consume por la función que lo resuelve, no por un import
+    // muerto que sólo existía para satisfacer este gate (revisión 2026-09-08).
+    expect(read(ALTA_EVAL)).toContain("getRequirementsForFramework(");
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { checksVigentes } from "../checks-vigentes";
 
 /**
@@ -80,7 +80,6 @@ describe("la lectura del módulo pasa por el filtro", () => {
     // 2026-09-08 (revisión adversarial): el Board Pack leía el histórico entero
     // y multiplicaba las no conformidades por cada reevaluación. El gate
     // barría un solo fichero; ahora barre todos los hooks.
-    const { readdirSync } = require("node:fs") as typeof import("node:fs");
     const hooks = readdirSync("src/hooks").filter((f) => /\.ts$/.test(f)).map((f) => `src/hooks/${f}`);
     expect(hooks.length).toBeGreaterThan(10);
     const src = hooks.map((f) => readFileSync(f, "utf8")).join("\n");

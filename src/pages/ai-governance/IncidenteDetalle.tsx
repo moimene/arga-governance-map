@@ -10,6 +10,7 @@ import {
   RiaIncidentSeverity,
 } from "@/lib/aims/incident-clocks";
 import { isMaterialSeverity } from "@/lib/aims/readiness";
+import { normalizeAimsStatus } from "@/lib/aims/vocabulario";
 import { isModuleEnabled } from "@/lib/tenant-modules";
 import { useTenantBranding } from "@/context/TenantBrandContext";
 import CabeceraIncidente from "@/components/ai-governance/incidente/CabeceraIncidente";
@@ -50,7 +51,8 @@ export default function AiIncidenteDetalle() {
   const handleSave = async () => {
     if (!id || !incident) return;
     try {
-      const closedAt = status === "CERRADO" && !incident.closed_at ? new Date().toISOString() : incident.closed_at;
+      const cerrado = normalizeAimsStatus(status) === "CERRADO";
+      const closedAt = cerrado && !incident.closed_at ? new Date().toISOString() : incident.closed_at;
       await updateMutation.mutateAsync({
         id,
         updates: {
@@ -58,7 +60,7 @@ export default function AiIncidenteDetalle() {
           severity,
           root_cause: rootCause,
           corrective_action: correctiveAction,
-          closed_at: status === "CERRADO" ? closedAt : null,
+          closed_at: cerrado ? closedAt : null,
         },
       });
       toast.success("Incidente actualizado correctamente");

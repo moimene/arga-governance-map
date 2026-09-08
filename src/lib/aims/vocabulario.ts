@@ -130,9 +130,39 @@ const CLASE_NIVEL_RIESGO: Record<string, string> = {
   Mínimo: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
 };
 
+/**
+ * Chip del estado de una EVALUACIÓN. `CON_GAPS` y `CONFORME` son los dos
+ * estados que el producto escribe, y hasta el 2026-09-08 el mapa local de la
+ * lista sólo teñía los tres legados: una evaluación con brechas se pintaba
+ * igual que una conforme, en gris, y la lista no las distinguía.
+ */
+const CHIP_ESTADO_EVALUACION: Record<string, string> = {
+  CONFORME: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
+  CON_GAPS: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
+  BORRADOR: CHIP_NEUTRO,
+  // Legado de ARGA: ningún camino los escribe, pero hay filas con ellos.
+  APROBADO: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
+  EN_REVISION: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
+};
+
+const CHIP_SEVERIDAD: Record<string, string> = {
+  CRITICO: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
+  ALTO: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
+  MEDIO: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
+  BAJO: "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
+};
+
+const CHIP_ESTADO_INCIDENTE: Record<string, string> = {
+  ABIERTO: "bg-[var(--status-error)]/10 text-[var(--status-error)] border border-[var(--status-error)]/30",
+  EN_INVESTIGACION:
+    "bg-[var(--status-warning)]/10 text-[var(--g-text-secondary)] border border-[var(--status-warning)]/30",
+  CERRADO: "bg-[var(--status-success)]/10 text-[var(--status-success)] border border-[var(--status-success)]/30",
+};
+
 /** Chip del estado de un sistema. Fuera del vocabulario, neutro. */
 export function chipClaseEstadoSistema(status: string | null | undefined): string {
-  return CHIP_ESTADO_SISTEMA[status ?? ""] ?? CHIP_NEUTRO;
+  // Misma normalización que el KPI: «Activo» cuenta como activo y se pinta como activo.
+  return CHIP_ESTADO_SISTEMA[normalizeAimsStatus(status)] ?? CHIP_NEUTRO;
 }
 
 /** Chip del nivel de riesgo. Fuera del vocabulario, neutro: un nivel que no se
@@ -147,4 +177,22 @@ export function claseNivelRiesgo(nivel: string | null | undefined): string {
  */
 export function isMaterialSeverity(severity: string | null | undefined): boolean {
   return ["CRITICO", "ALTO"].includes(normalizeAimsStatus(severity));
+}
+
+/**
+ * Chip del estado de una evaluación. Fuera del vocabulario, neutro: un estado
+ * que nadie declaró no es «conforme» ni «con brechas».
+ */
+export function chipClaseEstadoEvaluacion(status: string | null | undefined): string {
+  return CHIP_ESTADO_EVALUACION[normalizeAimsStatus(status)] ?? CHIP_NEUTRO;
+}
+
+/** Chip de la severidad de un incidente. Fuera del vocabulario, neutro. */
+export function chipClaseSeveridad(severity: string | null | undefined): string {
+  return CHIP_SEVERIDAD[normalizeAimsStatus(severity)] ?? CHIP_NEUTRO;
+}
+
+/** Chip del estado de un incidente. Fuera del vocabulario, neutro. */
+export function chipClaseEstadoIncidente(status: string | null | undefined): string {
+  return CHIP_ESTADO_INCIDENTE[normalizeAimsStatus(status)] ?? CHIP_NEUTRO;
 }

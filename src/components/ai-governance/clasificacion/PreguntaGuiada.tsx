@@ -39,6 +39,9 @@ export default function PreguntaGuiada({
         <div className="max-w-xl space-y-0.5">
           <p className="text-sm text-[var(--g-text-primary)]">{pregunta.titulo}</p>
           <p className="text-xs text-[var(--g-text-secondary)]">{pregunta.articulo}</p>
+          {pregunta.notaSpec && (
+            <p className="text-xs text-[var(--g-text-secondary)]">{pregunta.notaSpec}</p>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
           {[

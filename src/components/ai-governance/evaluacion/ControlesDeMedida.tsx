@@ -9,7 +9,7 @@
  */
 import { MATURITY_LEVELS, DIFICULTAD_SIN_EVALUAR } from "@/lib/aims/catalog-aesia";
 import { INPUT_CLASSES, LABEL_CLASSES, SELECT_CLASSES, TEXTAREA_CLASSES, type MeasureEvaluationState } from "./estado-medida";
-import { NIVEL_NO_APLICABLE, MOTIVO_L8_SIN_JUSTIFICAR } from "@/lib/aims/evaluacion-payload";
+import { NIVEL_NO_APLICABLE, MOTIVO_L8_SIN_JUSTIFICAR, motivoNoAcredita } from "@/lib/aims/conformidad";
 
 /**
  * Plan de adaptación resultante del nivel de madurez. Lo pintan la medida guía
@@ -39,7 +39,10 @@ export type ControlesDeMedidaProps = {
 
 export default function ControlesDeMedida({ state, onChange }: ControlesDeMedidaProps) {
   const matMeta = MATURITY_LEVELS[state.maturity];
-  const l8SinMotivo = state.maturity === NIVEL_NO_APLICABLE && !state.justification.trim();
+  // El predicado es el de la hoja `conformidad.ts`, no una copia: si mañana
+  // cambia lo que acredita, el aviso en vivo del wizard lo sigue.
+  const l8SinMotivo =
+    motivoNoAcredita({ status: state.maturity, justification: state.justification }) === MOTIVO_L8_SIN_JUSTIFICAR;
 
   return (
     <>

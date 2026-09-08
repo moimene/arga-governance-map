@@ -14,6 +14,7 @@ import {
   AVISO_COBERTURA_PROVISIONAL,
   AVISO_ISO_NO_ES_OBLIGACION,
 } from "@/lib/aims/perfil-aplicabilidad";
+import { normalizeAimsStatus } from "@/lib/aims/vocabulario";
 import type { AiRiskAssessment } from "@/hooks/useAiAssessments";
 
 export interface CabeceraInformeProps {
@@ -202,10 +203,10 @@ export default function CabeceraInforme({
               <button
                 type="button"
                 onClick={onCongelar}
-                disabled={congelando || assessment.status === "BORRADOR"}
+                disabled={congelando || normalizeAimsStatus(assessment.status) === "BORRADOR"}
                 aria-busy={congelando}
                 title={
-                  assessment.status === "BORRADOR"
+                  normalizeAimsStatus(assessment.status) === "BORRADOR"
                     ? "Un borrador no se congela: ciérralo antes."
                     : undefined
                 }

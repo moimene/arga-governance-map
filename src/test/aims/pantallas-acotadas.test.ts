@@ -55,7 +55,11 @@ describe("§2.3 — ninguna pantalla ni componente AIMS por encima de 400 línea
     // página puede importar los catálogos —para pasárselos al criterio— pero no
     // puede decidir con ellos por su cuenta: si los importa, tiene que llamar
     // al criterio.
-    for (const f of paginas) {
+    //
+    // Barre TAMBIÉN los componentes desde el 2026-09-08: la descomposición de
+    // las tres pantallas grandes movió JSX a `components/`, así que mirar sólo
+    // `pages/` dejaba de ver justamente donde ahora vive el riesgo.
+    for (const f of [...paginas, ...componentes]) {
       const src = readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
       const tocaCatalogo = /\b(AESIA_RIA_REQUIREMENTS|DESPLIEGUE_REQUIREMENTS|ISO_42001_REQUIREMENTS|getRequirementsForFramework)\b/.test(src);
       if (!tocaCatalogo) continue;
@@ -64,8 +68,12 @@ describe("§2.3 — ninguna pantalla ni componente AIMS por encima de 400 línea
         `${f} toca un catálogo de medidas sin pasar por el criterio de perfil`,
       ).toBe(true);
     }
-    // Control positivo: al menos una página toca el catálogo (si ninguna lo
+    // Control positivo de TAMAÑO y de contenido: el barrido ve las dos
+    // superficies, y al menos una fuente toca el catálogo (si ninguna lo
     // hiciera, el bucle no asertaría nada).
-    expect(paginas.some((f) => /AESIA_RIA_REQUIREMENTS/.test(readFileSync(f, "utf8")))).toBe(true);
+    expect(paginas.length + componentes.length).toBeGreaterThanOrEqual(30);
+    expect(
+      [...paginas, ...componentes].some((f) => /AESIA_RIA_REQUIREMENTS/.test(readFileSync(f, "utf8"))),
+    ).toBe(true);
   });
 });

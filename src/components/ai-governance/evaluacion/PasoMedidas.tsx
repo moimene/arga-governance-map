@@ -13,7 +13,8 @@ import {
   calculateAdaptationPlan,
   type RequirementDef,
 } from "@/lib/aims/catalog-aesia";
-import { MOTIVO_L5_SIN_EVIDENCIA, type MedidaAdicionalRef } from "@/lib/aims/evaluacion-payload";
+import type { MedidaAdicionalRef } from "@/lib/aims/evaluacion-payload";
+import { motivoNoAcredita } from "@/lib/aims/conformidad";
 import { procedenciaDe } from "@/lib/aims/perfil-aplicabilidad";
 import EvidenciaDeMedida from "@/components/ai-governance/EvidenciaDeMedida";
 import ControlesDeMedida, { BadgePlan } from "./ControlesDeMedida";
@@ -254,13 +255,21 @@ export default function PasoMedidas({
                       delSistema={evidencias}
                     />
                   )}
-                  {/* `L5` sin nada detrás es una autodeclaración: se dice en la
-                      propia medida y no suma al porcentaje. */}
-                  {state.maturity === "L5" && (evidenciasDe[m.id] ?? []).length === 0 && (
-                    <p className="text-[11px] font-semibold text-[var(--status-warning)]">
-                      {MOTIVO_L5_SIN_EVIDENCIA}: no computa como acreditada.
-                    </p>
-                  )}
+                  {/* Una medida en nivel conforme que no acredita (L5 sin nada
+                      detrás, L8 sin motivo) lo dice en la propia medida. El
+                      motivo lo da la hoja `conformidad.ts`, no una copia. */}
+                  {(() => {
+                    const motivo = motivoNoAcredita({
+                      status: state.maturity,
+                      justification: state.justification,
+                      evidenceCount: (evidenciasDe[m.id] ?? []).length,
+                    });
+                    return motivo ? (
+                      <p className="text-[11px] font-semibold text-[var(--status-warning)]">
+                        {motivo}: no computa como acreditada.
+                      </p>
+                    ) : null;
+                  })()}
                 </div>
               );
             })}

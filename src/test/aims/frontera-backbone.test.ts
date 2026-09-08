@@ -93,7 +93,13 @@ describe("frontera del backbone — destino (b): ninguna superficie las toca", (
     const encontradas: string[] = [];
     for (const f of superficieAims()) {
       const src = fuente(f);
-      for (const t of MUERTAS) if (src.includes(`from("${t}")`)) encontradas.push(`${f} → ${t}`);
+      // Comilla doble, simple o plantilla: `src.includes('from("x")')` se
+      // derrotaba con sólo cambiar de comilla. CAPA DÉBIL declarada: un
+      // `from(VARIABLE)` sigue sin verse — contra eso protege el hecho de que
+      // ninguna de las 20 tiene hook, no este grep.
+      for (const t of MUERTAS) {
+        if (new RegExp(`from\\(\\s*['"\`]${t}['"\`]\\s*\\)`).test(src)) encontradas.push(`${f} → ${t}`);
+      }
     }
     expect(encontradas, "una superficie AIMS vuelve a una tabla de esquema muerto").toEqual([]);
   });

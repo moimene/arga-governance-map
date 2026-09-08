@@ -1,3 +1,5 @@
+import { chipClaseSeveridad, etiqueta, isMaterialSeverity } from "@/lib/aims/vocabulario";
+
 export interface IncidentesRecientesProps {
   incidents: { id: string; severity?: string | null; title?: string | null }[];
 }
@@ -17,16 +19,11 @@ export function IncidentesRecientes({ incidents }: IncidentesRecientesProps) {
           {incidents.slice(0, 3).map((inc) => (
             <div key={inc.id} className="flex items-start gap-2">
               <span
-                className={`mt-0.5 inline-flex shrink-0 items-center px-1.5 py-0.5 text-[10px] font-bold text-[var(--g-text-inverse)] ${
-                  inc.severity === "ALTO" || inc.severity === "CRITICO"
-                    ? "bg-[var(--status-error)]"
-                    : inc.severity === "MEDIO"
-                    ? "bg-[var(--status-warning)]"
-                    : "bg-[var(--status-info)]"
-                }`}
+                className={`mt-0.5 inline-flex shrink-0 items-center px-1.5 py-0.5 text-[10px] font-bold ${chipClaseSeveridad(inc.severity)}`}
                 style={{ borderRadius: "var(--g-radius-sm)" }}
+                aria-label={isMaterialSeverity(inc.severity) ? "Severidad material" : undefined}
               >
-                {inc.severity}
+                {etiqueta("severidad", inc.severity) || "Sin severidad"}
               </span>
               <p className="text-xs text-[var(--g-text-secondary)] leading-snug line-clamp-2">{inc.title}</p>
             </div>

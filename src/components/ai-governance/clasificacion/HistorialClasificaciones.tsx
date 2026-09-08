@@ -140,6 +140,9 @@ export default function HistorialClasificaciones({
           ))}
         </tbody>
       </table>
+      <p className="mt-2 text-xs text-[var(--g-text-secondary)]">
+        Huella SHA-512 calculada en servidor: acredita integridad y autoría; no acredita fecha cierta.
+      </p>
     </div>
   );
 }

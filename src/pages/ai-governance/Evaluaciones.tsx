@@ -3,15 +3,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, ClipboardCheck, FileWarning, Route, Search, SlidersHorizontal, PlusCircle } from "lucide-react";
 import { useAllAssessments } from "@/hooks/useAiAssessments";
 import { assessmentAcreditaConformidad, isAimsTechnicalFileGapCandidate } from "@/lib/aims/readiness";
-import { etiqueta, opcionesFiltro } from "@/lib/aims/vocabulario";
+import { chipClaseEstadoEvaluacion, etiqueta, opcionesFiltro } from "@/lib/aims/vocabulario";
 import FilterGroup from "@/components/ai-governance/FilterGroup";
 
-const ASSESSMENT_STATUS_CHIP: Record<string, string> = {
-  APROBADO:    "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-  EN_REVISION: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  BORRADOR:    "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
-};
-
+// El marco no es vocabulario de estado/severidad/nivel: su badge se queda aquí.
 const FRAMEWORK_BADGE: Record<string, string> = {
   EU_AI_ACT:  "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]",
   ISO_42001:  "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]",
@@ -178,8 +173,11 @@ export default function Evaluaciones() {
               />
             </div>
           </div>
-          <FilterGroup label="Marco" options={opcionesFiltro("marco")} value={frameworkFilter} onChange={setFrameworkFilter} />
-          <FilterGroup label="Estado" options={opcionesFiltro("estadoEvaluacion")} value={statusFilter} onChange={setStatusFilter} />
+          {/* Los dos filtran en cliente contra el valor crudo: sin los valores
+              presentes en el dato, una fila con una grafía fuera del
+              vocabulario no sería alcanzable por ningún filtro. */}
+          <FilterGroup label="Marco" options={opcionesFiltro("marco", assessments.map((a) => a.framework))} value={frameworkFilter} onChange={setFrameworkFilter} />
+          <FilterGroup label="Estado" options={opcionesFiltro("estadoEvaluacion", assessments.map((a) => a.status))} value={statusFilter} onChange={setStatusFilter} />
           <FilterGroup label="Acción" options={ACTION_OPTIONS} value={actionFilter} onChange={setActionFilter} />
         </div>
       </section>
@@ -220,7 +218,7 @@ export default function Evaluaciones() {
                 </thead>
                 <tbody className="divide-y divide-[var(--g-border-subtle)]">
                   {filtered.map((ass) => {
-                    const statusCls = ASSESSMENT_STATUS_CHIP[ass.status] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]";
+                    const statusCls = chipClaseEstadoEvaluacion(ass.status);
                     const frameCls = FRAMEWORK_BADGE[ass.framework ?? ""] ?? "bg-[var(--g-surface-subtle)] text-[var(--g-text-secondary)]";
                     const hasGrcHandoff = isAimsTechnicalFileGapCandidate(ass);
                     return (
@@ -300,7 +298,7 @@ export default function Evaluaciones() {
 
             <div className="divide-y divide-[var(--g-border-subtle)] lg:hidden" role="list" aria-label="Lista móvil de evaluaciones IA">
               {filtered.map((ass) => {
-                const statusCls = ASSESSMENT_STATUS_CHIP[ass.status] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]";
+                const statusCls = chipClaseEstadoEvaluacion(ass.status);
                 const frameCls = FRAMEWORK_BADGE[ass.framework ?? ""] ?? "bg-[var(--g-surface-subtle)] text-[var(--g-text-secondary)]";
                 const hasGrcHandoff = isAimsTechnicalFileGapCandidate(ass);
                 return (

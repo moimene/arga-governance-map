@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Calendar, ExternalLink, Save, ShieldAlert } from "lucide-react";
 import { formatIncidentDate } from "@/lib/aims/incident-clocks";
+import { etiqueta, normalizeAimsStatus } from "@/lib/aims/vocabulario";
 import type { AiIncident } from "@/hooks/useAiIncidents";
 
 export interface CabeceraIncidenteProps {
@@ -110,15 +111,15 @@ export default function CabeceraIncidente({
           <div className="flex items-center gap-2">
             <span
               className={`px-3 py-1 text-xs font-semibold uppercase tracking-wider ${
-                currentStatus === "CERRADO"
+                normalizeAimsStatus(currentStatus) === "CERRADO"
                   ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-                  : currentStatus === "EN_INVESTIGACION"
+                  : normalizeAimsStatus(currentStatus) === "EN_INVESTIGACION"
                   ? "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
                   : "bg-[var(--status-error)] text-[var(--g-text-inverse)]"
               }`}
               style={{ borderRadius: "var(--g-radius-full)" }}
             >
-              {currentStatus.replace("_", " ")}
+              {etiqueta("estadoIncidente", currentStatus) || currentStatus}
             </span>
 
             {/* Mismo predicado que el banner de dos bloques más abajo. Antes eran

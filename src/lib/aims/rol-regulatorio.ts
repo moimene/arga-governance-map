@@ -17,7 +17,10 @@
  *
  * QUÉ QUEDA AQUÍ Y QUÉ NO
  * -----------------------
- * Sólo el catálogo de roles y sus etiquetas. Las preguntas, la derivación del
+ * Sólo el catálogo de roles y sus etiquetas. El nivel de riesgo NO: su tipo y
+ * sus valores viven en `vocabulario.ts`, que es de donde los leen las
+ * pantallas — aquí había un tercer `NivelRiesgo` sin ningún consumidor.
+ * Las preguntas, la derivación del
  * rol y del nivel, y lo que impide confirmar viven en la hoja
  * `cuestionario-calificacion.ts`, que es de donde los leen el alta, la ficha y
  * el informe. Tener dos derivaciones era tener dos calificaciones jurídicas
@@ -31,8 +34,6 @@ export type RolRegulatorio =
   | "DISTRIBUIDOR"
   | "PROVEEDOR_GPAI"
   | "PROVEEDOR_POSTERIOR";
-
-export type NivelRiesgo = "Inaceptable" | "Alto" | "Limitado" | "Mínimo";
 
 export const ROLES_REGULATORIOS: {
   code: RolRegulatorio;

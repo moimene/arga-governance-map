@@ -120,7 +120,7 @@ export default function ClasificacionGuiada({
     >
       <Aviso>{TEXTO_ART63}</Aviso>
       <label htmlFor="art63-motivacion" className="block text-xs font-semibold text-[var(--g-text-primary)]">
-        Motivación del art. 6.3 *
+        Motivación de la evaluación *
       </label>
       <textarea
         id="art63-motivacion"
@@ -227,7 +227,10 @@ export default function ClasificacionGuiada({
               </p>
               <ul className="space-y-0.5 text-xs text-[var(--g-text-secondary)]">
                 {resultado.marcos.map((m) => (
-                  <li key={m.code}>· {m.articulos} — {m.titulo}</li>
+                  <li key={m.code}>
+                    · {m.articulos} — {m.titulo}
+                    {m.nota && <span className="block pl-3">{m.nota}</span>}
+                  </li>
                 ))}
               </ul>
               {motivacionArt63}

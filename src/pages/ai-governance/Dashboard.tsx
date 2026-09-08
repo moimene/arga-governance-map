@@ -138,7 +138,7 @@ export default function AiDashboard() {
   const sistemasClasificados = systems.filter((s) => (s.risk_level ?? "").trim() !== "").length;
 
   const incidentesAbiertos = incidents.filter(
-    (i) => i.status === "ABIERTO" || i.status === "EN_INVESTIGACION"
+    (i) => ["ABIERTO", "EN_INVESTIGACION"].includes(normalizeAimsStatus(i.status))
   ).length;
 
   // `APROBADO` es legado: el producto escribe `CONFORME`. Predicado único en

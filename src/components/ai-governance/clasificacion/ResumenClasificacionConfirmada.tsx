@@ -41,7 +41,10 @@ export default function ResumenClasificacionConfirmada({
       </p>
       <ul className="space-y-0.5 text-xs text-[var(--g-text-secondary)]">
         {resultado.marcos.map((m) => (
-          <li key={m.code}>· {m.articulos} — {m.titulo}</li>
+          <li key={m.code}>
+            · {m.articulos} — {m.titulo}
+            {m.nota && <span className="block pl-3">{m.nota}</span>}
+          </li>
         ))}
       </ul>
       <button

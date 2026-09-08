@@ -12,7 +12,7 @@
 // Se juzga lo que se renderiza, no la prosa que lo justifica: todo se mide
 // sobre el fuente SIN COMENTARIOS.
 import { describe, expect, it } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { sinComentarios } from "@/test/helpers/sin-comentarios";
 
 const DIR = "src/components/ai-governance/clasificacion";
@@ -21,25 +21,31 @@ const FICHEROS = [
   "PreguntaGuiada.tsx",
   "ResultadoProvisional.tsx",
   "HistorialClasificaciones.tsx",
+  "ResumenClasificacionConfirmada.tsx",
 ];
 
 const fuente = (f: string) => sinComentarios(readFileSync(`${DIR}/${f}`, "utf8"));
 const lineas = (f: string) => readFileSync(`${DIR}/${f}`, "utf8").split("\n").length;
 
 /**
- * Los dos únicos textos de la spec que un componente puede citar literalmente:
- * el banner del art. 5 y el aviso del art. 6.3. Se excluyen ANTES de buscar
- * citas legales propias, para que el gate no se dispare contra lo que la spec
- * manda escribir.
+ * Los DOS únicos textos que un componente puede citar literalmente. Se excluyen
+ * ANTES de buscar citas legales propias, para que el gate no se dispare contra
+ * lo que la spec manda escribir. Cada uno con su motivo y su fecha; añadir uno
+ * es una decisión, no un trámite — y cambiarle una coma vuelve a ponerlo rojo,
+ * que es lo que debe pasar con una cita legal nueva.
  */
 const CITAS_PERMITIDAS = [
+  // De la spec: el banner del art. 5 y el aviso del art. 6.3.
   "Este sistema realiza una práctica prohibida por el art. 5 del Reglamento. No puede registrarse.",
   "Un proveedor que considere que un sistema del Anexo III no es de alto riesgo debe documentar su evaluación antes de introducirlo en mercado o ponerlo en servicio (art. 6.3 RIA).",
 ];
 
 describe("cuestionario guiado — control positivo", () => {
-  it("los cuatro componentes existen", () => {
+  it("los cinco componentes existen y son todo el directorio", () => {
     for (const f of FICHEROS) expect(existsSync(`${DIR}/${f}`)).toBe(true);
+    // Sin esto, añadir un componente nuevo al directorio lo dejaría fuera de
+    // los cuatro bucles de abajo sin que nada se pusiera rojo.
+    expect(readdirSync(DIR).filter((f) => f.endsWith(".tsx")).sort()).toEqual([...FICHEROS].sort());
   });
 
   it("ClasificacionGuiada tiene cuerpo real", () => {
@@ -71,14 +77,36 @@ describe("cuestionario guiado — la arista con la hoja del criterio", () => {
   });
 
   it("ningún componente cita artículos por su cuenta fuera de los dos textos de la spec", () => {
+    // Antes sólo buscaba `art. 3.3` y `anexo iii`, así que CUALQUIER otra cita
+    // pasaba: `Motivación del art. 6.3 *` llevaba ahí desde el principio.
+    // Ahora se prohíbe toda cita numerada en el FUENTE. Lo que viene por props
+    // (`pregunta.articulo`, `m.articulos`, `m.nota`) no es fuente y sigue
+    // pasando, que es justamente lo que debe pasar: el artículo lo pone la
+    // hoja, no el componente.
+    //
+    // El `\b` tras `art` es lo que separa una cita de un identificador:
+    // `art. 6` y `arts. 9` casan; `articulos` y `art63-motivacion` no.
+    //
+    // CAPA DÉBIL declarada: es un grep sobre el fuente. Una cita construida en
+    // una variable (`"art. " + n`) no se ve. Contra eso protege la arista de
+    // arriba —que el texto venga de la hoja—, no este regex.
+    const CITA = /\bart(?:s|ículos?)?\b\.?\s*\d/gi;
     for (const f of FICHEROS) {
       let src = fuente(f);
       for (const cita of CITAS_PERMITIDAS) src = src.split(cita).join(" ");
-      expect({ f, citas: [...src.matchAll(/art\.\s*3\.3|anexo\s+iii/gi)].map((m) => m[0]) }).toEqual({
-        f,
-        citas: [],
-      });
+      expect({ f, citas: [...src.matchAll(CITA)].map((m) => m[0]) }).toEqual({ f, citas: [] });
     }
+  });
+
+  it("y el guard vería una cita nueva (control positivo del instrumento)", () => {
+    // Un regex que no casa nada deja el bucle de arriba verde para siempre.
+    const CITA = /\bart(?:s|ículos?)?\b\.?\s*\d/gi;
+    expect("Motivación del art. 6.3".match(CITA)).not.toBeNull();
+    expect("obligaciones de los arts. 9–15".match(CITA)).not.toBeNull();
+    expect("el artículo 50 del Reglamento".match(CITA)).not.toBeNull();
+    // Y no se dispara contra identificadores ni contra el campo de la hoja.
+    expect("{m.articulos} — {m.titulo}".match(CITA)).toBeNull();
+    expect('id="art63-motivacion"'.match(CITA)).toBeNull();
   });
 });
 

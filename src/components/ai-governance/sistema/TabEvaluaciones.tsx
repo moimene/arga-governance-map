@@ -1,6 +1,7 @@
 import { ExternalLink } from "lucide-react";
 import type { AiRiskAssessment } from "@/hooks/useAiAssessments";
 import { assessmentAcreditaConformidad } from "@/lib/aims/readiness";
+import { etiqueta } from "@/lib/aims/vocabulario";
 
 /**
  * Historial de autodiagnósticos del sistema.
@@ -51,7 +52,7 @@ export default function TabEvaluaciones({ assessments, onNueva, onAbrir }: TabEv
             >
               <div className="flex justify-between items-start">
                 <div>
-                  <span className="font-mono text-xs font-bold text-[var(--g-brand-3308)]">{ass.framework}</span>
+                  <span className="font-mono text-xs font-bold text-[var(--g-brand-3308)]">{etiqueta("marco", ass.framework) || "Sin marco"}</span>
                   <h3 className="text-sm font-bold text-[var(--g-text-primary)] mt-0.5">
                     Evaluación del{" "}
                     {ass.assessment_date ? new Date(ass.assessment_date).toLocaleDateString("es-ES") : "N/D"}
@@ -81,7 +82,7 @@ export default function TabEvaluaciones({ assessments, onNueva, onAbrir }: TabEv
                   }`}
                   style={{ borderRadius: "var(--g-radius-full)" }}
                 >
-                  {ass.status}
+                  {etiqueta("estadoEvaluacion", ass.status) || "Sin estado"}
                 </span>
                 <span className="text-[var(--g-brand-3308)] font-semibold inline-flex items-center gap-1">
                   <span>Ver detalles</span>

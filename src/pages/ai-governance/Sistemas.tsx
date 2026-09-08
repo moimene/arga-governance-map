@@ -4,7 +4,7 @@ import { ArrowRight, Cpu, PlusCircle, Search, ShieldCheck, SlidersHorizontal } f
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { useScope } from "@/context/ScopeContext";
 import { filterSystemsByScope, systemStatusChipClass, systemStatusLabel } from "@/lib/aims/readiness";
-import { claseNivelRiesgo, opcionesFiltro } from "@/lib/aims/vocabulario";
+import { claseNivelRiesgo, normalizeAimsStatus, opcionesFiltro } from "@/lib/aims/vocabulario";
 import FilterGroup from "@/components/ai-governance/FilterGroup";
 
 function formatDate(value: string | null) {
@@ -45,7 +45,7 @@ export default function Sistemas() {
     return matchesSearch && matchesStatus;
   });
 
-  const activeCount = systems.filter((s) => s.status === "ACTIVO").length;
+  const activeCount = systems.filter((s) => normalizeAimsStatus(s.status) === "ACTIVO").length;
   const attentionCount = systems.filter((s) => s.risk_level === "Alto" || s.risk_level === "Inaceptable").length;
 
   return (
@@ -136,6 +136,8 @@ export default function Sistemas() {
             </div>
           </div>
 
+          {/* El de riesgo filtra en SERVIDOR (`.eq("risk_level")`): una grafía
+              fuera del vocabulario no sería alcanzable por este filtro. */}
           <FilterGroup label="Riesgo" options={opcionesFiltro("nivel")} value={riskFilter} onChange={setRiskFilter} />
           <FilterGroup label="Estado" options={opcionesFiltro("estadoSistema", systems.map((s) => s.status))} value={statusFilter} onChange={setStatusFilter} />
         </div>

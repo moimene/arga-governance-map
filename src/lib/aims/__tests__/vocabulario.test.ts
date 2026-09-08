@@ -7,6 +7,9 @@ import {
   NIVELES_RIESGO,
   SEVERIDADES_INCIDENTE,
   ESTADOS_INCIDENTE,
+  chipClaseEstadoEvaluacion,
+  chipClaseEstadoIncidente,
+  chipClaseSeveridad,
   claseNivelRiesgo,
   etiqueta,
   isMaterialSeverity,
@@ -140,5 +143,71 @@ describe("los conjuntos de valores", () => {
     expect([...SEVERIDADES_INCIDENTE]).toEqual(["CRITICO", "ALTO", "MEDIO", "BAJO"]);
     expect([...ESTADOS_INCIDENTE]).toEqual(["ABIERTO", "EN_INVESTIGACION", "CERRADO"]);
     expect([...MARCOS_EVALUACION]).toEqual(["EU_AI_ACT", "ISO_42001"]);
+  });
+});
+
+describe("chipClaseEstadoEvaluacion", () => {
+  it("distingue los DOS estados que el producto escribe, y ninguno es el neutro", () => {
+    // El mapa local de la lista sólo teñía los tres legados: `CONFORME` y
+    // `CON_GAPS` caían los dos al gris de reserva, así que una evaluación con
+    // brechas se pintaba igual que una conforme.
+    const conforme = chipClaseEstadoEvaluacion("CONFORME");
+    const conGaps = chipClaseEstadoEvaluacion("CON_GAPS");
+    const neutro = chipClaseEstadoEvaluacion("lo que sea");
+    expect(conGaps).not.toBe(conforme);
+    expect(conforme).not.toBe(neutro);
+    expect(conGaps).not.toBe(neutro);
+    expect(conforme).toContain("status-success");
+    expect(conGaps).toContain("status-warning");
+  });
+
+  it("el borrador y los legados tienen su sitio, y lo desconocido cae al neutro", () => {
+    const neutro = chipClaseEstadoEvaluacion("lo que sea");
+    expect(chipClaseEstadoEvaluacion("BORRADOR")).toBe(neutro);
+    expect(chipClaseEstadoEvaluacion("APROBADO")).toContain("status-success");
+    expect(chipClaseEstadoEvaluacion("EN_REVISION")).toContain("status-warning");
+    expect(chipClaseEstadoEvaluacion(null)).toBe(neutro);
+  });
+
+  it("resuelve la grafía real de Cloud, no sólo la mayúscula", () => {
+    expect(chipClaseEstadoEvaluacion("En revisión")).toBe(chipClaseEstadoEvaluacion("EN_REVISION"));
+    expect(chipClaseEstadoEvaluacion("Conforme")).toBe(chipClaseEstadoEvaluacion("CONFORME"));
+  });
+
+  it("sólo usa tokens de la guía Garrigues", () => {
+    for (const e of [...ESTADOS_EVALUACION, ...ESTADOS_EVALUACION_LEGADO, "desconocido"]) {
+      const cls = chipClaseEstadoEvaluacion(e);
+      expect(/#[0-9a-fA-F]{3,8}|bg-(gray|green|amber|red|slate)-/.test(cls), `${e}: ${cls}`).toBe(false);
+    }
+  });
+});
+
+describe("chipClaseSeveridad y chipClaseEstadoIncidente", () => {
+  it("la severidad material se tiñe distinto de la que no lo es", () => {
+    const neutro = chipClaseSeveridad("lo que sea");
+    expect(chipClaseSeveridad("CRITICO")).toContain("status-error");
+    expect(chipClaseSeveridad("ALTO")).toContain("status-error");
+    expect(chipClaseSeveridad("MEDIO")).toContain("status-warning");
+    expect(chipClaseSeveridad("BAJO")).toContain("status-info");
+    expect(chipClaseSeveridad("BAJO")).not.toBe(neutro);
+    expect(chipClaseSeveridad(null)).toBe(neutro);
+  });
+
+  it("los tres estados de incidente se distinguen y lo desconocido cae al neutro", () => {
+    const neutro = chipClaseEstadoIncidente("lo que sea");
+    const clases = ESTADOS_INCIDENTE.map((e) => chipClaseEstadoIncidente(e));
+    expect(new Set(clases).size).toBe(ESTADOS_INCIDENTE.length);
+    for (const c of clases) expect(c).not.toBe(neutro);
+    expect(chipClaseEstadoIncidente("En investigación")).toBe(chipClaseEstadoIncidente("EN_INVESTIGACION"));
+  });
+
+  it("sólo usan tokens de la guía Garrigues", () => {
+    const NATIVO = /#[0-9a-fA-F]{3,8}|bg-(gray|green|amber|red|slate)-/;
+    for (const v of [...SEVERIDADES_INCIDENTE, "desconocido"]) {
+      expect(NATIVO.test(chipClaseSeveridad(v)), `${v}`).toBe(false);
+    }
+    for (const v of [...ESTADOS_INCIDENTE, "desconocido"]) {
+      expect(NATIVO.test(chipClaseEstadoIncidente(v)), `${v}`).toBe(false);
+    }
   });
 });

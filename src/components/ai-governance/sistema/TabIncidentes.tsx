@@ -1,6 +1,7 @@
 import { ExternalLink } from "lucide-react";
 import type { AiIncident } from "@/hooks/useAiIncidents";
 import { isMaterialSeverity } from "@/lib/aims/readiness";
+import { etiqueta } from "@/lib/aims/vocabulario";
 
 /**
  * Incidentes registrados del sistema. Qué severidad es material lo decide
@@ -62,9 +63,9 @@ export default function TabIncidentes({ incidents, onNuevo, onAbrir }: TabIncide
                   }`}
                   style={{ borderRadius: "var(--g-radius-full)" }}
                 >
-                  {inc.severity || "Sin severidad"}
+                  {etiqueta("severidad", inc.severity) || "Sin severidad"}
                 </span>
-                <span className="text-xs font-bold text-[var(--g-text-primary)]">{inc.status}</span>
+                <span className="text-xs font-bold text-[var(--g-text-primary)]">{etiqueta("estadoIncidente", inc.status) || "Sin estado"}</span>
                 <ExternalLink className="w-4 h-4 text-[var(--g-text-secondary)]" />
               </div>
             </div>

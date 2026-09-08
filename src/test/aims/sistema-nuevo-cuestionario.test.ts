@@ -114,12 +114,15 @@ describe("alta de sistema — retirada completa de la calificación a mano", () 
     }
   });
 
-  it("la hoja de roles conserva lo que sí sigue siendo suyo", () => {
+  it("la hoja de roles conserva lo que sí sigue siendo suyo, y sólo eso", () => {
+    // `ROLES_REGULATORIOS` no se pina: es la fuente de `ETIQUETA_ROL` y sin él
+    // no compila. `NivelRiesgo` SÍ se retiró de aquí: era un tercer tipo con
+    // cero consumidores que duplicaba el de `vocabulario.ts`, y pinarlo
+    // convertía este gate en el motivo para conservarlo.
     const src = fuente(HOJA_ROL);
-    expect(src).toContain("export const ROLES_REGULATORIOS");
     expect(src).toContain("export const ETIQUETA_ROL");
     expect(src).toContain("export type RolRegulatorio");
-    expect(src).toContain("export type NivelRiesgo");
+    expect({ nivel: src.includes("export type NivelRiesgo") }).toEqual({ nivel: false });
   });
 });
 

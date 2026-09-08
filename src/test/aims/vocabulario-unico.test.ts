@@ -123,12 +123,46 @@ describe("(b) arista — cada pantalla importa la hoja y la llama", () => {
   });
 });
 
+/**
+ * El barrido de la capa (c) llega también a `components/`: mover el mapa de
+ * `pages/` a un componente hermano no lo unifica, sólo lo esconde. Es la misma
+ * corrección que ya se hizo en `pantallas-acotadas`.
+ */
+function tsxRecursivo(dir: string): string[] {
+  const out: string[] = [];
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = `${dir}/${e.name}`;
+    if (e.isDirectory()) out.push(...tsxRecursivo(p));
+    else if (e.name.endsWith(".tsx")) out.push(p);
+  }
+  return out;
+}
+
+const SUPERFICIE_C = [
+  ...tsxRecursivo("src/pages/ai-governance"),
+  ...tsxRecursivo("src/components/ai-governance"),
+];
+
 describe("(c) capa débil — ninguna pantalla vuelve a declarar su lista", () => {
+  it("el barrido ve páginas y componentes (control positivo de tamaño)", () => {
+    // Sin esto, un barrido que sólo mirase `pages/` —o ninguno— dejaría el
+    // bucle de abajo verde por vacío. Era exactamente el hueco de la lente 2:
+    // los mapas locales que quedaban estaban en `components/`.
+    expect(SUPERFICIE_C.length, "el barrido de la capa (c) se ha quedado corto").toBeGreaterThanOrEqual(30);
+    expect(SUPERFICIE_C).toContain("src/pages/ai-governance/Evaluaciones.tsx");
+    expect(SUPERFICIE_C).toContain("src/components/ai-governance/dashboard/IncidentesRecientes.tsx");
+  });
+
   it("no hay constantes locales de opciones, etiquetas ni colores de nivel", () => {
-    const PROHIBIDO = /const\s+(SYSTEM_STATUS_BASE|SEVERITY|STATUS|RISK|FRAMEWORK)_?(OPTIONS|LEVELS|LABEL|COLORS)\b|const\s+(INCIDENT_STATUS_LABEL|SEVERITY_LABEL|ASSESSMENT_STATUS_LABEL)\b/;
-    for (const f of readdirSync("src/pages/ai-governance")) {
-      if (!f.endsWith(".tsx")) continue;
-      const ruta = `src/pages/ai-governance/${f}`;
+    // El sufijo `_CHIP` se añade el 2026-09-08: `ASSESSMENT_STATUS_CHIP` dejaba
+    // en gris `CONFORME` y `CON_GAPS` —los DOS estados que el producto
+    // escribe—, así que una evaluación con brechas se pintaba igual que una
+    // conforme. Se prohíbe el chip de VOCABULARIO (estado / severidad / nivel);
+    // `FRAMEWORK_BADGE` y los chips de dominios propios (`CHIP_ESTADO` del
+    // ciclo del cuestionario, `CHIP_SECCION`, `CHIP_INDICADOR`) no lo son y se
+    // quedan donde están.
+    const PROHIBIDO = /const\s+(SYSTEM_STATUS_BASE|SEVERITY|STATUS|RISK|FRAMEWORK)_?(OPTIONS|LEVELS|LABEL|COLORS)\b|const\s+(INCIDENT_STATUS_LABEL|SEVERITY_LABEL|ASSESSMENT_STATUS_LABEL)\b|const\s+(ASSESSMENT_STATUS|INCIDENT_STATUS|STATUS|SEVERITY|SEVERIDAD|ESTADO|RISK|NIVEL)_CHIP\b/;
+    for (const ruta of SUPERFICIE_C) {
       const m = sinComentarios(read(ruta)).match(PROHIBIDO);
       expect(m?.[0] ?? null, `${ruta}: vuelve a declarar su propio vocabulario`).toBeNull();
     }

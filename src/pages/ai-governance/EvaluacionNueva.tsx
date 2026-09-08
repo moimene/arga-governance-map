@@ -27,7 +27,7 @@ import { useCreateComplianceChecks, useDraftAssessment, useSaveAssessment } from
 import { generarPlanDeAdaptacion, type AccionPDA } from "@/lib/aims/plan-adaptacion";
 import { perfilAplicable } from "@/lib/aims/perfil-aplicabilidad";
 import { buildEvaluationPayload, restoreEvaluationState, type MedidaAdicionalRef } from "@/lib/aims/evaluacion-payload";
-import { AESIA_RIA_REQUIREMENTS, getRequirementsForFramework, computeAssessmentStats, type RequirementDef } from "@/lib/aims/catalog-aesia";
+import { getRequirementsForFramework, computeAssessmentStats, type RequirementDef } from "@/lib/aims/catalog-aesia";
 import PasoParametros, { type MarcoEvaluacion } from "@/components/ai-governance/evaluacion/PasoParametros";
 import PasoMedidas from "@/components/ai-governance/evaluacion/PasoMedidas";
 import PasoRevision from "@/components/ai-governance/evaluacion/PasoRevision";

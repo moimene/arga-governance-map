@@ -57,6 +57,9 @@ const ROLES: { code: LeadRole; label: string }[] = [
   { code: "LEGAL", label: "Asesoría jurídica" },
 ];
 
+/** El código del rol no es texto de pantalla: se pinta su etiqueta. */
+const etiquetaRol = (code: string) => ROLES.find((r) => r.code === code)?.label ?? code;
+
 const MOTIVACION_MINIMA = 20;
 
 const INPUT_CLASSES =
@@ -181,7 +184,7 @@ export default function SubexpedientesRegimen({
                   <div className="flex flex-wrap gap-3 text-[11px] text-[var(--g-text-secondary)] pt-1">
                     <span>Autoridad: <strong className="text-[var(--g-text-primary)]">{fila?.target_authority ?? reg.authority}</strong></span>
                     <span>•</span>
-                    <span>Responsable: <strong className="text-[var(--g-text-primary)]">{fila?.lead_role ?? reg.role}</strong></span>
+                    <span>Responsable: <strong className="text-[var(--g-text-primary)]">{etiquetaRol(fila?.lead_role ?? reg.role)}</strong></span>
                     <span>•</span>
                     <span>{fila ? `Subexpediente registrado · ${fila.status}` : "Valor de referencia, no registrado"}</span>
                   </div>
