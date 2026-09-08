@@ -4,7 +4,7 @@ import { AlertTriangle, PlusCircle, Route, Search, ShieldAlert, SlidersHorizonta
 import { useAiIncidentsList } from "@/hooks/useAiIncidents";
 import { isAimsMaterialIncidentCandidate } from "@/lib/aims/readiness";
 import { etiqueta, opcionesFiltro } from "@/lib/aims/vocabulario";
-import { cn } from "@/lib/utils";
+import FilterGroup from "@/components/ai-governance/FilterGroup";
 
 const SEVERITY_CHIP: Record<string, string> = {
   CRITICO: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
@@ -18,9 +18,6 @@ const STATUS_CHIP: Record<string, string> = {
   EN_INVESTIGACION: "bg-[var(--status-warning)]/10 text-[var(--g-text-secondary)] border border-[var(--status-warning)]/30",
   CERRADO:          "bg-[var(--status-success)]/10 text-[var(--status-success)] border border-[var(--status-success)]/30",
 };
-
-const FILTER_BUTTON =
-  "px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-page)]";
 
 function formatDate(value: string | null) {
   if (!value) return "Sin fecha";
@@ -37,43 +34,6 @@ function severityLabel(severity: string | null | undefined) {
 
 function incidentStatusLabel(status: string | null | undefined) {
   return status ? etiqueta("estadoIncidente", status) : "Sin estado";
-}
-
-function FilterGroup({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: { value: string; label: string }[];
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="min-w-0">
-      <p className="mb-2 text-xs font-medium text-[var(--g-text-secondary)]">{label}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {options.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onChange(option.value)}
-            aria-pressed={value === option.value}
-            className={cn(
-              FILTER_BUTTON,
-              value === option.value
-                ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
-                : "border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)]",
-            )}
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 export default function AiIncidentes() {

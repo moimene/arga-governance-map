@@ -4,7 +4,7 @@ import { ArrowRight, ClipboardCheck, FileWarning, Route, Search, SlidersHorizont
 import { useAllAssessments } from "@/hooks/useAiAssessments";
 import { assessmentAcreditaConformidad, isAimsTechnicalFileGapCandidate } from "@/lib/aims/readiness";
 import { etiqueta, opcionesFiltro } from "@/lib/aims/vocabulario";
-import { cn } from "@/lib/utils";
+import FilterGroup from "@/components/ai-governance/FilterGroup";
 
 const ASSESSMENT_STATUS_CHIP: Record<string, string> = {
   APROBADO:    "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
@@ -22,9 +22,6 @@ const ACTION_OPTIONS = [
   { value: "gap", label: "Requieren GRC" },
   { value: "sin-gap", label: "Sin acción GRC" },
 ];
-
-const FILTER_BUTTON =
-  "px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-page)]";
 
 function formatDate(value: string | null) {
   if (!value) return "Sin fecha";
@@ -48,43 +45,6 @@ function scoreTone(score: number | null) {
   if (score >= 80) return "bg-[var(--status-success)]";
   if (score >= 60) return "bg-[var(--status-warning)]";
   return "bg-[var(--status-error)]";
-}
-
-function FilterGroup({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: { value: string; label: string }[];
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="min-w-0">
-      <p className="mb-2 text-xs font-medium text-[var(--g-text-secondary)]">{label}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {options.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onChange(option.value)}
-            aria-pressed={value === option.value}
-            className={cn(
-              FILTER_BUTTON,
-              value === option.value
-                ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
-                : "border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)]",
-            )}
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 export default function Evaluaciones() {
