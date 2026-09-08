@@ -1,6 +1,7 @@
 import { useQueries } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { checksVigentes } from "@/lib/aims/checks-vigentes";
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -339,11 +340,16 @@ export function useBoardPackData(meetingId: string, entityId?: string | null): {
           const { data: checks } = systemIds.length
             ? await supabase
                 .from("ai_compliance_checks")
-                .select("system_id, requirement_code, requirement_title, status")
+                .select("system_id, requirement_code, requirement_title, status, created_at")
                 .in("system_id", systemIds)
-            : { data: [] as Array<{ system_id: string; requirement_code: string; requirement_title: string; status: string }> };
+            : { data: [] as Array<{ system_id: string; requirement_code: string; requirement_title: string; status: string; created_at: string | null }> };
+          // Reevaluar no borra el histórico de comprobaciones: «Motor de triaje»
+          // tiene 28 filas para 7 códigos. Sin el filtro, un sistema reevaluado
+          // cuatro veces multiplicaba por cuatro sus no conformidades en el
+          // informe ejecutivo. Manda la más reciente por requisito.
+          const vigentes = checksVigentes(checks ?? []);
           return (systems ?? []).map((sys) => {
-            const sysChecks = (checks ?? []).filter((c) => c.system_id === sys.id);
+            const sysChecks = vigentes.filter((c) => c.system_id === sys.id);
             return {
               id: sys.id,
               name: sys.name,

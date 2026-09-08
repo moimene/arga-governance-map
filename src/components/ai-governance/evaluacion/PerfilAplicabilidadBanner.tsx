@@ -82,7 +82,9 @@ export default function PerfilAplicabilidadBanner({
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <AlertTriangle className="w-3.5 h-3.5 text-[var(--status-warning)]" />
           <span className="font-semibold text-[var(--g-text-primary)]">
-            Sin clasificación guiada — catálogo completo por defecto
+            {perfil.sinRolDeclarado
+              ? "Sin clasificación guiada — catálogo completo por defecto"
+              : "Sin clasificación guiada — el perfil sale del rol y nivel declarados en la ficha, no de un cuestionario"}
           </span>
           <Link
             to={`/ai-governance/sistemas/${sistema.id}`}

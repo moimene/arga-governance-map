@@ -56,7 +56,7 @@ function Dato({ rotulo, children }: { rotulo: string; children: React.ReactNode 
 }
 
 export default function ClasificacionVigentePanel({ systemId, tieneOwner }: ClasificacionVigentePanelProps) {
-  const { data: cuestionarios = [], refetch } = useCuestionariosDeSistema(systemId);
+  const { data: cuestionarios = [], refetch, isError, error } = useCuestionariosDeSistema(systemId);
   const vigente = cuestionarios.find((c) => c.status === "COMPLETED") ?? null;
   const borrador = cuestionarios.find((c) => c.status === "DRAFT") ?? null;
 
@@ -165,7 +165,14 @@ export default function ClasificacionVigentePanel({ systemId, tieneOwner }: Clas
         </div>
       </div>
 
-      {!vigente ? (
+      {isError ? (
+        // «No medido» no es «no hay»: con la consulta en error no se afirma
+        // ausencia de clasificación (la tarjeta hermana del Dashboard hace lo mismo).
+        <p className="flex items-start gap-1.5 text-xs font-semibold text-[var(--g-text-secondary)]">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>No consta si hay clasificación guiada: no se pudo leer ({mensaje(error)}).</span>
+        </p>
+      ) : !vigente ? (
         <p className="flex items-start gap-1.5 text-xs font-semibold text-[var(--status-warning)]">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <span>Sin clasificación guiada — este sistema se mide contra el catálogo completo</span>

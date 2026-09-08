@@ -1,4 +1,4 @@
-import { ETIQUETA_PERFIL, type ResultadoCuestionario } from "@/lib/aims/cuestionario-calificacion";
+import { AVISO_ROLES_NO_DERIVABLES, ETIQUETA_PERFIL, type ResultadoCuestionario } from "@/lib/aims/cuestionario-calificacion";
 import { ETIQUETA_ROL, type RolRegulatorio } from "@/lib/aims/rol-regulatorio";
 import { claseNivelRiesgo, etiqueta } from "@/lib/aims/vocabulario";
 
@@ -54,6 +54,8 @@ export default function ResultadoProvisional({ resultado }: { resultado: Resulta
       </Fila>
 
       <Fila rotulo="Perfil probable">{perfil}</Fila>
+
+      <p className="text-xs text-[var(--g-text-secondary)]">{AVISO_ROLES_NO_DERIVABLES}</p>
 
       <Fila rotulo="Modelo de uso general">{resultado.gpai ? "Sí" : "No"}</Fila>
 

@@ -226,6 +226,13 @@ export type RolDerivado = "PROVEEDOR" | "RESPONSABLE_DESPLIEGUE";
 export type NivelDerivado = "Inaceptable" | "Alto" | "Limitado" | "Mínimo";
 export type PerfilCatalogo = "PROFILE_A" | "PROFILE_B" | "PROFILE_C";
 
+/**
+ * S-1 de la validación: la spec no trae preguntas para importador ni
+ * distribuidor y no se inventan. Se dice en pantalla, no sólo aquí.
+ */
+export const AVISO_ROLES_NO_DERIVABLES =
+  "Este cuestionario sólo distingue proveedor y responsable del despliegue. No contempla importador ni distribuidor (arts. 3.6 y 3.7): esos roles quedan para el equipo legal.";
+
 export const ETIQUETA_PERFIL: Record<PerfilCatalogo, string> = {
   PROFILE_A: "Perfil A — alto riesgo, proveedor",
   PROFILE_B: "Perfil B — alto riesgo, responsable del despliegue",
