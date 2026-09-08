@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient, skipToken } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { ANEXO_IV_SECCIONES } from "@/lib/aims/expediente-tecnico";
 
 // Los tipos siguientes reflejan las columnas REALES de Cloud
 // (`information_schema`, verificado 2026-08-29). La versión anterior declaraba
@@ -54,39 +55,6 @@ export type AimsMonitoringIndicator = {
   status: string;
   last_observed_at?: string | null;
   evidence_refs?: unknown[] | null;
-  created_at: string;
-};
-
-export type AimsModelRegistryItem = {
-  id: string;
-  tenant_id: string;
-  system_id: string;
-  version_id?: string | null;
-  model_name: string;
-  model_type?: string | null;
-  provider?: string | null;
-  model_version?: string | null;
-  intended_use?: string | null;
-  performance_metrics?: Record<string, unknown> | null;
-  validation_results?: Record<string, unknown> | null;
-  limitations?: unknown;              // jsonb en Cloud, no texto
-  status?: string | null;
-  created_at: string;
-};
-
-export type AimsDatasetRegistryItem = {
-  id: string;
-  tenant_id: string;
-  system_id: string;
-  version_id?: string | null;
-  dataset_name: string;
-  dataset_type?: string | null;
-  source_system?: string | null;
-  lawful_basis?: string | null;
-  data_categories?: unknown[] | null;
-  lineage?: Record<string, unknown> | null;
-  quality_metrics?: Record<string, unknown> | null;
-  status?: string | null;
   created_at: string;
 };
 
@@ -151,61 +119,28 @@ export function useAimsMonitoringIndicators(systemId: string | undefined) {
 }
 
 /**
- * Registro de Modelos técnicos
- */
-export function useAimsModelRegistry(systemId: string | undefined) {
-  const { tenantId } = useTenantContext();
-  return useQuery({
-    queryKey: ["aims_model_registry", tenantId, systemId],
-    queryFn: tenantId && systemId ? async () => {
-      const { data, error } = await supabase
-        .from("aims_model_registry")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .eq("system_id", systemId)
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as AimsModelRegistryItem[];
-    } : skipToken,
-  });
-}
-
-/**
- * Registro de Datasets
- */
-export function useAimsDatasetRegistry(systemId: string | undefined) {
-  const { tenantId } = useTenantContext();
-  return useQuery({
-    queryKey: ["aims_dataset_registry", tenantId, systemId],
-    queryFn: tenantId && systemId ? async () => {
-      const { data, error } = await supabase
-        .from("aims_dataset_registry")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .eq("system_id", systemId)
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as AimsDatasetRegistryItem[];
-    } : skipToken,
-  });
-}
-
-/**
- * Actualizar una sección del expediente técnico
+ * Actualiza una sección del expediente técnico.
+ *
+ * La escritura va acotada por tenant Y por id, y se comprueba que vuelve fila:
+ * la RLS filtra un UPDATE ajeno a CERO FILAS SIN ERROR, así que sin esta
+ * comprobación una edición de otro entorno se daría por guardada.
  */
 export function useUpdateTechnicalFileSection() {
   const qc = useQueryClient();
   const { tenantId } = useTenantContext();
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<AimsTechnicalFileSection> }) => {
+    mutationFn: async ({ id, content, status }: { id: string; content: Record<string, unknown>; status: string }) => {
       const { data, error } = await supabase
         .from("aims_technical_file_sections")
-        .update(updates)
-        .eq("tenant_id", tenantId)
+        .update({ content, status })
+        .eq("tenant_id", tenantId!)
         .eq("id", id)
         .select()
-        .single();
+        .maybeSingle();
       if (error) throw error;
+      if (!data) {
+        throw new Error("No se pudo guardar la sección: no pertenece a este entorno.");
+      }
       return data as AimsTechnicalFileSection;
     },
     onSuccess: (data) => {
@@ -218,42 +153,122 @@ export function useUpdateTechnicalFileSection() {
 }
 
 /**
- * Cerrar el expediente técnico (art. 11 RIA): registro interno, sin hash de
- * integridad — ni `aims_system_versions` ni `aims_technical_file_sections`
- * tienen columna donde guardarlo (verificado en Cloud, 2026-09-05).
- * No interviene ningún prestador de confianza: la función no realiza llamada externa.
- *
- * La RPC admite además tres parámetros que este hook NO envía y que dejan de
- * existir en su contrato (2026-09-06):
- *
- *  - `p_qseal_token` / `p_tsq_token`: nadie los produce. Aceptarlos como
- *    entrada era ofrecer un sello que el producto no emite, y dejaba la puerta
- *    abierta a que cualquier llamador colase un valor arbitrario en columnas
- *    que se leen como prueba.
- *  - `p_signed_by`: alimenta `evidence_bundles.signed_by` y `signature_date`,
- *    dos columnas cuyo nombre AFIRMA una firma. No hay ninguna. Sin el
- *    parámetro quedan NULL y la cadena de custodia registra el actor como
- *    «sin firmante atribuido», que es lo que consta.
- *
- * Los tres tienen DEFAULT NULL en la función, así que omitirlos es válido.
- * Revocar el EXECUTE a `authenticated` y forzar NULL dentro de la RPC es
- * trabajo de Cloud, fuera de este carril.
+ * La RLS de estas tablas sólo mira `tenant_id`, y la FK `system_id` no lleva
+ * tenant: sin esto, un `system_id` ajeno colgaría filas huérfanas en el tenant
+ * propio. Mismo criterio que la apertura de subexpedientes.
  */
-export function useCloseAimsTechnicalFile() {
+async function exigirSistemaDelTenant(tenantId: string, systemId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from("ai_systems")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("id", systemId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("El sistema no pertenece a este entorno.");
+}
+
+/**
+ * Crea el esqueleto de las nueve secciones del anexo IV.
+ *
+ * Sólo se ofrece cuando el sistema no tiene ninguna sección: no completa un
+ * expediente a medias ni pisa lo ya sembrado. `status` nace en `PENDING`, que
+ * es lo que consta — no se estrena nada como conforme.
+ */
+export function useIniciarExpedienteTecnico() {
   const qc = useQueryClient();
   const { tenantId } = useTenantContext();
   return useMutation({
-    mutationFn: async ({ versionId }: { versionId: string }) => {
-      const { data, error } = await supabase.rpc("fn_aims_close_technical_file", {
-        p_version_id: versionId,
-      });
+    mutationFn: async (systemId: string) => {
+      await exigirSistemaDelTenant(tenantId!, systemId);
+      const { data, error } = await supabase
+        .from("aims_technical_file_sections")
+        .insert(
+          ANEXO_IV_SECCIONES.map((s) => ({
+            tenant_id: tenantId!,
+            system_id: systemId,
+            section_code: s.code,
+            title: s.titulo,
+            status: "PENDING",
+            content: { annex: s.anexo },
+          })),
+        )
+        .select();
       if (error) throw error;
-      return data;
+      return (data ?? []) as AimsTechnicalFileSection[];
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["aims_system_versions", tenantId] });
-      qc.invalidateQueries({ queryKey: ["aims_technical_file_sections", tenantId] });
-      qc.invalidateQueries({ queryKey: ["evidence_bundles", tenantId] });
+    onSuccess: (_, systemId) =>
+      qc.invalidateQueries({ queryKey: ["aims_technical_file_sections", tenantId, systemId] }),
+  });
+}
+
+/** Registra una versión del sistema. Registro interno: no sella ni custodia nada. */
+export function useRegistrarVersion() {
+  const qc = useQueryClient();
+  const { tenantId } = useTenantContext();
+  return useMutation({
+    mutationFn: async (v: {
+      systemId: string;
+      versionLabel: string;
+      releaseStage: string;
+      effectiveFrom: string | null;
+      changeSummary: string | null;
+    }) => {
+      await exigirSistemaDelTenant(tenantId!, v.systemId);
+      const { data, error } = await supabase
+        .from("aims_system_versions")
+        .insert({
+          tenant_id: tenantId!,
+          system_id: v.systemId,
+          version_label: v.versionLabel,
+          release_stage: v.releaseStage,
+          effective_from: v.effectiveFrom,
+          change_summary: v.changeSummary,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as AimsSystemVersion;
     },
+    onSuccess: (_, v) =>
+      qc.invalidateQueries({ queryKey: ["aims_system_versions", tenantId, v.systemId] }),
+  });
+}
+
+/**
+ * Registra un indicador de vigilancia poscomercialización.
+ *
+ * `status` se fija en `OK`, el único valor que la columna escribe por defecto y
+ * el único que consta en el dato: ofrecer una escala que la tabla no declara
+ * (no hay CHECK) sería inventarla.
+ */
+export function useRegistrarIndicador() {
+  const qc = useQueryClient();
+  const { tenantId } = useTenantContext();
+  return useMutation({
+    mutationFn: async (v: {
+      systemId: string;
+      indicatorName: string;
+      metricKey: string | null;
+      lastObservedAt: string | null;
+    }) => {
+      await exigirSistemaDelTenant(tenantId!, v.systemId);
+      const { data, error } = await supabase
+        .from("aims_monitoring_indicators")
+        .insert({
+          tenant_id: tenantId!,
+          system_id: v.systemId,
+          indicator_name: v.indicatorName,
+          metric_key: v.metricKey,
+          last_observed_at: v.lastObservedAt,
+          status: "OK",
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as AimsMonitoringIndicator;
+    },
+    onSuccess: (_, v) =>
+      qc.invalidateQueries({ queryKey: ["aims_monitoring_indicators", tenantId, v.systemId] }),
   });
 }

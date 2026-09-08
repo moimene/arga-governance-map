@@ -1,37 +1,22 @@
 import { useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
+import { AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 import { useAiIncidentById, useUpdateAiIncident } from "@/hooks/useAiIncidents";
-import { useIncidentRegimes, useUpdateIncidentRegime } from "@/hooks/useAimsMultiregime";
+import { useIncidentRegimes } from "@/hooks/useAimsMultiregime";
 import {
   evaluateMultiregimeIncident,
-  formatDeadline,
-  formatIncidentDate,
-  formatRemainingTime,
   altoRiesgoDeclarado,
   RiaIncidentSeverity,
 } from "@/lib/aims/incident-clocks";
 import { isMaterialSeverity } from "@/lib/aims/readiness";
+import { normalizeAimsStatus } from "@/lib/aims/vocabulario";
 import { isModuleEnabled } from "@/lib/tenant-modules";
 import { useTenantBranding } from "@/context/TenantBrandContext";
-import {
-  AlertTriangle,
-  ArrowLeft,
-  Calendar,
-  CheckCircle2,
-  Clock,
-  ExternalLink,
-  FileText,
-  Save,
-  Send,
-  ShieldAlert,
-  Sparkles,
-  Layers,
-  Lock,
-  FileCheck,
-  ShieldCheck,
-  Info,
-} from "lucide-react";
-import { toast } from "sonner";
+import CabeceraIncidente from "@/components/ai-governance/incidente/CabeceraIncidente";
+import RelojesRegulatorios from "@/components/ai-governance/incidente/RelojesRegulatorios";
+import SubexpedientesRegimen from "@/components/ai-governance/incidente/SubexpedientesRegimen";
+import EdicionIncidente from "@/components/ai-governance/incidente/EdicionIncidente";
 
 export default function AiIncidenteDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -39,7 +24,6 @@ export default function AiIncidenteDetalle() {
   const { data: incident, isLoading, error } = useAiIncidentById(id);
   const updateMutation = useUpdateAiIncident();
   const { data: dbRegimes = [] } = useIncidentRegimes(id);
-  const updateRegimeMutation = useUpdateIncidentRegime();
   const branding = useTenantBranding();
 
   const [status, setStatus] = useState<string>("");
@@ -67,7 +51,8 @@ export default function AiIncidenteDetalle() {
   const handleSave = async () => {
     if (!id || !incident) return;
     try {
-      const closedAt = status === "CERRADO" && !incident.closed_at ? new Date().toISOString() : incident.closed_at;
+      const cerrado = normalizeAimsStatus(status) === "CERRADO";
+      const closedAt = cerrado && !incident.closed_at ? new Date().toISOString() : incident.closed_at;
       await updateMutation.mutateAsync({
         id,
         updates: {
@@ -75,7 +60,7 @@ export default function AiIncidenteDetalle() {
           severity,
           root_cause: rootCause,
           corrective_action: correctiveAction,
-          closed_at: status === "CERRADO" ? closedAt : null,
+          closed_at: cerrado ? closedAt : null,
         },
       });
       toast.success("Incidente actualizado correctamente");
@@ -83,29 +68,6 @@ export default function AiIncidenteDetalle() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       toast.error(`Error al actualizar incidente: ${msg}`);
-    }
-  };
-
-  const handleCloseRegimeSubcase = async (regimeCode: "RIA" | "GDPR" | "DORA") => {
-    const fila = dbRegimes.find((r) => r.regime_code === regimeCode);
-    if (!fila) {
-      // No se puede cerrar lo que no existe. Antes se lanzaba el toast igual.
-      toast.error(`No hay subexpediente ${regimeCode} registrado que cerrar`);
-      return;
-    }
-    try {
-      await updateRegimeMutation.mutateAsync({
-        id: fila.id,
-        updates: { status: "CLOSED", closed_at: new Date().toISOString() },
-      });
-      toast.success(`Subexpediente ${regimeCode} cerrado`, {
-        description:
-          "El cierre no arrastra a los demás regímenes. No constituye notificación " +
-          "a la autoridad ni acuse de recibo: sólo cierra el subexpediente interno.",
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`No se pudo cerrar el subexpediente ${regimeCode}: ${msg}`);
     }
   };
 
@@ -140,7 +102,7 @@ export default function AiIncidenteDetalle() {
     );
   }
 
-  // Cálculo en vivo de los relojes multirrégimen
+  // Cálculo en vivo de los relojes multirrégimen.
   // HISTORIA: estos tres arrancaron en `true` —TODO incidente de TODO tenant
   // activaba los relojes del RGPD y de DORA— y el 2026-09-06 se dejaron en
   // `false` fijo, porque no había dónde declararlos y presumirlos era peor.
@@ -166,10 +128,6 @@ export default function AiIncidenteDetalle() {
     affectsCriticalFunction: declarado(incident.affects_critical_function) ?? false,
   });
 
-  const riaRemaining = clocks.ria ? formatRemainingTime(clocks.ria.deadlineDate) : null;
-  const gdprRemaining = clocks.gdpr ? formatRemainingTime(clocks.gdpr.deadlineDate) : null;
-  const doraRemaining = clocks.dora ? formatRemainingTime(clocks.dora.initialDeadlineDate) : null;
-
   // El alta escribe CRITICO/ALTO/MEDIO/BAJO; comparar con CRITICA/ALTA (que no
   // escribe nadie) dejaba este banner apagado para siempre.
   const isMaterial = isMaterialSeverity(currentSeverity);
@@ -184,576 +142,43 @@ export default function AiIncidenteDetalle() {
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-6">
-      {/* Breadcrumb / Top Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <button
-          onClick={() => navigate("/ai-governance/incidentes")}
-          className="flex items-center gap-2 text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-text-primary)] transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Volver a Registro de Incidentes</span>
-        </button>
+      <CabeceraIncidente
+        incident={incident}
+        isEditing={isEditing}
+        isSaving={updateMutation.isPending}
+        currentStatus={currentStatus}
+        currentSeverity={currentSeverity}
+        isMaterial={isMaterial}
+        regimenesEnCurso={regimenesEnCurso}
+        onStartEdit={handleStartEdit}
+        onCancelEdit={() => setIsEditing(false)}
+        onSave={handleSave}
+      />
 
-        <div className="flex items-center gap-3">
-          {!isEditing ? (
-            <button
-              onClick={handleStartEdit}
-              className="px-4 py-2 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-sm font-medium transition-colors"
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              Gestionar / Editar
-            </button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsEditing(false)}
-                className="px-3 py-2 border border-[var(--g-border-subtle)] text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)] text-sm font-medium transition-colors"
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={updateMutation.isPending}
-                className="flex items-center gap-1.5 px-4 py-2 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-sm font-medium transition-colors disabled:opacity-50"
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                <Save className="w-4 h-4" />
-                <span>{updateMutation.isPending ? "Guardando..." : "Guardar Cambios"}</span>
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      <RelojesRegulatorios clocks={clocks} doraVisible={doraVisible} />
 
-      {/* Header Card */}
-      <div
-        className="p-6 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] space-y-4"
-        style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-      >
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs text-[var(--g-text-secondary)]">
-              <span className="font-mono">EXP-INC-{incident.id.slice(0, 8).toUpperCase()}</span>
-              <span>•</span>
-              <span className="flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5" />
-                Reportado: {formatIncidentDate(incident.reported_at)}
-              </span>
-            </div>
-            <h1 className="text-2xl font-bold text-[var(--g-text-primary)]">{incident.title}</h1>
-            <p className="text-sm text-[var(--g-text-secondary)]">
-              Sistema afectado:{" "}
-              {incident.system_id ? (
-                <Link
-                  to={`/ai-governance/sistemas/${incident.system_id}`}
-                  className="font-semibold text-[var(--g-brand-3308)] hover:underline inline-flex items-center gap-1"
-                >
-                  {incident.ai_systems?.name || "Ver sistema IA"}
-                  <ExternalLink className="w-3 h-3" />
-                </Link>
-              ) : (
-                <span className="italic">No asignado</span>
-              )}
-            </p>
-          </div>
+      <SubexpedientesRegimen
+        incidentId={incident.id}
+        regimes={dbRegimes}
+        doraVisible={doraVisible}
+      />
 
-          <div className="flex items-center gap-2">
-            <span
-              className={`px-3 py-1 text-xs font-semibold uppercase tracking-wider ${
-                currentStatus === "CERRADO"
-                  ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-                  : currentStatus === "EN_INVESTIGACION"
-                  ? "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
-                  : "bg-[var(--status-error)] text-[var(--g-text-inverse)]"
-              }`}
-              style={{ borderRadius: "var(--g-radius-full)" }}
-            >
-              {currentStatus.replace("_", " ")}
-            </span>
-
-            {/* Mismo predicado que el banner de dos bloques más abajo. Antes eran
-                dos criterios distintos sobre el mismo dato: el banner acertaba
-                con `isMaterialSeverity` y el chip comparaba con 'CRITICA'/'ALTA',
-                grafías que ningún camino de escritura produce (el alta y la
-                lista escriben 'CRITICO'/'ALTO'). El único incidente del
-                inventario, 'ALTO' y en investigación, salía en azul informativo
-                al lado de un banner que lo declaraba material. Se pierde a
-                propósito el matiz crítico/alto en el color —lo dice el literal—
-                a cambio de que las dos superficies no puedan volver a
-                discrepar. */}
-            <span
-              className={`px-3 py-1 text-xs font-semibold uppercase tracking-wider ${
-                isMaterial
-                  ? "bg-[var(--status-error)] text-[var(--g-text-inverse)]"
-                  : "bg-[var(--status-info)] text-[var(--g-text-inverse)]"
-              }`}
-              style={{ borderRadius: "var(--g-radius-full)" }}
-            >
-              Severidad: {currentSeverity || "sin registrar"}
-            </span>
-          </div>
-        </div>
-
-        {/* Handoff Buttons */}
-        {isMaterial && (
-          <div
-            className="p-4 bg-[var(--g-surface-subtle)] border-l-4 border-[var(--status-error)] flex flex-wrap items-center justify-between gap-3"
-            style={{ borderRadius: "var(--g-radius-sm)" }}
-          >
-            <div className="flex items-center gap-3">
-              <ShieldAlert className="w-5 h-5 text-[var(--status-error)] shrink-0" />
-              <div>
-                <p className="text-xs font-bold text-[var(--g-text-primary)]">
-                  Incidente de severidad material
-                </p>
-                <p className="text-xs text-[var(--g-text-secondary)]">
-                  {/* No se anuncian los tres regímenes: la afectación a datos
-                      personales y la sujeción a DORA no están declaradas en
-                      ninguna parte de esta ficha, así que sus relojes no se
-                      están contando. Se nombra sólo lo que sí se cuenta. */}
-                  {regimenesEnCurso.length > 0
-                    ? `Plazo en curso: ${regimenesEnCurso.join(" · ")}. Los demás regímenes no se cuentan porque su aplicabilidad no consta declarada.`
-                    : "No hay ningún plazo regulatorio en curso: la aplicabilidad de cada régimen no consta declarada."}{" "}
-                  Escalado recomendado a Secretaría y comités de control.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Link
-                to={`/grc/incidentes?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${incident.id}`}
-                className="px-3 py-1.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-xs font-medium transition-colors inline-flex items-center gap-1.5"
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                <span>Handoff GRC</span>
-                <ExternalLink className="w-3 h-3" />
-              </Link>
-              <Link
-                to={`/secretaria/reuniones/nueva?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${incident.id}`}
-                className="px-3 py-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] text-xs font-medium transition-colors inline-flex items-center gap-1.5"
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                <span>Punto Orden del Día</span>
-                <ExternalLink className="w-3 h-3" />
-              </Link>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* PANEL DE RELOJES REGULATORIOS PARALELOS */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-[var(--g-brand-3308)]" />
-            <h2 className="text-base font-bold text-[var(--g-text-primary)]">
-              Relojes Regulatorios Paralelos
-            </h2>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Reloj 1: RIA Art. 73 */}
-          <div
-            className="p-4 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] space-y-3"
-            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="font-mono text-[10px] font-bold bg-[var(--g-surface-subtle)] text-[var(--g-brand-3308)] px-2 py-0.5" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                  EU AI ACT (Art. 73)
-                </span>
-                <h3 className="text-sm font-bold text-[var(--g-text-primary)] mt-1.5">Vigilancia de Mercado (AESIA)</h3>
-              </div>
-              {riaRemaining && (
-                <span className={`px-2 py-0.5 text-[10px] ${riaRemaining.badgeClass}`} style={{ borderRadius: "var(--g-radius-full)" }}>
-                  {riaRemaining.label}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-[var(--g-text-secondary)] leading-relaxed">
-              {clocks.ria?.ruleDescription ??
-                "El sistema asociado consta clasificado fuera del alto riesgo, así que el art. 73 no le alcanza: no hay plazo que contar."}
-              {/* Este texto SÓLO se pinta cuando el motor ha omitido el reloj, y
-                  el motor lo omite únicamente con `isAiHighRisk === false`, es
-                  decir con clasificación registrada. Sin clasificación devuelve
-                  el reloj con `highRiskUnconfirmed`, y lo que se lee es el aviso
-                  de abajo. */}
-            </p>
-            {clocks.ria?.highRiskUnconfirmed && (
-              <p className="text-[11px] text-[var(--status-warning)] leading-relaxed">
-                El sistema asociado no tiene clasificación de riesgo registrada: no consta que el
-                art. 73 le alcance. El plazo se muestra por prudencia, no como obligación acreditada.
-              </p>
-            )}
-            <div className="pt-2 border-t border-[var(--g-border-subtle)] flex justify-between items-center text-xs">
-              <span className="text-[var(--g-text-secondary)]">Vencimiento:</span>
-              <span className="font-mono font-bold text-[var(--g-text-primary)]">
-                {formatDeadline(clocks.ria?.deadlineDate)}
-              </span>
-            </div>
-            {clocks.ria && (
-              <p className="text-[11px] text-[var(--g-text-secondary)] leading-relaxed">
-                Tipología del art. 73 no registrada: el incidente no tiene columna donde guardarla.
-                El plazo se calcula asumiendo incidente grave ordinario (15 días naturales); al
-                editar puede elegirse otra tipología, pero el cambio no se guarda con el incidente.
-              </p>
-            )}
-          </div>
-
-          {/* Reloj 2: RGPD Art. 33/34 */}
-          <div
-            className="p-4 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] space-y-3"
-            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="font-mono text-[10px] font-bold bg-[var(--g-surface-subtle)] text-[var(--g-brand-3308)] px-2 py-0.5" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                  RGPD (Art. 33 / 34)
-                </span>
-                <h3 className="text-sm font-bold text-[var(--g-text-primary)] mt-1.5">Protección de Datos (AEPD)</h3>
-              </div>
-              {gdprRemaining && (
-                <span className={`px-2 py-0.5 text-[10px] ${gdprRemaining.badgeClass}`} style={{ borderRadius: "var(--g-radius-full)" }}>
-                  {gdprRemaining.label}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-[var(--g-text-secondary)] leading-relaxed">
-              {clocks.gdpr?.ruleDescription ??
-                "No consta declarado que el incidente afecte a datos personales, así que no se cuenta plazo del art. 33 RGPD."}
-            </p>
-            {clocks.gdpr?.dataSubjectNoticeArticleRef && (
-              <p className="text-[11px] text-[var(--g-text-secondary)] leading-relaxed">
-                Además, comunicación al interesado ({clocks.gdpr.dataSubjectNoticeArticleRef}) sin
-                dilación indebida: no tiene plazo de 72 h.
-              </p>
-            )}
-            <div className="pt-2 border-t border-[var(--g-border-subtle)] flex justify-between items-center text-xs">
-              <span className="text-[var(--g-text-secondary)]">Vencimiento 72h:</span>
-              <span className="font-mono font-bold text-[var(--g-text-primary)]">
-                {formatDeadline(clocks.gdpr?.deadlineDate)}
-              </span>
-            </div>
-          </div>
-
-          {/* Reloj 3: DORA Art. 19 — sólo si el tenant tiene el módulo (D-5). */}
-          {doraVisible && (
-          <div
-            className="p-4 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] space-y-3"
-            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="font-mono text-[10px] font-bold bg-[var(--g-surface-subtle)] text-[var(--g-brand-3308)] px-2 py-0.5" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                  DORA (Art. 19 · Rgto. Delegado 2025/301)
-                </span>
-                <h3 className="text-sm font-bold text-[var(--g-text-primary)] mt-1.5">Supervisor Financiero (DGSFP)</h3>
-              </div>
-              {doraRemaining && (
-                <span className={`px-2 py-0.5 text-[10px] ${doraRemaining.badgeClass}`} style={{ borderRadius: "var(--g-radius-full)" }}>
-                  {doraRemaining.label}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-[var(--g-text-secondary)] leading-relaxed">
-              {clocks.dora?.ruleDescription ??
-                "No consta que la entidad esté sujeta a DORA ni que el incidente afecte a funciones críticas TIC: no se cuenta plazo."}
-            </p>
-            {clocks.dora?.assumesPriorReportsAtDeadline && (
-              <p className="text-[11px] text-[var(--g-text-secondary)] leading-relaxed">
-                Los hitos intermedio y final se calculan sobre el vencimiento del anterior, no sobre
-                su envío real: son los últimos permisibles si cada informe se presenta justo en plazo.
-              </p>
-            )}
-            <div className="pt-2 border-t border-[var(--g-border-subtle)] flex justify-between items-center text-xs">
-              <span className="text-[var(--g-text-secondary)]">
-                {clocks.dora?.initialRule === "24H_CAP_FROM_KNOWLEDGE"
-                  ? "Informe inicial (tope 24 h desde conocimiento):"
-                  : "Informe inicial (4 h desde clasificación):"}
-              </span>
-              <span className="font-mono font-bold text-[var(--g-text-primary)]">
-                {formatDeadline(clocks.dora?.initialDeadlineDate)}
-              </span>
-            </div>
-          </div>
-          )}
-        </div>
-      </div>
-
-      {/* SUBEXPEDIENTES POR RÉGIMEN & AISLAMIENTO DE CIERRES */}
-      <div
-        className="p-6 bg-[var(--g-surface-card)] border border-[var(--g-border-default)] space-y-4"
-        style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--g-border-subtle)] pb-3">
-          <div className="flex items-center gap-2">
-            <Layers className="w-5 h-5 text-[var(--g-brand-3308)]" />
-            <h3 className="text-sm font-bold text-[var(--g-text-primary)]">
-              Regímenes potencialmente aplicables
-            </h3>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-[var(--g-text-secondary)]">
-            <Info className="w-4 h-4 text-[var(--g-brand-3308)]" />
-            <span>El cierre de un subexpediente no arrastra ni altera el estado de los demás regímenes.</span>
-          </div>
-        </div>
-
-        {/* Este listado es un catálogo de referencia, no el registro del
-            incidente. Ninguna pantalla del producto abre un subexpediente:
-            `aims_incident_regimes` no tiene un solo camino de escritura en
-            `src/` (verificado 2026-09-06) y en Cloud hay 0 filas. Decirlo es lo
-            que corresponde; abrirlos automáticamente al dar de alta el
-            incidente afirmaría que el régimen ALCANZA al caso, que es
-            exactamente la presunción que esta ficha dejó de hacer con el RGPD y
-            con DORA. Cuando exista una fila, sus valores mandan sobre los del
-            catálogo. */}
-        <p className="text-xs text-[var(--g-text-secondary)]">
-          Correspondencia régimen ↔ autoridad de referencia. No acredita que el régimen alcance a
-          este incidente ni que exista subexpediente abierto: la apertura no está disponible desde
-          esta consola. Los datos de un subexpediente ya registrado sustituyen a los de referencia.
-        </p>
-
-        <div className="space-y-3">
-          {[
-            {
-              code: "RIA",
-              title: "Subexpediente RIA — AESIA (Vigilancia de Mercado)",
-              desc: "Notificación de incidente grave de IA y análisis de causalidad algorítmica.",
-              authority: "AESIA",
-              role: "AI Officer",
-            },
-            {
-              code: "GDPR",
-              title: "Subexpediente RGPD — AEPD (Protección de Datos)",
-              desc: "Documentación verificable de brecha, medidas de cifrado y comunicación a interesados.",
-              authority: "AEPD",
-              role: "DPO",
-            },
-            // D-5: el subexpediente DORA nombra a la DGSFP y al Banco de España.
-            // Un despacho no es entidad financiera y tiene DORA oculto por
-            // `branding.modules`: ofrecerle aquí el régimen contradice al resto
-            // del producto.
-            ...(doraVisible
-              ? [{
-                  code: "DORA",
-                  title: "Subexpediente DORA — DGSFP / BdE (Resiliencia Operativa TIC)",
-                  desc: "Plantilla normalizada TIC, informe intermedio a 72h e informe final de causa raíz.",
-                  authority: "DGSFP",
-                  role: "CISO",
-                }]
-              : []),
-          ].map((reg) => {
-            // La fila registrada, si la hay, es el dato; `reg` sólo es el
-            // catálogo de referencia. Pintar siempre el literal hacía pasar por
-            // registrado un valor que nadie ha escrito.
-            const fila = dbRegimes.find((r) => r.regime_code === reg.code);
-            return (
-            <div
-              key={reg.code}
-              className="p-4 bg-[var(--g-surface-subtle)]/30 border border-[var(--g-border-subtle)] flex flex-wrap items-center justify-between gap-4"
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              <div className="space-y-1 max-w-xl">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-bold text-[var(--g-brand-3308)]">{reg.code}</span>
-                  <h4 className="text-sm font-bold text-[var(--g-text-primary)]">{reg.title}</h4>
-                </div>
-                <p className="text-xs text-[var(--g-text-secondary)]">{reg.desc}</p>
-                <div className="flex gap-3 text-[11px] text-[var(--g-text-secondary)] pt-1">
-                  <span>Autoridad: <strong className="text-[var(--g-text-primary)]">{fila?.target_authority ?? reg.authority}</strong></span>
-                  <span>•</span>
-                  <span>Responsable: <strong className="text-[var(--g-text-primary)]">{fila?.lead_role ?? reg.role}</strong></span>
-                  <span>•</span>
-                  <span>{fila ? "Dato del subexpediente registrado" : "Valor de referencia, no registrado"}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {fila ? (
-                  <button
-                    onClick={() => handleCloseRegimeSubcase(reg.code as "RIA" | "GDPR" | "DORA")}
-                    disabled={updateRegimeMutation.isPending}
-                    className="px-3 py-1.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-xs font-semibold transition-colors flex items-center gap-1.5 disabled:opacity-50"
-                    style={{ borderRadius: "var(--g-radius-md)" }}
-                  >
-                    <FileCheck className="w-3.5 h-3.5" />
-                    <span>Cerrar subexpediente</span>
-                  </button>
-                ) : (
-                  <span className="text-[11px] text-[var(--g-text-secondary)]">
-                    Sin subexpediente registrado
-                  </span>
-                )}
-              </div>
-            </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Main Grid: Description, Root Cause & Remediation */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 space-y-6">
-          {/* Descripción */}
-          <div
-            className="p-6 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] space-y-3"
-            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-          >
-            <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-[var(--g-brand-3308)]" />
-              <h2 className="text-base font-bold text-[var(--g-text-primary)]">Descripción del Incidente</h2>
-            </div>
-            <p className="text-sm text-[var(--g-text-secondary)] whitespace-pre-wrap leading-relaxed">
-              {incident.description || "Sin descripción registrada."}
-            </p>
-          </div>
-
-          {/* Causa Raíz */}
-          <div
-            className="p-6 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] space-y-4"
-            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-          >
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-[var(--g-brand-3308)]" />
-              <h2 className="text-base font-bold text-[var(--g-text-primary)]">Análisis de Causa Raíz (RCA)</h2>
-            </div>
-
-            {isEditing ? (
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-[var(--g-text-primary)]">
-                  Causa Raíz Identificada
-                </label>
-                <textarea
-                  rows={4}
-                  value={rootCause}
-                  onChange={(e) => setRootCause(e.target.value)}
-                  placeholder="Detallar la causa técnica o metodológica (drift no detectado, dataset sesgado, fallo de pipeline, etc.)..."
-                  className="w-full p-3 text-sm border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-                  style={{ borderRadius: "var(--g-radius-md)" }}
-                />
-              </div>
-            ) : (
-              <p className="text-sm text-[var(--g-text-secondary)] whitespace-pre-wrap leading-relaxed">
-                {currentRootCause || "Pendiente de determinación por el equipo de investigación técnica."}
-              </p>
-            )}
-          </div>
-
-          {/* Remedios */}
-          <div
-            className="p-6 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] space-y-4"
-            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-          >
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-[var(--status-success)]" />
-              <h2 className="text-base font-bold text-[var(--g-text-primary)]">
-                Medidas Correctoras y Plan de Remediación
-              </h2>
-            </div>
-
-            {isEditing ? (
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-[var(--g-text-primary)]">
-                  Acciones Correctivas Implementadas o Previstas
-                </label>
-                <textarea
-                  rows={4}
-                  value={correctiveAction}
-                  onChange={(e) => setCorrectiveAction(e.target.value)}
-                  placeholder="Detallar acciones inmediatas y preventivas (reentrenamiento, threshold tuning, actualización de guardrails, auditoría)..."
-                  className="w-full p-3 text-sm border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-                  style={{ borderRadius: "var(--g-radius-md)" }}
-                />
-              </div>
-            ) : (
-              <p className="text-sm text-[var(--g-text-secondary)] whitespace-pre-wrap leading-relaxed">
-                {currentCorrectiveAction || "No se han documentado medidas correctoras definitivas todavía."}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Columna Derecha: Configuración */}
-        <div className="space-y-6">
-          <div
-            className="p-6 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] space-y-4"
-            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-          >
-            <h3 className="text-sm font-bold text-[var(--g-text-primary)] uppercase tracking-wider">
-              Control de Ciclo de Vida
-            </h3>
-
-            {isEditing ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--g-text-primary)] mb-1">
-                    Estado del Incidente
-                  </label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className="w-full p-2.5 text-sm border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-                    style={{ borderRadius: "var(--g-radius-md)" }}
-                  >
-                    <option value="ABIERTO">ABIERTO (En recepción)</option>
-                    <option value="EN_INVESTIGACION">EN INVESTIGACIÓN</option>
-                    <option value="CERRADO">CERRADO (Resuelto)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--g-text-primary)] mb-1">
-                    Tipología RIA Art. 73 (no se guarda)
-                  </label>
-                  <select
-                    value={riaSeverity}
-                    onChange={(e) => setRiaSeverity(e.target.value as RiaIncidentSeverity)}
-                    className="w-full p-2.5 text-sm border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]"
-                    style={{ borderRadius: "var(--g-radius-md)" }}
-                  >
-                    <option value="ORDINARY_SERIOUS">Grave Ordinario (15 días naturales)</option>
-                    <option value="WIDESPREAD_INFRINGEMENT">Infracción Generalizada / Urgente (2 días)</option>
-                    <option value="DEATH_INCIDENT">Fallecimiento de persona (10 días)</option>
-                  </select>
-                  {/* `ai_incidents` no tiene columna donde vivir esta tipología y
-                      `handleSave` no la envía. Recalcula el plazo del art. 73 en
-                      pantalla y se pierde al salir: decirlo es más honesto que
-                      retirar el control (que sí sirve para ver el plazo) o que
-                      fingir una persistencia que no existe. */}
-                  <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">
-                    Recalcula el plazo del art. 73 en esta pantalla. No se guarda con el
-                    incidente: al salir vuelve a «Grave Ordinario».
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3 text-xs text-[var(--g-text-secondary)]">
-                <div className="flex justify-between py-1.5 border-b border-[var(--g-border-subtle)]">
-                  <span>Estado:</span>
-                  <span className="font-semibold text-[var(--g-text-primary)]">{currentStatus}</span>
-                </div>
-                <div className="flex justify-between py-1.5 border-b border-[var(--g-border-subtle)]">
-                  <span>Severidad:</span>
-                  <span className="font-semibold text-[var(--g-text-primary)]">{currentSeverity}</span>
-                </div>
-                <div className="flex justify-between py-1.5 border-b border-[var(--g-border-subtle)]">
-                  <span>Fecha de conocimiento:</span>
-                  <span className="font-semibold text-[var(--g-text-primary)]">
-                    {formatIncidentDate(incident.reported_at)}
-                  </span>
-                </div>
-                <div className="flex justify-between py-1.5">
-                  <span>Fecha Cierre:</span>
-                  <span className="font-semibold text-[var(--g-text-primary)]">
-                    {incident.closed_at ? formatIncidentDate(incident.closed_at) : "Abierto"}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <EdicionIncidente
+        incident={incident}
+        isEditing={isEditing}
+        currentStatus={currentStatus}
+        currentSeverity={currentSeverity}
+        currentRootCause={currentRootCause}
+        currentCorrectiveAction={currentCorrectiveAction}
+        status={status}
+        setStatus={setStatus}
+        rootCause={rootCause}
+        setRootCause={setRootCause}
+        correctiveAction={correctiveAction}
+        setCorrectiveAction={setCorrectiveAction}
+        riaSeverity={riaSeverity}
+        setRiaSeverity={setRiaSeverity}
+      />
     </div>
   );
 }

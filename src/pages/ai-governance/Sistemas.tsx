@@ -2,49 +2,10 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Cpu, PlusCircle, Search, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
-import { cn } from "@/lib/utils";
 import { useScope } from "@/context/ScopeContext";
 import { filterSystemsByScope, systemStatusChipClass, systemStatusLabel } from "@/lib/aims/readiness";
-
-const RISK_COLORS: Record<string, string> = {
-  Inaceptable: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  Alto:        "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  Limitado:    "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  Mínimo:      "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-};
-
-// `ai_systems.status` no tiene CHECK y en Cloud hay valores fuera de esta lista
-// ('En revision', 'Pendiente', 'Conforme'). El chip y la etiqueta ya toleran lo
-// desconocido —se pinta el literal crudo con estilo neutro—, pero el FILTRO era
-// una lista fija: tres de los ocho sistemas del inventario no eran alcanzables
-// por ningún filtro. Las opciones se derivan del dato presente, sin renombrar
-// nada: un valor sin etiqueta conocida se ofrece tal cual está escrito.
-const SYSTEM_STATUS_BASE_OPTIONS = [
-  { value: "Todos", label: "Todos" },
-  { value: "ACTIVO", label: "Activos" },
-  { value: "EN_EVALUACION", label: "En evaluación" },
-  { value: "RETIRADO", label: "Retirados" },
-];
-
-function systemStatusOptions(systems: { status: string | null }[]) {
-  const conocidos = new Set(SYSTEM_STATUS_BASE_OPTIONS.map((o) => o.value));
-  const extra = [...new Set(systems.map((s) => s.status).filter((v): v is string => !!v))]
-    .filter((v) => !conocidos.has(v))
-    .sort()
-    .map((v) => ({ value: v, label: v }));
-  return [...SYSTEM_STATUS_BASE_OPTIONS, ...extra];
-}
-
-const RISK_LEVELS = [
-  { value: "Todos", label: "Todos" },
-  { value: "Inaceptable", label: "Inaceptable" },
-  { value: "Alto", label: "Alto" },
-  { value: "Limitado", label: "Limitado" },
-  { value: "Mínimo", label: "Mínimo" },
-];
-
-const FILTER_BUTTON =
-  "px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-page)]";
+import { claseNivelRiesgo, normalizeAimsStatus, opcionesFiltro } from "@/lib/aims/vocabulario";
+import FilterGroup from "@/components/ai-governance/FilterGroup";
 
 function formatDate(value: string | null) {
   if (!value) return "Sin fecha";
@@ -57,43 +18,6 @@ function formatDate(value: string | null) {
 
 function systemRiskLabel(risk: string | null | undefined) {
   return risk ? `Riesgo ${risk}` : "Sin clasificación";
-}
-
-function FilterGroup({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: { value: string; label: string }[];
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="min-w-0">
-      <p className="mb-2 text-xs font-medium text-[var(--g-text-secondary)]">{label}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {options.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onChange(option.value)}
-            aria-pressed={value === option.value}
-            className={cn(
-              FILTER_BUTTON,
-              value === option.value
-                ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
-                : "border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)]",
-            )}
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 export default function Sistemas() {
@@ -121,7 +45,7 @@ export default function Sistemas() {
     return matchesSearch && matchesStatus;
   });
 
-  const activeCount = systems.filter((s) => s.status === "ACTIVO").length;
+  const activeCount = systems.filter((s) => normalizeAimsStatus(s.status) === "ACTIVO").length;
   const attentionCount = systems.filter((s) => s.risk_level === "Alto" || s.risk_level === "Inaceptable").length;
 
   return (
@@ -212,8 +136,10 @@ export default function Sistemas() {
             </div>
           </div>
 
-          <FilterGroup label="Riesgo" options={RISK_LEVELS} value={riskFilter} onChange={setRiskFilter} />
-          <FilterGroup label="Estado" options={systemStatusOptions(systems)} value={statusFilter} onChange={setStatusFilter} />
+          {/* El de riesgo filtra en SERVIDOR (`.eq("risk_level")`): una grafía
+              fuera del vocabulario no sería alcanzable por este filtro. */}
+          <FilterGroup label="Riesgo" options={opcionesFiltro("nivel")} value={riskFilter} onChange={setRiskFilter} />
+          <FilterGroup label="Estado" options={opcionesFiltro("estadoSistema", systems.map((s) => s.status))} value={statusFilter} onChange={setStatusFilter} />
         </div>
       </section>
 
@@ -249,7 +175,7 @@ export default function Sistemas() {
                 </thead>
                 <tbody className="divide-y divide-[var(--g-border-subtle)]">
                   {filtered.map((sys) => {
-                    const riskCls = RISK_COLORS[sys.risk_level ?? ""] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
+                    const riskCls = claseNivelRiesgo(sys.risk_level);
                     const statusCls = systemStatusChipClass(sys.status);
                     return (
                       <tr
@@ -298,7 +224,7 @@ export default function Sistemas() {
 
             <div className="divide-y divide-[var(--g-border-subtle)] lg:hidden" role="list" aria-label="Lista móvil de sistemas IA">
               {filtered.map((sys) => {
-                const riskCls = RISK_COLORS[sys.risk_level ?? ""] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
+                const riskCls = claseNivelRiesgo(sys.risk_level);
                 const statusCls = systemStatusChipClass(sys.status);
                 return (
                   <article key={sys.id} role="listitem" className="p-4">

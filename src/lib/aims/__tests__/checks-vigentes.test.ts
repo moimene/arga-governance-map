@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { checksVigentes } from "../checks-vigentes";
 
 /**
@@ -76,8 +76,13 @@ describe("de cada requisito manda la comprobación más reciente", () => {
 });
 
 describe("la lectura del módulo pasa por el filtro", () => {
-  it("los dos hooks de comprobaciones lo aplican", () => {
-    const src = readFileSync("src/hooks/useAiAssessments.ts", "utf8");
+  it("todo lector de ai_compliance_checks en src/hooks lo aplica", () => {
+    // 2026-09-08 (revisión adversarial): el Board Pack leía el histórico entero
+    // y multiplicaba las no conformidades por cada reevaluación. El gate
+    // barría un solo fichero; ahora barre todos los hooks.
+    const hooks = readdirSync("src/hooks").filter((f) => /\.ts$/.test(f)).map((f) => `src/hooks/${f}`);
+    expect(hooks.length).toBeGreaterThan(10);
+    const src = hooks.map((f) => readFileSync(f, "utf8")).join("\n");
     // Corregir sólo uno dejaría la consola contando duplicados por el otro
     // camino: es exactamente el patrón de «se arregla la pantalla que se está
     // mirando y la misma afirmación sobrevive por su hermana».

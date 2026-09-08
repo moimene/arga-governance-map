@@ -8,6 +8,7 @@ import {
   isMaterialSeverity,
   normalizeAimsStatus,
 } from "../readiness";
+import { SEVERIDADES_INCIDENTE } from "../vocabulario";
 
 /**
  * El vocabulario que el producto ESCRIBE tiene que ser el que el producto LEE.
@@ -167,12 +168,15 @@ describe("vocabulario de severidad de incidentes: escritura ↔ lectura", () => 
 
   it("el alta sigue ofreciendo exactamente estos cuatro valores", () => {
     // Ancla contra el fuente: si el alta cambia de vocabulario, este test cae
-    // antes de que la lectura se quede sorda otra vez.
-    const alta = readFileSync("src/pages/ai-governance/IncidenteNuevo.tsx", "utf8");
-    const opciones = [...alta.matchAll(/<option value="([A-Z_]+)">/g)].map((m) => m[1]);
-    for (const v of QUE_SE_ESCRIBE) {
-      expect(opciones, `el alta ya no ofrece ${v}`).toContain(v);
-    }
+    // antes de que la lectura se quede sorda otra vez. Desde el 2026-09-08 el
+    // `<select>` se genera del módulo hoja, así que el ancla son las dos
+    // mitades: el array y la arista que lo recorre.
+    // Los campos del alta se extrajeron el 2026-09-08 a `FormularioIncidente`;
+    // la página se quedó con la validación y el payload.
+    const alta = readFileSync(
+      "src/components/ai-governance/incidente/FormularioIncidente.tsx", "utf8");
+    expect(alta, "el alta ya no genera sus opciones del vocabulario").toContain("SEVERIDADES_INCIDENTE.map");
+    expect([...SEVERIDADES_INCIDENTE]).toEqual(QUE_SE_ESCRIBE);
   });
 
   it("la severidad material se reconoce sobre lo que el alta escribe", () => {

@@ -1,16 +1,8 @@
 import { acreditaConformidad } from "./conformidad";
+import { etiqueta, isMaterialSeverity, normalizeAimsStatus } from "./vocabulario";
 
 export type AimsSourcePosture = "legacy-ai" | "aims-ready" | "local-derived";
 export type AimsReadinessStatus = "ready" | "watch" | "gap";
-export type AimsContractPosture =
-  | "legacy_read"
-  | "legacy_write"
-  | "backbone_read"
-  | "backbone_write"
-  | "bridge_read"
-  | "migration_candidate";
-export type AimsScreenOperation = "read-only" | "owner-write" | "migration-candidate";
-export type AimsEvidencePosture = "REFERENCE" | "BUNDLE_STUB" | "AUDITED_BUNDLE" | "LEGAL_HOLD_READY" | "NOT_EVIDENCE";
 
 export interface AimsSystemLike {
   id: string;
@@ -46,32 +38,6 @@ export interface AimsComplianceCheckLike {
   description?: string | null;
   status?: string | null;
   evidence_url?: string | null;
-}
-
-export interface AimsScreenPosture {
-  route: string;
-  screen: string;
-  owner: "AIMS 360";
-  hooks: string[];
-  tables: string[];
-  posture: AimsContractPosture;
-  sourceOfTruth: string;
-  operation: AimsScreenOperation;
-  crossModuleHandoffs: string[];
-  migrationRequired: boolean;
-  notes: string;
-}
-
-export interface AimsHandoffAffordance {
-  id: string;
-  label: string;
-  sourceScreen: string;
-  trigger: string;
-  targetOwner: "GRC Compass" | "Secretaría Societaria" | "AIMS 360";
-  targetRoute: string;
-  contractEvent: string;
-  evidencePosture: AimsEvidencePosture;
-  mutation: "read-only route handoff";
 }
 
 export interface AimsReadinessDomain {
@@ -118,206 +84,11 @@ export interface AimsReadinessSummary {
   nextSteps: string[];
 }
 
-export const aimsScreenPostures: AimsScreenPosture[] = [
-  {
-    route: "/ai-governance",
-    screen: "Dashboard AIMS",
-    owner: "AIMS 360",
-    hooks: ["useAiSystemsList", "useAiIncidentsList", "useAllAssessments"],
-    tables: ["ai_systems", "ai_incidents", "ai_risk_assessments"],
-    posture: "legacy_read",
-    sourceOfTruth: "Supabase Cloud legacy ai_* read model",
-    operation: "read-only",
-    crossModuleHandoffs: ["Navegación interna AIMS", "Referencia Secretaría con evidence=REFERENCE"],
-    migrationRequired: false,
-    notes: "Standalone-ready; no depende del shell TGMS para navegación básica.",
-  },
-  {
-    route: "/ai-governance/sistemas",
-    screen: "Inventario de Sistemas IA",
-    owner: "AIMS 360",
-    hooks: ["useAiSystemsList"],
-    tables: ["ai_systems"],
-    posture: "legacy_read",
-    sourceOfTruth: "ai_systems",
-    operation: "read-only",
-    crossModuleHandoffs: ["Drilldown propietario AIMS"],
-    migrationRequired: false,
-    notes: "No mezcla aims_*; el backbone queda candidato por workflow.",
-  },
-  {
-    route: "/ai-governance/sistemas/nuevo",
-    screen: "Alta de Sistema IA",
-    owner: "AIMS 360",
-    hooks: ["useCreateAiSystem"],
-    tables: ["ai_systems"],
-    posture: "legacy_write",
-    sourceOfTruth: "ai_systems",
-    operation: "owner-write",
-    crossModuleHandoffs: ["No aplica; alta propietaria AIMS"],
-    migrationRequired: false,
-    notes: "Reactivacion owner-write sobre tabla legacy existente; no escribe aims_* ni modulos externos.",
-  },
-  {
-    route: "/ai-governance/sistemas/:id",
-    screen: "Detalle de Sistema IA",
-    owner: "AIMS 360",
-    hooks: [
-      "useAiSystemById", "useAssessmentsBySystem", "useComplianceChecksBySystem",
-      "useAiIncidentsBySystem", "useAimsTechnicalFile*", "useFriaBySystem", "useFriaDetails",
-    ],
-    tables: [
-      "ai_systems", "ai_risk_assessments", "ai_compliance_checks", "ai_incidents",
-      "aims_technical_file_sections", "aims_system_versions", "aims_monitoring_indicators",
-      "aims_model_registry", "aims_dataset_registry", "aims_fria_*",
-    ],
-    posture: "legacy_write",
-    sourceOfTruth: "ai_systems como owner; expediente técnico y FRIA sobre aims_*",
-    operation: "owner-write",
-    crossModuleHandoffs: ["Referencia contextual a evaluaciones e incidentes AIMS"],
-    migrationRequired: true,
-    // CORRECCIÓN (review A5): declaraba `read-only` sobre `ai_*` y
-    // `migrationRequired: false`, y la pantalla lee seis tablas `aims_*` y
-    // ESCRIBE en `aims_technical_file_sections`. El contrato se afirmaba a sí
-    // mismo sin mirar el consumidor, y `readiness.test.ts` lo blindaba.
-    notes: "Consume el backbone aims_* además de ai_*; escribe secciones del expediente técnico.",
-  },
-  {
-    route: "/ai-governance/evaluaciones",
-    screen: "Evaluaciones AI Act / ISO 42001",
-    owner: "AIMS 360",
-    hooks: ["useAllAssessments"],
-    tables: ["ai_risk_assessments", "ai_systems"],
-    posture: "legacy_read",
-    sourceOfTruth: "ai_risk_assessments con join tenant-scoped a ai_systems",
-    operation: "read-only",
-    crossModuleHandoffs: ["AIMS_TECHNICAL_FILE_GAP -> /grc/risk-360"],
-    migrationRequired: false,
-    notes: "Los gaps se proponen a GRC; AIMS no crea controles GRC directamente.",
-  },
-  {
-    route: "/ai-governance/evaluaciones/nuevo",
-    screen: "Nuevo autodiagnóstico de conformidad",
-    owner: "AIMS 360",
-    hooks: ["useAiSystemsList", "useDraftAssessment", "useSaveAssessment", "useCreateComplianceChecks"],
-    tables: ["ai_risk_assessments", "ai_compliance_checks", "ai_systems"],
-    posture: "legacy_write",
-    sourceOfTruth: "ai_risk_assessments y ai_compliance_checks, scoped por ai_systems",
-    operation: "owner-write",
-    crossModuleHandoffs: ["No aplica; alta propietaria AIMS"],
-    migrationRequired: false,
-    notes:
-      "Autoguarda como BORRADOR y lo cierra al enviar. Sin hash, sello ni bundle: registra el autodiagnóstico, no lo precinta.",
-  },
-  {
-    route: "/ai-governance/evaluaciones/:id",
-    screen: "Informe de autodiagnóstico",
-    owner: "AIMS 360",
-    hooks: ["useAssessmentById"],
-    tables: ["ai_risk_assessments", "ai_systems"],
-    posture: "legacy_read",
-    sourceOfTruth: "ai_risk_assessments con join tenant-scoped a ai_systems",
-    operation: "read-only",
-    crossModuleHandoffs: ["AIMS_TECHNICAL_FILE_GAP -> /grc/risk-360 cuando consta brecha"],
-    migrationRequired: false,
-    notes: "El desglose sólo reconcilia findings cuyo código esté en el catálogo del marco.",
-  },
-  {
-    route: "/ai-governance/incidentes",
-    screen: "Incidentes IA",
-    owner: "AIMS 360",
-    hooks: ["useAiIncidentsList"],
-    tables: ["ai_incidents", "ai_systems"],
-    posture: "legacy_read",
-    sourceOfTruth: "ai_incidents con referencia a ai_systems",
-    operation: "read-only",
-    crossModuleHandoffs: [
-      "AIMS_INCIDENT_MATERIAL -> /grc/incidentes",
-      "AIMS_INCIDENT_MATERIAL -> /secretaria/reuniones/nueva",
-    ],
-    migrationRequired: false,
-    notes: "AIMS registra la señal IA; GRC gestiona riesgo operativo y Secretaría decide escalado formal.",
-  },
-  {
-    route: "/ai-governance/incidentes/nuevo",
-    screen: "Alta de Incidente IA",
-    owner: "AIMS 360",
-    hooks: ["useCreateAiIncident", "useAiSystemsList"],
-    tables: ["ai_incidents", "ai_systems"],
-    posture: "legacy_write",
-    sourceOfTruth: "ai_incidents con system_id a ai_systems",
-    operation: "owner-write",
-    crossModuleHandoffs: [
-      "Post-alta, AIMS_INCIDENT_MATERIAL -> /grc/incidentes si aplica",
-      "Post-alta, AIMS_INCIDENT_MATERIAL -> /secretaria/reuniones/nueva si aplica",
-    ],
-    migrationRequired: false,
-    notes: "Probe de permisos alcanzo FK segura; no escribe GRC ni Secretaria.",
-  },
-  {
-    route: "/ai-governance/incidentes/:id",
-    screen: "Ficha de Incidente IA",
-    owner: "AIMS 360",
-    hooks: ["useAiIncidentById", "useUpdateAiIncident", "useIncidentRegimes", "useUpdateIncidentRegime"],
-    tables: ["ai_incidents", "ai_systems", "aims_incident_regimes"],
-    posture: "legacy_write",
-    sourceOfTruth: "ai_incidents como owner; subexpedientes por régimen en aims_incident_regimes",
-    operation: "owner-write",
-    crossModuleHandoffs: [
-      "AIMS_INCIDENT_MATERIAL -> /grc/incidentes",
-      "AIMS_INCIDENT_MATERIAL -> /secretaria/reuniones/nueva",
-    ],
-    migrationRequired: true,
-    notes: "Los relojes se calculan en cliente y no se persisten; el cierre de subexpediente no notifica a ninguna autoridad.",
-  },
-];
-
-export const aimsReadOnlyHandoffs: AimsHandoffAffordance[] = [
-  {
-    id: "aims-technical-file-gap-to-grc",
-    label: "Gap expediente técnico -> GRC",
-    sourceScreen: "/ai-governance/evaluaciones",
-    trigger: "Evaluación no aprobada, score bajo o finding abierto",
-    targetOwner: "GRC Compass",
-    targetRoute: "/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP",
-    contractEvent: "AIMS_TECHNICAL_FILE_GAP",
-    evidencePosture: "NOT_EVIDENCE",
-    mutation: "read-only route handoff",
-  },
-  {
-    id: "aims-material-incident-to-grc",
-    label: "Incidente IA material -> GRC",
-    sourceScreen: "/ai-governance/incidentes",
-    trigger: "Severidad crítica/alta y estado abierto o en investigación",
-    targetOwner: "GRC Compass",
-    targetRoute: "/grc/incidentes?source=aims&handoff=AIMS_INCIDENT_MATERIAL",
-    contractEvent: "AIMS_INCIDENT_MATERIAL",
-    evidencePosture: "NOT_EVIDENCE",
-    mutation: "read-only route handoff",
-  },
-  {
-    id: "aims-material-incident-to-secretaria",
-    label: "Incidente IA material -> Secretaría",
-    sourceScreen: "/ai-governance/incidentes",
-    trigger: "Materialidad regulatoria o reputacional que puede requerir órgano",
-    targetOwner: "Secretaría Societaria",
-    targetRoute: "/secretaria/reuniones/nueva?source=aims&handoff=AIMS_INCIDENT_MATERIAL",
-    contractEvent: "AIMS_INCIDENT_MATERIAL",
-    evidencePosture: "NOT_EVIDENCE",
-    mutation: "read-only route handoff",
-  },
-  {
-    id: "secretaria-certification-reference-to-aims",
-    label: "Certificación Secretaría -> referencia AIMS",
-    sourceScreen: "/ai-governance",
-    trigger: "Acuerdo, acta o certificación con postura probatoria explícita",
-    targetOwner: "AIMS 360",
-    targetRoute: "/secretaria/actas?source=aims&handoff=SECRETARIA_CERTIFICATION_REFERENCE&evidence=REFERENCE",
-    contractEvent: "SECRETARIA_CERTIFICATION_ISSUED",
-    evidencePosture: "REFERENCE",
-    mutation: "read-only route handoff",
-  },
-];
+// Aquí vivían `aimsScreenPostures` y `aimsReadOnlyHandoffs`. El primero era una
+// descripción EN PROSA de lo que hacen las pantallas, mantenida aparte de las
+// pantallas: derivaba en cuanto alguien tocaba una, y llegó a afirmar por las
+// diez filas lo que sólo valía para ocho. Se retira (D-10). Los handoffs, que
+// son dato de navegación y no prosa, se mudan a `./handoffs`.
 
 function pct(part: number, total: number) {
   if (total === 0) return 0;
@@ -331,64 +102,19 @@ function domainStatus(value: number, watchAt: number, readyAt: number): AimsRead
 }
 
 /**
- * Normaliza un estado para compararlo: mayúsculas, sin tildes y con el espacio
- * unificado al guion bajo.
- *
- * `ai_compliance_checks.status` convive en Cloud con SEIS grafías del mismo
- * puñado de estados —`CONFORME` y `Conforme`, `NO_CONFORME` y `No conforme`,
- * `EN_CURSO` y `En revisión`—, y las tablas `ai_*` no tienen CHECK que lo
- * impida. Comparar contra literales en mayúsculas dejaba «No conforme» fuera de
- * `GAP_STATUSES` y `statusFromChecks` devolvía «Vigilancia»: una no conformidad
- * real pintada como amarilla.
+ * El vocabulario (valores, etiquetas, chips y los dos predicados de estado)
+ * vive en `./vocabulario`, un módulo HOJA que también importan las pantallas.
+ * Se re-exporta con los nombres de siempre para no partir a los llamadores.
  */
-export function normalizeAimsStatus(status: string | null | undefined): string {
-  return (status ?? "")
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase()
-    .replace(/[\s-]+/g, "_");
-}
+export {
+  normalizeAimsStatus,
+  isMaterialSeverity,
+  chipClaseEstadoSistema as systemStatusChipClass,
+} from "./vocabulario";
 
-/**
- * Vocabulario de `ai_systems.status`: chip y etiqueta, en UN solo sitio.
- *
- * La columna NO tiene CHECK y en Cloud conviven cinco grafías ('ACTIVO',
- * 'EN_EVALUACION', 'En revision', 'Pendiente', 'Conforme'). La lista y el
- * dashboard ya toleraban lo desconocido —chip neutro y literal crudo—, pero la
- * ficha del sistema conservaba su propia comparación contra 'ACTIVO' y pintaba
- * de AVISO los otros cuatro valores: un sistema 'Conforme' salía en ámbar sólo
- * por no estar en la lista de dos entradas de esa pantalla.
- *
- * Se resuelve donde ya vive `normalizeAimsStatus`, que existe por este mismo
- * problema, para que no vuelva a haber dos vocabularios.
- */
-const SYSTEM_STATUS_CHIP_NEUTRO =
-  "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
-
-const SYSTEM_STATUS_CHIP: Record<string, string> = {
-  ACTIVO: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-  EN_EVALUACION: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  RETIRADO: SYSTEM_STATUS_CHIP_NEUTRO,
-};
-
-const SYSTEM_STATUS_LABEL: Record<string, string> = {
-  ACTIVO: "Activo",
-  EN_EVALUACION: "En evaluación",
-  RETIRADO: "Retirado",
-};
-
-/** Clase del chip. Un valor fuera del vocabulario conocido va en neutro: no se
- *  le atribuye ni bondad ni alarma que nadie ha declarado. */
-export function systemStatusChipClass(status: string | null | undefined): string {
-  return SYSTEM_STATUS_CHIP[status ?? ""] ?? SYSTEM_STATUS_CHIP_NEUTRO;
-}
-
-/** Etiqueta. Sin traducción conocida se pinta el literal tal cual está escrito
- *  en la base: renombrarlo sería inventar un estado. */
+/** Sin estado no se pinta un literal vacío: se dice que falta. */
 export function systemStatusLabel(status: string | null | undefined): string {
-  if (!status) return "Sin estado";
-  return SYSTEM_STATUS_LABEL[status] ?? status;
+  return status ? etiqueta("estadoSistema", status) : "Sin estado";
 }
 
 /**
@@ -406,16 +132,6 @@ const ASSESSMENT_COMPLIANT_STATUSES = new Set(["APROBADO", "CONFORME"]);
 
 export function assessmentAcreditaConformidad(status: string | null | undefined): boolean {
   return ASSESSMENT_COMPLIANT_STATUSES.has(normalizeAimsStatus(status));
-}
-
-/**
- * Severidad material de un incidente. El alta (`IncidenteNuevo`) y la lista
- * escriben `CRITICO | ALTO | MEDIO | BAJO`; la ficha comparaba con `CRITICA` y
- * `ALTA`, que nadie escribe, así que el banner de incidente material y el chip
- * de severidad nunca se encendían. Único predicado para todos los llamadores.
- */
-export function isMaterialSeverity(severity: string | null | undefined): boolean {
-  return ["CRITICO", "ALTO"].includes(normalizeAimsStatus(severity));
 }
 
 export function isAimsTechnicalFileGapCandidate(assessment: AimsAssessmentLike) {

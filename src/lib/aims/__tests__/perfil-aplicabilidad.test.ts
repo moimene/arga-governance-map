@@ -165,13 +165,20 @@ describe("las pantallas declaran el perfil", () => {
   it("el wizard y el informe avisan de la cobertura provisional", () => {
     // Cargar un catálogo no validado por el Comité de IA sin decirlo lo
     // convertiría en un dictamen que nadie ha firmado.
+    // El wizard se descompuso el 2026-09-08: el aviso lo pinta su banner y la
+    // página sólo lo monta. Se apunta a donde vive el literal.
     for (const f of [
-      "src/pages/ai-governance/EvaluacionNueva.tsx",
-      "src/pages/ai-governance/EvaluacionDetalle.tsx",
+      "src/components/ai-governance/evaluacion/PerfilAplicabilidadBanner.tsx",
+      "src/components/ai-governance/evaluacion-detalle/CabeceraInforme.tsx",
     ]) {
       const src = readFileSync(f, "utf8");
       expect(src, `${f} no declara la cobertura provisional`).toContain("AVISO_COBERTURA_PROVISIONAL");
     }
+    // ARISTA. Repuntar sólo el literal dejaría verde un banner que nadie monta:
+    // el aviso estaría escrito y no llegaría a ninguna pantalla.
+    const wizard = readFileSync("src/pages/ai-governance/EvaluacionNueva.tsx", "utf8");
+    expect(wizard, "el wizard ya no monta el banner del perfil: el aviso no llega a pantalla")
+      .toContain("<PerfilAplicabilidadBanner");
     expect(AVISO_COBERTURA_PROVISIONAL).toMatch(/Comité de IA/);
   });
 
@@ -179,5 +186,24 @@ describe("las pantallas declaran el perfil", () => {
     const src = readFileSync("src/pages/ai-governance/EvaluacionNueva.tsx", "utf8");
     expect(src).toMatch(/perfilAplicable\(selectedSystem/);
     expect(src).toMatch(/const requirements: RequirementDef\[\] = perfil\.requirements/);
+  });
+});
+
+describe("el perfil expone el perfil de catálogo A/B/C del cuestionario guiado (2026-09-08)", () => {
+  it("proveedor de alto riesgo es A; despliegue de alto riesgo es B y falla abierto diciéndolo", () => {
+    const a = perfilAplicable({ regulatory_role: "PROVEEDOR", risk_level: "Alto" }, AESIA_RIA_REQUIREMENTS);
+    expect(a.catalogProfile).toBe("PROFILE_A");
+    const b = perfilAplicable({ regulatory_role: "RESPONSABLE_DESPLIEGUE", risk_level: "Alto" }, AESIA_RIA_REQUIREMENTS);
+    expect(b.catalogProfile).toBe("PROFILE_B");
+    // S-6: no hay catálogo validado para el perfil B; se mide contra las 84 y se dice.
+    expect(b.requirements).toBe(AESIA_RIA_REQUIREMENTS);
+    expect(b.motivo).toMatch(/no hay catálogo validado/i);
+  });
+
+  it("despliegue de riesgo limitado es C con las 43; sin rol no hay perfil", () => {
+    const c = perfilAplicable({ regulatory_role: "RESPONSABLE_DESPLIEGUE", risk_level: "Limitado" }, AESIA_RIA_REQUIREMENTS);
+    expect(c.catalogProfile).toBe("PROFILE_C");
+    expect(c.requirements).toBe(DESPLIEGUE_REQUIREMENTS);
+    expect(perfilAplicable({ regulatory_role: null, risk_level: "Limitado" }, AESIA_RIA_REQUIREMENTS).catalogProfile).toBeNull();
   });
 });

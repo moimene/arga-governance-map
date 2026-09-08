@@ -3,51 +3,14 @@ import { Link, useNavigate } from "react-router-dom";
 import { AlertTriangle, PlusCircle, Route, Search, ShieldAlert, SlidersHorizontal } from "lucide-react";
 import { useAiIncidentsList } from "@/hooks/useAiIncidents";
 import { isAimsMaterialIncidentCandidate } from "@/lib/aims/readiness";
-import { cn } from "@/lib/utils";
-
-const SEVERITY_CHIP: Record<string, string> = {
-  CRITICO: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  ALTO:    "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  MEDIO:   "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  BAJO:    "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
-};
-
-const STATUS_CHIP: Record<string, string> = {
-  ABIERTO:          "bg-[var(--status-error)]/10 text-[var(--status-error)] border border-[var(--status-error)]/30",
-  EN_INVESTIGACION: "bg-[var(--status-warning)]/10 text-[var(--g-text-secondary)] border border-[var(--status-warning)]/30",
-  CERRADO:          "bg-[var(--status-success)]/10 text-[var(--status-success)] border border-[var(--status-success)]/30",
-};
-
-const SEVERITY_LABEL: Record<string, string> = {
-  CRITICO: "Crítico",
-  ALTO: "Alto",
-  MEDIO: "Medio",
-  BAJO: "Bajo",
-};
-
-const INCIDENT_STATUS_LABEL: Record<string, string> = {
-  ABIERTO: "Abierto",
-  EN_INVESTIGACION: "En investigación",
-  CERRADO: "Cerrado",
-};
-
-const SEVERITY_OPTIONS = [
-  { value: "Todos", label: "Todas" },
-  { value: "CRITICO", label: "Crítica" },
-  { value: "ALTO", label: "Alta" },
-  { value: "MEDIO", label: "Media" },
-  { value: "BAJO", label: "Baja" },
-];
-
-const STATUS_OPTIONS = [
-  { value: "Todos", label: "Todos" },
-  { value: "ABIERTO", label: "Abiertos" },
-  { value: "EN_INVESTIGACION", label: "En investigación" },
-  { value: "CERRADO", label: "Cerrados" },
-];
-
-const FILTER_BUTTON =
-  "px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-page)]";
+import {
+  chipClaseEstadoIncidente,
+  chipClaseSeveridad,
+  etiqueta,
+  normalizeAimsStatus,
+  opcionesFiltro,
+} from "@/lib/aims/vocabulario";
+import FilterGroup from "@/components/ai-governance/FilterGroup";
 
 function formatDate(value: string | null) {
   if (!value) return "Sin fecha";
@@ -59,50 +22,11 @@ function formatDate(value: string | null) {
 }
 
 function severityLabel(severity: string | null | undefined) {
-  if (!severity) return "Sin severidad";
-  return SEVERITY_LABEL[severity] ?? severity;
+  return severity ? etiqueta("severidad", severity) : "Sin severidad";
 }
 
 function incidentStatusLabel(status: string | null | undefined) {
-  if (!status) return "Sin estado";
-  return INCIDENT_STATUS_LABEL[status] ?? status;
-}
-
-function FilterGroup({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: { value: string; label: string }[];
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="min-w-0">
-      <p className="mb-2 text-xs font-medium text-[var(--g-text-secondary)]">{label}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {options.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onChange(option.value)}
-            aria-pressed={value === option.value}
-            className={cn(
-              FILTER_BUTTON,
-              value === option.value
-                ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
-                : "border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)]",
-            )}
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
+  return status ? etiqueta("estadoIncidente", status) : "Sin estado";
 }
 
 export default function AiIncidentes() {
@@ -112,8 +36,10 @@ export default function AiIncidentes() {
   const [severityFilter, setSeverityFilter] = useState("Todos");
   const { data: incidents = [], isLoading } = useAiIncidentsList();
 
-  const abiertos = incidents.filter((i) => i.status === "ABIERTO" || i.status === "EN_INVESTIGACION").length;
-  const cerrados = incidents.filter((i) => i.status === "CERRADO").length;
+  const abiertos = incidents.filter(
+    (i) => ["ABIERTO", "EN_INVESTIGACION"].includes(normalizeAimsStatus(i.status)),
+  ).length;
+  const cerrados = incidents.filter((i) => normalizeAimsStatus(i.status) === "CERRADO").length;
   const materialCount = incidents.filter(isAimsMaterialIncidentCandidate).length;
   const filtered = incidents.filter((incident) => {
     const q = search.toLowerCase();
@@ -226,8 +152,11 @@ export default function AiIncidentes() {
               />
             </div>
           </div>
-          <FilterGroup label="Estado" options={STATUS_OPTIONS} value={statusFilter} onChange={setStatusFilter} />
-          <FilterGroup label="Severidad" options={SEVERITY_OPTIONS} value={severityFilter} onChange={setSeverityFilter} />
+          {/* Los dos filtran en cliente contra el valor crudo: sin los valores
+              presentes en el dato, una fila con una grafía fuera del
+              vocabulario no sería alcanzable por ningún filtro. */}
+          <FilterGroup label="Estado" options={opcionesFiltro("estadoIncidente", incidents.map((i) => i.status))} value={statusFilter} onChange={setStatusFilter} />
+          <FilterGroup label="Severidad" options={opcionesFiltro("severidad", incidents.map((i) => i.severity))} value={severityFilter} onChange={setSeverityFilter} />
         </div>
       </section>
 
@@ -268,8 +197,8 @@ export default function AiIncidentes() {
                 </thead>
                 <tbody className="divide-y divide-[var(--g-border-subtle)]">
                   {filtered.map((inc) => {
-                    const sevCls = SEVERITY_CHIP[inc.severity ?? ""] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]";
-                    const stCls = STATUS_CHIP[inc.status] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]";
+                    const sevCls = chipClaseSeveridad(inc.severity);
+                    const stCls = chipClaseEstadoIncidente(inc.status);
                     const isMaterial = isAimsMaterialIncidentCandidate(inc);
                     return (
                       <tr
@@ -340,8 +269,8 @@ export default function AiIncidentes() {
 
             <div className="divide-y divide-[var(--g-border-subtle)] lg:hidden" role="list" aria-label="Lista móvil de incidentes IA">
               {filtered.map((inc) => {
-                const sevCls = SEVERITY_CHIP[inc.severity ?? ""] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]";
-                const stCls = STATUS_CHIP[inc.status] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]";
+                const sevCls = chipClaseSeveridad(inc.severity);
+                const stCls = chipClaseEstadoIncidente(inc.status);
                 const isMaterial = isAimsMaterialIncidentCandidate(inc);
                 return (
                   <article key={inc.id} role="listitem" className="p-4">

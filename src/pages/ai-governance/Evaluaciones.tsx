@@ -3,56 +3,20 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, ClipboardCheck, FileWarning, Route, Search, SlidersHorizontal, PlusCircle } from "lucide-react";
 import { useAllAssessments } from "@/hooks/useAiAssessments";
 import { assessmentAcreditaConformidad, isAimsTechnicalFileGapCandidate } from "@/lib/aims/readiness";
-import { cn } from "@/lib/utils";
+import { chipClaseEstadoEvaluacion, etiqueta, opcionesFiltro } from "@/lib/aims/vocabulario";
+import FilterGroup from "@/components/ai-governance/FilterGroup";
 
-const ASSESSMENT_STATUS_CHIP: Record<string, string> = {
-  APROBADO:    "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-  EN_REVISION: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  BORRADOR:    "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
-};
-
+// El marco no es vocabulario de estado/severidad/nivel: su badge se queda aquí.
 const FRAMEWORK_BADGE: Record<string, string> = {
   EU_AI_ACT:  "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]",
   ISO_42001:  "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]",
 };
-
-const ASSESSMENT_STATUS_LABEL: Record<string, string> = {
-  APROBADO: "Aprobada",
-  CONFORME: "Conforme",
-  CON_GAPS: "Con brechas",
-  NO_CONFORME: "No conforme",
-  EN_REVISION: "En revisión",
-  BORRADOR: "Borrador",
-};
-
-const FRAMEWORK_LABEL: Record<string, string> = {
-  EU_AI_ACT: "EU AI Act",
-  ISO_42001: "ISO 42001",
-};
-
-const STATUS_OPTIONS = [
-  { value: "Todos", label: "Todas" },
-  { value: "CONFORME", label: "Conformes" },
-  { value: "CON_GAPS", label: "Con brechas" },
-  { value: "APROBADO", label: "Aprobadas (legado)" },
-  { value: "EN_REVISION", label: "En revisión" },
-  { value: "BORRADOR", label: "Borrador" },
-];
-
-const FRAMEWORK_OPTIONS = [
-  { value: "Todos", label: "Todos" },
-  { value: "EU_AI_ACT", label: "EU AI Act" },
-  { value: "ISO_42001", label: "ISO 42001" },
-];
 
 const ACTION_OPTIONS = [
   { value: "Todos", label: "Todas" },
   { value: "gap", label: "Requieren GRC" },
   { value: "sin-gap", label: "Sin acción GRC" },
 ];
-
-const FILTER_BUTTON =
-  "px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-page)]";
 
 function formatDate(value: string | null) {
   if (!value) return "Sin fecha";
@@ -64,13 +28,11 @@ function formatDate(value: string | null) {
 }
 
 function frameworkLabel(framework: string | null | undefined) {
-  if (!framework) return "Sin marco";
-  return FRAMEWORK_LABEL[framework] ?? framework;
+  return framework ? etiqueta("marco", framework) : "Sin marco";
 }
 
 function assessmentStatusLabel(status: string | null | undefined) {
-  if (!status) return "Sin estado";
-  return ASSESSMENT_STATUS_LABEL[status] ?? status;
+  return status ? etiqueta("estadoEvaluacion", status) : "Sin estado";
 }
 
 function scoreTone(score: number | null) {
@@ -78,43 +40,6 @@ function scoreTone(score: number | null) {
   if (score >= 80) return "bg-[var(--status-success)]";
   if (score >= 60) return "bg-[var(--status-warning)]";
   return "bg-[var(--status-error)]";
-}
-
-function FilterGroup({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: { value: string; label: string }[];
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="min-w-0">
-      <p className="mb-2 text-xs font-medium text-[var(--g-text-secondary)]">{label}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {options.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onChange(option.value)}
-            aria-pressed={value === option.value}
-            className={cn(
-              FILTER_BUTTON,
-              value === option.value
-                ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
-                : "border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)]",
-            )}
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 export default function Evaluaciones() {
@@ -248,8 +173,11 @@ export default function Evaluaciones() {
               />
             </div>
           </div>
-          <FilterGroup label="Marco" options={FRAMEWORK_OPTIONS} value={frameworkFilter} onChange={setFrameworkFilter} />
-          <FilterGroup label="Estado" options={STATUS_OPTIONS} value={statusFilter} onChange={setStatusFilter} />
+          {/* Los dos filtran en cliente contra el valor crudo: sin los valores
+              presentes en el dato, una fila con una grafía fuera del
+              vocabulario no sería alcanzable por ningún filtro. */}
+          <FilterGroup label="Marco" options={opcionesFiltro("marco", assessments.map((a) => a.framework))} value={frameworkFilter} onChange={setFrameworkFilter} />
+          <FilterGroup label="Estado" options={opcionesFiltro("estadoEvaluacion", assessments.map((a) => a.status))} value={statusFilter} onChange={setStatusFilter} />
           <FilterGroup label="Acción" options={ACTION_OPTIONS} value={actionFilter} onChange={setActionFilter} />
         </div>
       </section>
@@ -290,7 +218,7 @@ export default function Evaluaciones() {
                 </thead>
                 <tbody className="divide-y divide-[var(--g-border-subtle)]">
                   {filtered.map((ass) => {
-                    const statusCls = ASSESSMENT_STATUS_CHIP[ass.status] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]";
+                    const statusCls = chipClaseEstadoEvaluacion(ass.status);
                     const frameCls = FRAMEWORK_BADGE[ass.framework ?? ""] ?? "bg-[var(--g-surface-subtle)] text-[var(--g-text-secondary)]";
                     const hasGrcHandoff = isAimsTechnicalFileGapCandidate(ass);
                     return (
@@ -370,7 +298,7 @@ export default function Evaluaciones() {
 
             <div className="divide-y divide-[var(--g-border-subtle)] lg:hidden" role="list" aria-label="Lista móvil de evaluaciones IA">
               {filtered.map((ass) => {
-                const statusCls = ASSESSMENT_STATUS_CHIP[ass.status] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]";
+                const statusCls = chipClaseEstadoEvaluacion(ass.status);
                 const frameCls = FRAMEWORK_BADGE[ass.framework ?? ""] ?? "bg-[var(--g-surface-subtle)] text-[var(--g-text-secondary)]";
                 const hasGrcHandoff = isAimsTechnicalFileGapCandidate(ass);
                 return (

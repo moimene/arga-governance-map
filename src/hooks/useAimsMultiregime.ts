@@ -72,6 +72,77 @@ export function useIncidentRegimes(incidentId: string | undefined) {
 }
 
 /**
+ * Abre un subexpediente por régimen.
+ *
+ * QUÉ REGISTRA, Y QUÉ NO. Deja constancia de que, a juicio de quien lo abre, el
+ * régimen alcanza a este incidente. No hay envío a ninguna autoridad ni acuse
+ * de nadie: la motivación de aplicabilidad es obligatoria precisamente porque
+ * la afirmación es de quien abre, no del producto.
+ *
+ * `tenant_id` va EXPLÍCITO: la tabla no tiene default y varias del proyecto
+ * defaultean al tenant de ARGA, así que un insert que lo omita aterriza en el
+ * tenant equivocado. Y la pertenencia del incidente se comprueba ANTES, porque
+ * el `incident_id` llega de la URL.
+ */
+export function useAbrirSubexpedienteRegimen() {
+  const queryClient = useQueryClient();
+  const { tenantId } = useTenantContext();
+
+  return useMutation({
+    mutationFn: async ({
+      incidentId,
+      regimeCode,
+      targetAuthority,
+      leadRole,
+      applicabilityRationale,
+    }: {
+      incidentId: string;
+      regimeCode: IncidentRegimeCase["regime_code"];
+      targetAuthority: string;
+      leadRole: IncidentRegimeCase["lead_role"];
+      applicabilityRationale: string;
+    }) => {
+      const motivacion = applicabilityRationale.trim();
+      if (motivacion.length < 20) {
+        throw new Error("La motivación de aplicabilidad necesita al menos 20 caracteres.");
+      }
+
+      const { data: incidente, error: errorIncidente } = await supabase
+        .from("ai_incidents")
+        .select("id")
+        .eq("tenant_id", tenantId!)
+        .eq("id", incidentId)
+        .maybeSingle();
+      if (errorIncidente) throw errorIncidente;
+      if (!incidente) throw new Error("El incidente no pertenece a este entorno.");
+
+      const { data, error } = await supabase
+        .from("aims_incident_regimes")
+        .insert({
+          tenant_id: tenantId,
+          incident_id: incidentId,
+          regime_code: regimeCode,
+          target_authority: targetAuthority,
+          lead_role: leadRole,
+          applicability_rationale: motivacion,
+          status: "OPEN",
+        })
+        .select()
+        .maybeSingle();
+
+      if (error) throw error;
+      // La RLS filtra a cero filas SIN error: sin fila no se ha escrito nada y
+      // decir lo contrario sería el defecto que este módulo lleva corrigiendo.
+      if (!data) throw new Error("La apertura no ha devuelto fila: no se ha registrado nada.");
+      return data as IncidentRegimeCase;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["aims_incident_regimes", tenantId, data.incident_id] });
+    },
+  });
+}
+
+/**
  * Actualiza un subexpediente de régimen de forma aislada (Aislamiento de Cierres).
  */
 export function useUpdateIncidentRegime() {
@@ -92,12 +163,13 @@ export function useUpdateIncidentRegime() {
           ...updates,
           updated_at: new Date().toISOString(),
         })
-        .eq("tenant_id", tenantId)
+        .eq("tenant_id", tenantId!)
         .eq("id", id)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) throw new Error("El cierre no ha devuelto fila: no se ha actualizado nada.");
       return data as IncidentRegimeCase;
     },
     onSuccess: (data) => {
