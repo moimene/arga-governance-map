@@ -56,7 +56,7 @@ function Dato({ rotulo, children }: { rotulo: string; children: React.ReactNode 
 }
 
 export default function ClasificacionVigentePanel({ systemId, tieneOwner }: ClasificacionVigentePanelProps) {
-  const { data: cuestionarios = [] } = useCuestionariosDeSistema(systemId);
+  const { data: cuestionarios = [], refetch } = useCuestionariosDeSistema(systemId);
   const vigente = cuestionarios.find((c) => c.status === "COMPLETED") ?? null;
   const borrador = cuestionarios.find((c) => c.status === "DRAFT") ?? null;
 
@@ -74,6 +74,14 @@ export default function ClasificacionVigentePanel({ systemId, tieneOwner }: Clas
       const fila = borrador ?? (await iniciar.mutateAsync(systemId));
       setDraftId(fila.id);
     } catch (err) {
+      // Sólo puede haber un DRAFT por sistema (índice parcial): si otra pestaña
+      // lo creó y la caché no lo sabía, se recupera y se reutiliza en vez de
+      // enseñar «duplicate key».
+      if ((err as { code?: string })?.code === "23505") {
+        const { data } = await refetch();
+        const existente = (data ?? []).find((c) => c.status === "DRAFT");
+        if (existente) { setDraftId(existente.id); return; }
+      }
       toast.error(`No se pudo abrir la clasificación: ${mensaje(err)}`);
     }
   };

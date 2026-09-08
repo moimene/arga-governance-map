@@ -174,8 +174,8 @@ begin
     raise exception 'VERIFICACION: authenticated conserva EXECUTE sobre fn_aims_close_technical_file';
   end if;
 
-  -- Control positivo: lo que DEBE quedar sigue estando. Sin esto, un revoke de
-  -- más (que rompiera el alta) pasaría la verificación igual.
+  -- Control positivo de verdad: lo que DEBE quedar sigue estando. Sin esto, un
+  -- revoke de más (que rompiera el alta) pasaría la verificación igual.
   select count(*) into v_control from information_schema.role_table_grants
    where table_schema = 'public' and grantee = 'authenticated'
      and table_name = 'ai_systems' and privilege_type = 'INSERT';

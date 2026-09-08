@@ -153,6 +153,22 @@ export function useUpdateTechnicalFileSection() {
 }
 
 /**
+ * La RLS de estas tablas sólo mira `tenant_id`, y la FK `system_id` no lleva
+ * tenant: sin esto, un `system_id` ajeno colgaría filas huérfanas en el tenant
+ * propio. Mismo criterio que la apertura de subexpedientes.
+ */
+async function exigirSistemaDelTenant(tenantId: string, systemId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from("ai_systems")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("id", systemId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("El sistema no pertenece a este entorno.");
+}
+
+/**
  * Crea el esqueleto de las nueve secciones del anexo IV.
  *
  * Sólo se ofrece cuando el sistema no tiene ninguna sección: no completa un
@@ -164,6 +180,7 @@ export function useIniciarExpedienteTecnico() {
   const { tenantId } = useTenantContext();
   return useMutation({
     mutationFn: async (systemId: string) => {
+      await exigirSistemaDelTenant(tenantId!, systemId);
       const { data, error } = await supabase
         .from("aims_technical_file_sections")
         .insert(
@@ -197,6 +214,7 @@ export function useRegistrarVersion() {
       effectiveFrom: string | null;
       changeSummary: string | null;
     }) => {
+      await exigirSistemaDelTenant(tenantId!, v.systemId);
       const { data, error } = await supabase
         .from("aims_system_versions")
         .insert({
@@ -234,6 +252,7 @@ export function useRegistrarIndicador() {
       metricKey: string | null;
       lastObservedAt: string | null;
     }) => {
+      await exigirSistemaDelTenant(tenantId!, v.systemId);
       const { data, error } = await supabase
         .from("aims_monitoring_indicators")
         .insert({

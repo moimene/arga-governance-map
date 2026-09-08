@@ -264,7 +264,12 @@ async function main() {
       if (e) fail(`${s.code}: ${e.message}`);
       altas++;
     } else if (accion === "actualiza") {
-      const { error: e } = await db.from("ai_systems").update(aFila(s))
+      // La clasificación (rol y nivel) NUNCA la escribe un seed sobre una fila
+      // que ya existe: desde 2026-09-08 sólo la cambia el cuestionario guiado
+      // (trigger CLASIFICACION_SOLO_POR_CUESTIONARIO), y pisarla con null
+      // pondría la corrida en rojo en cuanto alguien clasifique Harvey.
+      const { risk_level: _nivel, ...sinClasificacion } = aFila(s);
+      const { error: e } = await db.from("ai_systems").update(sinClasificacion)
         .eq("tenant_id", GARRIGUES_TENANT).eq("id", fila!.id);
       if (e) fail(`${s.code}: ${e.message}`);
       actualizaciones++;

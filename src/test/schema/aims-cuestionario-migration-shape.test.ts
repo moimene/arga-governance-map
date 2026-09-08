@@ -62,6 +62,7 @@ describe("20260908120000 — cuestionario guiado de calificación", () => {
       "COMPLETAR_SOLO_POR_RPC",
       "CLASIFICACION_SOLO_POR_CUESTIONARIO",
       "ALTA_SOLO_POR_CUESTIONARIO",
+      "CLASIFICACION_INCOHERENTE",
     ]) {
       expect(sql, `falta ${marca}`).toContain(`'${marca}`);
     }
@@ -76,6 +77,20 @@ describe("20260908120000 — cuestionario guiado de calificación", () => {
     // Y las dos RPC apagan el flag al terminar: en una transacción larga no
     // debe seguir abriendo puertas.
     expect((sql.match(/set_config\('aims\.clasificacion_rpc', 'off', true\)/g) ?? []).length).toBe(2);
+  });
+
+  it("el servidor re-deriva desde las RESPUESTAS y no se fía de la conclusión del cliente", () => {
+    // Revisión adversarial 2026-09-08 (lentes 1 y 2): la práctica prohibida se
+    // validaba contra `computed_risk_level`, que manda el cliente.
+    expect(sql).toMatch(/coalesce\(\(v_row\.phase2_responses->>'Q2_1'\)::boolean, false\)/);
+    for (const fn of ["fn_aims_derivar_rol(p jsonb)", "fn_aims_derivar_nivel(p jsonb)", "fn_aims_perfil_catalogo(p_rol text, p_nivel text)"]) {
+      expect(sql, `falta ${fn}`).toContain(`create or replace function public.${fn}`);
+    }
+    expect(sql).toMatch(/v_row\.computed_role is distinct from v_rol_derivado/);
+    expect(sql).toMatch(/v_row\.computed_risk_level is distinct from v_nivel_derivado/);
+    // Y el DRAFT no puede reescribir su versión de cuestionario ni su autor.
+    expect(sql).toMatch(/new\.questionnaire_version is distinct from old\.questionnaire_version/);
+    expect(sql).toMatch(/new\.created_by is distinct from old\.created_by/);
   });
 
   it("el tenant del alta sale de la sesión, nunca del cliente", () => {

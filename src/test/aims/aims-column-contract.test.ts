@@ -89,6 +89,12 @@ async function columnasInexistentes(tabla: string, columnas: string[]): Promise<
   const r = await fetch(url, { headers: { apikey: ANON, Authorization: `Bearer ${ANON}` } });
   if (r.ok) return null;
   const cuerpo = (await r.json()) as { code?: string; message?: string };
+  // Desde `20260908130000` `anon` no tiene SELECT sobre el backbone: una columna
+  // REAL responde `42501 permission denied`, y una inexistente sigue
+  // respondiendo `42703` porque el análisis del `select` precede al chequeo de
+  // privilegios (medido en la sonda revertida del 2026-09-08). El permiso
+  // denegado NO es un fallo del contrato: las columnas existen.
+  if (cuerpo.code === "42501") return null;
   return `${cuerpo.code}: ${cuerpo.message}`;
 }
 

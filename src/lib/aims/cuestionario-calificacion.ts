@@ -38,6 +38,8 @@ export type PreguntaGuiada = {
   fase: 1 | 2;
   titulo: string;
   articulo: string;
+  /** Qué citaba la spec cuando el artículo se corrigió, para que Legal vea el cambio. */
+  notaSpec?: string;
   ayuda: Ayuda;
   siImplica: string;
   noImplica: string;
@@ -51,6 +53,7 @@ export const PREGUNTAS: PreguntaGuiada[] = [
     fase: 1,
     titulo: "¿Su organización ha creado o entrenado este sistema de IA?",
     articulo: "Art. 3.3 (definición de proveedor)",
+    notaSpec: "La spec cita el art. 3.1; en el texto final la definición de proveedor es el art. 3.3.",
     ayuda: {
       queSignifica:
         "Responda «Sí» si su organización (o alguien contratado por ella) diseñó, programó o entrenó el sistema desde cero. Responda «No» si su organización compró, contrató o usa un sistema desarrollado por un tercero.",
@@ -71,6 +74,7 @@ export const PREGUNTAS: PreguntaGuiada[] = [
     titulo:
       "¿Su organización ha cambiado de forma importante el funcionamiento del sistema respecto a lo que el fabricante diseñó?",
     articulo: "Art. 3.23 y art. 25.1 (modificación sustancial y cambio de finalidad)",
+    notaSpec: "La spec cita el art. 3.3; la modificación sustancial se define en el art. 3.23 y sus efectos sobre el rol están en el art. 25.1 (alto riesgo).",
     ayuda: {
       queSignifica:
         "Responda «Sí» si ha modificado el sistema de manera que ahora hace algo diferente de lo previsto originalmente. Responda «No» si lo usa tal como lo entregó el proveedor, aunque lo haya configurado o personalizado con sus datos.",
@@ -233,8 +237,8 @@ export function derivarRol(r: Respuestas): { rol: RolDerivado; motivo: string } 
   if (afirmadas.length > 0) {
     const motivos: Record<string, string> = {
       Q1_1: "ha creado o entrenado el sistema (art. 3.3)",
-      Q1_2: "lo ha modificado sustancialmente o cambiado su finalidad (art. 25.1)",
-      Q1_3: "lo introduce en el mercado con su nombre o marca (art. 25.1 a)",
+      Q1_2: "lo ha modificado sustancialmente o cambiado su finalidad (art. 3.23; en alto riesgo, art. 25.1 b) y c))",
+      Q1_3: "lo introduce en el mercado con su nombre o marca (art. 3.3; en alto riesgo, art. 25.1 a))",
     };
     return { rol: "PROVEEDOR", motivo: `Proveedor: ${afirmadas.map((id) => motivos[id]).join("; ")}.` };
   }
@@ -288,8 +292,15 @@ export type MarcoNormativo = {
   nota?: string;
 };
 
-const ROLES_DE_DESPLIEGUE = new Set(["RESPONSABLE_DESPLIEGUE", "IMPORTADOR", "DISTRIBUIDOR"]);
-const ROLES_DE_PROVEEDOR = new Set(["PROVEEDOR", "PROVEEDOR_GPAI", "PROVEEDOR_POSTERIOR"]);
+/**
+ * Agrupación de los seis roles persistidos por su posición. Única copia: la
+ * importa también `perfil-aplicabilidad.ts`. Importador y distribuidor se
+ * agrupan con el despliegue SOLO a efectos de qué catálogo de medidas medir
+ * (falla abierto hacia el catálogo más exigente disponible); sus obligaciones
+ * propias (arts. 23 y 24) no se derivan aquí (DA-1).
+ */
+export const ROLES_DE_DESPLIEGUE = new Set(["RESPONSABLE_DESPLIEGUE", "IMPORTADOR", "DISTRIBUIDOR"]);
+export const ROLES_DE_PROVEEDOR = new Set(["PROVEEDOR", "PROVEEDOR_GPAI", "PROVEEDOR_POSTERIOR"]);
 
 export function derivarMarcos(
   rol: string | null | undefined,
@@ -300,7 +311,16 @@ export function derivarMarcos(
   const out: MarcoNormativo[] = [
     { code: "RIA_ART_4", norma: "RIA", articulos: "Art. 4", titulo: "Alfabetización en materia de IA (todos los sistemas)" },
   ];
-  if (nivel === "Alto" && ROLES_DE_DESPLIEGUE.has(rol)) {
+  if (rol === "IMPORTADOR" || rol === "DISTRIBUIDOR") {
+    out.push({
+      code: "RIA_ARTS_23_24",
+      norma: "RIA",
+      articulos: rol === "IMPORTADOR" ? "Art. 23" : "Art. 24",
+      titulo: rol === "IMPORTADOR" ? "Obligaciones de los importadores" : "Obligaciones de los distribuidores",
+      nota: "El cuestionario no deriva este rol (la spec no trae preguntas para él): sus obligaciones específicas quedan para el equipo legal. Se cita el artículo y no se desarrolla.",
+    });
+  }
+  if (nivel === "Alto" && rol === "RESPONSABLE_DESPLIEGUE") {
     out.push(
       { code: "RIA_ART_26", norma: "RIA", articulos: "Art. 26", titulo: "Obligaciones del responsable del despliegue de sistemas de alto riesgo" },
       {
@@ -338,7 +358,10 @@ export function derivarMarcos(
       norma: "RIA",
       articulos: "Cap. V, arts. 51–56",
       titulo: "Modelos de IA de uso general",
-      nota: "La spec cita «Capítulo V-A (arts. 51–55)», numeración de borrador; en el texto final es el capítulo V, arts. 51–56.",
+      nota:
+        ROLES_DE_PROVEEDOR.has(rol)
+          ? "La spec cita «Capítulo V-A (arts. 51–55)», numeración de borrador; en el texto final es el capítulo V, arts. 51–56."
+          : "Las obligaciones del cap. V vinculan al PROVEEDOR del modelo de uso general; para el responsable del despliegue este marco es la trazabilidad del modelo y del proveedor en la cadena de suministro. La spec lo lista para todo sistema con dependencia GPAI; el alcance lo decide el equipo legal. (Numeración: la spec cita «cap. V-A, arts. 51–55»; en el texto final es el cap. V, arts. 51–56.)",
     });
   }
   out.push(

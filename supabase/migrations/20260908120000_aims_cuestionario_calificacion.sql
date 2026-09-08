@@ -189,8 +189,10 @@ begin
       raise exception 'COMPLETAR_SOLO_POR_RPC: la huella se calcula en servidor' using errcode = '42501';
     end if;
     if new.completed_by is not null or new.completed_at is not null or new.content_hash is not null
-       or new.version is distinct from old.version then
-      raise exception 'CAMPOS_SELLADOS_POR_RPC: completed_by, completed_at, content_hash y version no se escriben desde el cliente'
+       or new.version is distinct from old.version
+       or new.questionnaire_version is distinct from old.questionnaire_version
+       or new.created_by is distinct from old.created_by then
+      raise exception 'CAMPOS_SELLADOS_POR_RPC: completed_by, completed_at, content_hash, version, questionnaire_version y created_by no se escriben desde el cliente'
         using errcode = '42501';
     end if;
   end if;
@@ -244,6 +246,68 @@ create trigger trg_ai_systems_clasificacion_solo_por_cuestionario
   for each row execute function public.fn_ai_systems_clasificacion_solo_por_cuestionario();
 
 -- ---------------------------------------------------------------------------
+-- 5b. Derivación en servidor. El cliente manda rol, nivel y perfil ya derivados
+--     (los pinta en tiempo real), pero el servidor NO se fía: re-deriva desde
+--     las RESPUESTAS con el mismo árbol de la spec y rechaza lo incoherente.
+--     Es el mismo criterio que `src/lib/aims/cuestionario-calificacion.ts`, en
+--     dos lenguajes; la sonda viva los compara caso a caso para que no diverjan.
+-- ---------------------------------------------------------------------------
+create or replace function public.fn_aims_derivar_rol(p jsonb)
+returns text
+language sql
+immutable
+as $fn$
+  select case
+    when coalesce((p->>'Q1_1')::boolean, false)
+      or coalesce((p->>'Q1_2')::boolean, false)
+      or coalesce((p->>'Q1_3')::boolean, false) then 'PROVEEDOR'
+    when (p->>'Q1_1')::boolean is false
+     and (p->>'Q1_2')::boolean is false
+     and (p->>'Q1_3')::boolean is false then 'RESPONSABLE_DESPLIEGUE'
+    else null
+  end
+$fn$;
+
+create or replace function public.fn_aims_derivar_nivel(p jsonb)
+returns text
+language sql
+immutable
+as $fn$
+  select case
+    when (p->>'Q2_1')::boolean is true then 'Inaceptable'
+    when (p->>'Q2_1')::boolean is not false then null
+    when (p->>'Q2_2')::boolean is null then null
+    when (p->>'Q2_2')::boolean is true and (p->>'Q2_3')::boolean is null then null
+    when (p->>'Q2_2')::boolean is true and (p->>'Q2_3')::boolean is false then 'Alto'
+    when (p->>'Q2_4')::boolean is null then null
+    when (p->>'Q2_4')::boolean is true then 'Limitado'
+    else 'Mínimo'
+  end
+$fn$;
+
+create or replace function public.fn_aims_perfil_catalogo(p_rol text, p_nivel text)
+returns text
+language sql
+immutable
+as $fn$
+  select case
+    when p_rol is null or p_nivel is null then null
+    when p_nivel = 'Inaceptable' then null
+    when p_nivel = 'Alto' and p_rol in ('PROVEEDOR', 'PROVEEDOR_GPAI', 'PROVEEDOR_POSTERIOR') then 'PROFILE_A'
+    when p_nivel = 'Alto' and p_rol in ('RESPONSABLE_DESPLIEGUE', 'IMPORTADOR', 'DISTRIBUIDOR') then 'PROFILE_B'
+    when p_nivel in ('Limitado', 'Mínimo') then 'PROFILE_C'
+    else null
+  end
+$fn$;
+
+revoke all on function public.fn_aims_derivar_rol(jsonb) from public, anon;
+revoke all on function public.fn_aims_derivar_nivel(jsonb) from public, anon;
+revoke all on function public.fn_aims_perfil_catalogo(text, text) from public, anon;
+grant execute on function public.fn_aims_derivar_rol(jsonb) to authenticated;
+grant execute on function public.fn_aims_derivar_nivel(jsonb) to authenticated;
+grant execute on function public.fn_aims_perfil_catalogo(text, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
 -- 6. RPC: completar un cuestionario. Asierta el tenant por la fila, valida lo
 --    que la spec exige (CA-4 art. 6.3; PROHIBIDO bloquea), supersede la
 --    anterior, sella con SHA-512 de servidor y sincroniza `ai_systems`.
@@ -262,6 +326,8 @@ declare
   v_canonico text;
   v_hash text;
   v_en_anexo_iii boolean;
+  v_rol_derivado text;
+  v_nivel_derivado text;
 begin
   if v_tenant is null then
     raise exception 'SIN_TENANT: la sesión no resuelve un tenant' using errcode = '42501';
@@ -278,12 +344,25 @@ begin
     raise exception 'NO_ES_BORRADOR: el cuestionario ya está %', v_row.status using errcode = '42501';
   end if;
 
-  if v_row.computed_risk_level = 'Inaceptable' then
+  -- La práctica prohibida se lee de la RESPUESTA, no de la conclusión que
+  -- mande el cliente: un cliente manipulado podría responder «Sí» al art. 5 y
+  -- declarar «Mínimo».
+  if coalesce((v_row.phase2_responses->>'Q2_1')::boolean, false) or v_row.computed_risk_level = 'Inaceptable' then
     raise exception 'PRACTICA_PROHIBIDA_BLOQUEA: un sistema que incurre en una práctica prohibida del art. 5 no puede registrarse'
       using errcode = '23514';
   end if;
-  if v_row.computed_role is null or v_row.computed_risk_level is null or v_row.catalog_profile is null then
-    raise exception 'CUESTIONARIO_INCOMPLETO: faltan rol, nivel o perfil derivados' using errcode = '23514';
+
+  v_rol_derivado := public.fn_aims_derivar_rol(v_row.phase1_responses);
+  v_nivel_derivado := public.fn_aims_derivar_nivel(v_row.phase2_responses);
+  if v_rol_derivado is null or v_nivel_derivado is null then
+    raise exception 'CUESTIONARIO_INCOMPLETO: faltan respuestas para derivar rol o nivel' using errcode = '23514';
+  end if;
+  if v_row.computed_role is distinct from v_rol_derivado
+     or v_row.computed_risk_level is distinct from v_nivel_derivado
+     or v_row.catalog_profile is distinct from public.fn_aims_perfil_catalogo(v_rol_derivado, v_nivel_derivado)
+     or v_row.gpai_dependency is distinct from coalesce((v_row.phase2_responses->>'Q2_5')::boolean, false) then
+    raise exception 'CLASIFICACION_INCOHERENTE: rol, nivel, perfil o GPAI no se corresponden con las respuestas'
+      using errcode = '23514';
   end if;
 
   -- CA-4: apartarse del anexo III exige documentar la evaluación (art. 6.3).
@@ -518,7 +597,27 @@ begin
     raise exception 'VERIFICACION: RPC security definer esperadas 2, encontradas %', v_fn;
   end if;
 
-  -- Control positivo: el instrumento tiene que saber decir que NO.
+  select count(*) into v_fn from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and not p.prosecdef and p.provolatile = 'i'
+     and p.proname in ('fn_aims_derivar_rol', 'fn_aims_derivar_nivel', 'fn_aims_perfil_catalogo');
+  if v_fn <> 3 then
+    raise exception 'VERIFICACION: funciones de derivación inmutables esperadas 3, encontradas %', v_fn;
+  end if;
+
+  -- Prueba de comportamiento del árbol en servidor: los casos canónicos.
+  if public.fn_aims_derivar_nivel('{"Q2_1":true}') is distinct from 'Inaceptable'
+     or public.fn_aims_derivar_nivel('{"Q2_1":false,"Q2_2":true,"Q2_3":false}') is distinct from 'Alto'
+     or public.fn_aims_derivar_nivel('{"Q2_1":false,"Q2_2":false,"Q2_4":true}') is distinct from 'Limitado'
+     or public.fn_aims_derivar_nivel('{"Q2_1":false,"Q2_2":false,"Q2_4":false}') is distinct from 'Mínimo'
+     or public.fn_aims_derivar_nivel('{"Q2_1":false,"Q2_2":true}') is not null
+     or public.fn_aims_derivar_rol('{"Q1_1":false,"Q1_2":false,"Q1_3":false}') is distinct from 'RESPONSABLE_DESPLIEGUE'
+     or public.fn_aims_derivar_rol('{"Q1_2":true}') is distinct from 'PROVEEDOR'
+     or public.fn_aims_derivar_rol('{"Q1_1":false}') is not null then
+    raise exception 'VERIFICACION: el árbol en servidor no deriva como la spec';
+  end if;
+
+  -- Control del instrumento (negativo): tiene que saber decir que NO. Los
+  -- casos del árbol de arriba son el control positivo real de este bloque.
   select count(*) into v_instrumento from pg_constraint
    where conrelid = 'public.aims_classification_questionnaires'::regclass
      and conname = 'constraint_que_no_existe_jamas';
@@ -526,6 +625,6 @@ begin
     raise exception 'VERIFICACION: el instrumento encuentra lo que no existe';
   end if;
 
-  raise notice 'VERIFICACION OK: tabla (20 col), 3 índices, RLS, 3 políticas sin DELETE, anon fuera, 3 triggers, 2 RPC';
+  raise notice 'VERIFICACION OK: tabla (20 col), 3 índices, RLS, 3 políticas sin DELETE, anon fuera, 3 triggers, 2 RPC, 3 derivadores';
 end;
 $verificacion$;

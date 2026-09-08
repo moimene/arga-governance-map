@@ -33,7 +33,7 @@
  */
 
 import type { RequirementDef } from "./catalog-aesia";
-import { perfilCatalogo, type PerfilCatalogo } from "./cuestionario-calificacion";
+import { ROLES_DE_DESPLIEGUE, perfilCatalogo, type PerfilCatalogo } from "./cuestionario-calificacion";
 
 export type FuenteMedida = "RIA" | "RGPD" | "ISO_42001" | "DEONTOLOGIA";
 export type CaracterMedida = "OBLIGACION" | "MARCO_OPERATIVO";
@@ -290,7 +290,6 @@ export type PerfilAplicabilidad = {
   catalogProfile: PerfilCatalogo | null;
 };
 
-const ROLES_DE_DESPLIEGUE = new Set(["RESPONSABLE_DESPLIEGUE", "IMPORTADOR", "DISTRIBUIDOR"]);
 
 /**
  * Elige el catálogo aplicable a un sistema.

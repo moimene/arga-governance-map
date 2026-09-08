@@ -29,6 +29,9 @@ describe("catálogo de preguntas", () => {
     expect(PREGUNTAS.map((p) => p.id)).toEqual([
       "Q1_1", "Q1_2", "Q1_3", "Q1_4", "Q2_1", "Q2_2", "Q2_3", "Q2_4", "Q2_5",
     ]);
+    // Donde se corrigió una cita de la spec, la spec se conserva en notaSpec.
+    expect(PREGUNTAS.find((p) => p.id === "Q1_1")?.notaSpec).toMatch(/3\.1/);
+    expect(PREGUNTAS.find((p) => p.id === "Q1_2")?.notaSpec).toMatch(/3\.3/);
     for (const p of PREGUNTAS) {
       expect(p.ayuda.queSignifica.length, `${p.id} sin «qué significa»`).toBeGreaterThan(20);
       expect(p.ayuda.ejemplos.length, `${p.id} sin ejemplos`).toBeGreaterThan(0);
@@ -155,6 +158,23 @@ describe("fase 3 — marcos y perfil", () => {
     expect(con?.articulos).toMatch(/56/);
     expect(con?.nota).toMatch(/55/);
     expect(derivarMarcos("RESPONSABLE_DESPLIEGUE", "Limitado", false).map((m) => m.code)).not.toContain("RIA_CAP_V_GPAI");
+  });
+
+  it("para el responsable del despliegue, el cap. V se acota en la nota: vincula al proveedor del modelo", () => {
+    const desp = derivarMarcos("RESPONSABLE_DESPLIEGUE", "Limitado", true).find((x) => x.code === "RIA_CAP_V_GPAI");
+    expect(desp?.nota).toMatch(/PROVEEDOR del modelo/);
+    expect(desp?.nota).toMatch(/equipo legal/);
+    const prov = derivarMarcos("PROVEEDOR", "Limitado", true).find((x) => x.code === "RIA_CAP_V_GPAI");
+    expect(prov?.nota).not.toMatch(/PROVEEDOR del modelo/);
+  });
+
+  it("importador y distribuidor (roles persistidos que el árbol no deriva) citan sus artículos sin desarrollarlos", () => {
+    const imp = derivarMarcos("IMPORTADOR", "Alto", false);
+    expect(imp.map((m) => m.code)).toContain("RIA_ARTS_23_24");
+    expect(imp.find((m) => m.code === "RIA_ARTS_23_24")?.articulos).toBe("Art. 23");
+    // No se les cuelgan los deberes del responsable del despliegue (art. 26).
+    expect(imp.map((m) => m.code)).not.toContain("RIA_ART_26");
+    expect(derivarMarcos("DISTRIBUIDOR", "Alto", false).find((m) => m.code === "RIA_ARTS_23_24")?.articulos).toBe("Art. 24");
   });
 
   it("los transversales (RGPD y deontología) van siempre", () => {

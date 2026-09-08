@@ -68,13 +68,17 @@ describe("cuestionario guiado — vivo, con los dos logins", () => {
 
   afterAll(async () => {
     // El cascade arrastra los cuestionarios (no hay DELETE directo sobre ellos).
+    // Se intentan LOS DOS borrados aunque el primero falle: un throw a la
+    // primera dejaría el sistema de sonda de ARGA vivo, contra el cero cambio.
+    const fallos: string[] = [];
     for (const [cli, id] of [[garr, sistemaGarr], [arga, sistemaArga]] as const) {
       if (!cli || !id) continue;
       const { error } = await cli.from("ai_systems").delete().eq("id", id);
-      if (error) throw new Error(`la sonda dejó el sistema ${id} sin borrar: ${error.message}`);
+      if (error) { fallos.push(`la sonda dejó el sistema ${id} sin borrar: ${error.message}`); continue; }
       const { data } = await cli.from("aims_classification_questionnaires").select("id").eq("system_id", id);
-      if ((data ?? []).length > 0) throw new Error(`quedan cuestionarios del sistema ${id} tras el cascade`);
+      if ((data ?? []).length > 0) fallos.push(`quedan cuestionarios del sistema ${id} tras el cascade`);
     }
+    if (fallos.length > 0) throw new Error(fallos.join("; "));
   }, 30_000);
 
   it("un INSERT directo en ai_systems como usuario autenticado se rechaza: el alta va por la RPC", async () => {
@@ -208,6 +212,48 @@ describe("cuestionario guiado — vivo, con los dos logins", () => {
     // Y la transacción se revirtió entera: no quedó sistema a medias.
     const { data: restos } = await garr.from("ai_systems").select("id").eq("name", `${MARCA}-PROHIBIDA`);
     expect(restos ?? []).toEqual([]);
+  });
+
+  it("el servidor no se fía de la conclusión del cliente: prohibida por la respuesta e incoherencia rechazadas", async () => {
+    // Revisión adversarial 2026-09-08: antes PRACTICA_PROHIBIDA se validaba
+    // contra computed_risk_level, que manda el cliente.
+    const manipulado = { ...payload({ ...DESPLIEGUE_LIMITADO, Q2_1: true }), computed_risk_level: "Mínimo", catalog_profile: "PROFILE_C" };
+    const prohibida = await garr.rpc("fn_aims_registrar_sistema", {
+      p_sistema: { name: `${MARCA}-MANIPULADA` },
+      p_cuestionario: manipulado,
+    });
+    expect(prohibida.error?.message ?? "").toContain("PRACTICA_PROHIBIDA_BLOQUEA");
+
+    const incoherente = { ...payload(DESPLIEGUE_LIMITADO), computed_role: "PROVEEDOR", catalog_profile: "PROFILE_C" };
+    const rechazo = await garr.rpc("fn_aims_registrar_sistema", {
+      p_sistema: { name: `${MARCA}-INCOHERENTE` },
+      p_cuestionario: incoherente,
+    });
+    expect(rechazo.error?.message ?? "").toContain("CLASIFICACION_INCOHERENTE");
+    const restos = await garr.from("ai_systems").select("id").like("name", `${MARCA}-%`);
+    expect((restos.data ?? []).map((r) => r.id)).toEqual([sistemaGarr].filter(Boolean));
+  });
+
+  it("el árbol en servidor deriva igual que la hoja TypeScript, caso a caso", async () => {
+    // Dos implementaciones del mismo criterio (TS para pintar en tiempo real,
+    // SQL para no fiarse del cliente): este es el gate de que no diverjan.
+    const casos: Respuestas[] = [
+      { Q1_1: true }, { Q1_1: false, Q1_2: true, Q1_3: false }, { Q1_1: false, Q1_2: false, Q1_3: false }, { Q1_1: false },
+      { Q2_1: true }, { Q2_1: false, Q2_2: true, Q2_3: false }, { Q2_1: false, Q2_2: true, Q2_3: true, Q2_4: true },
+      { Q2_1: false, Q2_2: true, Q2_3: true, Q2_4: false }, { Q2_1: false, Q2_2: false, Q2_4: true },
+      { Q2_1: false, Q2_2: false, Q2_4: false }, { Q2_1: false, Q2_2: true }, { Q2_1: false, Q2_2: false }, {},
+    ];
+    for (const c of casos) {
+      const esperado = resultadoProvisional(c);
+      const rol = await garr.rpc("fn_aims_derivar_rol", { p: c });
+      const nivel = await garr.rpc("fn_aims_derivar_nivel", { p: c });
+      expect(rol.error).toBeNull();
+      expect(nivel.error).toBeNull();
+      expect(rol.data ?? null, `rol para ${JSON.stringify(c)}`).toBe(esperado.rol);
+      expect(nivel.data ?? null, `nivel para ${JSON.stringify(c)}`).toBe(esperado.nivel);
+    }
+    const perfil = await garr.rpc("fn_aims_perfil_catalogo", { p_rol: "RESPONSABLE_DESPLIEGUE", p_nivel: "Alto" });
+    expect(perfil.data).toBe("PROFILE_B");
   });
 
   it("no hay DELETE de cuestionarios desde la aplicación", async () => {
