@@ -125,22 +125,3 @@ export function useUpdateAiIncident() {
     },
   });
 }
-
-export function useDeleteAiIncident() {
-  const { tenantId } = useTenantContext();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("ai_incidents")
-        .delete()
-        .eq("tenant_id", tenantId!)
-        .eq("id", id);
-      if (error) throw error;
-      return id;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["ai_incidents"] });
-    },
-  });
-}
