@@ -66,4 +66,33 @@ ejecutado sobre la spec del equipo legal validada en
 
 ## 4. Hitos
 
-(se rellena por tarea: qué se cerró con evidencia, qué se refutó, qué queda)
+### H-1 · Tareas 1–4: vocabulario, motor puro, migraciones (2026-09-08)
+
+**Cerrado con evidencia**
+
+| Qué | Evidencia |
+|---|---|
+| Vocabulario único (`src/lib/aims/vocabulario.ts`, hoja) consumido por las 7 pantallas | `f04242d`; `vocabulario-unico.test.ts` (comportamiento + arista + capa débil); mutaciones: `SEVERITY_OPTIONS` local → cae (c); quitar `BORRADOR` → cae (a) |
+| Motor puro del cuestionario (`cuestionario-calificacion.ts`, hoja, 0 imports) + `catalogProfile` en `perfilAplicable` | `d76746d`; 29 + 2 tests |
+| Migración `20260908120000` (tabla, RLS sin DELETE, revoke explícito, versión por trigger, inmutabilidad, RPC completar + registrar con SHA-512 de servidor, trigger de `ai_systems`) | **Sonda revertida contra Cloud, 27 pasos**, `BEGIN … ROLLBACK`, cero residuo (comprobado: 0 sistemas `PROBE-%`, tabla inexistente después) |
+| Migración `20260908130000` (anon fuera de 28 tablas, TRUNCATE/REFERENCES/TRIGGER fuera, escritura fuera en las 20 muertas, EXECUTE fuera de `fn_aims_close_technical_file`) | misma sonda: bloque de verificación OK; `anon` con columna inexistente → `42703`, con columna real → `42501` (el contrato de columnas sigue midiendo) |
+
+Resultados de la sonda (sesiones simuladas con `set_config('request.jwt.claims')` + `set local role`):
+
+| Paso | Resultado |
+|---|---|
+| INSERT directo en `ai_systems` como `authenticated` | `42501 ALTA_SOLO_POR_CUESTIONARIO` |
+| `fn_aims_registrar_sistema` (ARGA) | sistema + cuestionario; hash 128 hex; `ai_systems` sincronizado (`RESPONSABLE_DESPLIEGUE`, `Limitado`, perfil C); flag `off` al volver |
+| UPDATE de la COMPLETED por su dueño | `42501 CUESTIONARIO_COMPLETADO_INMUTABLE` |
+| UPDATE directo de `risk_level` / `regulatory_role` | `42501 CLASIFICACION_SOLO_POR_CUESTIONARIO` (×2); `description` sí se edita |
+| DRAFT v2 con anexo III + excepción, sin motivación → completar | `23514 ART63_MOTIVACION_OBLIGATORIA` |
+| Misma con motivación ≥ 40 → completar | v2 COMPLETED, v1 SUPERSEDED, `ai_systems.regulatory_profile.exige_art63 = true`, `version = 2` |
+| DRAFT con `Q2_1 = true` → completar | `23514 PRACTICA_PROHIBIDA_BLOQUEA` |
+| Cliente pone `status = 'COMPLETED'` / `content_hash` a mano | `42501 COMPLETAR_SOLO_POR_RPC` / `42501 CAMPOS_SELLADOS_POR_RPC`; el resto del DRAFT sí se edita |
+| DELETE | `42501 permission denied` |
+| Garrigues lee cuestionarios y sistema de ARGA | 0 y 0; INSERT de DRAFT para un sistema de ARGA → RLS `42501` |
+| Garrigues registra el suyo; ARGA lo lee | tenant `…0002`, hash 128; ARGA ve 0 suyos-ajenos y 3 propios |
+
+**Refutado en la propia sonda (y corregido antes de commitear):** los dos triggers de `ai_systems`/inmutabilidad comparaban `current_setting('aims.clasificacion_rpc', true) = 'on'`; sin flag el `current_setting` devuelve **NULL**, `NULL = 'on'` es NULL y `if not v_rpc` no bloqueaba **nunca**. La primera pasada de la sonda lo mostró (`a_insert_directo` y `e_update_risk_level` en «NO BLOQUEO»). Corregido con `coalesce(…, '') = 'on'` y gate en el test de forma. Segundo hallazgo de la misma pasada: el flag, local a la transacción, seguía `on` tras la RPC y abría las puertas al resto de la transacción larga; ahora las dos RPC lo apagan al terminar (`b2_flag_tras_rpc = off`).
+
+**Queda:** aplicar las dos migraciones (autorización del usuario), y los tests vivos de la Tarea 13.
