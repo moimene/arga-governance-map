@@ -327,9 +327,10 @@ Garrigues (Harvey, `2f877e8c…`) y su informe de validación regulatoria. Detal
 completo: `docs/superpowers/reviews/2026-09-07-cierre-aims-piloto-harvey.md`.
 
 **El informe validó la solidez regulatoria, NO sus premisas técnicas** — lo
-declara él mismo: no localizó el código ni el esquema. Contrastadas: las 28
-tablas `aims_*` sí existen con RLS, Garrigues tiene 0 filas en las 28 (el alta
-escribe sólo en `ai_systems`), y `ai_risk_assessments`/`ai_compliance_checks` no
+declara él mismo: no localizó el código ni el esquema. Contrastadas: las 25
+tablas `aims_*` (el cierre del 07 decía 28; re-medido el 08: 25) sí existen con
+RLS, Garrigues tiene 0 filas en las 25 (el alta escribe sólo en `ai_systems`), y
+`ai_risk_assessments`/`ai_compliance_checks` no
 tienen `tenant_id` — su aislamiento va por join, y eso condiciona toda escritura
 nueva sobre ellas.
 

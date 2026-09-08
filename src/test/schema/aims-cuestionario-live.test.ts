@@ -82,6 +82,10 @@ describe("cuestionario guiado — vivo, con los dos logins", () => {
       .from("ai_systems")
       .insert({ tenant_id: GARRIGUES_TENANT, name: `${MARCA}-DIRECTO`, status: "ACTIVO" })
       .select("id");
+    // Si el trigger no está (migración sin aplicar), el INSERT aterriza: se
+    // borra ANTES de asertar para que la sonda roja no deje residuo en el
+    // inventario de Garrigues. Ocurrió el 2026-09-08 en la primera corrida.
+    for (const fila of data ?? []) await garr.from("ai_systems").delete().eq("id", fila.id);
     expect(error?.message ?? "", "el INSERT directo no fue rechazado").toContain("ALTA_SOLO_POR_CUESTIONARIO");
     expect(data ?? []).toEqual([]);
   });

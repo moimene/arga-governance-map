@@ -84,6 +84,9 @@ describe("n=1002 — Garrigues escribe su inventario de IA y sólo lo ve él", (
       .from("ai_systems")
       .insert({ tenant_id: GARRIGUES_TENANT, name: `${MARCA}-DIRECTO`, status: "ACTIVO" })
       .select("id");
+    // Sin el trigger (migración sin aplicar) el INSERT aterriza: se borra antes
+    // de asertar para que una sonda roja no deje residuo en el inventario.
+    for (const fila of data ?? []) await garr.from("ai_systems").delete().eq("id", fila.id);
     expect(error?.message ?? "").toContain("ALTA_SOLO_POR_CUESTIONARIO");
     expect(data ?? []).toEqual([]);
   });
@@ -154,7 +157,11 @@ describe("n=1002 — Garrigues escribe su inventario de IA y sólo lo ve él", (
       p_sistema: { name: MARCA_FORJADA, status: "ACTIVO", tenant_id: DEMO_TENANT },
       p_cuestionario: cuestionario(DESPLIEGUE_LIMITADO),
     });
+    // Control positivo: la RPC existe y registra. Sin esto, con la migración
+    // sin aplicar el test pasaría por vacuidad (nada aterriza en ningún sitio).
+    expect(forjado.error, `la RPC falló: ${forjado.error?.message}`).toBeNull();
     const fila = (forjado.data ?? [])[0] as { system_id: string } | undefined;
+    expect(fila, "la RPC no devolvió fila").toBeDefined();
     try {
       const enArga = await arga.from("ai_systems").select("id").eq("name", MARCA_FORJADA);
       expect(enArga.error).toBeNull();
