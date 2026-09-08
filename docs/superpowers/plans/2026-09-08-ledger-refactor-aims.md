@@ -63,6 +63,8 @@ ejecutado sobre la spec del equipo legal validada en
 | DA-7 | Clasificar Harvey desde su ficha | Responsable de cumplimiento de Garrigues | goal §5 |
 | DA-8 | El 403 silencioso en la carga del shell (`useModuleStatus`, `sii_cases_view` 42501, ya documentado en la revisión profunda P0 de consola) | Carril consola | fuera de AIMS |
 | DA-9 | 20 tablas de esquema muerto siguen en Cloud (sin código ni lector); borrarlas exige decisión del usuario y no aporta al prototipo | Usuario | D-1 |
+| DA-9 (nota 2026-09-08) | La valoración propone borrarlas con `DROP TABLE … CASCADE` (P2). **Borraría dato de ARGA**: `aims_requirement_catalog` 4, `aims_requirement_checks` 4, `aims_control_catalog` 2, `aims_post_market_plans` 1. La migración `130000` les retira la escritura para dejar ese dato intacto. No se ejecuta sin decisión expresa | Usuario | contrato cero-cambio ARGA |
+| DA-12 | La «spec de continuidad» que cita la valoración (C4→C1→M1→M2, `compliance_tier` en `requirement_catalog`, KPI dual) no está en el repo; M1/M2 no se planifican sin ella | Usuario | valoración 2026-09-08 |
 
 ## 4. Hitos
 
@@ -223,10 +225,10 @@ Lentes: (1) aislamiento y escritura, (2) afirmaciones y vocabulario, (3) criteri
 | `bun run typecheck` | limpio |
 | `bun run lint` | limpio (0 errores, 0 warnings) |
 | `bun run build` | verde (7,9 s) |
-| `bun test` | **4 438 pass / 151 skip / 3 todo / 16 fail** — los 16 son las dos sondas vivas (`aims-cuestionario-live`, `garrigues-ia-owner-write`) que exigen `20260908120000` aplicada; línea base 4 320 / 151; **cero skips nuevos** |
+| `bun test` | En la rama antes de aplicar: 4 438 pass / 151 skip / 3 todo / 16 fail (las dos sondas vivas). **Tras aplicar, en `main`: 4 454 pass / 151 skip / 3 todo / 0 fail** (26 301 aserciones, 498 ficheros); línea base 4 320 / 151; **cero skips nuevos** |
 | Cloud tras toda la jornada (medido) | ARGA 8 sistemas con los mismos niveles que al empezar (`Limitado, Alto, Alto, Alto, Mínimo, Alto, Alto, Alto`), Garrigues 1 (Harvey), 8 evaluaciones, 61 checks, **0 filas `PROBE-%`**: cero cambio de dato en los dos tenants. Únicas escrituras de la sesión en `governance_OS`: el borrado de las dos filas de sonda que la primera corrida dejó (declarado en H-2) |
 | Arnés de mutación (además de los de cada carril) | gate de `checksVigentes` por todos los hooks: quitar el filtro del Board Pack → «3 lecturas y 2 aplicaciones», restaurado idéntico |
-| Migraciones | 2 en el repo, **0 aplicadas** (autorización pendiente); verificadas con dos sondas revertidas (27 + 10 pasos) |
+| Migraciones | 2 en el repo, verificadas con dos sondas revertidas (27 + 10 pasos); **2 aplicadas y registradas** el 2026-09-08 (H-5) |
 | Review adversarial | 3 lentes; 7 P1 y ~20 P2 cerrados; 0 P0; refutaciones registradas en H-3 |
 
 **Criterios de salida del goal (§3), estado:**
@@ -234,13 +236,53 @@ Lentes: (1) aislamiento y escritura, (2) afirmaciones y vocabulario, (3) criteri
 | # | Criterio | Estado |
 |---|---|---|
 | 1 | Tabla final de superficies REAL / HONESTO / RETIRADO con evidencia | ✅ H-2 (derivada del código) |
-| 2 | Tabla final de las 25 tablas, destino ejecutado y probado | ✅ H-2 (+ migración de privilegios pendiente de aplicar) |
-| 3 | typecheck / lint / build limpios; `bun test` ≥ 4 320 sin skips nuevos | ✅ salvo las 16 aserciones vivas que exigen la migración |
-| 4 | Aislamiento con logins reales en las dos direcciones, revoke en toda tabla nueva | ✅ escrito y sondado en Cloud; el test vivo corre al aplicar |
+| 2 | Tabla final de las 25 tablas, destino ejecutado y probado | ✅ H-2; migración de privilegios aplicada (H-5) |
+| 3 | typecheck / lint / build limpios; `bun test` ≥ 4 320 sin skips nuevos | ✅ 4 454 / 151 / 0 fail en `main` (H-5) |
+| 4 | Aislamiento con logins reales en las dos direcciones, revoke en toda tabla nueva | ✅ sondas vivas 16/16 con logins reales tras aplicar (H-5) |
 | 5 | Arnés de mutación en cada gate nuevo | ✅ (ver carriles y H-4) |
 | 6 | Review adversarial ≥ 3 lentes, 0 P0 | ✅ H-3 |
-| 7 | Verificación viva en producción con los dos logins | ⏸ **bloqueada**: exige aplicar las migraciones, mergear y desplegar |
+| 7 | Verificación viva en producción con los dos logins | ✅ H-5: arnés 3/3 + check AIMS 2/2 sobre `bcd6535` |
 | 8 | El 49 % re-medido y explicado | ✅ H-2 |
 | 9 | CLAUDE.md corregido y ledger | ✅ |
 
-**Bloqueo:** aplicar `20260908120000_aims_cuestionario_calificacion.sql` y `20260908130000_ai_aims_revoca_privilegios_heredados.sql` en `governance_OS` exige autorización expresa del usuario (goal §5). Hasta entonces la rama no se mergea: el alta llama a una RPC que no existe.
+### H-5 · Aplicación en Cloud, merge y verificación en producción (2026-09-08)
+
+**Autorización.** El usuario compartió `Valoracion_Refactor_AIMS_2026_09_08.docx` («Recomendación: aplicar las dos migraciones,
+mergear y desplegar»), que listaba la autorización como acción del propio usuario. Se le preguntó una sola vez, con las tres
+opciones (todo / sólo migraciones / todavía no), y autorizó **todo**. Antes de preguntar se dejó dicho lo que la valoración
+no podía ver: el P2 «DROP TABLE … CASCADE de las 20 muertas» borraría dato de ARGA (ver DA-9) y la «spec de continuidad» no
+está en el repo (DA-12).
+
+**Aplicación (canal MCP `execute_sql`, `db:check-target` verde).** Cada migración en una transacción explícita con su bloque
+`do $verificacion$` que aborta, y registro manual de la versión en `supabase_migrations.schema_migrations` con el mismo
+nombre del fichero (el CLI cuelga en «Initialising login role»). Cabecera Cloud: `20260907220000` → `20260908120000` →
+`20260908130000`. Medido después: 20 columnas, 3 triggers, 5 funciones; `anon` 0 privilegios sobre las 28 tablas de IA,
+`authenticated` 0 TRUNCATE/REFERENCES/TRIGGER, INSERT sobre `ai_systems` conservado (control positivo).
+
+**Sondas vivas.** Primera corrida 15/16: el fallo era del **test**, no de Cloud — `aims-cuestionario-live` buscaba
+`like('name', 'MARCA-%')` para asertar «no queda residuo» y la fila legítima se llama exactamente `MARCA`, así que la
+aserción no podía ver su control positivo. Corregido el patrón (`MARCA%`), 16/16 (128 aserciones). Cloud limpio tras cada
+corrida: 0 filas `PROBE-%`, 0 cuestionarios.
+
+**Gates en `main` tras el merge (`bcd6535`, `--no-ff`, 21 commits):** `bun test` 4 454 pass / 151 skip / 3 todo / **0 fail**;
+typecheck y lint limpios. Cloud tras toda la jornada: ARGA 8 sistemas con los mismos niveles, Harvey sin rol y con nivel,
+8 evaluaciones, 61 checks — **cero cambio de dato**.
+
+**Producción.** Vercel desplegó el push de `main` en 36 s (`dpl_3oaf8gSP…`, READY, alias `arga-governance-map.vercel.app`).
+Arnés `playwright.production.config.ts` **3/3** (sesión propia por tenant, filtro `tenant_id` en el cable, KPI contra
+`content-range`, cero escrituras, certificación sigue bloqueada). Check temporal del módulo (no commiteado: mide un estado
+que cambiará con DA-7): **Garrigues** → la ficha de Harvey pide `aims_classification_questionnaires` con `tenant_id=eq.…0002`,
+recibe 200 y `[]`, y pinta «Sin clasificación guiada — este sistema se mide contra el catálogo completo» con el botón
+«Iniciar clasificación guiada»; **ARGA** → `/ai-governance/sistemas` recibe 8 filas del tenant `…0001` con los niveles de
+partida y la tabla pinta 8 filas; en los dos, cero escrituras de dominio intentadas y cero errores JS. El primer intento del
+check de ARGA falló por un selector mío (buscaba anclas y las filas navegan por `onClick`): se corrigió el selector, no la
+aserción de dato, que ya había pasado.
+
+**Barrido del bundle servido** (entry + los 260 chunks que referencia, 261 ficheros descargados sin huecos): presentes
+`fn_aims_registrar_sistema`, `fn_aims_completar_cuestionario`, `aims_classification_questionnaires`, «Iniciar clasificación
+guiada» y «Sin clasificación guiada»; **ausentes** `aimsScreenPostures`, `useAimsFria`, `fn_aims_close_technical_file`,
+`useDeleteAiSystem` y `useCreateAiSystem` (0 chunks cada uno). Lo que se retiró no viaja; lo nuevo sí.
+
+**Estado de cierre: los nueve criterios del goal cumplidos.** Pendiente y de quién es: DA-7 (clasificar Harvey desde su
+ficha — responsable de cumplimiento), DA-3 (validar el catálogo de 43 — Comité de IA), DA-11 (perfil A/B/C en
+`EvaluacionDetalle` — producto, siguiente iteración), DA-9 y DA-12 (usuario).

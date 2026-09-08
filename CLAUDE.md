@@ -415,7 +415,7 @@ pantalla lo dice.
 
 ### Refactor total del módulo AIMS + cuestionario guiado de calificación (2026-09-08)
 
-Rama `refactor/aims-total-2026-09-08`. Goal: `docs/superpowers/prompts/2026-09-08-goal-refactor-total-aims.md`; spec del
+Rama `refactor/aims-total-2026-09-08`, **mergeada en `main` el 2026-09-08 (`bcd6535`, `--no-ff`) y desplegada**. Goal: `docs/superpowers/prompts/2026-09-08-goal-refactor-total-aims.md`; spec del
 equipo legal validada en `docs/superpowers/reviews/2026-09-08-validacion-spec-cuestionario-vs-refactor-aims.md` (S-1…S-14);
 plan `docs/superpowers/plans/2026-09-08-refactor-total-aims-plan.md`; **ledger canónico
 `docs/superpowers/plans/2026-09-08-ledger-refactor-aims.md`** (decisiones D-1…D-12, refutaciones, deudas DA-1…DA-9,
@@ -449,15 +449,30 @@ pantallas lo consumen), `cuestionario-calificacion.ts`, `expediente-tecnico.ts` 
 (`SistemaDetalle` 1 387 → 167, `EvaluacionNueva` 1 360 → 395, `Dashboard` 1 022 → 384); 41 componentes en
 `src/components/ai-governance/{clasificacion,sistema,evaluacion,evaluacion-detalle,dashboard,incidente}/`.
 
-**Migraciones PENDIENTES DE APLICAR (autorización del usuario, cambio a cambio):** `20260908120000_aims_cuestionario_calificacion`
-y `20260908130000_ai_aims_revoca_privilegios_heredados` (medido: `anon` tenía DELETE/INSERT/UPDATE/TRUNCATE… sobre 28
-tablas `ai_*`/`aims_*`; `authenticated` TRUNCATE/REFERENCES/TRIGGER). Verificadas en Cloud con una **sonda revertida de 27
-pasos** (ledger H-1). Hasta que se apliquen, `aims-cuestionario-live.test.ts` y `garrigues-ia-owner-write.test.ts` están
-**rojos a propósito** (16 aserciones) y la rama **no se mergea**: el alta llama a una RPC que no existe. Gates en la rama:
-`bun test` 4 438 pass / 151 skip / 0 fallos fuera de esas 16; typecheck, lint (0 warnings) y build limpios. Review adversarial de 3
-lentes (H-3 del ledger): 7 P1 cerrados, entre ellos que el servidor validaba la práctica prohibida contra la conclusión que
-mandaba el cliente — ahora **re-deriva rol, nivel y perfil desde las respuestas** (`fn_aims_derivar_*`, espejo SQL del árbol) y
-rechaza `CLASIFICACION_INCOHERENTE`; la sonda viva compara SQL y TS caso a caso.
+**Migraciones APLICADAS y registradas en `governance_OS` el 2026-09-08 con autorización expresa del usuario** (cabecera Cloud
+`20260908130000`): `20260908120000_aims_cuestionario_calificacion` y `20260908130000_ai_aims_revoca_privilegios_heredados`.
+Medido antes: `anon` tenía DELETE/INSERT/UPDATE/TRUNCATE… sobre 28 tablas `ai_*`/`aims_*` y `authenticated`
+TRUNCATE/REFERENCES/TRIGGER; después: **0 y 0**, y `authenticated` conserva INSERT sobre `ai_systems` (control positivo).
+Verificadas antes de aplicar con una **sonda revertida de 27 pasos** (ledger H-1); aplicadas vía MCP `execute_sql` en una
+transacción explícita con el bloque de verificación que aborta y **registro manual** en `schema_migrations` (el CLI cuelga por
+token caducado). Tras aplicarlas: `aims-cuestionario-live.test.ts` y `garrigues-ia-owner-write.test.ts` **16/16 con logins
+reales** (la primera corrida cazó un defecto del propio test: buscaba `MARCA-%` y la fila legítima se llama `MARCA`, así que la
+aserción «no queda residuo» no veía su control positivo); `bun test` en `main` **4 454 pass / 151 skip / 3 todo / 0 fail**
+(línea base 4 320); typecheck, lint (0 warnings) y build limpios. **Producción verificada con sesión iniciada en los dos
+tenants** (despliegue `bcd6535` READY en 36 s): arnés `playwright.production.config.ts` 3/3 y un check temporal del módulo
+—la ficha de Harvey en Garrigues lee `aims_classification_questionnaires` con `tenant_id=eq.…0002` en el cable, recibe 200 y
+vacío, y declara «Sin clasificación guiada» con el botón «Iniciar clasificación guiada»; ARGA sigue con 8 sistemas y los
+mismos niveles; cero escrituras de dominio intentadas y cero errores JS—. Cloud tras toda la jornada: ARGA 8 / Garrigues 1 /
+8 evaluaciones / 61 checks / 0 cuestionarios / 0 filas `PROBE-%`. Review adversarial de 3 lentes (H-3 del ledger): 7 P1
+cerrados, entre ellos que el servidor validaba la práctica prohibida contra la conclusión que mandaba el cliente — ahora
+**re-deriva rol, nivel y perfil desde las respuestas** (`fn_aims_derivar_*`, espejo SQL del árbol) y rechaza
+`CLASIFICACION_INCOHERENTE`; la sonda viva compara SQL y TS caso a caso.
+
+**No hacer sin decisión expresa:** la valoración del 2026-09-08 propone como P2 «borrar las 20 tablas muertas con `DROP TABLE
+… CASCADE`». **Borraría dato de ARGA**: `aims_requirement_catalog` 4, `aims_requirement_checks` 4, `aims_control_catalog` 2 y
+`aims_post_market_plans` 1 filas. La migración `130000` les retira la escritura precisamente para dejar ese dato intacto y
+legible (DA-9 del ledger). Y la «spec de continuidad» que esa valoración cita (C4→C1→M1→M2, `compliance_tier`, KPI dual)
+**no está en el repo**: M1/M2 no se planifican sin ella (DA-12).
 
 **GOTCHAs nuevos:** (1) `current_setting('x', true)` devuelve **NULL** sin flag y `NULL = 'on'` es NULL: un `if not v_rpc`
 no bloquea nunca — siempre `coalesce(…, '')`; la sonda lo cazó en la primera pasada. (2) Un flag `set_config(…, true)`
