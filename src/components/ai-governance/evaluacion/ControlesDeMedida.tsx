@@ -5,35 +5,11 @@
  * Medidas Adicionales. Mientras las MA no tuvieron estos controles no eran
  * evaluables: se añadían, se pintaban y se descartaban al enviar.
  *
- * Aquí viven además las clases de formulario compartidas por los cuatro pasos
- * del wizard: son una sola definición, no cuatro copias que divergen.
+ * Las clases de formulario y el estado de una medida viven en `estado-medida.ts`.
  */
 import { MATURITY_LEVELS, DIFICULTAD_SIN_EVALUAR } from "@/lib/aims/catalog-aesia";
+import { INPUT_CLASSES, LABEL_CLASSES, SELECT_CLASSES, TEXTAREA_CLASSES, type MeasureEvaluationState } from "./estado-medida";
 import { NIVEL_NO_APLICABLE, MOTIVO_L8_SIN_JUSTIFICAR } from "@/lib/aims/evaluacion-payload";
-
-export const INPUT_CLASSES =
-  "h-10 w-full px-3 text-sm bg-[var(--g-surface-card)] text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)]/60 border border-[var(--g-border-subtle)] focus:border-[var(--g-brand-3308)] focus:outline-none transition-colors";
-
-export const TEXTAREA_CLASSES =
-  "w-full px-3 py-2 text-sm bg-[var(--g-surface-card)] text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)]/60 border border-[var(--g-border-subtle)] focus:border-[var(--g-brand-3308)] focus:outline-none transition-colors resize-none";
-
-export const SELECT_CLASSES =
-  "h-10 w-full px-3 text-sm bg-[var(--g-surface-card)] text-[var(--g-text-primary)] border border-[var(--g-border-subtle)] focus:border-[var(--g-brand-3308)] focus:outline-none transition-colors";
-
-export const LABEL_CLASSES = "block text-sm font-medium text-[var(--g-text-primary)] mb-1";
-
-export type MeasureEvaluationState = {
-  /** `''` = sin evaluar. Antes nacía en `'01'` (media) sin que nadie graduara. */
-  difficulty: string;
-  maturity: string; // 'L1' - 'L8'
-  justification: string;
-};
-
-export const ESTADO_VACIO: MeasureEvaluationState = {
-  difficulty: DIFICULTAD_SIN_EVALUAR,
-  maturity: "",
-  justification: "",
-};
 
 /**
  * Plan de adaptación resultante del nivel de madurez. Lo pintan la medida guía

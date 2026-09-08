@@ -6,7 +6,7 @@
  */
 import { ArrowRight } from "lucide-react";
 import type { AiSystem } from "@/hooks/useAiSystems";
-import { LABEL_CLASSES, SELECT_CLASSES } from "./ControlesDeMedida";
+import { LABEL_CLASSES, SELECT_CLASSES } from "./estado-medida";
 
 export type MarcoEvaluacion = "EU_AI_ACT" | "ISO_42001";
 

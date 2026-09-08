@@ -16,11 +16,8 @@ import {
 import { MOTIVO_L5_SIN_EVIDENCIA, type MedidaAdicionalRef } from "@/lib/aims/evaluacion-payload";
 import { procedenciaDe } from "@/lib/aims/perfil-aplicabilidad";
 import EvidenciaDeMedida from "@/components/ai-governance/EvidenciaDeMedida";
-import ControlesDeMedida, {
-  BadgePlan,
-  ESTADO_VACIO,
-  type MeasureEvaluationState,
-} from "./ControlesDeMedida";
+import ControlesDeMedida, { BadgePlan } from "./ControlesDeMedida";
+import { ESTADO_VACIO, type MeasureEvaluationState } from "./estado-medida";
 import { BotonNuevaMedidaAdicional, ListaMedidasAdicionales } from "./MedidasAdicionales";
 
 export type EstadoAutoguardado = "limpio" | "guardando" | "guardado" | "error";

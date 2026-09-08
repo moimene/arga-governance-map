@@ -33,7 +33,7 @@ import PasoMedidas from "@/components/ai-governance/evaluacion/PasoMedidas";
 import PasoRevision from "@/components/ai-governance/evaluacion/PasoRevision";
 import PasoResultado from "@/components/ai-governance/evaluacion/PasoResultado";
 import PerfilAplicabilidadBanner from "@/components/ai-governance/evaluacion/PerfilAplicabilidadBanner";
-import { ESTADO_VACIO, type MeasureEvaluationState } from "@/components/ai-governance/evaluacion/ControlesDeMedida";
+import { ESTADO_VACIO, type MeasureEvaluationState } from "@/components/ai-governance/evaluacion/estado-medida";
 
 /**
  * Los dos marcos evaluables. Se declaran junto a la decisión de catálogo y no

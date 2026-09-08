@@ -9,7 +9,7 @@
 import { AlertTriangle, Save } from "lucide-react";
 import { ADAPTATION_PLANS } from "@/lib/aims/catalog-aesia";
 import type { AccionPDA } from "@/lib/aims/plan-adaptacion";
-import { LABEL_CLASSES, TEXTAREA_CLASSES } from "./ControlesDeMedida";
+import { LABEL_CLASSES, TEXTAREA_CLASSES } from "./estado-medida";
 
 export type EstadisticasEvaluacion = {
   maturityScore: number;

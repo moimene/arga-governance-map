@@ -14,13 +14,8 @@ import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { subpartTitle, calculateAdaptationPlan, type RequirementDef } from "@/lib/aims/catalog-aesia";
 import type { MedidaAdicionalRef } from "@/lib/aims/evaluacion-payload";
-import ControlesDeMedida, {
-  BadgePlan,
-  ESTADO_VACIO,
-  SELECT_CLASSES,
-  TEXTAREA_CLASSES,
-  type MeasureEvaluationState,
-} from "./ControlesDeMedida";
+import ControlesDeMedida, { BadgePlan } from "./ControlesDeMedida";
+import { ESTADO_VACIO, SELECT_CLASSES, TEXTAREA_CLASSES, type MeasureEvaluationState } from "./estado-medida";
 
 export type BotonNuevaMedidaAdicionalProps = {
   requirement: RequirementDef;
