@@ -230,7 +230,7 @@ describe("cuestionario guiado — vivo, con los dos logins", () => {
       p_cuestionario: incoherente,
     });
     expect(rechazo.error?.message ?? "").toContain("CLASIFICACION_INCOHERENTE");
-    const restos = await garr.from("ai_systems").select("id").like("name", `${MARCA}-%`);
+    const restos = await garr.from("ai_systems").select("id").like("name", `${MARCA}%`);
     expect((restos.data ?? []).map((r) => r.id)).toEqual([sistemaGarr].filter(Boolean));
   });
 
