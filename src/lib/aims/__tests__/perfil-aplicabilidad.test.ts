@@ -181,3 +181,22 @@ describe("las pantallas declaran el perfil", () => {
     expect(src).toMatch(/const requirements: RequirementDef\[\] = perfil\.requirements/);
   });
 });
+
+describe("el perfil expone el perfil de catálogo A/B/C del cuestionario guiado (2026-09-08)", () => {
+  it("proveedor de alto riesgo es A; despliegue de alto riesgo es B y falla abierto diciéndolo", () => {
+    const a = perfilAplicable({ regulatory_role: "PROVEEDOR", risk_level: "Alto" }, AESIA_RIA_REQUIREMENTS);
+    expect(a.catalogProfile).toBe("PROFILE_A");
+    const b = perfilAplicable({ regulatory_role: "RESPONSABLE_DESPLIEGUE", risk_level: "Alto" }, AESIA_RIA_REQUIREMENTS);
+    expect(b.catalogProfile).toBe("PROFILE_B");
+    // S-6: no hay catálogo validado para el perfil B; se mide contra las 84 y se dice.
+    expect(b.requirements).toBe(AESIA_RIA_REQUIREMENTS);
+    expect(b.motivo).toMatch(/no hay catálogo validado/i);
+  });
+
+  it("despliegue de riesgo limitado es C con las 43; sin rol no hay perfil", () => {
+    const c = perfilAplicable({ regulatory_role: "RESPONSABLE_DESPLIEGUE", risk_level: "Limitado" }, AESIA_RIA_REQUIREMENTS);
+    expect(c.catalogProfile).toBe("PROFILE_C");
+    expect(c.requirements).toBe(DESPLIEGUE_REQUIREMENTS);
+    expect(perfilAplicable({ regulatory_role: null, risk_level: "Limitado" }, AESIA_RIA_REQUIREMENTS).catalogProfile).toBeNull();
+  });
+});

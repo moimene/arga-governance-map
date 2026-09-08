@@ -33,6 +33,7 @@
  */
 
 import type { RequirementDef } from "./catalog-aesia";
+import { perfilCatalogo, type PerfilCatalogo } from "./cuestionario-calificacion";
 
 export type FuenteMedida = "RIA" | "RGPD" | "ISO_42001" | "DEONTOLOGIA";
 export type CaracterMedida = "OBLIGACION" | "MARCO_OPERATIVO";
@@ -281,6 +282,12 @@ export type PerfilAplicabilidad = {
   provisional: boolean;
   /** `true` cuando no hay rol declarado y se cae al catálogo de proveedor. */
   sinRolDeclarado: boolean;
+  /**
+   * Perfil A/B/C del cuestionario guiado (spec v1.1). `null` sin rol, sin nivel
+   * o en Inaceptable. El perfil dice QUIÉN es y CUÁNTO riesgo hay; el catálogo
+   * que se mide sale de aquí y del criterio de abajo, no al revés.
+   */
+  catalogProfile: PerfilCatalogo | null;
 };
 
 const ROLES_DE_DESPLIEGUE = new Set(["RESPONSABLE_DESPLIEGUE", "IMPORTADOR", "DISTRIBUIDOR"]);
@@ -306,21 +313,29 @@ export function perfilAplicable(
       motivo: AVISO_SIN_ROL,
       provisional: false,
       sinRolDeclarado: true,
+      catalogProfile: null,
     };
   }
 
   // Alto riesgo o inaceptable: el catálogo completo, sea cual sea el rol. No se
   // reduce nada donde el Reglamento es más exigente.
   if (nivel === "Alto" || nivel === "Inaceptable" || nivel === "") {
+    const perfilB = nivel === "Alto" && ROLES_DE_DESPLIEGUE.has(rol);
     return {
       requirements: catalogoProveedor,
       etiqueta: "Proveedor de sistema de alto riesgo",
       motivo:
         nivel === ""
           ? "El sistema no declara nivel de riesgo: se mide contra el catálogo completo."
-          : `Nivel de riesgo «${nivel}»: se mide contra el catálogo completo de los arts. 9 a 15 y 17.`,
+          : perfilB
+            // S-6 de la validación de la spec: no hay catálogo validado para el
+            // responsable del despliegue de alto riesgo (arts. 26 y 27, RGPD) y
+            // componerlo es del Comité de IA. Medir de más y decirlo es conservador.
+            ? "Responsable del despliegue de alto riesgo: no hay catálogo validado para este perfil, así que se mide contra el catálogo completo del proveedor (arts. 9 a 15 y 17) y se dice."
+            : `Nivel de riesgo «${nivel}»: se mide contra el catálogo completo de los arts. 9 a 15 y 17.`,
       provisional: false,
       sinRolDeclarado: false,
+      catalogProfile: perfilCatalogo(rol, nivel),
     };
   }
 
@@ -332,6 +347,7 @@ export function perfilAplicable(
         "Las 84 medidas guía desarrollan las obligaciones del PROVEEDOR de un sistema de alto riesgo (arts. 9 a 15, 17, 72 y 73). Este perfil se mide contra las que sí vinculan a esta posición regulatoria.",
       provisional: true,
       sinRolDeclarado: false,
+      catalogProfile: perfilCatalogo(rol, nivel),
     };
   }
 
@@ -344,6 +360,7 @@ export function perfilAplicable(
       "El rol declarado es de proveedor: se mide contra el catálogo completo, aunque parte de las medidas puedan resultar no aplicables al caso.",
     provisional: false,
     sinRolDeclarado: false,
+    catalogProfile: perfilCatalogo(rol, nivel),
   };
 }
 
