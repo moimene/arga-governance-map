@@ -1,44 +1,28 @@
 import { Link, useNavigate } from "react-router-dom";
-import {
-  AlertTriangle,
-  ArrowRight,
-  Brain,
-  CheckCircle2,
-  ClipboardCheck,
-  Clock,
-  Cpu,
-  Database,
-  Eye,
-  FileCheck2,
-  GitBranch,
-  Hand,
-  ListChecks,
-  Route,
-  PlusCircle,
-  ShieldCheck,
-  UserCheck,
-} from "lucide-react";
+import { AlertTriangle, ArrowRight, Brain, Clock, Cpu } from "lucide-react";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { useAiIncidentsList } from "@/hooks/useAiIncidents";
 import { useAllAssessments, useAllComplianceChecks } from "@/hooks/useAiAssessments";
 import {
-  aimsReadOnlyHandoffs,
-  aimsScreenPostures,
   assessmentAcreditaConformidad,
   buildAimsReadiness,
   filterSystemsByScope,
+  isAimsMaterialIncidentCandidate,
+  normalizeAimsStatus,
   systemStatusChipClass,
   systemStatusLabel,
-  type AimsComplianceMonitorDomain,
-  type AimsReadinessDomain,
-  type AimsReadinessStatus,
 } from "@/lib/aims/readiness";
 import { useScope } from "@/context/ScopeContext";
 import { useTenantContext } from "@/context/TenantContext";
 import { useBodyBySlug } from "@/hooks/useBodies";
 import { aiGovernanceBodySlug } from "@/lib/aims/governing-body";
-import { normalizeAimsStatus } from "@/lib/aims/readiness";
 import { claseNivelRiesgo } from "@/lib/aims/vocabulario";
+import { ClasificacionGuiadaCard } from "@/components/ai-governance/dashboard/ClasificacionGuiadaCard";
+import { ComplianceMonitorPanel } from "@/components/ai-governance/dashboard/ComplianceMonitorPanel";
+import { IncidentesRecientes } from "@/components/ai-governance/dashboard/IncidentesRecientes";
+import { OrganoRector } from "@/components/ai-governance/dashboard/OrganoRector";
+import { PrioridadAhora } from "@/components/ai-governance/dashboard/PrioridadAhora";
+import { ReadinessDomains } from "@/components/ai-governance/dashboard/ReadinessDomains";
 
 function RiskBadge({ level }: { level: string | null }) {
   if (!level) return null;
@@ -110,340 +94,6 @@ function KpiCard({
   );
 }
 
-const READINESS_STATUS: Record<AimsReadinessStatus, { label: string; className: string }> = {
-  ready: {
-    label: "Listo",
-    className: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-  },
-  watch: {
-    label: "Vigilancia",
-    className: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  },
-  gap: {
-    label: "Gap",
-    className: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  },
-};
-
-const DOMAIN_ICONS: Record<string, React.ElementType> = {
-  inventory: Database,
-  "ai-act-assessments": ClipboardCheck,
-  incidents: AlertTriangle,
-  controls: ShieldCheck,
-  "operational-evidence": FileCheck2,
-  migration: GitBranch,
-};
-
-const COMPLIANCE_MONITOR_ICONS: Record<string, React.ElementType> = {
-  "governance-accountability": UserCheck,
-  "inventory-classification": Database,
-  "prohibited-practices": AlertTriangle,
-  "high-risk-obligations": ClipboardCheck,
-  "technical-documentation": FileCheck2,
-  "data-governance": Database,
-  "transparency-user-information": Eye,
-  "human-oversight": Hand,
-  "accuracy-robustness-cybersecurity": ShieldCheck,
-  "provider-vendor-third-party": Cpu,
-  "post-market-monitoring": Clock,
-  "incident-reporting-escalation": AlertTriangle,
-  "fundamental-rights-dpia": ShieldCheck,
-  "iso-42001-management-system": ListChecks,
-  "evidence-recordkeeping": FileCheck2,
-};
-
-function ReadinessBadge({ status }: { status: AimsReadinessStatus }) {
-  const meta = READINESS_STATUS[status];
-  return (
-    <span
-      className={`inline-flex items-center px-2 py-0.5 text-[10px] font-bold uppercase ${meta.className}`}
-      style={{ borderRadius: "var(--g-radius-full)" }}
-    >
-      {meta.label}
-    </span>
-  );
-}
-
-function ComplianceMonitorPanel({ monitors }: { monitors: AimsComplianceMonitorDomain[] }) {
-  const summary = {
-    ready: monitors.filter((monitor) => monitor.status === "ready").length,
-    watch: monitors.filter((monitor) => monitor.status === "watch").length,
-    gap: monitors.filter((monitor) => monitor.status === "gap").length,
-  };
-
-  return (
-    <section
-      className="mb-6 border border-[var(--g-border-default)] bg-[var(--g-surface-card)]"
-      style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-      aria-label="Monitor de cumplimiento AIMS"
-    >
-      <div className="border-b border-[var(--g-border-subtle)] px-5 py-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
-              Monitor de cumplimiento
-            </p>
-            <h2 className="text-base font-semibold text-[var(--g-text-primary)]">
-              Áreas AIMS que deben estar bajo vigilancia continua
-            </h2>
-            <p className="mt-1 max-w-3xl text-xs leading-5 text-[var(--g-text-secondary)]">
-              La lectura se deriva de inventario, evaluaciones, controles de cumplimiento e incidentes. No crea controles GRC ni mueve el backbone `aims_*`.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <span
-              className="bg-[var(--status-success)] px-2.5 py-1 text-xs font-semibold text-[var(--g-text-inverse)]"
-              style={{ borderRadius: "var(--g-radius-full)" }}
-            >
-              {summary.ready} listas
-            </span>
-            <span
-              className="bg-[var(--status-warning)] px-2.5 py-1 text-xs font-semibold text-[var(--g-text-inverse)]"
-              style={{ borderRadius: "var(--g-radius-full)" }}
-            >
-              {summary.watch} vigilancia
-            </span>
-            <span
-              className="bg-[var(--status-error)] px-2.5 py-1 text-xs font-semibold text-[var(--g-text-inverse)]"
-              style={{ borderRadius: "var(--g-radius-full)" }}
-            >
-              {summary.gap} gaps
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">
-        {monitors.map((monitor) => {
-          const Icon = COMPLIANCE_MONITOR_ICONS[monitor.id] ?? ListChecks;
-          return (
-            <Link
-              key={monitor.id}
-              to={monitor.route}
-              className="min-h-[154px] border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 transition-colors hover:border-[var(--g-brand-3308)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
-              style={{ borderRadius: "var(--g-radius-lg)" }}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-start gap-3">
-                  <div
-                    className="flex h-9 w-9 shrink-0 items-center justify-center bg-[var(--g-surface-subtle)]"
-                    style={{ borderRadius: "var(--g-radius-md)" }}
-                  >
-                    <Icon className="h-4 w-4 text-[var(--g-brand-3308)]" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--g-text-secondary)]">
-                      {monitor.area}
-                    </p>
-                    <h3 className="mt-0.5 text-sm font-semibold text-[var(--g-text-primary)]">
-                      {monitor.label}
-                    </h3>
-                  </div>
-                </div>
-                <ReadinessBadge status={monitor.status} />
-              </div>
-              <p className="mt-3 line-clamp-2 text-xs leading-5 text-[var(--g-text-secondary)]">
-                {monitor.detail}
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="text-xs font-semibold text-[var(--g-text-primary)]">{monitor.metric}</span>
-                <span
-                  className="bg-[var(--g-surface-muted)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--g-text-secondary)]"
-                  style={{ borderRadius: "var(--g-radius-full)" }}
-                >
-                  {monitor.source}
-                </span>
-                {monitor.handoff && (
-                  <span
-                    className="bg-[var(--g-surface-subtle)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--g-brand-3308)]"
-                    style={{ borderRadius: "var(--g-radius-full)" }}
-                  >
-                    handoff
-                  </span>
-                )}
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-function ReadinessDomainCard({ domain }: { domain: AimsReadinessDomain }) {
-  const Icon = DOMAIN_ICONS[domain.id] ?? ListChecks;
-  return (
-    <Link
-      to={domain.route}
-      className="block border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 hover:border-[var(--g-brand-3308)] transition-colors"
-      style={{ borderRadius: "var(--g-radius-lg)" }}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center bg-[var(--g-surface-subtle)]"
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            <Icon className="h-4 w-4 text-[var(--g-brand-3308)]" />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">{domain.label}</h3>
-            <p className="mt-1 text-xs text-[var(--g-text-secondary)] leading-relaxed">{domain.detail}</p>
-          </div>
-        </div>
-        <ReadinessBadge status={domain.status} />
-      </div>
-      <div className="mt-3 flex items-center justify-between">
-        <span className="text-xs font-semibold text-[var(--g-text-primary)]">{domain.metric}</span>
-        <ArrowRight className="h-3.5 w-3.5 text-[var(--g-text-secondary)]" />
-      </div>
-    </Link>
-  );
-}
-
-function ScreenPostureTable() {
-  return (
-    <details
-      className="mt-5 overflow-hidden border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
-      style={{ borderRadius: "var(--g-radius-lg)" }}
-    >
-      <summary className="flex cursor-pointer items-center gap-2 border-b border-[var(--g-border-subtle)] px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2">
-        <ListChecks className="h-4 w-4 text-[var(--g-brand-3308)]" />
-        <h3 className="text-xs font-semibold uppercase text-[var(--g-text-primary)]">
-          Contexto técnico AIMS
-        </h3>
-        <span
-          className="ml-auto bg-[var(--g-surface-subtle)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--g-text-primary)]"
-          style={{ borderRadius: "var(--g-radius-full)" }}
-        >
-          solo lectura demo
-        </span>
-      </summary>
-      <div className="grid gap-3 p-4 md:hidden">
-        {aimsScreenPostures.map((screen) => (
-          <div
-            key={screen.route}
-            className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3"
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-[var(--g-text-primary)]">{screen.screen}</p>
-                <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">{screen.route}</p>
-              </div>
-              <span
-                className="bg-[var(--g-surface-muted)] px-2 py-0.5 text-[11px] font-semibold text-[var(--g-text-secondary)]"
-                style={{ borderRadius: "var(--g-radius-full)" }}
-              >
-                {screen.operation}
-              </span>
-            </div>
-            <p className="mt-2 text-xs leading-5 text-[var(--g-text-secondary)]">
-              {screen.crossModuleHandoffs.join("; ")}
-            </p>
-          </div>
-        ))}
-      </div>
-      <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[900px]">
-          <thead>
-            <tr className="bg-[var(--g-surface-subtle)]">
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
-                Pantalla
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
-                Datos responsables
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
-                Operación
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
-                Handoff seguro
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--g-border-subtle)]">
-            {aimsScreenPostures.map((screen) => (
-              <tr key={screen.route} className="hover:bg-[var(--g-surface-subtle)]/50">
-                <td className="px-4 py-3 align-top">
-                  <p className="text-sm font-semibold text-[var(--g-text-primary)]">{screen.screen}</p>
-                  <p className="mt-0.5 font-mono text-[11px] text-[var(--g-text-secondary)]">{screen.route}</p>
-                </td>
-                <td className="px-4 py-3 align-top">
-                  <p className="text-xs text-[var(--g-text-primary)]">{screen.tables.join(", ")}</p>
-                  <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">{screen.sourceOfTruth}</p>
-                </td>
-                <td className="px-4 py-3 align-top">
-                  <span
-                    className="inline-flex bg-[var(--g-surface-muted)] px-2 py-0.5 text-[11px] font-semibold text-[var(--g-text-secondary)]"
-                    style={{ borderRadius: "var(--g-radius-full)" }}
-                  >
-                    {screen.operation}
-                  </span>
-                  {/* Era PROSA FIJA en las diez filas y contradecía al dato de
-                      la propia fila: dos pantallas declaran
-                      `migrationRequired: true`. Y «ni escrituras cross-module»
-                      no se mide aquí: la columna de handoffs ya dice lo que
-                      hay. Se pinta el campo, no una afirmación general. */}
-                  <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">
-                    {screen.migrationRequired
-                      ? "Con migración declarada pendiente."
-                      : "Sin migración declarada."}
-                  </p>
-                </td>
-                <td className="px-4 py-3 align-top">
-                  <p className="text-xs text-[var(--g-text-secondary)]">
-                    {screen.crossModuleHandoffs.join("; ")}
-                  </p>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </details>
-  );
-}
-
-function HandoffAffordances() {
-  return (
-    <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
-      {aimsReadOnlyHandoffs.map((handoff) => (
-        <Link
-          key={handoff.id}
-          to={handoff.targetRoute}
-          className="block border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 transition-colors hover:border-[var(--g-brand-3308)]"
-          style={{ borderRadius: "var(--g-radius-lg)" }}
-        >
-          <div className="flex items-start gap-3">
-            <div
-              className="flex h-9 w-9 shrink-0 items-center justify-center bg-[var(--g-surface-subtle)]"
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              <Route className="h-4 w-4 text-[var(--g-brand-3308)]" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">{handoff.label}</h3>
-                <span
-                  className="bg-[var(--g-surface-muted)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--g-text-secondary)]"
-                  style={{ borderRadius: "var(--g-radius-full)" }}
-                >
-                  {handoff.evidencePosture}
-                </span>
-              </div>
-              <p className="mt-1 text-xs leading-relaxed text-[var(--g-text-secondary)]">
-                {handoff.trigger}. {handoff.targetOwner} conserva la decisión; AIMS solo enruta.
-              </p>
-              <p className="mt-2 font-mono text-[11px] text-[var(--g-text-secondary)]">{handoff.contractEvent}</p>
-            </div>
-          </div>
-        </Link>
-      ))}
-    </div>
-  );
-}
-
 export default function AiDashboard() {
   const { scope } = useScope();
   // Órgano de gobierno de la IA del tenant. Doble puerta: el mapa no devuelve
@@ -508,59 +158,10 @@ export default function AiDashboard() {
 
   const readiness = buildAimsReadiness({ systems, assessments, incidents, complianceChecks });
   const loading = loadingSystems || loadingIncidents || loadingAssessments || loadingComplianceChecks;
-  const materialIncidents = incidents.filter(
-    (incident) =>
-      ["CRITICO", "CRÍTICO", "ALTO"].includes(incident.severity ?? "") &&
-      ["ABIERTO", "EN_INVESTIGACION"].includes(incident.status ?? "")
-  ).length;
-  const priorityItems = [
-    {
-      label: "Alto riesgo sin evaluación aprobada",
-      value: altosNoEvaluados,
-      body: "Cerrar evaluación AI Act antes de presentar el sistema como controlado.",
-      to: "/ai-governance/evaluaciones",
-      icon: ClipboardCheck,
-      tone:
-        altosNoEvaluados > 0
-          ? "text-[var(--status-error)]"
-          : systems.length === 0
-            ? "text-[var(--g-text-secondary)]"
-            : "text-[var(--status-success)]",
-    },
-    {
-      label: "Incidentes materiales de IA",
-      value: materialIncidents,
-      body: "Revisar severidad, causa raíz y posible handoff a GRC o Secretaría.",
-      to: "/ai-governance/incidentes",
-      icon: AlertTriangle,
-      // Con cero incidentes registrados el cero no es bueno ni malo: no consta.
-      tone:
-        materialIncidents > 0
-          ? "text-[var(--status-warning)]"
-          : incidents.length === 0
-            ? "text-[var(--g-text-secondary)]"
-            : "text-[var(--status-success)]",
-    },
-    {
-      label: "Inventario activo",
-      value: activos,
-      // Antes afirmaba que los N sistemas tenían clasificación de riesgo sin
-      // mirar `risk_level`. Se cuenta.
-      body:
-        systems.length === 0
-          ? "Sin sistemas registrados en el inventario."
-          : `${detalleInventario}; ${sistemasClasificados} con nivel de riesgo declarado.`,
-      to: "/ai-governance/sistemas",
-      icon: Cpu,
-      tone: systems.length === 0 ? "text-[var(--g-text-secondary)]" : "text-[var(--status-info)]",
-    },
-  ];
-  const quickActions = [
-    { label: "Nuevo sistema IA", body: "Alta gestionada en AIMS.", to: "/ai-governance/sistemas/nuevo", icon: PlusCircle },
-    { label: "Revisar evaluaciones", body: "Cobertura AI Act, findings y expediente técnico.", to: "/ai-governance/evaluaciones", icon: ClipboardCheck },
-    { label: "Registrar incidente IA", body: "Incidente gestionado con severidad y sistema asociado.", to: "/ai-governance/incidentes/nuevo", icon: AlertTriangle },
-    { label: "Proponer riesgo GRC", body: "Handoff de solo lectura para que GRC decida el riesgo.", to: "/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP", icon: Route },
-  ];
+  // Un solo predicado para «incidente material», el mismo que decide el handoff.
+  // Aquí se comparaba a mano contra tres grafías, y una de ellas ('CRÍTICO')
+  // no la escribe ningún camino del producto.
+  const materialIncidents = incidents.filter(isAimsMaterialIncidentCandidate).length;
 
   return (
     <div className="mx-auto max-w-[1320px] p-4 sm:p-6">
@@ -581,105 +182,18 @@ export default function AiDashboard() {
         </p>
       </div>
 
-      {aiBody && (
-        <Link
-          to={`/organos/${aiBody.slug}`}
-          className="mb-6 flex items-center gap-3 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-5 py-3 transition-colors hover:bg-[var(--g-surface-subtle)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
-          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-        >
-          <span
-            className="flex h-9 w-9 shrink-0 items-center justify-center bg-[var(--g-surface-subtle)] text-[var(--g-brand-3308)]"
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            <UserCheck className="h-5 w-5" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
-              Órgano de gobierno de la IA
-            </span>
-            <span className="block truncate text-sm font-medium text-[var(--g-text-primary)]">
-              {aiBody.name}
-            </span>
-          </span>
-          <ArrowRight className="h-4 w-4 shrink-0 text-[var(--g-text-secondary)]" />
-        </Link>
-      )}
+      {aiBody && <OrganoRector slug={aiBody.slug} name={aiBody.name} />}
 
-      <section className="mb-6 grid gap-4 xl:grid-cols-[1.2fr_0.9fr]">
-        <div
-          className="overflow-hidden border border-[var(--g-border-default)] bg-[var(--g-surface-card)]"
-          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-        >
-          <div className="border-b border-[var(--g-border-subtle)] px-5 py-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
-              Prioridad ahora
-            </p>
-            <h2 className="text-base font-semibold text-[var(--g-text-primary)]">
-              Sistemas, evaluaciones e incidentes que requieren criterio
-            </h2>
-          </div>
-          <div className="divide-y divide-[var(--g-border-subtle)]">
-            {priorityItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.label}
-                  to={item.to}
-                  className="flex min-h-[92px] items-start gap-3 px-5 py-4 transition-colors hover:bg-[var(--g-surface-subtle)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
-                >
-                  <span
-                    className="flex h-10 w-10 shrink-0 items-center justify-center bg-[var(--g-surface-subtle)] text-[var(--g-brand-3308)]"
-                    style={{ borderRadius: "var(--g-radius-md)" }}
-                  >
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-semibold text-[var(--g-text-primary)]">{item.label}</span>
-                      <span className={`text-sm font-bold tabular-nums ${item.tone}`}>{loading ? "..." : item.value}</span>
-                    </span>
-                    <span className="mt-1 block text-sm leading-6 text-[var(--g-text-secondary)]">{item.body}</span>
-                  </span>
-                  <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[var(--g-text-secondary)]" />
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-
-        <div
-          className="overflow-hidden border border-[var(--g-border-default)] bg-[var(--g-surface-card)]"
-          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-        >
-          <div className="border-b border-[var(--g-border-subtle)] px-5 py-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
-              Empezar un flujo
-            </p>
-            <h2 className="text-base font-semibold text-[var(--g-text-primary)]">
-              Acciones del officer AIMS
-            </h2>
-          </div>
-          <div className="divide-y divide-[var(--g-border-subtle)]">
-            {quickActions.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className="flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-[var(--g-surface-subtle)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
-                >
-                  <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--g-brand-3308)]" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-[var(--g-text-primary)]">{item.label}</span>
-                    <span className="mt-0.5 block text-xs leading-5 text-[var(--g-text-secondary)]">{item.body}</span>
-                  </span>
-                  <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[var(--g-text-secondary)]" />
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+      <PrioridadAhora
+        altosNoEvaluados={altosNoEvaluados}
+        materialIncidents={materialIncidents}
+        activos={activos}
+        totalSistemas={systems.length}
+        totalIncidentes={incidents.length}
+        detalleInventario={detalleInventario}
+        sistemasClasificados={sistemasClasificados}
+        loading={loading}
+      />
 
       {loading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -727,139 +241,15 @@ export default function AiDashboard() {
             />
           </div>
 
-          {/* AIMS readiness P0 */}
-          <div
-            className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-5 mb-6"
-            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-          >
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <ListChecks className="h-5 w-5 text-[var(--g-brand-3308)]" />
-                  <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
-                    Readiness de demo AIMS
-                  </h2>
-                  {/* Era incondicional y contradecía al propio resumen: se
-                      pinta el veredicto que `buildAimsReadiness` calcula. */}
-                  <span
-                    className={`text-[10px] font-bold uppercase px-2 py-0.5 ${
-                      readiness.standaloneReady
-                        ? "text-[var(--g-text-inverse)] bg-[var(--g-brand-3308)]"
-                        : "text-[var(--g-text-secondary)] bg-[var(--g-surface-muted)] border border-[var(--g-border-subtle)]"
-                    }`}
-                    style={{ borderRadius: "var(--g-radius-full)" }}
-                  >
-                    {readiness.standaloneReady ? "Standalone-ready" : "Standalone con gaps"}
-                  </span>
-                </div>
-                <p className="mt-2 max-w-3xl text-xs text-[var(--g-text-secondary)] leading-relaxed">
-                  Inventario, evaluaciones e incidentes ya son navegables. La migración técnica queda
-                  como contexto, no como tarea principal del officer.
-                </p>
-              </div>
-              <div
-                className="min-w-[220px] border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-4 py-3"
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                <div className="flex items-center gap-2">
-                  <CheckCircle2
-                    className={`h-4 w-4 ${
-                      readiness.standaloneReady ? "text-[var(--status-success)]" : "text-[var(--status-warning)]"
-                    }`}
-                  />
-                  <span className="text-xs font-semibold text-[var(--g-text-primary)]">
-                    {readiness.standaloneReady ? "Demo operable" : "Demo con gaps"}
-                  </span>
-                </div>
-                <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">
-                  {/* «datos demo conectados» era incondicional: con las tres
-                      fuentes vacías seguía afirmando que había datos. */}
-                  Estado de fuentes:{" "}
-                  {systems.length + incidents.length + assessments.length === 0
-                    ? "sin datos en las tres fuentes"
-                    : `${systems.length} sistemas · ${assessments.length} evaluaciones · ${incidents.length} incidentes`}
-                </p>
-                <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">
-                  Contrato: demostrador AIMS P0
-                </p>
-              </div>
-            </div>
+          <ClasificacionGuiadaCard systems={systems} />
 
-            <div className="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {readiness.domains.map((domain) => (
-                <ReadinessDomainCard key={domain.id} domain={domain} />
-              ))}
-            </div>
-
-            <div className="mt-5 grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-4">
-              <div
-                className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
-                style={{ borderRadius: "var(--g-radius-lg)" }}
-              >
-                <h3 className="text-xs font-semibold uppercase text-[var(--g-text-primary)]">
-                  Contrato de datos
-                </h3>
-                <dl className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <dt className="text-[11px] text-[var(--g-text-secondary)]">Fuentes</dt>
-                    <dd className="mt-1 text-xs font-medium text-[var(--g-text-primary)]">
-                      Inventario, evaluaciones e incidentes
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-[11px] text-[var(--g-text-secondary)]">Mutación</dt>
-                    <dd className="mt-1 text-xs font-medium text-[var(--g-text-primary)]">Solo lectura en dashboard</dd>
-                  </div>
-                  <div>
-                    <dt className="text-[11px] text-[var(--g-text-secondary)]">Migración</dt>
-                    {/* «sin schema nuevo» era falso —las tablas `aims_*` existen
-                        desde abril— y además contradecía al dominio `migration`
-                        del propio resumen, que dice «No medido». */}
-                    <dd className="mt-1 text-xs font-medium text-[var(--g-text-primary)]">No medido en este resumen</dd>
-                  </div>
-                </dl>
-                <p className="mt-3 text-xs text-[var(--g-text-secondary)] leading-relaxed">
-                  Este panel es de solo lectura sobre <code>ai_*</code>. El backbone <code>aims_*</code> existe y lo
-                  usan otras pantallas del módulo, pero su estado no se mide aquí.
-                </p>
-              </div>
-
-              <div
-                className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
-                style={{ borderRadius: "var(--g-radius-lg)" }}
-              >
-                <h3 className="text-xs font-semibold uppercase text-[var(--g-text-primary)]">
-                  Próximos pasos
-                </h3>
-                <ul className="mt-3 space-y-2">
-                  {readiness.nextSteps.map((step) => (
-                    <li key={step} className="flex items-start gap-2 text-xs text-[var(--g-text-secondary)] leading-relaxed">
-                      <span
-                        className="mt-1 h-1.5 w-1.5 shrink-0 bg-[var(--g-brand-3308)]"
-                        style={{ borderRadius: "var(--g-radius-full)" }}
-                      />
-                      <span>{step}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            <ScreenPostureTable />
-
-            <div className="mt-5">
-              <div className="flex items-center gap-2">
-                <Route className="h-4 w-4 text-[var(--g-brand-3308)]" />
-                <h3 className="text-xs font-semibold uppercase text-[var(--g-text-primary)]">
-                  Handoffs de solo lectura
-                </h3>
-              </div>
-              <p className="mt-1 text-xs leading-relaxed text-[var(--g-text-secondary)]">
-                Rutas de entrada a módulos responsables. AIMS enruta contexto, no toma decisiones de GRC ni de Secretaría.
-              </p>
-              <HandoffAffordances />
-            </div>
-          </div>
+          <ReadinessDomains
+            readiness={readiness}
+            veredicto={readiness.standaloneReady ? "Standalone-ready" : "Standalone con gaps"}
+            totalSistemas={systems.length}
+            totalEvaluaciones={assessments.length}
+            totalIncidentes={incidents.length}
+          />
 
           {/* Distribución por nivel de riesgo */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
@@ -906,36 +296,7 @@ export default function AiDashboard() {
               </div>
             </div>
 
-            {/* Resumen rápido incidentes */}
-            <div
-              className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-5"
-              style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-            >
-              <h2 className="text-sm font-semibold text-[var(--g-text-primary)] mb-4">Incidentes recientes</h2>
-              {incidents.length === 0 ? (
-                <p className="text-xs text-[var(--g-text-secondary)]">Sin incidentes registrados</p>
-              ) : (
-                <div className="space-y-3">
-                  {incidents.slice(0, 3).map((inc) => (
-                    <div key={inc.id} className="flex items-start gap-2">
-                      <span
-                        className={`mt-0.5 inline-flex shrink-0 items-center px-1.5 py-0.5 text-[10px] font-bold text-[var(--g-text-inverse)] ${
-                          inc.severity === "ALTO" || inc.severity === "CRITICO"
-                            ? "bg-[var(--status-error)]"
-                            : inc.severity === "MEDIO"
-                            ? "bg-[var(--status-warning)]"
-                            : "bg-[var(--status-info)]"
-                        }`}
-                        style={{ borderRadius: "var(--g-radius-sm)" }}
-                      >
-                        {inc.severity}
-                      </span>
-                      <p className="text-xs text-[var(--g-text-secondary)] leading-snug line-clamp-2">{inc.title}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <IncidentesRecientes incidents={incidents} />
           </div>
 
           {/* Tabla rápida de sistemas */}

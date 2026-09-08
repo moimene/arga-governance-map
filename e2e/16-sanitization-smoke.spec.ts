@@ -116,13 +116,16 @@ test.describe('Sanitization smoke — AIMS-GRC', () => {
     }
   });
 
-  test('AIMS declara postura por pantalla y handoffs sin writes cross-module', async ({ page }) => {
+  test('AIMS declara handoffs de solo lectura sin writes cross-module', async ({ page }) => {
+    // 2026-09-08: el catálogo de posturas por pantalla («Contexto técnico
+    // AIMS», «solo lectura demo») se borró por decisión (ledger D-10): era
+    // prosa mantenida aparte de las pantallas. Los handoffs siguen y se
+    // afirman; la ausencia de la tabla también, para que no vuelva.
     await visitRoute(page, '/ai-governance', [/Readiness de demo AIMS/i]);
-    await expect(page.getByText('Contexto técnico AIMS')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('heading', { name: 'Handoffs de solo lectura' })).toBeVisible();
-    await expect(page.getByText('solo lectura demo').first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Handoffs de solo lectura' })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('SECRETARIA_CERTIFICATION_ISSUED')).toBeVisible();
     await expect(page.getByText(/AIMS enruta contexto, no toma decisiones/i)).toBeVisible();
+    await expect(page.getByText('Contexto técnico AIMS')).toHaveCount(0);
   });
 });
 
