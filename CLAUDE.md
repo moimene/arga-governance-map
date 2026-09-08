@@ -413,6 +413,62 @@ módulo la pregunta y registra la respuesta); y **Harvey no declara rol
 regulatorio** — hasta que se declare desde su ficha se mide contra las 84 y la
 pantalla lo dice.
 
+### Refactor total del módulo AIMS + cuestionario guiado de calificación (2026-09-08)
+
+Rama `refactor/aims-total-2026-09-08`. Goal: `docs/superpowers/prompts/2026-09-08-goal-refactor-total-aims.md`; spec del
+equipo legal validada en `docs/superpowers/reviews/2026-09-08-validacion-spec-cuestionario-vs-refactor-aims.md` (S-1…S-14);
+plan `docs/superpowers/plans/2026-09-08-refactor-total-aims-plan.md`; **ledger canónico
+`docs/superpowers/plans/2026-09-08-ledger-refactor-aims.md`** (decisiones D-1…D-12, refutaciones, deudas DA-1…DA-9,
+tabla de superficies derivada del código y tabla de las 25 tablas).
+
+**Frontera legacy/backbone, decidida y ejecutada (D-1).** `ai_systems` sigue siendo el inventario. De las **25** tablas
+`aims_*` (no 28), **6 tienen camino de escritura real desde una pantalla** —`aims_classification_questionnaires` (nueva),
+`aims_evidence_items`, `aims_technical_file_sections`, `aims_system_versions`, `aims_monitoring_indicators`,
+`aims_incident_regimes`— y **20 son esquema muerto declarado**: sin hook, sin pestaña, sin tipo en el contrato de columnas,
+y con la escritura de `authenticated` revocada. Se retiraron la pestaña FRIA y `useAimsFria.ts`, «Modelos & Datasets», el
+botón y el hook de cierre del expediente, y el catálogo de posturas `aimsScreenPostures` (D-10: prosa mantenida aparte de
+las pantallas). Gate: `src/test/aims/frontera-backbone.test.ts`.
+
+**Cuestionario guiado (spec v1.1).** Criterio en la hoja `src/lib/aims/cuestionario-calificacion.ts` (nueve preguntas con
+ayuda en tres secciones, derivación de rol/nivel/GPAI/marcos/perfil A-B-C, bloqueos); persistencia versionada en
+`aims_classification_questionnaires` con **SHA-512 calculado en servidor** (`fn_aims_completar_cuestionario`; acredita
+integridad y autoría, **no fecha cierta**), supersedencia por RPC, COMPLETED/SUPERSEDED inmutables por trigger, sin DELETE;
+alta atómica sistema + cuestionario por `fn_aims_registrar_sistema` con el tenant de la sesión; `ai_systems.regulatory_role`
+y `risk_level` **sólo cambian por la RPC** (trigger; el modal de edición ya no los ofrece). Decisiones que la spec no cerraba:
+el árbol sólo deriva PROVEEDOR / RESPONSABLE_DESPLIEGUE (importador y distribuidor → Legal, DA-1); vocabulario persistido
+intacto (`Inaceptable`, no `PROHIBIDO`); numeración FINAL del Reglamento con la cita de la spec en `nota` (art. 95, cap. V
+51–56, art. 27 sólo en los supuestos del 27.1); perfil B sin catálogo → falla abierto y lo dice; preguntas en catálogo TS
+versionado (`questionnaire_version` por fila), no en tabla sin editor.
+
+**Un criterio, un módulo hoja.** `vocabulario.ts` (estados, severidades, niveles, marcos y sus etiquetas: las siete
+pantallas lo consumen), `cuestionario-calificacion.ts`, `expediente-tecnico.ts` (`vinculaArt11`), `handoffs.ts`;
+`perfil-aplicabilidad.ts` expone `catalogProfile`. Gates de arista: `vocabulario-unico`, `cuestionario-arista`,
+`evaluacion-nueva-perfil`, `dashboard-sin-posturas`, `incidente-regimenes-escritura`, `sistema-nuevo-cuestionario`.
+
+**Pantallas ≤ 400 líneas** (`pantallas-acotadas.test.ts`, también para componentes): páginas 7 660 → 2 897 líneas
+(`SistemaDetalle` 1 387 → 167, `EvaluacionNueva` 1 360 → 395, `Dashboard` 1 022 → 384); 41 componentes en
+`src/components/ai-governance/{clasificacion,sistema,evaluacion,evaluacion-detalle,dashboard,incidente}/`.
+
+**Migraciones PENDIENTES DE APLICAR (autorización del usuario, cambio a cambio):** `20260908120000_aims_cuestionario_calificacion`
+y `20260908130000_ai_aims_revoca_privilegios_heredados` (medido: `anon` tenía DELETE/INSERT/UPDATE/TRUNCATE… sobre 28
+tablas `ai_*`/`aims_*`; `authenticated` TRUNCATE/REFERENCES/TRIGGER). Verificadas en Cloud con una **sonda revertida de 27
+pasos** (ledger H-1). Hasta que se apliquen, `aims-cuestionario-live.test.ts` y `garrigues-ia-owner-write.test.ts` están
+**rojos a propósito** (16 aserciones) y la rama **no se mergea**: el alta llama a una RPC que no existe. Gates en la rama:
+`bun test` 4 438 pass / 151 skip / 0 fallos fuera de esas 16; typecheck, lint (0 warnings) y build limpios. Review adversarial de 3
+lentes (H-3 del ledger): 7 P1 cerrados, entre ellos que el servidor validaba la práctica prohibida contra la conclusión que
+mandaba el cliente — ahora **re-deriva rol, nivel y perfil desde las respuestas** (`fn_aims_derivar_*`, espejo SQL del árbol) y
+rechaza `CLASIFICACION_INCOHERENTE`; la sonda viva compara SQL y TS caso a caso.
+
+**GOTCHAs nuevos:** (1) `current_setting('x', true)` devuelve **NULL** sin flag y `NULL = 'on'` es NULL: un `if not v_rpc`
+no bloquea nunca — siempre `coalesce(…, '')`; la sonda lo cazó en la primera pasada. (2) Un flag `set_config(…, true)`
+sigue `on` el resto de la transacción larga: las RPC lo apagan al terminar. (3) Una sonda viva roja por migración sin aplicar
+**deja residuo** si el INSERT «que debe rechazarse» aterriza: borrar lo que vuelva antes de asertar (ocurrió; dos filas
+`PROBE-%` borradas de Garrigues). (4) El MCP `execute_sql` corre como `postgres` y devuelve el último `select` aunque la
+llamada termine en `rollback`: sirve para sondas revertidas enteras con `set_config('request.jwt.claims', …)` +
+`set local role`. (5) El CLI `supabase db query --linked` cuelga en «Initialising login role» (token caducado). (6) Un gate
+que lee un literal de una página se queda **vacuo** al descomponerla: los gates repuntan al componente y añaden la arista de
+montaje; los que vigilaban un sujeto retirado (FRIA, cierre) se invierten a **ausencia** con control positivo.
+
 ### Verificación última conocida (2026-09-07, cuarta tanda del cierre)
 
 - `bun test`: **4217 pass / 151 skip / 3 todo / 0 fail** (23 565 aserciones, 476 ficheros). Línea base del 05: 4020 / 152.

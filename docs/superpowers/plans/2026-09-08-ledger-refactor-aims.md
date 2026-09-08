@@ -187,3 +187,60 @@ Ninguna fila «no verificada»: cada hook citado se lee en `src/hooks/useAi*.ts`
 ### El 49 % de Harvey, re-medido (§3.8 del goal)
 
 Dato: 1 evaluación `EU_AI_ACT` (`fdcccf9e…`), `score = 49`, `CON_GAPS`, sin congelar, **84 findings con códigos `MG_*`** — el catálogo del proveedor de un sistema de alto riesgo (arts. 9–15, 17, 72, 73). Harvey no tiene cuestionario guiado (`regulatory_role` NULL, `regulatory_profile` NULL): la ficha y el wizard lo dicen ahora con el aviso «Sin clasificación guiada — catálogo completo por defecto». **El número no cambia hasta que el responsable de cumplimiento del despacho complete el cuestionario desde la ficha (DA-7); el producto no lo rellena por él.** Lo que sí queda fijado: si las respuestas fueran las previsibles para un despacho que usa un asistente contratado (Q1.1–Q1.3 «No», Q2.1 «No», Q2.2 «No», Q2.4 «Sí», Q2.5 «Sí»), el resultado sería Responsable del despliegue · Limitado · perfil C · GPAI, con marcos art. 4, art. 50, cap. V (51–56), RGPD y deontología; contra ese perfil el catálogo aplicable son las **43** medidas `MD_*`, de las que la evaluación existente **no responde ninguna** (0 de 43: los códigos son de otro catálogo). El «49 %» pasa a leerse como lo que es: la proporción de obligaciones del proveedor de alto riesgo que se acreditaron, sobre un sistema al que esas obligaciones previsiblemente no vinculan. El resultado nuevo será «sin evaluar contra su catálogo» hasta que se reevalúe.
+
+### H-3 · Review adversarial de rama (3 lentes, opus, sólo lectura) y cierres (2026-09-08)
+
+Lentes: (1) aislamiento y escritura, (2) afirmaciones y vocabulario, (3) criterio y descomposición. Cada lente intentó refutarse antes de reportar; se listan sólo los hallazgos que sobrevivieron y qué se hizo.
+
+| Sev | Hallazgo | Lente | Cierre |
+|---|---|---|---|
+| P1 | El servidor validaba la práctica prohibida contra `computed_risk_level`, que manda el cliente: `Q2_1 = Sí` + «Mínimo» se sellaba con SHA-512 | 1, 2 | `fn_aims_derivar_rol/nivel/perfil_catalogo` (SQL, inmutables, espejo del árbol) re-derivan desde las respuestas; `PRACTICA_PROHIBIDA` se lee de `Q2_1`; `CLASIFICACION_INCOHERENTE` rechaza rol/nivel/perfil/GPAI que no salgan de las respuestas. **Sonda revertida nº 2 (10 pasos): manipulada → 23514; incoherente → 23514; GPAI incoherente → 23514.** La sonda viva compara los derivadores SQL con la hoja TS caso a caso (13 casos) |
+| P1 | `aims-column-contract.test.ts` se pondría rojo al aplicar el revoke de `anon` (columna real → `42501`) y el ledger decía lo contrario | 1 | El helper trata `42501` como «las columnas existen» (el análisis del `select` precede al ACL; una inexistente sigue dando `42703`, medido) |
+| P1 | El seed `seed-garrigues-ia.ts` abortaría en cuanto alguien clasifique Harvey: su `update` ponía `risk_level` a null y el trigger lo rechaza | 1 | La actualización ya no lleva `risk_level`; la clasificación nunca la escribe un seed |
+| P1 | El cap. V (arts. 51–56) se listaba como marco al responsable del despliegue sin acotar que vincula al proveedor del modelo | 2 | `nota` específica cuando el rol es de despliegue: trazabilidad en la cadena de suministro; el alcance lo decide Legal (DA-10) |
+| P1 | `Evaluaciones.tsx` pintaba en gris `CONFORME` y `CON_GAPS` (los dos estados que el producto escribe): indistinguibles | 2 | `chipClaseEstadoEvaluacion` en la hoja; la capa (c) del gate prohíbe también los `_CHIP` locales |
+| P1 | El Board Pack contaba no conformidades sobre el histórico entero de `ai_compliance_checks` (28 filas / 7 códigos) | 3 | `checksVigentes` en `useBoardPackData`; el gate barre TODOS los hooks, no un fichero |
+| P1 | S-1 (el árbol no contempla importador ni distribuidor) estaba decidido en un comentario y en ninguna pantalla | 3 | `AVISO_ROLES_NO_DERIVABLES` en la hoja, pintado en el resultado provisional |
+| P2 | Los altas del expediente (secciones, versiones, indicadores) no probaban que el sistema fuera del tenant (la RLS sólo mira `tenant_id`) | 1 | `exigirSistemaDelTenant` antes de cada insert |
+| P2 | `afterAll` de la sonda viva podía dejar el sistema de ARGA vivo si el primer borrado fallaba | 1 | Intenta los dos borrados y lanza al final |
+| P2 | El DRAFT podía reescribir `questionnaire_version` y `created_by` | 1 | Sellados por el trigger; sonda nº 2: `42501 CAMPOS_SELLADOS_POR_RPC` |
+| P2 | Un DRAFT creado en otra pestaña chocaba con el índice parcial (`23505`) | 1 | El panel refresca y reutiliza el DRAFT existente |
+| P2 | Cambio de pantalla en ARGA no declarado nominalmente | 1 | Declarado en H-2 |
+| P2 | `IncidentesRecientes`, `Sistemas.tsx` y cuatro componentes comparaban o rotulaban estados con literales fuera de la hoja | 2, 3 | Pasan por `isMaterialSeverity`/`normalizeAimsStatus`/`etiqueta` |
+| P2 | Los guards de estructura barrían sólo `src/pages/` (el código está en `components/`) y el de citas legales era casi vacuo | 2, 3 | Barren `components/**`; el de citas prohíbe `art. N` fuera de la hoja y declara su capa débil |
+| P2 | El «catálogo completo por defecto» del banner no seguía a la condición que lo gobierna (`sinRolDeclarado`) | 3 | Texto condicionado |
+| P2 | «No medido» pintado como «no hay» en el panel de clasificación cuando la consulta falla | 3 | Estado de error propio («No consta … no se pudo leer») |
+| P2 | Historial de clasificaciones con huella sin cualificar; marcos sin `nota` en la confirmación; `AI_OFFICER` crudo; guard de tablas muertas derrotable por comilla; test que fijaba exports muertos; `opcionesFiltro` sin `extra` en 5 de 6 filtros; motivo del rol citando el art. 25.1 fuera de alto riesgo; citas corregidas sin `notaSpec`; «control positivo» que era negativo | 2 | Cerrados (ver commits `14ad6a6` y siguientes) |
+
+**Refutados por las lentes (no se tocan):** `p_sistema` no puede colar `tenant_id`/`id`; el trigger del owner dispara dentro de la RPC; no hay dos COMPLETED bajo concurrencia (`for update` + índice parcial); el flag no sobrevive a la petición PostgREST; las 20 tablas muertas no tienen escritor en `src/`, `e2e` ni `scripts`; ninguna Edge Function las usa; el grafo de imports de `lib/aims` es un DAG (profundidad 2, 9 hojas); ninguna extracción cambió comportamiento (comparadas bloque a bloque con `main`); el techo de 400 líneas no se burla con líneas largas (máximo real 390 caracteres, y son clases Tailwind).
+
+**Deuda nueva:** DA-10 — alcance del cap. V para el responsable del despliegue (Equipo legal); DA-11 — el informe (`EvaluacionDetalle`) no dice «sin clasificación guiada» ni pinta el perfil A/B/C: resuelve el catálogo por el dato (Producto, siguiente iteración).
+
+### H-4 · Gates finales y estado de cierre (2026-09-08)
+
+| Gate | Resultado |
+|---|---|
+| `bun run typecheck` | limpio |
+| `bun run lint` | limpio (0 errores, 0 warnings) |
+| `bun run build` | verde (7,9 s) |
+| `bun test` | **4 438 pass / 151 skip / 3 todo / 16 fail** — los 16 son las dos sondas vivas (`aims-cuestionario-live`, `garrigues-ia-owner-write`) que exigen `20260908120000` aplicada; línea base 4 320 / 151; **cero skips nuevos** |
+| Cloud tras toda la jornada (medido) | ARGA 8 sistemas con los mismos niveles que al empezar (`Limitado, Alto, Alto, Alto, Mínimo, Alto, Alto, Alto`), Garrigues 1 (Harvey), 8 evaluaciones, 61 checks, **0 filas `PROBE-%`**: cero cambio de dato en los dos tenants. Únicas escrituras de la sesión en `governance_OS`: el borrado de las dos filas de sonda que la primera corrida dejó (declarado en H-2) |
+| Arnés de mutación (además de los de cada carril) | gate de `checksVigentes` por todos los hooks: quitar el filtro del Board Pack → «3 lecturas y 2 aplicaciones», restaurado idéntico |
+| Migraciones | 2 en el repo, **0 aplicadas** (autorización pendiente); verificadas con dos sondas revertidas (27 + 10 pasos) |
+| Review adversarial | 3 lentes; 7 P1 y ~20 P2 cerrados; 0 P0; refutaciones registradas en H-3 |
+
+**Criterios de salida del goal (§3), estado:**
+
+| # | Criterio | Estado |
+|---|---|---|
+| 1 | Tabla final de superficies REAL / HONESTO / RETIRADO con evidencia | ✅ H-2 (derivada del código) |
+| 2 | Tabla final de las 25 tablas, destino ejecutado y probado | ✅ H-2 (+ migración de privilegios pendiente de aplicar) |
+| 3 | typecheck / lint / build limpios; `bun test` ≥ 4 320 sin skips nuevos | ✅ salvo las 16 aserciones vivas que exigen la migración |
+| 4 | Aislamiento con logins reales en las dos direcciones, revoke en toda tabla nueva | ✅ escrito y sondado en Cloud; el test vivo corre al aplicar |
+| 5 | Arnés de mutación en cada gate nuevo | ✅ (ver carriles y H-4) |
+| 6 | Review adversarial ≥ 3 lentes, 0 P0 | ✅ H-3 |
+| 7 | Verificación viva en producción con los dos logins | ⏸ **bloqueada**: exige aplicar las migraciones, mergear y desplegar |
+| 8 | El 49 % re-medido y explicado | ✅ H-2 |
+| 9 | CLAUDE.md corregido y ledger | ✅ |
+
+**Bloqueo:** aplicar `20260908120000_aims_cuestionario_calificacion.sql` y `20260908130000_ai_aims_revoca_privilegios_heredados.sql` en `governance_OS` exige autorización expresa del usuario (goal §5). Hasta entonces la rama no se mergea: el alta llama a una RPC que no existe.
