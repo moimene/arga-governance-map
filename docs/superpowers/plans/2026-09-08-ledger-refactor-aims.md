@@ -389,3 +389,22 @@ de «Inventario activo» pasa de «8 con nivel de riesgo declarado» a «0 con c
 se afirma». Refutados: borradores huérfanos (pre-existente, sin camino de borrado antes ni después), `SELECT INTO` sin STRICT
 en la migración de perfiles (los UPDATE están acotados por construcción), gates que «fijan el rótulo nuevo» (son control
 positivo de una ausencia asertada al lado), «Inventario activo» no declarado (la variable sigue en uso y el gate lo exige).
+
+**Merge y producción (2026-09-14).** Rama fusionada en `main` como `283b50d` (`--no-ff`, tres commits: `81ed44a` hojas +
+seed + migraciones, `cfdf0f5` cinco carriles, `2c2aa69` cierres de la revisión transversal) y empujada. Gates finales en la
+rama: `bun test` **4 551 pass / 151 skip / 3 todo / 0 fail** (línea base 4 454, cero skips nuevos); typecheck, lint y build
+limpios. Vercel desplegó el push (`dpl_EqCUfebFdLCqhMcL8pbXHZaAW4DG`, READY a los ~2,5 min; el sondeo por CLI fue ciego
+porque `vercel ls` sin TTY no imprime edades — GOTCHA). **Check de producción con sesión en los dos tenants: 3/3**
+(incluye la petición a `aims_classification_questionnaires` por tenant y el estado de clasificación de la primera ficha por
+concepto; certificación sigue bloqueada). **Barrido del bundle servido (281 chunks):** presentes «Derivaciones de solo
+lectura», «nivel declarado en ficha, sin cuestionario» (3 chunks), «Evaluada contra otro catálogo», «Derivar a GRC»,
+«Inventario conectado», «Registro de incidentes conectado», «RESPONSABLE DE LA DECLARACIÓN»; **ausentes** «Demo AIMS
+conectada», «PROVEEDOR RESPONSABLE», «no hay columna», «legacy_write · ai_incidents», «Readiness de demo», «hasta activar
+backbone», «standalone-ready», «SUSPENDIDO». Único resto de «Handoffs de solo lectura»: `src/pages/grc/Dashboard.tsx:814`
+(GRC, DA-18). Cloud tras toda la jornada: cabecera `20260914121000`, ARGA 8 / Garrigues 6 sistemas, 8 evaluaciones (0
+congeladas), 61 checks, 0 cuestionarios, 0 evidencias, 0 `PROBE-%`; `authenticated` con DELETE sólo en `ai_systems`.
+
+**Lo que sigue, y de quién es:** DA-7 ampliado — clasificar los seis sistemas de Garrigues desde su ficha, reevaluar a
+Harvey contra las 43 y recorrer congelar (`demo@`) → revisar (`admin@`), que dejará por primera vez una evaluación con
+`content_hash` y `reviewed_by_id ≠ frozen_by_id` (responsable de cumplimiento; guion en §5 del análisis del 14); DA-3
+(Comité de IA); DA-13/DA-14 (usuario); DA-15 (producto); DA-18/DA-19 (carriles GRC y Secretaría).
