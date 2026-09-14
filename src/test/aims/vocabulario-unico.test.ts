@@ -35,11 +35,17 @@ const PANTALLAS = [
   "src/pages/ai-governance/Evaluaciones.tsx",
   "src/pages/ai-governance/Incidentes.tsx",
   "src/components/ai-governance/incidente/FormularioIncidente.tsx",
+  // 2026-09-14: el desplegable de estado de la ficha declaraba su propia lista.
+  "src/components/ai-governance/incidente/EdicionIncidente.tsx",
   "src/pages/ai-governance/SistemaNuevo.tsx",
   "src/pages/ai-governance/Dashboard.tsx",
   // Mismo motivo, misma fecha: la ficha del sistema se descompuso y el chip de
   // nivel lo pinta su cabecera. `SistemaDetalle.tsx` sólo compone.
   "src/components/ai-governance/sistema/CabeceraSistema.tsx",
+  // 2026-09-14 (carril B): el chip de estado del informe y el estado del
+  // sistema en el paso 1 del wizard pintaban el literal crudo.
+  "src/components/ai-governance/evaluacion-detalle/CabeceraInforme.tsx",
+  "src/components/ai-governance/evaluacion/PasoParametros.tsx",
 ];
 
 const ALTA_INCIDENTE = "src/components/ai-governance/incidente/FormularioIncidente.tsx";
@@ -63,7 +69,7 @@ describe("control positivo del instrumento", () => {
     // Los tres bucles de abajo asertan AUSENCIA o recorren esta lista: una
     // lista vacía o un directorio encogido los pondría verdes a los tres.
     for (const f of PANTALLAS) expect(existsSync(f), `${f} no existe`).toBe(true);
-    expect(PANTALLAS.length).toBe(7);
+    expect(PANTALLAS.length).toBe(10);
     expect(readdirSync("src/pages/ai-governance").length).toBeGreaterThanOrEqual(10);
   });
 });
@@ -100,7 +106,13 @@ describe("(a) comportamiento — lo que el producto escribe cabe en el vocabular
   it("el alta de sistemas genera su estado del vocabulario", () => {
     const src = sinComentarios(read("src/pages/ai-governance/SistemaNuevo.tsx"));
     expect(src).toContain("ESTADOS_SISTEMA.map");
-    expect([...ESTADOS_SISTEMA]).toEqual(["ACTIVO", "EN_EVALUACION", "RETIRADO"]);
+    // 2026-09-14 (carril A): la edición de la ficha ofrecía su propia lista, con
+    // SUSPENDIDO (0 filas en Cloud, ningún camino lo escribe).
+    const edicion = sinComentarios(read("src/components/ai-governance/sistema/EditarSistemaModal.tsx"));
+    expect(edicion).toContain("ESTADOS_SISTEMA.map");
+    expect(edicion).not.toContain("SUSPENDIDO");
+    expect([...edicion.matchAll(/<option value="([A-Z_]{2,})">/g)].map((m) => m[1])).toEqual([]);
+    expect([...ESTADOS_SISTEMA]).toEqual(["ACTIVO", "EN_EVALUACION", "PLANIFICADO", "RETIRADO"]);
   });
 });
 

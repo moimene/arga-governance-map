@@ -11,9 +11,33 @@
 // Todo se mide sobre el fuente SIN COMENTARIOS: el comentario que explica una
 // retirada cita por fuerza lo retirado, y sin esto el gate se dispara contra su
 // propia justificación.
-import { describe, expect, it } from "bun:test";
+import { afterAll, afterEach, describe, expect, it } from "bun:test";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { createElement } from "react";
+import { cleanup, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { sinComentarios } from "@/test/helpers/sin-comentarios";
+import { mockearModulos } from "@/test/garrigues/_mock-restaurable";
+
+// Las tres listas se montan con las consultas mockeadas en dos modos: una
+// lectura que FALLA y una que devuelve vacío. Restaurado en `afterAll` porque
+// `mock.module` es global a la corrida (ver _mock-restaurable.ts).
+let modo: "error" | "vacio" = "vacio";
+const consulta = () =>
+  modo === "error"
+    ? { data: undefined, isLoading: false, isError: true, error: new Error("permiso denegado") }
+    : { data: [], isLoading: false, isError: false, error: null };
+const restaurarMocks = await mockearModulos([
+  ["@/hooks/useAiSystems", () => ({ useAiSystemsList: consulta })],
+  ["@/hooks/useAiIncidents", () => ({ useAiIncidentsList: consulta })],
+  ["@/hooks/useAiAssessments", () => ({ useAllAssessments: consulta, useAllComplianceChecks: consulta })],
+  ["@/hooks/useAimsClasificacion", () => ({ useCuestionariosVigentesDelTenant: consulta })],
+  ["@/hooks/useBodies", () => ({ useBodyBySlug: () => ({ data: null }) })],
+  ["@/context/ScopeContext", () => ({ useScope: () => ({ scope: "Todos" }) })],
+  ["@/context/TenantContext", () => ({ useTenantContext: () => ({ tenantId: null }) })],
+]);
+afterAll(restaurarMocks);
+afterEach(() => cleanup());
 
 const DASHBOARD = "src/pages/ai-governance/Dashboard.tsx";
 const READINESS = "src/lib/aims/readiness.ts";
@@ -143,5 +167,163 @@ describe("la clasificación guiada se cuenta del dato, y el órgano sigue enlaza
     const comp = sinComentarios(read(`${DIR}/OrganoRector.tsx`));
     expect(/<Link\b/.test(comp), "OrganoRector ya no enlaza: sólo rotula").toBe(true);
     expect(/to=\{`\/organos\/\$\{slug\}`\}/.test(comp), "el enlace del órgano no apunta a su ficha").toBe(true);
+  });
+});
+
+describe("D4 — una lectura fallida no se pinta como inventario vacío", () => {
+  const LISTAS: Array<[string, string, string]> = [
+    // [página, literal de vacío, literal de fallo]
+    ["@/pages/ai-governance/Dashboard", "Sin inventario registrado", "No se pudo leer el inventario"],
+    ["@/pages/ai-governance/Sistemas", "Sin sistemas registrados en el inventario", "No se pudo leer el inventario"],
+    ["@/pages/ai-governance/Evaluaciones", "Sin evaluaciones registradas", "No se pudo leer las evaluaciones"],
+  ];
+
+  async function montar(ruta: string) {
+    const { default: Pagina } = await import(ruta);
+    render(createElement(MemoryRouter, null, createElement(Pagina)));
+  }
+
+  for (const [ruta, vacio, fallo] of LISTAS) {
+    it(`${ruta}: con la consulta rechazada dice el motivo y no el vacío`, async () => {
+      modo = "error";
+      await montar(ruta);
+      expect(screen.getByRole("alert").textContent).toContain(`${fallo} (permiso denegado)`);
+      expect(screen.queryByText(new RegExp(vacio))).toBeNull();
+      // El Dashboard tampoco deja la prioridad con ceros y su literal de vacío.
+      expect(screen.queryByText(/Sin sistemas registrados en el inventario/)).toBeNull();
+    });
+
+    it(`${ruta}: control positivo — con datos vacíos sí aparece el literal de vacío`, async () => {
+      modo = "vacio";
+      await montar(ruta);
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(screen.getAllByText(new RegExp(vacio)).length).toBeGreaterThan(0);
+    });
+  }
+});
+
+describe("D6 — el nivel sólo lleva color con cuestionario, y se cuenta con la hoja", () => {
+  it("Sistemas importa `tieneClasificacionGuiada` y con él decide el color del chip", () => {
+    const src = sinComentarios(read("src/pages/ai-governance/Sistemas.tsx"));
+    expect(src).toContain('from "@/lib/aims/cuestionario-calificacion"');
+    expect(/const guiada = tieneClasificacionGuiada\(system\)/.test(src)).toBe(true);
+    expect(/claseNivelRiesgo\(guiada \? system\.risk_level : null\)/.test(src),
+      "el chip vuelve a colorear el nivel declarado en ficha sin cuestionario").toBe(true);
+    expect(src).toContain("sin cuestionario");
+    // Y el chip se monta en las dos vistas (tabla y móvil), no sólo se declara.
+    expect((src.match(/<RiskChip system=\{sys\} \/>/g) ?? []).length).toBe(2);
+  });
+
+  it("el Dashboard pinta el mismo chip neutro sin cuestionario en su inventario (tabla y móvil)", () => {
+    const src = sinComentarios(read(DASHBOARD));
+    expect(/const guiada = tieneClasificacionGuiada\(system\)/.test(src)).toBe(true);
+    expect(/claseNivelRiesgo\(guiada \? system\.risk_level : null\)/.test(src),
+      "el Dashboard vuelve a colorear el nivel declarado en ficha sin cuestionario").toBe(true);
+    expect(src).toContain("sin cuestionario");
+    expect((src.match(/<RiskBadge system=\{sys\} \/>/g) ?? []).length).toBe(2);
+  });
+
+  it("el Dashboard cuenta la clasificación por la hoja y se lo pasa a la prioridad", () => {
+    const src = sinComentarios(read(DASHBOARD));
+    expect(/systems\.filter\(tieneClasificacionGuiada\)/.test(src)).toBe(true);
+    // Y la tarjeta usa el MISMO criterio: no hay dos «clasificado» en la misma pantalla.
+    const card = sinComentarios(read(`${DIR}/ClasificacionGuiadaCard.tsx`));
+    expect(/const clasificados = systems\.filter\(tieneClasificacionGuiada\)/.test(card),
+      "la tarjeta cuenta «clasificado» por otro camino que la prioridad").toBe(true);
+    expect(/conClasificacionGuiada=\{conClasificacionGuiada\}/.test(src)).toBe(true);
+    const prio = sinComentarios(read(`${DIR}/PrioridadAhora.tsx`));
+    expect(prio).toContain("con clasificación guiada");
+    expect(prio).not.toContain("con nivel de riesgo declarado");
+  });
+});
+
+describe("el filtro de estado de Sistemas compara normalizado, como su propio KPI", () => {
+  it("una fila «Activo» no desaparece al filtrar por ACTIVO, ni aparece como opción duplicada", () => {
+    const src = sinComentarios(read("src/pages/ai-governance/Sistemas.tsx"));
+    expect(/normalizeAimsStatus\(s\.status\) === statusFilter/.test(src), "vuelve a comparar `s.status` en crudo").toBe(true);
+    expect(/opcionesFiltro\("estadoSistema", systems\.map\(\(s\) => normalizeAimsStatus\(s\.status\)\)\)/.test(src),
+      "las opciones extra se ofrecen en crudo y no casan con la comparación").toBe(true);
+    expect(/\bs\.status === statusFilter/.test(src)).toBe(false);
+  });
+});
+
+describe("D7 — copy sin nombres de tabla ni jerga de contrato, y raíz etiquetada", () => {
+  const COMPONENTES = readdirSync(DIR).filter((f) => f.endsWith(".tsx")).map((f) => `${DIR}/${f}`);
+  const SUPERFICIE = [...COMPONENTES, DASHBOARD, "src/pages/ai-governance/Sistemas.tsx", "src/pages/ai-governance/Evaluaciones.tsx"];
+
+  it("ReadinessDomains es una <section aria-label=\"Readiness AIMS\">", () => {
+    const src = sinComentarios(read(`${DIR}/ReadinessDomains.tsx`));
+    expect(/<section\s+aria-label="Readiness AIMS"/.test(src)).toBe(true);
+    expect(src).toContain("Estado del módulo");
+  });
+
+  it("los rótulos viejos no sobreviven en ninguna superficie", () => {
+    expect(SUPERFICIE.length).toBeGreaterThan(8);
+    for (const f of SUPERFICIE) {
+      const src = sinComentarios(read(f));
+      for (const viejo of ["Readiness de demo", "Demo operable", "Demo con gaps", "Standalone", "officer", "intake GRC"]) {
+        expect(src.includes(viejo), `${f}: sigue diciendo «${viejo}»`).toBe(false);
+      }
+      // Nombres de tabla en el copy: `ai_*`, `aims_*`, `evidence_bundles`…
+      expect(/<code>a(i|ims)_\*<\/code>|ai_\* → aims_\*|`aims_\*`|evidence_bundles y audit_log/.test(src),
+        `${f}: nombra tablas en el copy`).toBe(false);
+    }
+    const readiness = sinComentarios(read(READINESS));
+    expect(/Migración ai_\*|mapping ai_systems|evidence_bundles y audit_log/.test(readiness)).toBe(false);
+    // La jerga tampoco sobrevive por el DATO que pintan los monitores (`detail`).
+    expect(/intake GRC|officer|handoff potencial/.test(readiness), "readiness.ts sigue llevando la jerga en `detail`").toBe(false);
+    // Ni por el chip literal del monitor, ni por la prosa fija del Dashboard.
+    const panel = sinComentarios(read(`${DIR}/ComplianceMonitorPanel.tsx`));
+    expect(/>\s*handoff\s*</.test(panel), "el monitor vuelve a pintar el chip «handoff»").toBe(false);
+    expect(/>\s*derivación\s*</.test(panel)).toBe(true);
+    expect(sinComentarios(read(DASHBOARD))).not.toContain("reciben handoffs");
+  });
+
+  it("el veredicto es «Operable» / «Con carencias» y sale del resumen", () => {
+    const src = sinComentarios(read(DASHBOARD));
+    expect(/readiness\.standaloneReady \? "Operable" : "Con carencias"/.test(src)).toBe(true);
+  });
+
+  it("HandoffAffordances traduce la postura y no pinta el evento de contrato", () => {
+    const src = sinComentarios(read(`${DIR}/HandoffAffordances.tsx`));
+    expect(src).toContain('NOT_EVIDENCE: "No es evidencia"');
+    expect(/\{handoff\.contractEvent\}/.test(src)).toBe(false);
+    expect(/\{handoff\.evidencePosture\}/.test(src), "la postura vuelve a pintarse en crudo").toBe(false);
+  });
+
+  it("el monitor pinta las comprobaciones apartadas y etiqueta la fuente en castellano", () => {
+    const src = sinComentarios(read(`${DIR}/ComplianceMonitorPanel.tsx`));
+    expect(/monitor\.otroCatalogo > 0 &&/.test(src)).toBe(true);
+    expect(src).toContain("medidas contra otro catálogo");
+    expect(/\{monitor\.source\}/.test(src), "la fuente vuelve a pintarse como nombre de tabla").toBe(false);
+  });
+});
+
+describe("«handoff» no se rinde como rótulo en ninguna superficie del módulo (2026-09-14)", () => {
+  // La revisión transversal cazó que el Dashboard cambió «handoff» → «derivación»
+  // mientras el panel de derivaciones, el botón de la ficha del incidente y un
+  // toast seguían diciendo «handoff»: retirada a medias. Se juzga lo renderizado.
+  const DIRS = [
+    "src/components/ai-governance/dashboard",
+    "src/components/ai-governance/incidente",
+    "src/components/ai-governance/sistema",
+  ];
+  const ficheros = DIRS.flatMap((d) => readdirSync(d).filter((f) => f.endsWith(".tsx")).map((f) => `${d}/${f}`));
+
+  it("ni botón, ni heading, ni toast con «handoff»", () => {
+    expect(ficheros.length).toBeGreaterThan(20);
+    for (const f of ficheros) {
+      const src = sinComentarios(readFileSync(f, "utf8"));
+      expect(src, `${f}: rótulo «Handoff» renderizado`).not.toMatch(/>\s*Handoffs?\b[^<]*</);
+      expect(src, `${f}: toast con «handoff»`).not.toMatch(/toast\.[a-z]+\([^)]*handoff/i);
+    }
+  });
+
+  it("control positivo: la palabra vigente sí está donde se retiró la vieja", () => {
+    const cabecera = readFileSync("src/components/ai-governance/incidente/CabeceraIncidente.tsx", "utf8");
+    expect(cabecera).toContain("Derivar a GRC");
+    const panel = readFileSync("src/components/ai-governance/dashboard/HandoffAffordances.tsx", "utf8");
+    expect(panel).toContain('aria-label="Derivaciones AIMS"');
+    expect(panel).toContain("Derivaciones de solo lectura");
   });
 });

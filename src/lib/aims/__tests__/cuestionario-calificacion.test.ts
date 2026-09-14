@@ -4,6 +4,7 @@ import {
   ETIQUETA_PERFIL,
   PREGUNTAS,
   bloqueosParaConfirmar,
+  tieneClasificacionGuiada,
   derivarMarcos,
   derivarNivel,
   derivarRol,
@@ -235,6 +236,27 @@ describe("resultado provisional y confirmación", () => {
   it("no se confirma una práctica prohibida", () => {
     const { bloqueos } = bloqueosParaConfirmar({ ...DESPLIEGUE, Q2_1: true, Q2_2: false, Q2_4: false, Q2_5: false }, "", true);
     expect(bloqueos.some((b) => /art\. 5/i.test(b))).toBe(true);
+  });
+
+  it("el bloqueo del art. 5 dice «registrarse» en alta y «confirmarse» en reclasificación; el default es alta", () => {
+    const prohibida: Respuestas = { ...DESPLIEGUE, Q2_1: true, Q2_2: false, Q2_4: false, Q2_5: false };
+    const alta = bloqueosParaConfirmar(prohibida, "", true, "alta").bloqueos.find((b) => /art\. 5/.test(b))!;
+    const recl = bloqueosParaConfirmar(prohibida, "", true, "reclasificacion").bloqueos.find((b) => /art\. 5/.test(b))!;
+    expect(alta).toBe("Este sistema realiza una práctica prohibida por el art. 5 del Reglamento. No puede registrarse.");
+    expect(recl).toBe(
+      "Este sistema realiza una práctica prohibida por el art. 5 del Reglamento. No puede confirmarse esta clasificación: revise la respuesta del art. 5.",
+    );
+    expect(bloqueosParaConfirmar(prohibida, "", true).bloqueos).toContain(alta);
+    expect(bloqueosParaConfirmar(prohibida, "", true).bloqueos).not.toContain(recl);
+  });
+
+  it("tieneClasificacionGuiada: sólo con cuestionario_id en regulatory_profile", () => {
+    expect(tieneClasificacionGuiada({ regulatory_profile: { cuestionario_id: "x" } })).toBe(true);
+    expect(tieneClasificacionGuiada({ regulatory_profile: { cuestionario_id: "" } })).toBe(false);
+    expect(tieneClasificacionGuiada({ regulatory_profile: { perfil: "PROFILE_C" } })).toBe(false);
+    expect(tieneClasificacionGuiada({ regulatory_profile: null })).toBe(false);
+    expect(tieneClasificacionGuiada(null)).toBe(false);
+    expect(tieneClasificacionGuiada(undefined)).toBe(false);
   });
 
   it("el art. 6.3 exige motivación (≥ 40 caracteres) al bajar del anexo III", () => {

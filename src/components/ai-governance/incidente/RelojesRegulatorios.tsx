@@ -69,11 +69,11 @@ export default function RelojesRegulatorios({ clocks, doraVisible }: RelojesRegu
               {formatDeadline(clocks.ria?.deadlineDate)}
             </span>
           </div>
-          {clocks.ria && (
-            <p className="text-[11px] text-[var(--g-text-secondary)] leading-relaxed">
-              Tipología del art. 73 no registrada: el incidente no tiene columna donde guardarla.
-              El plazo se calcula asumiendo incidente grave ordinario (15 días naturales); al
-              editar puede elegirse otra tipología, pero el cambio no se guarda con el incidente.
+          {clocks.ria?.severityPresumed && (
+            <p className="text-[11px] text-[var(--status-warning)] leading-relaxed">
+              Tipología del art. 73 no declarada: el plazo se calcula como incidente grave
+              ordinario (15 días naturales). Si fuera infracción generalizada o con fallecimiento
+              el plazo real es más corto: decláralo al editar.
             </p>
           )}
         </div>

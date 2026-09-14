@@ -1,6 +1,7 @@
 import { CheckCircle2, FileText, Sparkles } from "lucide-react";
-import { formatIncidentDate, type RiaIncidentSeverity } from "@/lib/aims/incident-clocks";
+import { formatIncidentDate, GRAVEDAD_RIA, type RiaIncidentSeverity } from "@/lib/aims/incident-clocks";
 import type { AiIncident } from "@/hooks/useAiIncidents";
+import { ESTADOS_INCIDENTE, etiqueta } from "@/lib/aims/vocabulario";
 
 export interface EdicionIncidenteProps {
   incident: AiIncident;
@@ -17,8 +18,9 @@ export interface EdicionIncidenteProps {
   setRootCause: (v: string) => void;
   correctiveAction: string;
   setCorrectiveAction: (v: string) => void;
-  riaSeverity: RiaIncidentSeverity;
-  setRiaSeverity: (v: RiaIncidentSeverity) => void;
+  /** `""` = no declarado; viaja como NULL. */
+  riaSeverity: RiaIncidentSeverity | "";
+  setRiaSeverity: (v: RiaIncidentSeverity | "") => void;
 }
 
 const TEXTAREA_CLASSES =
@@ -144,34 +146,29 @@ export default function EdicionIncidente({
                   className="w-full p-2.5 text-sm border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] focus:ring-2 focus:ring-[var(--g-brand-3308)]"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
-                  <option value="ABIERTO">ABIERTO (En recepción)</option>
-                  <option value="EN_INVESTIGACION">EN INVESTIGACIÓN</option>
-                  <option value="CERRADO">CERRADO (Resuelto)</option>
+                  {ESTADOS_INCIDENTE.map((v) => (
+                    <option key={v} value={v}>{etiqueta("estadoIncidente", v)}</option>
+                  ))}
                 </select>
               </div>
 
               <div>
                 <label htmlFor="incidente-tipologia-ria" className="block text-xs font-semibold text-[var(--g-text-primary)] mb-1">
-                  Tipología RIA Art. 73 (no se guarda)
+                  Tipología del art. 73
                 </label>
                 <select
                   id="incidente-tipologia-ria"
                   value={riaSeverity}
-                  onChange={(e) => setRiaSeverity(e.target.value as RiaIncidentSeverity)}
+                  onChange={(e) => setRiaSeverity(e.target.value as RiaIncidentSeverity | "")}
                   className="w-full p-2.5 text-sm border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
-                  <option value="ORDINARY_SERIOUS">Grave Ordinario (15 días naturales)</option>
-                  <option value="WIDESPREAD_INFRINGEMENT">Infracción Generalizada / Urgente (2 días)</option>
-                  <option value="DEATH_INCIDENT">Fallecimiento de persona (10 días)</option>
+                  {GRAVEDAD_RIA.map((g) => (
+                    <option key={g.code} value={g.code}>{g.label}</option>
+                  ))}
                 </select>
-                {/* `handleSave` no la envía: recalcula el plazo del art. 73 en
-                    pantalla y se pierde al salir. Decirlo es más honesto que
-                    retirar el control (que sí sirve para ver el plazo) o que
-                    fingir una persistencia que no existe. */}
                 <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">
-                  Recalcula el plazo del art. 73 en esta pantalla. No se guarda con el
-                  incidente: al salir vuelve a «Grave Ordinario».
+                  Recalcula el plazo del art. 73 y se guarda con el incidente al pulsar Guardar.
                 </p>
               </div>
             </div>
@@ -179,16 +176,24 @@ export default function EdicionIncidente({
             <div className="space-y-3 text-xs text-[var(--g-text-secondary)]">
               <div className="flex justify-between py-1.5 border-b border-[var(--g-border-subtle)]">
                 <span>Estado:</span>
-                <span className="font-semibold text-[var(--g-text-primary)]">{currentStatus}</span>
+                <span className="font-semibold text-[var(--g-text-primary)]">{etiqueta("estadoIncidente", currentStatus)}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-[var(--g-border-subtle)]">
                 <span>Severidad:</span>
-                <span className="font-semibold text-[var(--g-text-primary)]">{currentSeverity}</span>
+                <span className="font-semibold text-[var(--g-text-primary)]">{etiqueta("severidad", currentSeverity)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-[var(--g-border-subtle)]">
+                <span>Tipología art. 73:</span>
+                <span className="font-semibold text-[var(--g-text-primary)]">
+                  {GRAVEDAD_RIA.find((g) => g.code === (incident.ria_severity ?? ""))?.label ?? "No declarada"}
+                </span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-[var(--g-border-subtle)]">
                 <span>Fecha de conocimiento:</span>
                 <span className="font-semibold text-[var(--g-text-primary)]">
-                  {formatIncidentDate(incident.reported_at)}
+                  {incident.knowledge_at
+                    ? formatIncidentDate(incident.knowledge_at)
+                    : `${formatIncidentDate(incident.reported_at)} (no declarada; se usa la de registro)`}
                 </span>
               </div>
               <div className="flex justify-between py-1.5">

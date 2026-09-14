@@ -7,6 +7,7 @@
  *
  * Las clases de formulario y el estado de una medida viven en `estado-medida.ts`.
  */
+import { useId } from "react";
 import { MATURITY_LEVELS, DIFICULTAD_SIN_EVALUAR } from "@/lib/aims/catalog-aesia";
 import { INPUT_CLASSES, LABEL_CLASSES, SELECT_CLASSES, TEXTAREA_CLASSES, type MeasureEvaluationState } from "./estado-medida";
 import { NIVEL_NO_APLICABLE, MOTIVO_L8_SIN_JUSTIFICAR, motivoNoAcredita } from "@/lib/aims/conformidad";
@@ -39,6 +40,9 @@ export type ControlesDeMedidaProps = {
 
 export default function ControlesDeMedida({ state, onChange }: ControlesDeMedidaProps) {
   const matMeta = MATURITY_LEVELS[state.maturity];
+  // Un id por instancia: el componente se monta una vez por medida y `htmlFor`
+  // necesita un destino único.
+  const id = useId();
   // El predicado es el de la hoja `conformidad.ts`, no una copia: si mañana
   // cambia lo que acredita, el aviso en vivo del wizard lo sigue.
   const l8SinMotivo =
@@ -48,10 +52,11 @@ export default function ControlesDeMedida({ state, onChange }: ControlesDeMedida
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-[var(--g-border-subtle)]">
         <div>
-          <label className="block text-xs font-semibold text-[var(--g-text-primary)] mb-1">
+          <label htmlFor={`${id}-madurez`} className="block text-xs font-semibold text-[var(--g-text-primary)] mb-1">
             Nivel de madurez (escala L1–L8)
           </label>
           <select
+            id={`${id}-madurez`}
             value={state.maturity}
             onChange={(e) => onChange("maturity", e.target.value)}
             className={SELECT_CLASSES}
@@ -70,10 +75,11 @@ export default function ControlesDeMedida({ state, onChange }: ControlesDeMedida
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-[var(--g-text-primary)] mb-1">
+          <label htmlFor={`${id}-dificultad`} className="block text-xs font-semibold text-[var(--g-text-primary)] mb-1">
             Dificultad de implementación
           </label>
           <select
+            id={`${id}-dificultad`}
             value={state.difficulty}
             onChange={(e) => onChange("difficulty", e.target.value)}
             className={SELECT_CLASSES}
@@ -92,10 +98,11 @@ export default function ControlesDeMedida({ state, onChange }: ControlesDeMedida
 
       {state.maturity === NIVEL_NO_APLICABLE && (
         <div className="p-3 bg-[var(--g-surface-subtle)] border-l-4 border-[var(--g-brand-3308)] space-y-1.5">
-          <label className="block text-xs font-bold text-[var(--g-text-primary)]">
+          <label htmlFor={`${id}-justificacion`} className="block text-xs font-bold text-[var(--g-text-primary)]">
             Justificación técnica obligatoria *
           </label>
           <input
+            id={`${id}-justificacion`}
             type="text"
             value={state.justification}
             onChange={(e) => onChange("justification", e.target.value)}
@@ -103,9 +110,10 @@ export default function ControlesDeMedida({ state, onChange }: ControlesDeMedida
             className={INPUT_CLASSES}
             style={{ borderRadius: "var(--g-radius-md)" }}
             aria-invalid={l8SinMotivo}
+            aria-describedby={l8SinMotivo ? `${id}-justificacion-error` : undefined}
           />
           {l8SinMotivo && (
-            <p className="text-[11px] font-semibold text-[var(--status-error)]">
+            <p id={`${id}-justificacion-error`} className="text-[11px] font-semibold text-[var(--status-error)]">
               {MOTIVO_L8_SIN_JUSTIFICAR}: sin el motivo, esta medida no acredita conformidad y no
               suma al porcentaje.
             </p>

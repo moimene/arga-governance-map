@@ -2,6 +2,8 @@
 
 > **Estado: COMPLETO en Secretaría; PROVISIONAL en GRC, AIMS y canal.** La refutación adversarial (3 refutadores por hallazgo) se cortó dos veces el 2026-09-02: primero por límite de sesión (552 de 668 agentes fallidos) y, al reanudar a las 16:50 con `resumeFromRunId`, por el **límite de gasto mensual** (1127 de 1353 agentes fallidos). La reanudación completó Secretaría: 101 veredictos sobre 40 hallazgos (30 confirmados, 2 refutados, 2 parciales, 6 sin juzgar). GRC, AIMS y canal conservan solo los veredictos de la primera pasada. En total: 215 hallazgos, 183 veredictos, 56 confirmados y **144 SIN JUZGAR** — un hallazgo sin votos no está confirmado ni refutado. La primera versión de este fichero (escrita por un agente con entrada truncada) llamaba «refutados» a los sin voto; era un defecto de conteo del orquestador. Este fichero se regenera desde el journal crudo del workflow `wf_e40889cd-aa8` (226 resultados) sin agentes.
 
+> **Estado a 2026-09-14: informe HISTÓRICO, superado.** Los 257 hallazgos (§2 + §6) se juzgaron con refutador en `docs/superpowers/plans/2026-09-05-ledger-cierre-gaps.md` y `2026-09-06-ledger-cierre-gaps-verificacion.md`; el carril AIMS se rehízo entero en `2026-09-08-ledger-refactor-aims.md` (frontera de 26 tablas, FRIA y QSEAL retirados, rutas `/nueva` corregidas, e2e reescrito) y su backlog vivo está en `docs/superpowers/reviews/2026-09-14-backlog-consolidacion-aims.md`. No usar §2.3 ni §6.2 como lista de comprobación.
+
 ## 0. Conteos reales por carril
 
 | Carril | Total | Confirmados (≥2 votos) | …de ellos P0 / P1 | Parciales | Refutados (≥2 votos) | SIN JUZGAR | …de ellos P0 / P1 |

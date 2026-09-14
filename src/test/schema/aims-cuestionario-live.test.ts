@@ -64,6 +64,12 @@ describe("cuestionario guiado — vivo, con los dos logins", () => {
 
   beforeAll(async () => {
     [arga, garr] = await Promise.all([sesionDe("ARGA"), sesionDe("GARRIGUES")]);
+    // Barrido de residuo de corridas anteriores (una corrida interrumpida deja
+    // el sistema de sonda vivo). Cada cliente sólo alcanza lo suyo por RLS.
+    for (const cli of [arga, garr]) {
+      const { error } = await cli.from("ai_systems").delete().like("name", "PROBE-CUESTIONARIO-%");
+      if (error) throw new Error(`barrido de residuo PROBE-CUESTIONARIO-%: ${error.message}`);
+    }
   }, 30_000);
 
   afterAll(async () => {

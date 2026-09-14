@@ -1,7 +1,11 @@
 import { ExternalLink } from "lucide-react";
 import type { AiRiskAssessment } from "@/hooks/useAiAssessments";
+import type { AiSystem } from "@/hooks/useAiSystems";
+import { AESIA_RIA_REQUIREMENTS } from "@/lib/aims/catalog-aesia";
+import { mensajeUsuario } from "@/lib/aims/errores-rpc";
+import { evaluadaContraOtroCatalogo } from "@/lib/aims/perfil-aplicabilidad";
 import { assessmentAcreditaConformidad } from "@/lib/aims/readiness";
-import { etiqueta } from "@/lib/aims/vocabulario";
+import { claseNivelRiesgo, etiqueta } from "@/lib/aims/vocabulario";
 
 /**
  * Historial de autodiagnósticos del sistema.
@@ -14,12 +18,15 @@ import { etiqueta } from "@/lib/aims/vocabulario";
  */
 
 export interface TabEvaluacionesProps {
+  system: AiSystem;
   assessments: AiRiskAssessment[];
+  /** Error de la consulta: «no se pudo leer» no es «no hay». */
+  error?: unknown;
   onNueva: () => void;
   onAbrir: (assessmentId: string) => void;
 }
 
-export default function TabEvaluaciones({ assessments, onNueva, onAbrir }: TabEvaluacionesProps) {
+export default function TabEvaluaciones({ system, assessments, error, onNueva, onAbrir }: TabEvaluacionesProps) {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -34,7 +41,11 @@ export default function TabEvaluaciones({ assessments, onNueva, onAbrir }: TabEv
         </button>
       </div>
 
-      {assessments.length === 0 ? (
+      {error ? (
+        <p className="p-8 text-center text-xs font-semibold text-[var(--g-text-secondary)]">
+          No se pudo leer los autodiagnósticos ({mensajeUsuario(error)}).
+        </p>
+      ) : assessments.length === 0 ? (
         <div
           className="p-8 text-center text-xs text-[var(--g-text-secondary)] bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)]"
           style={{ borderRadius: "var(--g-radius-lg)" }}
@@ -74,15 +85,23 @@ export default function TabEvaluaciones({ assessments, onNueva, onAbrir }: TabEv
               </div>
 
               <div className="pt-2 border-t border-[var(--g-border-subtle)] flex justify-between items-center text-xs">
-                <span
-                  className={`px-2 py-0.5 font-semibold text-[11px] ${
-                    assessmentAcreditaConformidad(ass.status)
-                      ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-                      : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
-                  }`}
-                  style={{ borderRadius: "var(--g-radius-full)" }}
-                >
-                  {etiqueta("estadoEvaluacion", ass.status) || "Sin estado"}
+                <span className="flex flex-wrap items-center gap-1.5">
+                  <span
+                    className={`px-2 py-0.5 font-semibold text-[11px] ${
+                      assessmentAcreditaConformidad(ass.status)
+                        ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
+                        : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
+                    }`}
+                    style={{ borderRadius: "var(--g-radius-full)" }}
+                  >
+                    {etiqueta("estadoEvaluacion", ass.status) || "Sin estado"}
+                  </span>
+                  {/* Chip neutro de la hoja (el mismo que un nivel sin clasificar). */}
+                  {evaluadaContraOtroCatalogo(ass.findings, system, AESIA_RIA_REQUIREMENTS) && (
+                    <span className={`px-2 py-0.5 font-semibold text-[11px] ${claseNivelRiesgo(null)}`} style={{ borderRadius: "var(--g-radius-full)" }}>
+                      Evaluada contra otro catálogo
+                    </span>
+                  )}
                 </span>
                 <span className="text-[var(--g-brand-3308)] font-semibold inline-flex items-center gap-1">
                   <span>Ver detalles</span>

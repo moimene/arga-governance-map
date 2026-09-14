@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FileCheck, FilePlus2, Info, Layers } from "lucide-react";
 import { toast } from "sonner";
+import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 import {
   useAbrirSubexpedienteRegimen,
   useUpdateIncidentRegime,
@@ -107,8 +108,7 @@ export default function SubexpedientesRegimen({
           "a la autoridad ni acuse de recibo: sólo cierra el subexpediente interno.",
       });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`No se pudo cerrar el subexpediente ${regimeCode}: ${msg}`);
+      toast.error(`No se pudo cerrar el subexpediente ${regimeCode}: ${mensajeUsuario(err)}`);
     }
   };
 
@@ -129,8 +129,7 @@ export default function SubexpedientesRegimen({
       });
       setBorrador(null);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`No se pudo abrir el subexpediente ${borrador.code}: ${msg}`);
+      toast.error(`No se pudo abrir el subexpediente ${borrador.code}: ${mensajeUsuario(err)}`);
     }
   };
 

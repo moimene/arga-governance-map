@@ -63,8 +63,9 @@ describe("§2.3 — ninguna pantalla ni componente AIMS por encima de 400 línea
       const src = readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
       const tocaCatalogo = /\b(AESIA_RIA_REQUIREMENTS|DESPLIEGUE_REQUIREMENTS|ISO_42001_REQUIREMENTS|getRequirementsForFramework)\b/.test(src);
       if (!tocaCatalogo) continue;
+      // `evaluadaContraOtroCatalogo` (2026-09-14) ES el criterio: envuelve a los otros dos.
       expect(
-        /\b(perfilAplicable|catalogoDeLosFindings)\(/.test(src),
+        /\b(perfilAplicable|catalogoDeLosFindings|evaluadaContraOtroCatalogo)\(/.test(src),
         `${f} toca un catálogo de medidas sin pasar por el criterio de perfil`,
       ).toBe(true);
     }

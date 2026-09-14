@@ -3,6 +3,9 @@ import { AiSystem } from "@/hooks/useAiSystems";
 import { useTenantBranding, useTenantBrandingLoading } from "@/context/TenantBrandContext";
 import { groupFullLabel } from "@/lib/tenant-brand-labels";
 import { isModuleEnabled } from "@/lib/tenant-modules";
+import { derivarMarcos, tieneClasificacionGuiada } from "@/lib/aims/cuestionario-calificacion";
+import { vinculaArt47 } from "@/lib/aims/expediente-tecnico";
+import { ETIQUETA_ROL, type RolRegulatorio } from "@/lib/aims/rol-regulatorio";
 import {
   CheckCircle2,
   Download,
@@ -42,8 +45,60 @@ export default function DeclaracionConformidadModal({
   // para cualquiera. NIS2 va con DORA porque su aplicabilidad se declara junto
   // a la de DORA y este documento no tiene ningún otro dato con que decidirla.
   const marcoResilienciaVisible = isModuleEnabled(branding, "dora");
+  // Si el art. 47 vincula lo dice la hoja, no esta pantalla: sólo el proveedor
+  // de un sistema de alto riesgo declara. Sin cuestionario COMPLETED el rol y
+  // el nivel de la ficha son dato declarado, no clasificación: `null`, como
+  // sin rol o sin nivel. Mismo criterio que el chip de la cabecera.
+  const vincula = tieneClasificacionGuiada(system) ? vinculaArt47(system.regulatory_role, system.risk_level) : null;
+  const rolLabel = ETIQUETA_ROL[system.regulatory_role as RolRegulatorio] ?? system.regulatory_role ?? "";
+  const marcos = derivarMarcos(
+    system.regulatory_role,
+    system.risk_level,
+    Boolean(system.regulatory_profile?.gpai),
+  );
 
   if (!isOpen) return null;
+
+  if (vincula !== true) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[color-mix(in_srgb,var(--g-text-primary)_60%,transparent)] backdrop-blur-sm">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="art47-titulo"
+          className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] w-full max-w-lg p-6 space-y-4 shadow-2xl"
+          style={{ borderRadius: "var(--g-radius-lg)" }}
+        >
+          <div className="flex items-center justify-between border-b border-[var(--g-border-subtle)] pb-3">
+            <h2 id="art47-titulo" className="text-base font-bold text-[var(--g-text-primary)]">Declaración de Conformidad UE (Art. 47 RIA)</h2>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Cerrar modal"
+              className="p-1 text-[var(--g-text-secondary)] hover:text-[var(--g-text-primary)] transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <p className="text-sm text-[var(--g-text-primary)]">
+            {vincula === null
+              ? "Sin clasificación guiada: el art. 47 no se afirma para este sistema. Clasifícalo desde la ficha."
+              : "El art. 47 (declaración UE de conformidad) sólo vincula al proveedor de un sistema de alto riesgo; a este rol y nivel no le aplica."}
+          </p>
+          <div className="flex justify-end pt-3 border-t border-[var(--g-border-subtle)]">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-[var(--g-border-subtle)] text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)] text-xs font-medium transition-colors"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handlePrint = () => {
     window.print();
@@ -61,7 +116,8 @@ DECLARACIÓN DE CONFORMIDAD UE (REGLAMENTO UE 2024/1689 - ARTÍCULO 47)
    - Tipo de Sistema: ${system.system_type || "No declarado"}
    - Clasificación de Riesgo: ${clasificacion}
 
-2. PROVEEDOR RESPONSABLE:
+2. RESPONSABLE DE LA DECLARACIÓN:
+   - Rol regulatorio: ${rolLabel}
    - Entidad: ${entidad}
    - Persona / Cargo Responsable: [por completar antes de la emisión]
 
@@ -72,13 +128,9 @@ DECLARACIÓN DE CONFORMIDAD UE (REGLAMENTO UE 2024/1689 - ARTÍCULO 47)
 4. FINALIDAD PREVISTA:
    ${system.use_case || system.description || "No declarada."}
 
-5. MARCOS NORMATIVOS DE REFERENCIA (su aplicación efectiva se acredita con las
-   evaluaciones registradas del sistema, no con esta enumeración):
-   - Reglamento (UE) 2024/1689 del Parlamento Europeo y del Consejo (AI Act)
-   - Guías técnicas publicadas por la AESIA (material no vinculante; sin cotejo
-     guía a guía en este módulo)
-   - UNE-EN ISO/IEC 42001:2023 - Sistema de Gestión de Inteligencia Artificial
-   - Real Decreto 817/2023 - Entorno Controlado de Pruebas (Sandbox IA España)
+5. MARCOS DERIVADOS DEL ROL Y DEL NIVEL (su aplicación efectiva se acredita con
+   las evaluaciones registradas del sistema, no con esta enumeración):
+${marcos.map((m) => `   - ${m.articulos} — ${m.titulo}`).join("\n")}
 
 6. INTEGRIDAD Y CUSTODIA PROBATORIA:
    - Registro del manifiesto técnico: interno, sin hash de integridad
@@ -104,8 +156,11 @@ validación funcional y no constituye una declaración de conformidad emitida.
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[color-mix(in_srgb,var(--g-text-primary)_60%,transparent)] backdrop-blur-sm">
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="art47-titulo"
         className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
         style={{ borderRadius: "var(--g-radius-lg)" }}
       >
@@ -113,7 +168,7 @@ validación funcional y no constituye una declaración de conformidad emitida.
         <div className="flex items-center justify-between p-4 border-b border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)]/50">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-[var(--g-brand-3308)]" />
-            <h2 className="text-base font-bold text-[var(--g-text-primary)]">
+            <h2 id="art47-titulo" className="text-base font-bold text-[var(--g-text-primary)]">
               Declaración de Conformidad UE (Art. 47 RIA)
             </h2>
           </div>
@@ -158,8 +213,8 @@ validación funcional y no constituye una declaración de conformidad emitida.
                 <span className="font-bold">{clasificacion}</span>
               </div>
               <div>
-                <span className="font-semibold text-[var(--g-text-secondary)] block">Proveedor Responsable:</span>
-                <span>{system.vendor || "No declarado"}</span>
+                <span className="font-semibold text-[var(--g-text-secondary)] block">Rol regulatorio:</span>
+                <span>{rolLabel}</span>
               </div>
             </div>
 
@@ -174,15 +229,12 @@ validación funcional y no constituye una declaración de conformidad emitida.
 
             <div className="space-y-2">
               <h3 className="font-bold text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
-                2. Marcos Normativos de Referencia
+                2. Marcos derivados del rol y del nivel
               </h3>
               <ul className="list-disc list-inside space-y-1 text-[var(--g-text-secondary)] pl-1">
-                <li>Reglamento (UE) 2024/1689 (Artículos 9 a 17, 72 y 73).</li>
-                {/* Misma retirada que en el alta y el informe de la evaluación: la
-                    atribución a una guía numerada de la Agencia nunca se cotejó
-                    contra publicación oficial y no es la fuente del requisito. */}
-                <li>Catálogo de 84 medidas de referencia (MG) del módulo, alineadas con el Reglamento (UE) 2024/1689.</li>
-                <li>Estándar UNE-EN ISO/IEC 42001:2023 (Gestión de Inteligencia Artificial).</li>
+                {marcos.map((m) => (
+                  <li key={m.code}>{m.articulos} — {m.titulo}</li>
+                ))}
                 {marcoResilienciaVisible && (
                   <li>Marco de Ciberseguridad y Resiliencia Operativa Digital (DORA / NIS2).</li>
                 )}

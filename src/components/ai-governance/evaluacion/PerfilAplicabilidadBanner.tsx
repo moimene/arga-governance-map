@@ -16,7 +16,7 @@
  */
 import { Link } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
-import { ETIQUETA_PERFIL, type PerfilCatalogo } from "@/lib/aims/cuestionario-calificacion";
+import { ETIQUETA_PERFIL, tieneClasificacionGuiada, type PerfilCatalogo } from "@/lib/aims/cuestionario-calificacion";
 import { AVISO_COBERTURA_PROVISIONAL } from "@/lib/aims/perfil-aplicabilidad";
 
 /** Lo que la pantalla necesita del perfil. `PerfilAplicabilidad` lo cumple. */
@@ -41,10 +41,9 @@ export default function PerfilAplicabilidadBanner({
   totalMedidas,
   sistema,
 }: PerfilAplicabilidadBannerProps) {
-  // La clave `cuestionario_id` la escribe la RPC del cuestionario guiado en
-  // `ai_systems.regulatory_profile`: un sistema clasificado antes del
-  // cuestionario —o sin clasificar— no la tiene.
-  const sinClasificacionGuiada = Boolean(sistema) && !sistema?.regulatory_profile?.cuestionario_id;
+  // Criterio único de la hoja (la RPC del cuestionario escribe la clave en
+  // `ai_systems.regulatory_profile`); aquí sólo se pinta.
+  const sinClasificacionGuiada = Boolean(sistema) && !tieneClasificacionGuiada(sistema);
 
   return (
     <div

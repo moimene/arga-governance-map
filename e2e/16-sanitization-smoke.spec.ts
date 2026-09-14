@@ -93,7 +93,7 @@ async function openFirstDataRow(
 test.describe('Sanitization smoke — AIMS-GRC', () => {
   test('pantallas core renderizan contra Cloud actual', async ({ page }) => {
     const routes: Array<{ path: string; signals: RegExp[] }> = [
-      { path: '/ai-governance', signals: [/AI Governance/i, /Sistemas IA activos/i, /Readiness de demo AIMS/i] },
+      { path: '/ai-governance', signals: [/AI Governance/i, /Sistemas IA activos/i] },
       { path: '/ai-governance/sistemas', signals: [/Sistemas IA/i, /Buscar sistema/i] },
       { path: '/ai-governance/sistemas/nuevo', signals: [/Nuevo sistema IA/i, /Nombre del sistema/i] },
       { path: '/ai-governance/evaluaciones', signals: [/Evaluaciones/i, /Evaluaci[oó]n/i] },
@@ -121,9 +121,15 @@ test.describe('Sanitization smoke — AIMS-GRC', () => {
     // AIMS», «solo lectura demo») se borró por decisión (ledger D-10): era
     // prosa mantenida aparte de las pantallas. Los handoffs siguen y se
     // afirman; la ausencia de la tabla también, para que no vuelva.
-    await visitRoute(page, '/ai-governance', [/Readiness de demo AIMS/i]);
-    await expect(page.getByRole('heading', { name: 'Handoffs de solo lectura' })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('SECRETARIA_CERTIFICATION_ISSUED')).toBeVisible();
+    await visitRoute(page, '/ai-governance', [/Mesa de trabajo AI Governance/i]);
+    // Por concepto (aria-label), no por rótulo: el texto del panel cambia.
+    await expect(page.getByLabel('Readiness AIMS')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByLabel('Derivaciones AIMS')).toBeVisible({ timeout: 10_000 });
+    // Los eventos de contrato (SECRETARIA_CERTIFICATION_ISSUED…) ya no se pintan:
+    // son jerga de integración, no información para quien prueba (2026-09-14).
+    // La invariante es que las tarjetas existen y declaran que AIMS sólo enruta.
+    await expect(page.getByText('SECRETARIA_CERTIFICATION_ISSUED')).toHaveCount(0);
+    await expect(page.getByText(/AIMS solo enruta/).first()).toBeVisible();
     await expect(page.getByText(/AIMS enruta contexto, no toma decisiones/i)).toBeVisible();
     await expect(page.getByText('Contexto técnico AIMS')).toHaveCount(0);
   });

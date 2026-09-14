@@ -46,7 +46,7 @@ test.describe('Core UX workbench copy', () => {
 
     await page.goto('/ai-governance');
     await expect(page.getByRole('heading', { name: 'Mesa de trabajo AI Governance' })).toBeVisible();
-    await expect(page.getByText('Acciones del officer AIMS')).toBeVisible();
+    await expect(page.getByText('Acciones del responsable AIMS')).toBeVisible();
   });
 });
 

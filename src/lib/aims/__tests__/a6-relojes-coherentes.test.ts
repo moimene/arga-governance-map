@@ -180,3 +180,30 @@ describe("A6 — la clasificación desconocida se advierte, no se oculta", () =>
     ).toBeUndefined();
   });
 });
+
+describe("A6 — la tipología del art. 73 sin declarar se presume y se dice", () => {
+  it("sin severidad: plazo de 15 días y `severityPresumed` a true", () => {
+    // Antes la ficha arrancaba en ORDINARY_SERIOUS y el motor no distinguía
+    // «declarado ordinario» de «no declarado»: el mismo plazo, sin cautela.
+    const r = evaluateMultiregimeIncident({ knowledgeDate: K, isAiRelated: true, isAiHighRisk: true });
+    expect(r.ria?.deadlineHours).toBe(360);
+    expect(r.ria?.severityPresumed).toBe(true);
+  });
+
+  it("con FATALITY declarada: 10 días y sin presunción (control positivo)", () => {
+    const r = evaluateMultiregimeIncident({
+      knowledgeDate: K, isAiRelated: true, isAiHighRisk: true, riaSeverity: "DEATH_INCIDENT",
+    });
+    expect(r.ria?.deadlineHours).toBe(240);
+    expect(h(r.ria!.deadlineDate)).toBe(240);
+    expect(r.ria?.severityPresumed).toBe(false);
+  });
+
+  it("ORDINARY_SERIOUS declarado no es lo mismo que no declarado", () => {
+    const r = evaluateMultiregimeIncident({
+      knowledgeDate: K, isAiRelated: true, isAiHighRisk: true, riaSeverity: "ORDINARY_SERIOUS",
+    });
+    expect(r.ria?.deadlineHours).toBe(360);
+    expect(r.ria?.severityPresumed).toBe(false);
+  });
+});

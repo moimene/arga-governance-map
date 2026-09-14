@@ -5,6 +5,8 @@ import {
   DESPLIEGUE_REQUIREMENTS,
   PROCEDENCIA_DESPLIEGUE,
   catalogoDeLosFindings,
+  codigosDelPerfil,
+  evaluadaContraOtroCatalogo,
   perfilAplicable,
   procedenciaDe,
 } from "../perfil-aplicabilidad";
@@ -205,5 +207,52 @@ describe("el perfil expone el perfil de catálogo A/B/C del cuestionario guiado 
     expect(c.catalogProfile).toBe("PROFILE_C");
     expect(c.requirements).toBe(DESPLIEGUE_REQUIREMENTS);
     expect(perfilAplicable({ regulatory_role: null, risk_level: "Limitado" }, AESIA_RIA_REQUIREMENTS).catalogProfile).toBeNull();
+  });
+});
+
+describe("evaluadaContraOtroCatalogo — sólo con clasificación guiada", () => {
+  const MG = [{ code: "MG_QUAL_01" }, { code: "MG_QUAL_02" }];
+  const MD = [{ code: "MD_ALF_01" }, { code: "MD_TRA_01" }];
+  const despliegueGuiado = {
+    regulatory_role: "RESPONSABLE_DESPLIEGUE",
+    risk_level: "Limitado",
+    regulatory_profile: { cuestionario_id: "x" },
+  };
+  const sinPerfil = { regulatory_role: null, risk_level: null, regulatory_profile: null };
+
+  it("(a) findings del proveedor sobre un desplegador clasificado → true", () => {
+    // Control del instrumento: esos códigos son del catálogo de proveedor.
+    expect(catalogoDeLosFindings(MG, [AESIA_RIA_REQUIREMENTS, DESPLIEGUE_REQUIREMENTS])).toBe(AESIA_RIA_REQUIREMENTS);
+    expect(evaluadaContraOtroCatalogo(MG, despliegueGuiado, AESIA_RIA_REQUIREMENTS)).toBe(true);
+  });
+
+  it("(b) sin regulatory_profile ni rol → false SIEMPRE (fail-open intacto, cero cambio ARGA)", () => {
+    // Sin rol, perfilAplicable ya elige el catálogo de proveedor, igual que los
+    // findings MG: esta aserción da false con o sin guard (documenta ARGA, no muerde).
+    expect(evaluadaContraOtroCatalogo(MG, sinPerfil, AESIA_RIA_REQUIREMENTS)).toBe(false);
+    // ÉSTA es la que muerde el guard: rol de despliegue (catálogo distinto de los
+    // findings MG) y sin cuestionario. Sin tieneClasificacionGuiada daría true.
+    expect(evaluadaContraOtroCatalogo(MG, { ...despliegueGuiado, regulatory_profile: null }, AESIA_RIA_REQUIREMENTS)).toBe(false);
+  });
+
+  it("(e) sin nada evaluado contra el RIA no se afirma «otro catálogo»: [], undefined e ISO 42001 → false", () => {
+    // Control del instrumento: sin aciertos catalogoDeLosFindings cae a candidatos[0].
+    expect(catalogoDeLosFindings([], [AESIA_RIA_REQUIREMENTS, DESPLIEGUE_REQUIREMENTS])).toBe(AESIA_RIA_REQUIREMENTS);
+    expect(evaluadaContraOtroCatalogo([], despliegueGuiado, AESIA_RIA_REQUIREMENTS)).toBe(false);
+    expect(evaluadaContraOtroCatalogo(undefined, despliegueGuiado, AESIA_RIA_REQUIREMENTS)).toBe(false);
+    expect(evaluadaContraOtroCatalogo([{ code: "ISO_A_6_2_2" }], despliegueGuiado, AESIA_RIA_REQUIREMENTS)).toBe(false);
+    // Y el positivo (a) sigue vivo al lado.
+    expect(evaluadaContraOtroCatalogo(MG, despliegueGuiado, AESIA_RIA_REQUIREMENTS)).toBe(true);
+  });
+
+  it("(c) findings del despliegue sobre el mismo desplegador → false", () => {
+    expect(evaluadaContraOtroCatalogo(MD, despliegueGuiado, AESIA_RIA_REQUIREMENTS)).toBe(false);
+  });
+
+  it("(d) codigosDelPerfil sigue al perfil: despliegue sin QUALITY_MGMT, sin rol con él", () => {
+    const codigosDespliegue = codigosDelPerfil(despliegueGuiado, AESIA_RIA_REQUIREMENTS);
+    expect(codigosDespliegue).toEqual(new Set(DESPLIEGUE_REQUIREMENTS.map((r) => r.code)));
+    expect(codigosDespliegue.has("QUALITY_MGMT")).toBe(false);
+    expect(codigosDelPerfil(sinPerfil, AESIA_RIA_REQUIREMENTS).has("QUALITY_MGMT")).toBe(true);
   });
 });

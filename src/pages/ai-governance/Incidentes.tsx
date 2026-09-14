@@ -11,6 +11,7 @@ import {
   opcionesFiltro,
 } from "@/lib/aims/vocabulario";
 import FilterGroup from "@/components/ai-governance/FilterGroup";
+import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 
 function formatDate(value: string | null) {
   if (!value) return "Sin fecha";
@@ -34,7 +35,7 @@ export default function AiIncidentes() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [severityFilter, setSeverityFilter] = useState("Todos");
-  const { data: incidents = [], isLoading } = useAiIncidentsList();
+  const { data: incidents = [], isLoading, isError, error } = useAiIncidentsList();
 
   const abiertos = incidents.filter(
     (i) => ["ABIERTO", "EN_INVESTIGACION"].includes(normalizeAimsStatus(i.status)),
@@ -78,7 +79,7 @@ export default function AiIncidentes() {
       </div>
 
       {/* Stats rápidas */}
-      {!isLoading && incidents.length > 0 && (
+      {!isLoading && (isError || incidents.length > 0) && (
         <section
           className="grid gap-3 md:grid-cols-[1.2fr_0.6fr_0.6fr_0.6fr]"
           aria-label="Estado de incidentes AIMS"
@@ -94,17 +95,22 @@ export default function AiIncidentes() {
               <ShieldAlert className="h-5 w-5 text-[var(--g-brand-3308)]" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-[var(--g-text-primary)]">Demo AIMS conectada</p>
+              <p className="text-sm font-semibold text-[var(--g-text-primary)]">
+                {isError ? "Lectura no disponible" : "Registro de incidentes conectado"}
+              </p>
               <p className="mt-1 text-xs leading-5 text-[var(--g-text-secondary)]">
-                AIMS registra la señal IA. GRC y Secretaría reciben contexto de solo lectura si el incidente es material.
+                {isError
+                  ? "Los indicadores no se han podido medir: el servidor no devolvió los incidentes."
+                  : "AIMS registra la señal IA. GRC y Secretaría reciben contexto de solo lectura si el incidente es material."}
               </p>
             </div>
           </div>
+          {/* Con error de lectura el KPI es «—» en neutro: un 0 se leería como medición. */}
           {[
             { label: "Total incidentes", value: incidents.length, tone: "info" },
             { label: "Abiertos / En investigación", value: abiertos, tone: abiertos > 0 ? "error" : "success" },
             { label: "Materiales", value: materialCount, tone: materialCount > 0 ? "error" : "success" },
-          ].map((stat) => (
+          ].map((stat) => (isError ? { ...stat, value: "—", tone: "neutral" } : stat)).map((stat) => (
             <div
               key={stat.label}
               className="border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-5 py-4"
@@ -115,6 +121,8 @@ export default function AiIncidentes() {
                   ? "text-[var(--status-error)]"
                   : stat.tone === "success"
                   ? "text-[var(--status-success)]"
+                  : stat.tone === "neutral"
+                  ? "text-[var(--g-text-secondary)]"
                   : "text-[var(--g-brand-3308)]"
               }`}>
                 {stat.value}
@@ -122,7 +130,7 @@ export default function AiIncidentes() {
               <div className="text-xs text-[var(--g-text-secondary)] mt-0.5">{stat.label}</div>
             </div>
           ))}
-          <div className="sr-only">{cerrados} incidentes cerrados</div>
+          {!isError && <div className="sr-only">{cerrados} incidentes cerrados</div>}
         </section>
       )}
 
@@ -168,6 +176,14 @@ export default function AiIncidentes() {
         {isLoading ? (
           <div className="p-8 space-y-3">
             {[1,2,3].map((i) => <div key={i} className="skeleton h-16" style={{ borderRadius: "var(--g-radius-md)" }} />)}
+          </div>
+        ) : isError ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center" role="alert">
+            <AlertTriangle className="h-10 w-10 text-[var(--status-error)] mb-3" />
+            <p className="text-sm font-medium text-[var(--g-text-primary)]">
+              No se pudo leer los incidentes ({mensajeUsuario(error)})
+            </p>
+            <p className="text-xs text-[var(--g-text-secondary)] mt-1">La lista vacía no significa que no haya incidentes: la lectura falló.</p>
           </div>
         ) : incidents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">

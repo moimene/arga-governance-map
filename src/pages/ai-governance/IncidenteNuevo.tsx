@@ -1,9 +1,10 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { AlertTriangle, ChevronLeft, Save, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ChevronLeft, Save } from "lucide-react";
 import { toast } from "sonner";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { useCreateAiIncident, type AiIncident } from "@/hooks/useAiIncidents";
+import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 import FormularioIncidente, {
   type FormState,
 } from "@/components/ai-governance/incidente/FormularioIncidente";
@@ -33,7 +34,7 @@ export default function IncidenteNuevo() {
     description: "",
     incident_type: "",
     knowledge_at: nowForInput(),
-    ria_severity: "ORDINARY_SERIOUS",
+    ria_severity: "",
     afecta_datos: "",
     alto_riesgo_interesados: "",
     affected_count: "",
@@ -89,8 +90,7 @@ export default function IncidenteNuevo() {
       toast.success("Incidente IA registrado en AIMS.");
       navigate(created.system_id ? `/ai-governance/sistemas/${created.system_id}` : "/ai-governance/incidentes");
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`No se pudo registrar el incidente: ${message}`);
+      toast.error(`No se pudo registrar el incidente: ${mensajeUsuario(error)}`);
     }
   };
 
@@ -114,15 +114,8 @@ export default function IncidenteNuevo() {
             </h1>
           </div>
           <p className="text-sm text-[var(--g-text-secondary)]">
-            Registro owner de AIMS; cualquier escalado a GRC o Secretaría se mantiene como handoff read-only.
+            Registro del incidente en AIMS; el escalado a GRC o Secretaría se hace desde la ficha y es de sólo lectura.
           </p>
-        </div>
-        <div
-          className="inline-flex items-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-2 text-xs font-semibold text-[var(--g-text-primary)]"
-          style={{ borderRadius: "var(--g-radius-md)" }}
-        >
-          <ShieldCheck className="h-4 w-4 text-[var(--g-brand-3308)]" />
-          legacy_write · ai_incidents
         </div>
       </header>
 

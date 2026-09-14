@@ -9,7 +9,8 @@ export interface PrioridadAhoraProps {
   totalIncidentes: number;
   /** «N en inventario · M en evaluación», ya compuesto por la página. */
   detalleInventario: string;
-  sistemasClasificados: number;
+  /** Con cuestionario de clasificación completado (`tieneClasificacionGuiada`). */
+  conClasificacionGuiada: number;
   loading: boolean;
 }
 
@@ -17,7 +18,7 @@ const QUICK_ACTIONS = [
   { label: "Nuevo sistema IA", body: "Alta gestionada en AIMS.", to: "/ai-governance/sistemas/nuevo", icon: PlusCircle },
   { label: "Revisar evaluaciones", body: "Cobertura AI Act, findings y expediente técnico.", to: "/ai-governance/evaluaciones", icon: ClipboardCheck },
   { label: "Registrar incidente IA", body: "Incidente gestionado con severidad y sistema asociado.", to: "/ai-governance/incidentes/nuevo", icon: AlertTriangle },
-  { label: "Proponer riesgo GRC", body: "Handoff de solo lectura para que GRC decida el riesgo.", to: "/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP", icon: Route },
+  { label: "Proponer riesgo GRC", body: "Derivación de solo lectura para que GRC decida el riesgo.", to: "/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP", icon: Route },
 ];
 
 export function PrioridadAhora({
@@ -27,7 +28,7 @@ export function PrioridadAhora({
   totalSistemas,
   totalIncidentes,
   detalleInventario,
-  sistemasClasificados,
+  conClasificacionGuiada,
   loading,
 }: PrioridadAhoraProps) {
   const priorityItems = [
@@ -47,7 +48,7 @@ export function PrioridadAhora({
     {
       label: "Incidentes materiales de IA",
       value: materialIncidents,
-      body: "Revisar severidad, causa raíz y posible handoff a GRC o Secretaría.",
+      body: "Revisar severidad, causa raíz y posible derivación a GRC o Secretaría.",
       to: "/ai-governance/incidentes",
       icon: AlertTriangle,
       // Con cero incidentes registrados el cero no es bueno ni malo: no consta.
@@ -62,11 +63,11 @@ export function PrioridadAhora({
       label: "Inventario activo",
       value: activos,
       // Antes afirmaba que los N sistemas tenían clasificación de riesgo sin
-      // mirar `risk_level`. Se cuenta.
+      // mirarla. Se cuenta con el criterio único: cuestionario completado.
       body:
         totalSistemas === 0
           ? "Sin sistemas registrados en el inventario."
-          : `${detalleInventario}; ${sistemasClasificados} con nivel de riesgo declarado.`,
+          : `${detalleInventario}; ${conClasificacionGuiada} con clasificación guiada.`,
       to: "/ai-governance/sistemas",
       icon: Cpu,
       tone: totalSistemas === 0 ? "text-[var(--g-text-secondary)]" : "text-[var(--status-info)]",
@@ -125,7 +126,7 @@ export function PrioridadAhora({
             Empezar un flujo
           </p>
           <h2 className="text-base font-semibold text-[var(--g-text-primary)]">
-            Acciones del officer AIMS
+            Acciones del responsable AIMS
           </h2>
         </div>
         <div className="divide-y divide-[var(--g-border-subtle)]">

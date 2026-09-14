@@ -170,7 +170,7 @@ export default function CabeceraIncidente({
                 className="px-3 py-1.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-xs font-medium transition-colors inline-flex items-center gap-1.5"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
-                <span>Handoff GRC</span>
+                <span>Derivar a GRC</span>
                 <ExternalLink className="w-3 h-3" />
               </Link>
               <Link

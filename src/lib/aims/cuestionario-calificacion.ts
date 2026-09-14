@@ -428,6 +428,18 @@ export function resultadoProvisional(r: Respuestas): ResultadoCuestionario {
   };
 }
 
+/**
+ * ¿Tiene este sistema un cuestionario guiado COMPLETED? Criterio ÚNICO: la RPC
+ * `fn_aims_completar_cuestionario` escribe `cuestionario_id` en
+ * `ai_systems.regulatory_profile` (jsonb); un sistema clasificado antes del
+ * cuestionario —o sin clasificar— no la tiene.
+ */
+export function tieneClasificacionGuiada(
+  s: { regulatory_profile?: Record<string, unknown> | null } | null | undefined,
+): boolean {
+  return Boolean(s?.regulatory_profile?.cuestionario_id);
+}
+
 /** Mínimo que la spec exige para que una motivación del art. 6.3 cuente como tal. */
 export const MINIMO_MOTIVACION_ART63 = 40;
 
@@ -435,12 +447,17 @@ export function bloqueosParaConfirmar(
   r: Respuestas,
   justificacionArt63: string,
   tieneOwner: boolean,
+  modo: "alta" | "reclasificacion" = "alta",
 ): { bloqueos: string[]; avisos: string[] } {
   const res = resultadoProvisional(r);
   const bloqueos: string[] = [];
   const avisos: string[] = [];
   if (res.bloqueado) {
-    bloqueos.push("Este sistema realiza una práctica prohibida por el art. 5 del Reglamento. No puede registrarse.");
+    bloqueos.push(
+      modo === "reclasificacion"
+        ? "Este sistema realiza una práctica prohibida por el art. 5 del Reglamento. No puede confirmarse esta clasificación: revise la respuesta del art. 5."
+        : "Este sistema realiza una práctica prohibida por el art. 5 del Reglamento. No puede registrarse.",
+    );
   }
   if (res.pendientes.length > 0) {
     bloqueos.push(`Quedan ${res.pendientes.length} preguntas pendientes de responder.`);

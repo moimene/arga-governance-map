@@ -48,7 +48,7 @@ export default function Evaluaciones() {
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [frameworkFilter, setFrameworkFilter] = useState("Todos");
   const [actionFilter, setActionFilter] = useState("Todos");
-  const { data: assessments = [], isLoading } = useAllAssessments();
+  const { data: assessments = [], isLoading, error } = useAllAssessments();
 
   const approvedCount = assessments.filter((ass) => assessmentAcreditaConformidad(ass.status)).length;
   const gapCount = assessments.filter(isAimsTechnicalFileGapCandidate).length;
@@ -113,9 +113,9 @@ export default function Evaluaciones() {
               <FileWarning className="h-5 w-5 text-[var(--g-brand-3308)]" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-[var(--g-text-primary)]">Readiness de demo claro</p>
+              <p className="text-sm font-semibold text-[var(--g-text-primary)]">Cobertura y brechas</p>
               <p className="mt-1 text-xs leading-5 text-[var(--g-text-secondary)]">
-                AIMS muestra cobertura y gaps. El intake GRC es una propuesta de contexto, no una creación automática de riesgo.
+                AIMS muestra cobertura y brechas. La derivación a GRC es una propuesta de contexto, no una creación automática de riesgo.
               </p>
             </div>
           </div>
@@ -189,6 +189,10 @@ export default function Evaluaciones() {
         {isLoading ? (
           <div className="p-8 space-y-3">
             {[1,2,3].map((i) => <div key={i} className="skeleton h-16" style={{ borderRadius: "var(--g-radius-md)" }} />)}
+          </div>
+        ) : error ? (
+          <div role="alert" className="py-16 text-center text-sm text-[var(--g-text-primary)]">
+            No se pudo leer las evaluaciones ({error.message})
           </div>
         ) : assessments.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -365,7 +369,7 @@ export default function Evaluaciones() {
                           style={{ borderRadius: "var(--g-radius-md)" }}
                         >
                           <Route className="h-3.5 w-3.5 text-[var(--g-brand-3308)]" />
-                          Abrir intake GRC
+                          Abrir GRC
                         </Link>
                       ) : (
                         <span className="text-xs text-[var(--g-text-secondary)]">Sin acción GRC pendiente</span>
@@ -379,7 +383,7 @@ export default function Evaluaciones() {
         )}
       </div>
       <div className="text-xs text-[var(--g-text-secondary)]">
-        {filtered.length} evaluación{filtered.length !== 1 ? "es" : ""}
+        {error ? "—" : `${filtered.length} evaluación${filtered.length !== 1 ? "es" : ""}`}
       </div>
     </div>
   );

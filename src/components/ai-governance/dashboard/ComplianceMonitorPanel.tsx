@@ -15,6 +15,14 @@ import {
 import type { AimsComplianceMonitorDomain } from "@/lib/aims/readiness";
 import { ReadinessBadge } from "./ReadinessDomains";
 
+const ETIQUETA_FUENTE: Record<AimsComplianceMonitorDomain["source"], string> = {
+  ai_systems: "Inventario",
+  ai_risk_assessments: "Evaluaciones",
+  ai_compliance_checks: "Comprobaciones",
+  ai_incidents: "Incidentes",
+  derived: "Derivado",
+};
+
 const COMPLIANCE_MONITOR_ICONS: Record<string, React.ElementType> = {
   "governance-accountability": UserCheck,
   "inventory-classification": Database,
@@ -56,7 +64,7 @@ export function ComplianceMonitorPanel({ monitors }: { monitors: AimsComplianceM
               Áreas AIMS que deben estar bajo vigilancia continua
             </h2>
             <p className="mt-1 max-w-3xl text-xs leading-5 text-[var(--g-text-secondary)]">
-              La lectura se deriva de inventario, evaluaciones, controles de cumplimiento e incidentes. No crea controles GRC ni mueve el backbone `aims_*`.
+              La lectura se deriva de inventario, evaluaciones, controles de cumplimiento e incidentes. No crea controles GRC ni escribe en el backbone técnico.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -120,14 +128,19 @@ export function ComplianceMonitorPanel({ monitors }: { monitors: AimsComplianceM
                   className="bg-[var(--g-surface-muted)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--g-text-secondary)]"
                   style={{ borderRadius: "var(--g-radius-full)" }}
                 >
-                  {monitor.source}
+                  {ETIQUETA_FUENTE[monitor.source]}
                 </span>
+                {monitor.otroCatalogo > 0 && (
+                  <span className="text-[11px] text-[var(--g-text-secondary)]">
+                    {monitor.otroCatalogo} comprobaciones medidas contra otro catálogo
+                  </span>
+                )}
                 {monitor.handoff && (
                   <span
                     className="bg-[var(--g-surface-subtle)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--g-brand-3308)]"
                     style={{ borderRadius: "var(--g-radius-full)" }}
                   >
-                    handoff
+                    derivación
                   </span>
                 )}
               </div>

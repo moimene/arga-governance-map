@@ -3,6 +3,8 @@ import type { AiSystem } from "@/hooks/useAiSystems";
 import type { AimsSystemVersion } from "@/hooks/useAimsTechnicalFile";
 import { systemStatusChipClass, systemStatusLabel } from "@/lib/aims/readiness";
 import { claseNivelRiesgo } from "@/lib/aims/vocabulario";
+import { tieneClasificacionGuiada } from "@/lib/aims/cuestionario-calificacion";
+import { vinculaArt47 } from "@/lib/aims/expediente-tecnico";
 import { ETIQUETA_ROL, type RolRegulatorio } from "@/lib/aims/rol-regulatorio";
 
 /**
@@ -26,6 +28,12 @@ export interface CabeceraSistemaProps {
 const BOTON_SECUNDARIO =
   "flex items-center gap-1.5 px-3 py-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] text-xs font-medium transition-colors";
 
+/** Por qué el botón de la declaración no lleva a un documento. `null` = sí vincula. */
+const TITULO_ART47: Record<"false" | "null", string> = {
+  null: "Sin clasificación guiada: el art. 47 no se afirma para este sistema.",
+  false: "El art. 47 sólo vincula al proveedor de un sistema de alto riesgo; a este rol y nivel no le aplica.",
+};
+
 export default function CabeceraSistema({
   system,
   versionActual,
@@ -35,6 +43,10 @@ export default function CabeceraSistema({
   onDeclaracion,
   onEscalar,
 }: CabeceraSistemaProps) {
+  const conCuestionario = tieneClasificacionGuiada(system);
+  // Sin cuestionario COMPLETED el rol y el nivel son dato declarado en ficha:
+  // el art. 47 no se afirma (`null`), igual que en el modal.
+  const art47 = conCuestionario ? vinculaArt47(system.regulatory_role, system.risk_level) : null;
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -64,6 +76,7 @@ export default function CabeceraSistema({
           <button
             type="button"
             onClick={onDeclaracion}
+            title={art47 === true ? undefined : TITULO_ART47[String(art47) as "false" | "null"]}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--g-surface-subtle)] border border-[var(--g-brand-3308)] text-[var(--g-brand-3308)] hover:bg-[var(--g-brand-3308)] hover:text-[var(--g-text-inverse)] text-xs font-medium transition-colors"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
@@ -107,11 +120,15 @@ export default function CabeceraSistema({
           </div>
 
           <div className="flex flex-col items-end gap-2">
+            {/* Sin cuestionario COMPLETED el nivel es un dato declarado en la
+                ficha, no una clasificación: chip neutro y rótulo que lo dice. */}
             <span
-              className={`shrink-0 inline-flex items-center px-3 py-1 text-xs font-bold ${claseNivelRiesgo(system.risk_level)}`}
+              className={`shrink-0 inline-flex items-center px-3 py-1 text-xs font-bold ${claseNivelRiesgo(conCuestionario ? system.risk_level : null)}`}
               style={{ borderRadius: "var(--g-radius-full)" }}
             >
-              Riesgo {system.risk_level || "sin clasificar"}
+              {conCuestionario || !system.risk_level
+                ? `Riesgo ${system.risk_level || "sin clasificar"}`
+                : `Riesgo ${system.risk_level} · nivel declarado en ficha, sin cuestionario`}
             </span>
             <span
               className={`inline-flex items-center px-2.5 py-0.5 text-xs font-semibold ${systemStatusChipClass(system.status)}`}

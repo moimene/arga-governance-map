@@ -2,8 +2,9 @@
 //
 // La frontera del backbone `aims_*`, ejecutada y vigilada.
 //
-// De las 25 tablas del backbone, 6 tienen un camino de escritura desde una
-// pantalla —destino (a)— y 20 no tienen ninguno: ni lector, ni escritor, ni
+// De las 26 tablas del backbone (25 medidas el 2026-09-08 más
+// `aims_classification_questionnaires`, que nació ese día), 6 tienen un camino
+// de escritura desde una pantalla —destino (a)— y 20 no tienen ninguno: ni lector, ni escritor, ni
 // fila en ninguno de los dos tenants. Esas 20 son destino (b): esquema muerto
 // declarado. Un hook que vuelva a leerlas devuelve una lista vacía que la
 // pantalla presenta como «no hay», que es exactamente la falsedad que se

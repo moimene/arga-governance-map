@@ -72,15 +72,54 @@ for (const tenant of tenants) {
         await expect.soft(page.getByRole('heading', { name: /Consola General ARGA/ })).toHaveCount(0);
       }
 
+      // La clasificación guiada, EN EL CABLE: la mesa AIMS lee los cuestionarios
+      // COMPLETED del tenant (`useCuestionariosVigentesDelTenant`); se captura
+      // esa respuesta y luego se contrasta contra la ficha del primer sistema.
+      let cuestionarios: Promise<Response> | undefined;
       for (const [route, heading] of [
         ['/grc', 'Mesa de trabajo GRC'],
         ['/ai-governance', 'Mesa de trabajo AI Governance'],
       ]) {
+        if (route === '/ai-governance') {
+          cuestionarios = page.waitForResponse((response) => {
+            const url = new URL(response.url());
+            return url.hostname === PROJECT_HOST && url.pathname === '/rest/v1/aims_classification_questionnaires'
+              && response.request().method() === 'GET' && url.searchParams.get('tenant_id') === `eq.${tenant.id}`;
+          });
+        }
         await page.goto(route);
         await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
         const body = await page.locator('body').innerText();
         expect.soft(body).not.toMatch(/QSeal Custodia|PLAN DE SALIDA SELLADO EN LEDGER WORM|QSEAL-EADTRUST/i);
         evidence[route] = { headingVisible: true };
+      }
+
+      const cuestionariosResponse = await cuestionarios!;
+      expect(cuestionariosResponse.status(), 'aims_classification_questionnaires').toBe(200);
+      expect(new URL(cuestionariosResponse.url()).searchParams.get('status')).toBe('eq.COMPLETED');
+      const completados = (await cuestionariosResponse.json()) as Array<{ system_id: string }>;
+      evidence.cuestionariosCompletados = completados.length;
+
+      // La ficha del primer sistema, POR CONCEPTO: con ≥1 COMPLETED para ese
+      // sistema, el panel de clasificación vigente; sin él, «Sin clasificación
+      // guiada». Las filas navegan por onClick, no por <a>.
+      await page.goto('/ai-governance/sistemas');
+      const primeraFila = page.locator('tbody tr').first();
+      await expect(primeraFila, 'sin sistemas no habría ficha que juzgar').toBeVisible({ timeout: 30_000 });
+      await primeraFila.click();
+      await expect(page).toHaveURL(/\/ai-governance\/sistemas\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+      const systemId = page.url().split('/').at(-1)!;
+      // Acotado al panel: la cabecera de la ficha también pinta «Rol regulatorio:».
+      const panel = page.locator('section', { has: page.getByRole('heading', { name: 'Clasificación regulatoria' }) });
+      await expect(panel).toBeVisible({ timeout: 30_000 });
+      const clasificado = completados.some((c) => c.system_id === systemId);
+      evidence.primerSistema = { systemId, clasificado };
+      if (clasificado) {
+        await expect(panel.getByText('Rol regulatorio:')).toBeVisible();
+        await expect(panel.getByText('Sin clasificación guiada')).toHaveCount(0);
+      } else {
+        await expect(panel.getByText('Sin clasificación guiada')).toBeVisible();
+        await expect(panel.getByText('Rol regulatorio:')).toHaveCount(0);
       }
 
       await page.goto('/sii');

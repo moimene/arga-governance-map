@@ -16,6 +16,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Activity, AlertTriangle, ClipboardCheck, Cpu, Layers } from "lucide-react";
 import { useAiSystemById } from "@/hooks/useAiSystems";
+import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 import { useAssessmentsBySystem } from "@/hooks/useAiAssessments";
 import { useAiIncidentsBySystem } from "@/hooks/useAiIncidents";
 import {
@@ -40,12 +41,15 @@ export default function SistemaDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const { data: system, isLoading } = useAiSystemById(id);
-  const { data: assessments = [] } = useAssessmentsBySystem(id);
-  const { data: incidents = [] } = useAiIncidentsBySystem(id);
-  const { data: technicalSections = [] } = useAimsTechnicalFileSections(id);
-  const { data: versions = [] } = useAimsSystemVersions(id);
-  const { data: indicators = [] } = useAimsMonitoringIndicators(id);
+  const { data: system, isLoading, error: errSystem } = useAiSystemById(id);
+  // `error` viaja a cada pestaña: «no se pudo leer» no se pinta como «no hay»,
+  // y el contador de la pestaña no dice 0 cuando no se ha medido.
+  const { data: assessments = [], error: errAssessments } = useAssessmentsBySystem(id);
+  const { data: incidents = [], error: errIncidents } = useAiIncidentsBySystem(id);
+  const { data: technicalSections = [], error: errSections } = useAimsTechnicalFileSections(id);
+  const { data: versions = [], error: errVersions } = useAimsSystemVersions(id);
+  const { data: indicators = [], error: errIndicators } = useAimsMonitoringIndicators(id);
+  const cuenta = (n: number, err: unknown) => (err ? "no medido" : n);
 
   const [activeTab, setActiveTab] = useState<Pestana>("TECHNICAL_FILE");
   const [modal, setModal] = useState<Modal>(null);
@@ -68,7 +72,9 @@ export default function SistemaDetalle() {
     return (
       <div className="flex flex-col items-center justify-center py-24">
         <Cpu className="h-10 w-10 text-[var(--g-text-secondary)] mb-3" />
-        <p className="text-sm font-medium text-[var(--g-text-primary)]">Sistema no encontrado</p>
+        <p className="text-sm font-medium text-[var(--g-text-primary)]">
+          {errSystem ? `No se pudo leer el sistema (${mensajeUsuario(errSystem)})` : "Sistema no encontrado"}
+        </p>
         <button
           type="button"
           onClick={() => navigate("/ai-governance/sistemas")}
@@ -82,9 +88,9 @@ export default function SistemaDetalle() {
 
   const pestanas = [
     { id: "TECHNICAL_FILE", label: "Expediente Técnico Vivo (Art. 11)", icon: Layers },
-    { id: "EVALUATIONS", label: `Autodiagnósticos (${assessments.length})`, icon: ClipboardCheck },
-    { id: "INCIDENTS", label: `Incidentes (${incidents.length})`, icon: AlertTriangle },
-    { id: "POST_MARKET", label: `Vigilancia Poscomercialización (${indicators.length})`, icon: Activity },
+    { id: "EVALUATIONS", label: `Autodiagnósticos (${cuenta(assessments.length, errAssessments)})`, icon: ClipboardCheck },
+    { id: "INCIDENTS", label: `Incidentes (${cuenta(incidents.length, errIncidents)})`, icon: AlertTriangle },
+    { id: "POST_MARKET", label: `Vigilancia Poscomercialización (${cuenta(indicators.length, errIndicators)})`, icon: Activity },
   ] as const;
 
   return (
@@ -99,7 +105,7 @@ export default function SistemaDetalle() {
         onEscalar={() => setModal("ESCALADO")}
       />
 
-      <ClasificacionVigentePanel systemId={id} tieneOwner={!!system.owner_id} />
+      <ClasificacionVigentePanel system={system} />
 
       <div className="border-b border-[var(--g-border-subtle)] flex gap-2 overflow-x-auto text-xs font-semibold">
         {pestanas.map((tab) => {
@@ -130,13 +136,17 @@ export default function SistemaDetalle() {
           nivel={system.risk_level}
           secciones={technicalSections}
           versiones={versions}
+          errorSecciones={errSections}
+          errorVersiones={errVersions}
           onClasificar={() => window.scrollTo({ top: 0, behavior: "smooth" })}
         />
       )}
 
       {activeTab === "EVALUATIONS" && (
         <TabEvaluaciones
+          system={system}
           assessments={assessments}
+          error={errAssessments}
           onNueva={() => navigate(`/ai-governance/evaluaciones/nuevo?system_id=${system.id}`)}
           onAbrir={(assessmentId) => navigate(`/ai-governance/evaluaciones/${assessmentId}`)}
         />
@@ -145,12 +155,13 @@ export default function SistemaDetalle() {
       {activeTab === "INCIDENTS" && (
         <TabIncidentes
           incidents={incidents}
+          error={errIncidents}
           onNuevo={() => navigate(`/ai-governance/incidentes/nuevo?system_id=${system.id}`)}
           onAbrir={(incidentId) => navigate(`/ai-governance/incidentes/${incidentId}`)}
         />
       )}
 
-      {activeTab === "POST_MARKET" && <TabVigilancia systemId={id} indicators={indicators} />}
+      {activeTab === "POST_MARKET" && <TabVigilancia systemId={id} indicators={indicators} error={errIndicators} />}
 
       {modal === "EDITAR" && <EditarSistemaModal system={system} onClose={() => setModal(null)} />}
 

@@ -9,7 +9,8 @@ import {
   calculateAdaptationPlan,
 } from "@/lib/aims/catalog-aesia";
 import type { AccionPDA } from "@/lib/aims/plan-adaptacion";
-import { DESPLIEGUE_REQUIREMENTS, catalogoDeLosFindings } from "@/lib/aims/perfil-aplicabilidad";
+import { DESPLIEGUE_REQUIREMENTS, catalogoDeLosFindings, evaluadaContraOtroCatalogo } from "@/lib/aims/perfil-aplicabilidad";
+import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 import CabeceraInforme from "@/components/ai-governance/evaluacion-detalle/CabeceraInforme";
 import ChecklistMedidas from "@/components/ai-governance/evaluacion-detalle/ChecklistMedidas";
 import PlanYNotas from "@/components/ai-governance/evaluacion-detalle/PlanYNotas";
@@ -113,13 +114,16 @@ export default function EvaluacionDetalle() {
   /** Códigos que el marco conoce: lo que quede fuera es medida adicional. */
   const codigosDelCatalogo = new Set(catalog.flatMap((r) => r.measures.map((m) => m.id)));
 
+  // ¿Se midió contra un catálogo distinto del que hoy le corresponde al sistema?
+  // Sólo se afirma con clasificación guiada COMPLETED; sin perfil, `false`.
+  const anteriorAClasificacion = evaluadaContraOtroCatalogo(assessment.findings, assessment.ai_systems, AESIA_RIA_REQUIREMENTS);
+
   const handleCongelar = async () => {
     try {
       const res = await congelar.mutateAsync(assessment.id);
       toast.success(`Evaluación congelada. Huella ${res?.content_hash?.slice(0, 16)}…`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`No se pudo congelar: ${msg}`);
+      toast.error(`No se pudo congelar: ${mensajeUsuario(err)}`);
     }
   };
 
@@ -128,10 +132,9 @@ export default function EvaluacionDetalle() {
       await revisar.mutateAsync(assessment.id);
       toast.success("Revisión registrada.");
     } catch (err) {
-      // El error de la RPC ya explica el caso: misma cuenta que congeló, no
-      // congelada todavía, o ya revisada. Se muestra tal cual.
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`No se pudo registrar la revisión: ${msg}`);
+      // El error de la RPC ya explica el caso (misma cuenta que congeló, no
+      // congelada todavía, ya revisada): se pinta sin el código delante.
+      toast.error(`No se pudo registrar la revisión: ${mensajeUsuario(err)}`);
     }
   };
 
@@ -162,6 +165,7 @@ export default function EvaluacionDetalle() {
         assessment={assessment}
         isIso={isIso}
         catalogoDeDespliegue={catalog === DESPLIEGUE_REQUIREMENTS}
+        anteriorAClasificacion={anteriorAClasificacion}
         onExportJson={handleExportJson}
         onPrint={handlePrint}
         onCongelar={handleCongelar}

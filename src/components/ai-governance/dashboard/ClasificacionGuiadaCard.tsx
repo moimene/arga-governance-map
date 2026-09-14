@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, ListChecks } from "lucide-react";
 import { useCuestionariosVigentesDelTenant } from "@/hooks/useAimsClasificacion";
-import { ETIQUETA_PERFIL, type PerfilCatalogo } from "@/lib/aims/cuestionario-calificacion";
+import { ETIQUETA_PERFIL, tieneClasificacionGuiada, type PerfilCatalogo } from "@/lib/aims/cuestionario-calificacion";
 
 export interface ClasificacionGuiadaCardProps {
   /** El inventario YA filtrado por ámbito: se cuenta contra lo que la pantalla enseña. */
-  systems: { id: string }[];
+  systems: { id: string; regulatory_profile?: Record<string, unknown> | null }[];
 }
 
 const PERFILES: PerfilCatalogo[] = ["PROFILE_A", "PROFILE_B", "PROFILE_C"];
@@ -23,7 +23,8 @@ export function ClasificacionGuiadaCard({ systems }: ClasificacionGuiadaCardProp
 
   const enInventario = new Set(systems.map((s) => s.id));
   const delInventario = vigentes.filter((v) => enInventario.has(v.system_id));
-  const clasificados = new Set(delInventario.map((v) => v.system_id));
+  // «Clasificado» es el criterio único de la hoja, el mismo que cuenta PrioridadAhora.
+  const clasificados = systems.filter(tieneClasificacionGuiada);
   const noConsta = systems.length === 0 || isError;
 
   const porPerfil = PERFILES.map((perfil) => ({
@@ -65,7 +66,7 @@ export function ClasificacionGuiadaCard({ systems }: ClasificacionGuiadaCardProp
               noConsta ? "text-[var(--g-text-secondary)]" : "text-[var(--status-info)]"
             }`}
           >
-            {noConsta ? "—" : isLoading ? "…" : clasificados.size}
+            {noConsta ? "—" : isLoading ? "…" : clasificados.length}
           </div>
           <div className="mt-0.5 text-xs font-medium text-[var(--g-text-primary)]">Con clasificación vigente</div>
         </div>
@@ -75,7 +76,7 @@ export function ClasificacionGuiadaCard({ systems }: ClasificacionGuiadaCardProp
               noConsta ? "text-[var(--g-text-secondary)]" : "text-[var(--g-text-primary)]"
             }`}
           >
-            {noConsta ? "—" : isLoading ? "…" : systems.length - clasificados.size}
+            {noConsta ? "—" : isLoading ? "…" : systems.length - clasificados.length}
           </div>
           <div className="mt-0.5 text-xs font-medium text-[var(--g-text-primary)]">Sin clasificar por cuestionario</div>
         </div>

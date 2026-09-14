@@ -104,7 +104,8 @@ export function ReadinessDomains({
 }: ReadinessDomainsProps) {
   const sinFuentes = totalSistemas + totalEvaluaciones + totalIncidentes === 0;
   return (
-    <div
+    <section
+      aria-label="Readiness AIMS"
       className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-5 mb-6"
       style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
     >
@@ -113,24 +114,12 @@ export function ReadinessDomains({
           <div className="flex items-center gap-2">
             <ListChecks className="h-5 w-5 text-[var(--g-brand-3308)]" />
             <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
-              Readiness de demo AIMS
+              Estado del módulo
             </h2>
-            {/* Era incondicional y contradecía al propio resumen: hoy se pinta
-                el veredicto que `buildAimsReadiness` calcula. */}
-            <span
-              className={`text-[10px] font-bold uppercase px-2 py-0.5 ${
-                readiness.standaloneReady
-                  ? "text-[var(--g-text-inverse)] bg-[var(--g-brand-3308)]"
-                  : "text-[var(--g-text-secondary)] bg-[var(--g-surface-muted)] border border-[var(--g-border-subtle)]"
-              }`}
-              style={{ borderRadius: "var(--g-radius-full)" }}
-            >
-              {veredicto}
-            </span>
           </div>
           <p className="mt-2 max-w-3xl text-xs text-[var(--g-text-secondary)] leading-relaxed">
             Inventario, evaluaciones e incidentes ya son navegables. La migración técnica queda
-            como contexto, no como tarea principal del officer.
+            como contexto, no como tarea principal del responsable.
           </p>
         </div>
         <div
@@ -143,9 +132,9 @@ export function ReadinessDomains({
                 readiness.standaloneReady ? "text-[var(--status-success)]" : "text-[var(--status-warning)]"
               }`}
             />
-            <span className="text-xs font-semibold text-[var(--g-text-primary)]">
-              {readiness.standaloneReady ? "Demo operable" : "Demo con gaps"}
-            </span>
+            {/* Era incondicional y contradecía al propio resumen: hoy se pinta
+                el veredicto que `buildAimsReadiness` calcula. */}
+            <span className="text-xs font-semibold text-[var(--g-text-primary)]">{veredicto}</span>
           </div>
           <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">
             {/* «datos demo conectados» era incondicional: con las tres fuentes
@@ -154,9 +143,6 @@ export function ReadinessDomains({
             {sinFuentes
               ? "sin datos en las tres fuentes"
               : `${totalSistemas} sistemas · ${totalEvaluaciones} evaluaciones · ${totalIncidentes} incidentes`}
-          </p>
-          <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">
-            Contrato: demostrador AIMS P0
           </p>
         </div>
       </div>
@@ -173,7 +159,7 @@ export function ReadinessDomains({
           style={{ borderRadius: "var(--g-radius-lg)" }}
         >
           <h3 className="text-xs font-semibold uppercase text-[var(--g-text-primary)]">
-            Contrato de datos
+            Fuentes del panel
           </h3>
           <dl className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
@@ -195,7 +181,7 @@ export function ReadinessDomains({
             </div>
           </dl>
           <p className="mt-3 text-xs text-[var(--g-text-secondary)] leading-relaxed">
-            Este panel es de solo lectura sobre <code>ai_*</code>. El backbone <code>aims_*</code> existe y lo
+            Este panel es de solo lectura sobre el inventario legado. El backbone técnico existe y lo
             usan otras pantallas del módulo, pero su estado no se mide aquí.
           </p>
         </div>
@@ -222,6 +208,6 @@ export function ReadinessDomains({
       </div>
 
       <HandoffAffordances />
-    </div>
+    </section>
   );
 }

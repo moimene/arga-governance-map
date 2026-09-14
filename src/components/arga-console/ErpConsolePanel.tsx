@@ -122,7 +122,7 @@ function buildWorkItems(
     {
       id: "aims-high-risk",
       label: "IA alto riesgo sin evaluación",
-      detail: "Compatibilidad AIMS legacy hasta Track E.",
+      detail: "Medido sobre el inventario y las evaluaciones del tenant.",
       owner: "AIMS",
       source: "ai_systems + ai_risk_assessments",
       route: "/ai-governance/evaluaciones",

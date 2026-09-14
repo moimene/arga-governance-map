@@ -47,7 +47,7 @@ export default function EscaladoSecretariaModal({ system, onClose }: EscaladoSec
       );
     } catch (err) {
       console.error(err);
-      toast.error("Error al preparar el handoff de escalado");
+      toast.error("Error al preparar la derivación a Secretaría");
     }
   };
 

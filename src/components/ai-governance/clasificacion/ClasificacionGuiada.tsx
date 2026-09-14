@@ -52,8 +52,6 @@ const FASES = [
   { n: 4, label: "Confirmación" },
 ] as const;
 
-const TEXTO_BLOQUEO =
-  "Este sistema realiza una práctica prohibida por el art. 5 del Reglamento. No puede registrarse.";
 const TEXTO_ART63 =
   "Un proveedor que considere que un sistema del Anexo III no es de alto riesgo debe documentar su evaluación antes de introducirlo en mercado o ponerlo en servicio (art. 6.3 RIA).";
 
@@ -101,7 +99,7 @@ export default function ClasificacionGuiada({
   const [justificacion, setJustificacion] = useState(justificacionInicial ?? "");
 
   const resultado = useMemo(() => resultadoProvisional(respuestas), [respuestas]);
-  const { bloqueos, avisos } = bloqueosParaConfirmar(respuestas, justificacion, tieneOwner);
+  const { bloqueos, avisos } = bloqueosParaConfirmar(respuestas, justificacion, tieneOwner, modo);
 
   const aplicar = (r: Respuestas, j: string) => {
     setRespuestas(r);
@@ -166,7 +164,7 @@ export default function ClasificacionGuiada({
           className="mx-4 mt-4 border border-[var(--status-error)] p-3 text-sm font-semibold text-[var(--status-error)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
-          {TEXTO_BLOQUEO}
+          {bloqueos[0]}
         </div>
       )}
 

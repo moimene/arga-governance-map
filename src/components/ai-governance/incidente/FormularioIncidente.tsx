@@ -1,4 +1,5 @@
 import { ESTADOS_INCIDENTE, SEVERIDADES_INCIDENTE, etiqueta } from "@/lib/aims/vocabulario";
+import { GRAVEDAD_RIA } from "@/lib/aims/incident-clocks";
 
 export type FormState = {
   system_id: string;
@@ -31,13 +32,6 @@ const TIPOS_INCIDENTE: { code: string; label: string }[] = [
   { code: "DECISION_ERRONEA", label: "Decisión errónea con efecto sobre personas" },
   { code: "CAIDA_SERVICIO", label: "Caída o degradación del servicio" },
   { code: "OTRO", label: "Otro" },
-];
-
-/** Vocabulario EXACTO de `RiaIncidentSeverity`: 15 días, 2 días, 10 días. */
-const GRAVEDAD_RIA: { code: string; label: string }[] = [
-  { code: "ORDINARY_SERIOUS", label: "Incidente grave ordinario — 15 días (art. 73)" },
-  { code: "WIDESPREAD_INFRINGEMENT", label: "Infracción generalizada — 2 días (art. 73)" },
-  { code: "DEATH_INCIDENT", label: "Con resultado de fallecimiento — 10 días (art. 73)" },
 ];
 
 const INPUT_CLASSES =

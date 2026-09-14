@@ -9,6 +9,7 @@ import {
   ESTADOS_INCIDENTE,
   chipClaseEstadoEvaluacion,
   chipClaseEstadoIncidente,
+  chipClaseEstadoSistema,
   chipClaseSeveridad,
   claseNivelRiesgo,
   etiqueta,
@@ -61,6 +62,7 @@ describe("opcionesFiltro", () => {
       { value: "Todos", label: "Todos" },
       { value: "ACTIVO", label: "Activos" },
       { value: "EN_EVALUACION", label: "En evaluación" },
+      { value: "PLANIFICADO", label: "Planificados" },
       { value: "RETIRADO", label: "Retirados" },
     ]);
   });
@@ -77,7 +79,7 @@ describe("opcionesFiltro", () => {
     // `ai_systems.status` no tiene CHECK: en Cloud hay grafías fuera del
     // vocabulario y sin esto no eran alcanzables por ningún filtro.
     const opciones = opcionesFiltro("estadoSistema", ["Conforme", "ACTIVO"]);
-    expect(opciones.map((o) => o.value)).toEqual(["Todos", "ACTIVO", "EN_EVALUACION", "RETIRADO", "Conforme"]);
+    expect(opciones.map((o) => o.value)).toEqual(["Todos", "ACTIVO", "EN_EVALUACION", "PLANIFICADO", "RETIRADO", "Conforme"]);
     expect(opciones.at(-1)).toEqual({ value: "Conforme", label: "Conforme" });
   });
 
@@ -137,12 +139,23 @@ describe("los conjuntos de valores", () => {
     // Control positivo: sin esto, vaciar un array dejaría verdes los tests de
     // arriba que sólo recorren el dominio.
     expect([...NIVELES_RIESGO]).toEqual(["Inaceptable", "Alto", "Limitado", "Mínimo"]);
-    expect([...ESTADOS_SISTEMA]).toEqual(["ACTIVO", "EN_EVALUACION", "RETIRADO"]);
+    expect([...ESTADOS_SISTEMA]).toEqual(["ACTIVO", "EN_EVALUACION", "PLANIFICADO", "RETIRADO"]);
     expect([...ESTADOS_EVALUACION]).toEqual(["CONFORME", "CON_GAPS", "BORRADOR"]);
     expect([...ESTADOS_EVALUACION_LEGADO]).toEqual(["APROBADO", "EN_REVISION"]);
     expect([...SEVERIDADES_INCIDENTE]).toEqual(["CRITICO", "ALTO", "MEDIO", "BAJO"]);
     expect([...ESTADOS_INCIDENTE]).toEqual(["ABIERTO", "EN_INVESTIGACION", "CERRADO"]);
     expect([...MARCOS_EVALUACION]).toEqual(["EU_AI_ACT", "ISO_42001"]);
+  });
+});
+
+describe("chipClaseEstadoSistema", () => {
+  it("PLANIFICADO es del vocabulario, con etiqueta, y su chip es el neutro: un plan no desplegado no se tiñe", () => {
+    expect(etiqueta("estadoSistema", "PLANIFICADO")).toBe("Planificado");
+    const neutro = chipClaseEstadoSistema("lo que sea");
+    expect(chipClaseEstadoSistema("PLANIFICADO")).toBe(neutro);
+    // Control positivo: el neutro no es lo que devuelve para todo.
+    expect(chipClaseEstadoSistema("ACTIVO")).toContain("status-success");
+    expect(chipClaseEstadoSistema("ACTIVO")).not.toBe(neutro);
   });
 });
 
