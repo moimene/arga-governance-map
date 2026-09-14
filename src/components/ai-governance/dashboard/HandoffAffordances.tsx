@@ -16,11 +16,11 @@ const ETIQUETA_POSTURA: Record<AimsEvidencePosture, string> = {
  */
 export function HandoffAffordances() {
   return (
-    <div className="mt-5">
+    <section aria-label="Derivaciones AIMS" className="mt-5">
       <div className="flex items-center gap-2">
         <Route className="h-4 w-4 text-[var(--g-brand-3308)]" />
         <h3 className="text-xs font-semibold uppercase text-[var(--g-text-primary)]">
-          Handoffs de solo lectura
+          Derivaciones de solo lectura
         </h3>
       </div>
       <p className="mt-1 text-xs leading-relaxed text-[var(--g-text-secondary)]">
@@ -59,6 +59,6 @@ export function HandoffAffordances() {
           </Link>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

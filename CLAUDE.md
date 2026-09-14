@@ -234,7 +234,7 @@ Detalle canónico: `docs/superpowers/specs/2026-05-17-governance-os-active-dev-e
 - `/secretaria/tramitador/nuevo` es el alta operativa.
 - `/secretaria/tramitador/:id` es detalle read-only de expediente registral existente.
 - `/ai-governance/sistemas/nuevo` da de alta SÓLO por cuestionario guiado + RPC `fn_aims_registrar_sistema` (escribe `ai_systems` + `aims_classification_questionnaires` en una transacción con el tenant de la sesión); un INSERT directo como `authenticated` se rechaza con `ALTA_SOLO_POR_CUESTIONARIO` (42501). No escribe en GRC/Secretaría.
-- `/ai-governance/incidentes/nuevo` reactiva el alta de incidentes IA como `legacy_write` owner-write sobre `ai_incidents`; los escalados siguen siendo handoffs.
+- `/ai-governance/incidentes/nuevo` da de alta incidentes IA con INSERT owner-write directo sobre `ai_incidents` (tenant de sesión, sin RPC); los escalados a GRC y Secretaría son derivaciones de sólo lectura.
 - `/ai-governance/evaluaciones/nuevo` es owner-write sobre `ai_risk_assessments` + `ai_compliance_checks` (sin `tenant_id` propio: aislamiento por join a `ai_systems`, política FOR ALL con WITH CHECK desde `20260521150000`; `useAiAssessments.ts` comprueba antes la pertenencia del sistema). Congelación por `fn_aims_freeze_assessment`, revisión por `fn_aims_review_assessment` (cuatro ojos: `MISMO_EVALUADOR`). Cubierto por `e2e/aims-evaluaciones.spec.ts`. La frase de mayo sobre el 42501 estuvo vigente hasta esa migración.
 - `/grc/risk-360/nuevo` y `/grc/risk-360/:id/editar` son owner-write sobre `risks`; no escriben columnas generadas `inherent_score`/`residual_score`.
 - `/grc/penal-anticorrupcion` queda conectado como vista GRC sobre `risks`, `obligations` y `controls`; TPRM sigue backlog.
@@ -483,6 +483,64 @@ llamada termine en `rollback`: sirve para sondas revertidas enteras con `set_con
 `set local role`. (5) El CLI `supabase db query --linked` cuelga en «Initialising login role» (token caducado). (6) Un gate
 que lee un literal de una página se queda **vacuo** al descomponerla: los gates repuntan al componente y añaden la arista de
 montaje; los que vigilaban un sujeto retirado (FRIA, cierre) se invierten a **ausencia** con control positivo.
+
+### Consolidación de AIMS para poder probarlo (2026-09-14)
+
+Análisis medido en `docs/superpowers/reviews/2026-09-14-backlog-consolidacion-aims.md` (7 lentes → 60 hallazgos, 3
+refutadores por hallazgo, crítico de completitud) y ejecución en la rama `aims/consolidacion-2026-09-14`; ledger en
+`docs/superpowers/plans/2026-09-08-ledger-refactor-aims.md` §H-6 (deudas DA-13…DA-17).
+
+**Lo que el análisis destapó y que ninguna lista anterior decía:** nada bloqueaba la prueba, pero **el módulo nunca se
+había visto con un sistema clasificado** (0 cuestionarios en los dos tenants) y en cuanto el tester clasifique a Harvey
+afloraban seis incoherencias latentes (los 12 checks del proveedor seguían contando en los monitores, el informe del 49 %
+no decía contra qué catálogo se midió, el stepper decía «84 MGs» sobre 43, la ficha afirmaba «Riesgo Limitado» y «Sin
+clasificación guiada» a tres líneas, la Declaración del art. 47 llamaba PROVEEDOR al tenant); **congelar → revisar no lo
+había recorrido nadie** (0 congeladas y 0 revisadas en todo el histórico); el seed pisaba `owner_id`/`status` en su
+segunda corrida; y un usuario demo de Garrigues **vaciaba el dato IA del tenant en tres llamadas PostgREST**.
+
+**Seis decisiones del usuario (todas ejecutadas):** sembrar los 5 sistemas del catálogo una vez (Garrigues 1 → **6**,
+Harvey adoptado como `GARR-IA-002` sin pisar nada; ARGA 8 intacta); **REVOKE DELETE** a `authenticated` en las 7 tablas
+de IA sin camino de borrado (`20260914120000`; `ai_systems` lo conserva y se declara, DA-16: las sondas PROBE lo usan y
+con los FK `NO ACTION` un sistema con historial ya no se puede borrar desde la aplicación); retirar **6 políticas RLS
+sin espejo** en el repo (`20260914120500`, mismo predicado que las FOR ALL); `PLANIFICADO` entra en `ESTADOS_SISTEMA`
+(chip neutro); las dos cuentas demo de Garrigues **enlazadas a personas del censo** (`20260914121000`: `admin@` →
+Alejandro Padín Vidal, `demo@` → Isabel Redel, miembros vigentes del Comité de Gobernanza de la IA, orden alfabético,
+sin cargo atribuido; el saludo del shell ya muestra el nombre); el CHECK de `ai_systems.status` **aplazado** (DA-13).
+Cabecera Cloud: `20260914121000`. Cada migración verificada antes con sonda revertida.
+
+**Criterios nuevos, en hojas:** `tieneClasificacionGuiada` (criterio único de «tiene cuestionario COMPLETED»; lo usan
+cabecera, inventario, Dashboard, banner del wizard, art. 47 y monitores), `vinculaArt47`, `codigosDelPerfil`,
+`evaluadaContraOtroCatalogo` (false sin cuestionario y false sin ningún acierto RIA: findings vacíos o ISO no afirman
+nada), `bloqueosParaConfirmar(…, modo)`, `errores-rpc.ts` (`mensajeUsuario`: los `CODIGO: texto` del servidor dejan de
+llegar crudos al toast). **Fail-open intacto:** ARGA sólo cambia en lo declarado —«Requieren GRC» pasa de 3 a 2
+(sale el BORRADOR; la EN_REVISION sigue siendo gap por score y findings abiertos), los chips de nivel de sus 8 sistemas pasan a neutro «nivel declarado en ficha, sin
+cuestionario», el cuerpo de «Inventario activo» pasa a «0 con clasificación guiada», y el art. 47 no se afirma sin cuestionario
+(antes generaba un `.txt` que llamaba PROVEEDOR a ARGA)—.
+
+**Tramo congelar → revisar, verificado con sonda SQL revertida** (claims + `set local role authenticated`, RPCs reales,
+ROLLBACK): alta por RPC, congelar → hash de 128 hex y `frozen_by = demo@`; revisar con la misma cuenta → `42501
+MISMO_EVALUADOR`; editar la congelada → `42501 EVALUACION_CONGELADA`; `admin@` revisa → `reviewed_by ≠ frozen_by`. **No
+puede ser sonda permanente** (DA-17): con DELETE revocado y FK `NO ACTION`, una sonda que cree una evaluación no puede
+limpiarla como `authenticated`. La prueba humana lo deja persistido sobre la evaluación de Harvey; el gate permanente es
+`aims-revisar-live` (camino negativo, sin residuo) más el botón deshabilitado para quien congeló.
+
+**Pruebas:** e2e/23 y `aims-evaluaciones` corren como ARGA **y como Garrigues** (sólo lectura, tenant en el cable, invariantes
+en vez de rótulos); el check de producción captura la petición a `aims_classification_questionnaires` por tenant y el estado
+de clasificación de la primera ficha por concepto. `bun test` **4 549 pass / 151 skip / 3 todo / 0 fail** (línea base
+4 454); typecheck, lint y build limpios; sondas vivas con logins 89/89.
+
+**GOTCHAs nuevos:** (1) `catalogoDeLosFindings` devuelve el primer candidato cuando no hay ningún acierto: comparar
+catálogos sin exigir ≥ 1 acierto afirma «otro catálogo» sobre una evaluación vacía o de ISO. (2) Un `afterEach` que exige
+«≥ 1 petición» sin que el cuerpo del test la espere es racy: `expect.poll`, y que el test espere el dato. (3) La respuesta
+en vuelo de un autoguardado puede reinstalar el `draftId` del par sistema/marco anterior: capturar el par y descartar.
+(4) El fichero `tasks/<id>.output` de un Workflow existe VACÍO desde el arranque: esperar con `-s`, no `-f`; y un regex
+`/SIN HALLAZGOS/i` casa con «Verificado sin hallazgos:» al final de una lista de hallazgos — el cierre de un carril se saltó
+por eso y hubo que cerrarlo a mano. (5) `useCurrentUserProfile` pinta `persons.full_name`: enlazar `person_id` cambia el
+saludo del shell (deseado aquí).
+
+**Pendiente y de quién es:** DA-7 ampliado — clasificar los **seis** sistemas de Garrigues desde su ficha y reevaluar a
+Harvey contra las 43 (responsable de cumplimiento; guion en §5 del análisis); DA-3 (Comité de IA); DA-13 (CHECK de
+status, usuario); DA-14 (2 objetos `__sonda__` en el bucket, usuario); DA-15 (`assessor_id` nunca se escribe, producto).
 
 ### Verificación última conocida (2026-09-07, cuarta tanda del cierre)
 

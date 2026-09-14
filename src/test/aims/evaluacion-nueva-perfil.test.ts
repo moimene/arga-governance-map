@@ -100,8 +100,13 @@ describe("PerfilAplicabilidadBanner — dice qué perfil y qué le falta", () =>
   it("el aviso de CA-7 existe y su condición mira el cuestionario, no el rol", () => {
     const src = sinComentarios(read(BANNER));
     expect(src).toContain("Sin clasificación guiada");
-    expect(/regulatory_profile[^\n]*cuestionario_id/.test(src),
-      "el aviso no se decide por `regulatory_profile.cuestionario_id`").toBe(true);
+    // Arista, no reimplementación: el criterio de «tiene cuestionario COMPLETED»
+    // vive en la hoja (2026-09-14: el gate anterior fijaba la expresión
+    // duplicada y premiaba conservarla).
+    expect(src).toContain('from "@/lib/aims/cuestionario-calificacion"');
+    expect(src).toContain("tieneClasificacionGuiada(sistema)");
+    expect(/regulatory_profile\?\.cuestionario_id/.test(src),
+      "el banner reimplementa el criterio de la hoja en vez de importarlo").toBe(false);
     // Y lleva a algún sitio: un aviso sin salida obliga a adivinar dónde se
     // clasifica.
     expect(/\/ai-governance\/sistemas\/\$\{/.test(src), "el aviso no enlaza a la ficha del sistema").toBe(true);

@@ -298,3 +298,32 @@ describe("D7 — copy sin nombres de tabla ni jerga de contrato, y raíz etiquet
     expect(/\{monitor\.source\}/.test(src), "la fuente vuelve a pintarse como nombre de tabla").toBe(false);
   });
 });
+
+describe("«handoff» no se rinde como rótulo en ninguna superficie del módulo (2026-09-14)", () => {
+  // La revisión transversal cazó que el Dashboard cambió «handoff» → «derivación»
+  // mientras el panel de derivaciones, el botón de la ficha del incidente y un
+  // toast seguían diciendo «handoff»: retirada a medias. Se juzga lo renderizado.
+  const DIRS = [
+    "src/components/ai-governance/dashboard",
+    "src/components/ai-governance/incidente",
+    "src/components/ai-governance/sistema",
+  ];
+  const ficheros = DIRS.flatMap((d) => readdirSync(d).filter((f) => f.endsWith(".tsx")).map((f) => `${d}/${f}`));
+
+  it("ni botón, ni heading, ni toast con «handoff»", () => {
+    expect(ficheros.length).toBeGreaterThan(20);
+    for (const f of ficheros) {
+      const src = sinComentarios(readFileSync(f, "utf8"));
+      expect(src, `${f}: rótulo «Handoff» renderizado`).not.toMatch(/>\s*Handoffs?\b[^<]*</);
+      expect(src, `${f}: toast con «handoff»`).not.toMatch(/toast\.[a-z]+\([^)]*handoff/i);
+    }
+  });
+
+  it("control positivo: la palabra vigente sí está donde se retiró la vieja", () => {
+    const cabecera = readFileSync("src/components/ai-governance/incidente/CabeceraIncidente.tsx", "utf8");
+    expect(cabecera).toContain("Derivar a GRC");
+    const panel = readFileSync("src/components/ai-governance/dashboard/HandoffAffordances.tsx", "utf8");
+    expect(panel).toContain('aria-label="Derivaciones AIMS"');
+    expect(panel).toContain("Derivaciones de solo lectura");
+  });
+});

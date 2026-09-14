@@ -65,6 +65,13 @@ ejecutado sobre la spec del equipo legal validada en
 | DA-9 | 20 tablas de esquema muerto siguen en Cloud (sin código ni lector); borrarlas exige decisión del usuario y no aporta al prototipo | Usuario | D-1 |
 | DA-9 (nota 2026-09-08) | La valoración propone borrarlas con `DROP TABLE … CASCADE` (P2). **Borraría dato de ARGA**: `aims_requirement_catalog` 4, `aims_requirement_checks` 4, `aims_control_catalog` 2, `aims_post_market_plans` 1. La migración `130000` les retira la escritura para dejar ese dato intacto. No se ejecuta sin decisión expresa | Usuario | contrato cero-cambio ARGA |
 | DA-12 | La «spec de continuidad» que cita la valoración (C4→C1→M1→M2, `compliance_tier` en `requirement_catalog`, KPI dual) no está en el repo; M1/M2 no se planifican sin ella | Usuario | valoración 2026-09-08 |
+| DA-13 | `ai_systems.tenant_id` sin FK a `tenants` y `status` sin CHECK; tres filas de ARGA con grafías fuera del vocabulario (`Conforme`, `Pendiente`, `En revision`). La FK es aditiva y segura; el CHECK exige normalizar ARGA (cero-cambio). **Aplazado por decisión del usuario 2026-09-14** | Usuario | backlog 2026-09-14 CLOUD-5 |
+| DA-14 | Residuo de sonda: 2 objetos `<tenant>/__sonda__/aislamiento.txt` en `aims-evidence` desde 2026-09-07, sin fila en `aims_evidence_items`, no retirables desde la aplicación (sin DELETE en storage). Borrado puntual como `service_role` = decisión del usuario | Usuario | backlog 2026-09-14 TEST-6 |
+| DA-15 | `ai_risk_assessments.assessor_id` no lo escribe nunca el wizard (sólo existe en el tipo) | Producto | backlog 2026-09-14 DATA-3 |
+| DA-16 | `ai_systems` conserva DELETE para `authenticated` (acotado por RLS al tenant): las sondas vivas borran su PROBE por cascade (D-11) y el proyecto no usa `service_role` en el gate. Sin llamador en `src/`; `frontera-backbone` vigila. Los FK de `ai_risk_assessments`/`ai_compliance_checks`/`ai_incidents` son NO ACTION, así que un sistema con historial **no se puede borrar** desde la aplicación | Producto (declarado) | migración `20260914120000` |
+| DA-17 | El camino feliz congelar → revisar no puede ser sonda permanente sin residuo (DELETE revocado + FK NO ACTION): se verificó con sonda SQL revertida el 2026-09-14 (H-6) y lo deja persistido la prueba humana sobre la evaluación de Harvey | Producto | H-6 |
+| DA-18 | La jerga retirada de AIMS sobrevive en la pantalla GRC que recibe la derivación: `src/lib/grc/dashboard-readiness.ts:191,200,418` («intake GRC»), `src/pages/grc/Dashboard.tsx:723,777,826` (pinta `contractEvent`), `src/pages/grc/RiskEditor.tsx:212` (chip «legacy_write · risks», fijado por `e2e/10-grc.spec.ts:67`) | Carril GRC | review transversal 2026-09-14 |
+| DA-19 | La pantalla de Secretaría que recibe la derivación de un incidente pinta «Handoff read-only desde AIMS 360» y `e2e/19:42` lo fija por texto; en AIMS el término es «derivación» | Carril Secretaría | review transversal 2026-09-14 |
 
 ## 4. Hitos
 
@@ -286,3 +293,99 @@ guiada» y «Sin clasificación guiada»; **ausentes** `aimsScreenPostures`, `us
 **Estado de cierre: los nueve criterios del goal cumplidos.** Pendiente y de quién es: DA-7 (clasificar Harvey desde su
 ficha — responsable de cumplimiento), DA-3 (validar el catálogo de 43 — Comité de IA), DA-11 (perfil A/B/C en
 `EvaluacionDetalle` — producto, siguiente iteración), DA-9 y DA-12 (usuario).
+
+### H-6 · Consolidación para poder probar el módulo (2026-09-14)
+
+Origen: `docs/superpowers/reviews/2026-09-14-backlog-consolidacion-aims.md` (60 hallazgos de 7 lentes, 3 refutadores
+por hallazgo, crítico de completitud). Rama `aims/consolidacion-2026-09-14`.
+
+**Seis decisiones del usuario (2026-09-14):** (1) sembrar los 5 sistemas del catálogo una sola vez; (2) revocar DELETE
+en las 7 tablas sin uso, y decidir `ai_systems` (→ se conserva y se declara, DA-16); (3) reconciliar las 6 políticas sin
+espejo; (4) `PLANIFICADO` entra en el vocabulario; (5) enlazar las dos cuentas demo de Garrigues a personas del censo;
+(6) aplazar el CHECK de `status` (DA-13).
+
+**Migraciones APLICADAS y registradas** (cabecera Cloud `20260908130000` → `20260914121000`), cada una verificada antes
+con sonda revertida (`BEGIN … ROLLBACK`, claims + `set local role authenticated`):
+
+| Migración | Sonda revertida | Después |
+|---|---|---|
+| `20260914120000_ai_aims_revoca_delete_sin_uso` | como `demo@garrigues`: DELETE `ai_compliance_checks` → `42501 permission denied`; DELETE `ai_risk_assessments` → `42501`; DELETE `ai_systems` (id inexistente) → permitido, 0 filas | `authenticated` con DELETE sólo en `ai_systems`; INSERT intacto en las 7 |
+| `20260914120500_ai_assessments_checks_politicas_sin_espejo` | Garrigues ve 1 evaluación / 12 checks y actualiza la suya (1 fila); ARGA ve 7 / 49 y el UPDATE cruzado devuelve 0 filas | una política FOR ALL por tabla, RLS activa |
+| `20260914121000_garrigues_perfiles_demo_enlazados_a_personas` | los dos perfiles enlazados; ARGA sigue en `f8b64324…` | `admin@` → Alejandro Padín Vidal, `demo@` → Isabel Redel (miembros vigentes del Comité de Gobernanza de la IA, orden alfabético, sin cargo atribuido) |
+
+**Antes de las migraciones se midió lo que corregían:** tres llamadas PostgREST como `demo@garrigues` vaciaban el tenant
+(12 checks, 1 evaluación, 1 sistema, y el cascade se llevaba el cuestionario «inmutable»); las seis políticas por comando
+tenían exactamente el predicado de las FOR ALL (drift, no defecto); las políticas FOR ALL sin `WITH CHECK` de `ai_systems`
+y `ai_incidents` **sí** bloquean un cambio de `tenant_id` (Postgres reutiliza el USING; probado → 42501): sospecha cerrada
+sin deuda.
+
+**Sonda revertida del tramo congelar → revisar (nadie lo había recorrido: 0 congeladas y 0 revisadas en el histórico):**
+como `demo@`: alta por `fn_aims_registrar_sistema` ✓, evaluación CON_GAPS ✓, `fn_aims_freeze_assessment` → hash de 128
+hex y `frozen_by = demo` ✓, revisar con la misma cuenta → `42501 MISMO_EVALUADOR` ✓, UPDATE de la congelada →
+`42501 EVALUACION_CONGELADA` ✓; como `admin@`: `fn_aims_review_assessment` → `reviewed_by = admin ≠ frozen_by` ✓. Todo
+revertido: 0 `PROBE-%`, 0 congeladas después. No se convierte en sonda permanente (DA-17).
+
+**Seed de IA de Garrigues, endurecido y ejecutado una vez.** Defecto medido antes: la rama `actualiza` hacía `.update()`
+con `owner_id: null`, `status` y `description` del catálogo sobre filas existentes (pisado silencioso a partir de la segunda
+corrida). Ahora las dos ramas pasan por `parcheDeFila` (sólo rellena vacíos; nunca `owner_id`, `risk_level` ni
+`regulatory_role`) y el gate de capa débil está anclado a la llamada real. `--commit` (autorizado): 5 altas + 1 adopción
+(Harvey recibe `GARR-IA-002`; conserva `EN_EVALUACION`, `Limitado`, rol NULL, owner NULL); «Discriminante OK: ARGA intacta
+en 8, Garrigues 6, sin tenants ajenos». Dry-run posterior: 0 altas, 0 adopciones, 6 actualizaciones simuladas «sólo rellena
+vacíos», tabla en 14. Cloud: 14 sistemas, 8 evaluaciones, 61 checks, 0 cuestionarios, 0 `PROBE-%`. **DA-7 se amplía a los
+seis sistemas** (todos «Sin clasificación guiada» hasta que el responsable de cumplimiento los clasifique).
+
+**Fase 1 (`81ed44a`):** hojas `tieneClasificacionGuiada`, `bloqueosParaConfirmar(modo)`, `vinculaArt47`,
+`codigosDelPerfil`, `evaluadaContraOtroCatalogo`, `errores-rpc.ts`; `PLANIFICADO` en `ESTADOS_SISTEMA`. Refutado por el
+revisor de la fase y corregido antes de commitear: `evaluadaContraOtroCatalogo` afirmaba «otro catálogo» sobre findings
+vacíos o de ISO (ahora exige ≥ 1 acierto RIA); el gate del seed admitía un señuelo `const parche = aFila(s)` (ahora ancla
+`parcheDeFila(fila!, s)`). Gates de la fase: 451 pass / 0 fail en `src/lib/aims`, `src/test/aims`, `src/test/garrigues`;
+typecheck limpio; tres mutaciones en rojo donde debían.
+
+**Documentación corregida en la misma fase:** CLAUDE.md (alta sólo por RPC; `evaluaciones/nuevo` operativo — la frase del
+42501 era de mayo; `branding.scopes` NULL; 26 tablas; `close_technical_file` muerta y declarada; fila AIMS de la tabla de
+ownership); cabecera de `frontera-backbone.test.ts` (26); memoria `project_c2_ai_governance_auditoria` marcada como
+superada; nota de estado en la revisión del 09-02.
+
+**Fase 2 (`cfdf0f5`): cinco carriles en paralelo sobre perímetros disjuntos** (A ficha del sistema, B wizard e informe,
+C incidentes, D dashboard y listas, E pruebas), cada uno con revisor adversarial y cierre; 14 agentes, 0 errores.
+Cerrado por carril (detalle en el mensaje del commit): responsable editable, estados desde el vocabulario, art. 47 sólo
+con cuestionario y con el rol derivado, chip neutro «nivel declarado en ficha, sin cuestionario» en ficha, inventario y
+Dashboard, «evaluada contra otro catálogo» en ficha e informe, reset del wizard al cambiar sistema o marco (y descarte de
+la respuesta en vuelo, que el revisor de B cazó), «Revisar y aprobar» deshabilitado para quien congeló, custodia con
+quién congeló y revisó, art. 73 no presumido y editable, `knowledge_at` en la ficha, monitores que apartan las
+comprobaciones de otro catálogo RIA (no las ISO: el revisor de D lo cazó), BORRADOR fuera de «Requieren GRC», `isError`
+en todas las listas y pestañas, jerga de contrato y de demo fuera, e2e en los dos entornos con invariantes en vez de
+rótulos, check de producción con la petición de cuestionarios por tenant, sonda `aims-revisar-live` de camino negativo.
+
+**Refutaciones de los revisores que cambiaron código:** A1 «Sin clasificación guiada» con dos predicados (modal por
+`vinculaArt47 === null`, chip por `tieneClasificacionGuiada`) → un solo predicado; B1 carrera del autoguardado (la
+respuesta en vuelo del par anterior reinstalaba `draftId`) → `parRef` y descarte; D1 apartaba también los checks ISO →
+sólo códigos RIA fuera del perfil; D6 el Dashboard coloreaba el nivel sin cuestionario mientras Sistemas ya lo pintaba
+neutro → mismo criterio; E1 `afterEach` racy (exigía una lectura que los tests 2 y 3 no esperaban) → `expect.poll` y el
+test 3 deja de ser vacuo. **Incidencia de orquestación, declarada:** el revisor de C escribió «Verificado sin hallazgos:»
+y el cierre de C se saltó por el regex; el orquestador cerró a mano sus dos hallazgos reales (`sr-only` «0 incidentes
+cerrados» con error; tipología del art. 73 sin rotular en modo lectura) y el resto (`e2e/16:128` fijaba el evento de
+contrato que D retiró; `e2e/24:49` el rótulo «officer»; «Demo AIMS conectada» en Sistemas e Incidentes).
+
+**Gates de la fase:** `bun test` **4 549 pass / 151 skip / 3 todo / 0 fail** (línea base 4 454; cero skips nuevos);
+typecheck, lint (0 warnings) y build limpios; e2e `16`, `19`, `23`, `24` y `aims-evaluaciones` verdes en lote pequeño con
+los dos entornos (26/26 + 15/15); sondas vivas con logins reales tras las migraciones (`aims-cuestionario-live`,
+`aims-revisar-live`, `garrigues-ia-owner-write`, `aims-evidence-tenant-isolation`, `tenant-isolation`) **89 pass / 0
+fail**; Cloud tras todo: 0 `PROBE-%`, 0 cuestionarios, 14 sistemas.
+
+**Review transversal de la rama (3 lentes, 13 agentes): 10 hallazgos, 4 refutados, 6 cerrados.** P1: `PerfilAplicabilidadBanner`
+reimplementaba `regulatory_profile?.cuestionario_id` en vez de importar `tieneClasificacionGuiada`, y su gate
+(`evaluacion-nueva-perfil.test.ts`) **fijaba la expresión duplicada** (premiaba conservarla): ahora importa la hoja y el gate
+asierta la arista y prohíbe la reimplementación. P2 «handoff» retirado a medias (heading del panel, botón «Handoff GRC»,
+toast): «Derivaciones de solo lectura» (`aria-label="Derivaciones AIMS"`, que `e2e/16` usa), «Derivar a GRC», «derivación a
+Secretaría»; gate nuevo que barre `dashboard/`, `incidente/` y `sistema/`. P2 la consola del shell seguía afirmando «sobre
+`ai_*` hasta activar backbone `aims_*`» y «standalone-ready» sobre AIMS (`platform-readiness.ts:54-55`,
+`ErpConsolePanel.tsx:125`): reescrito con la postura vigente. P2 la jerga sobrevive en GRC y Secretaría (destino de las
+derivaciones): DA-18 y DA-19. **Corrección de dos declaraciones:** (1) el KPI «Requieren GRC» de ARGA pasa de **3 a 2**
+(sale sólo el BORRADOR de ISO 42001; la EN_REVISION sigue siendo gap por score 68 y findings abiertos, medido en Cloud), no
+«1 + 1»; (2) dos cambios más de pantalla en ARGA, ambos corrección de defecto probado (rol NULL en los 8, medido): el cuerpo
+de «Inventario activo» pasa de «8 con nivel de riesgo declarado» a «0 con clasificación guiada», y el botón «Declaración art.
+47» ya no genera un `.txt` que llamaba PROVEEDOR a ARGA para los 8 sistemas: muestra «Sin clasificación guiada: el art. 47 no
+se afirma». Refutados: borradores huérfanos (pre-existente, sin camino de borrado antes ni después), `SELECT INTO` sin STRICT
+en la migración de perfiles (los UPDATE están acotados por construcción), gates que «fijan el rótulo nuevo» (son control
+positivo de una ausencia asertada al lado), «Inventario activo» no declarado (la variable sigue en uso y el gate lo exige).

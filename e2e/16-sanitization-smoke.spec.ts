@@ -124,7 +124,7 @@ test.describe('Sanitization smoke — AIMS-GRC', () => {
     await visitRoute(page, '/ai-governance', [/Mesa de trabajo AI Governance/i]);
     // Por concepto (aria-label), no por rótulo: el texto del panel cambia.
     await expect(page.getByLabel('Readiness AIMS')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('heading', { name: 'Handoffs de solo lectura' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByLabel('Derivaciones AIMS')).toBeVisible({ timeout: 10_000 });
     // Los eventos de contrato (SECRETARIA_CERTIFICATION_ISSUED…) ya no se pintan:
     // son jerga de integración, no información para quien prueba (2026-09-14).
     // La invariante es que las tarjetas existen y declaran que AIMS sólo enruta.
