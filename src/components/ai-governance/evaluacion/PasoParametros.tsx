@@ -6,6 +6,7 @@
  */
 import { ArrowRight } from "lucide-react";
 import type { AiSystem } from "@/hooks/useAiSystems";
+import { etiqueta } from "@/lib/aims/vocabulario";
 import { LABEL_CLASSES, SELECT_CLASSES } from "./estado-medida";
 
 export type MarcoEvaluacion = "EU_AI_ACT" | "ISO_42001";
@@ -100,7 +101,7 @@ export default function PasoParametros({
               <span className="text-[var(--g-text-secondary)]">Proveedor:</span> {selectedSystem.vendor || "No declarado"}
             </div>
             <div>
-              <span className="text-[var(--g-text-secondary)]">Estado:</span> {selectedSystem.status}
+              <span className="text-[var(--g-text-secondary)]">Estado:</span> {etiqueta("estadoSistema", selectedSystem.status)}
             </div>
           </div>
         </div>

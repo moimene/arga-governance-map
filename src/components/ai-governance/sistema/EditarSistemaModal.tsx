@@ -2,6 +2,9 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 import { useUpdateAiSystem, type AiSystem } from "@/hooks/useAiSystems";
+import { usePersonasCanonical } from "@/hooks/usePersonasCanonical";
+import { mensajeUsuario } from "@/lib/aims/errores-rpc";
+import { ESTADOS_SISTEMA, etiqueta } from "@/lib/aims/vocabulario";
 
 /**
  * Edición de la ficha del sistema.
@@ -26,7 +29,9 @@ const ETIQUETA = "block font-semibold text-[var(--g-text-primary)] mb-1";
 
 export default function EditarSistemaModal({ system, onClose }: EditarSistemaModalProps) {
   const actualizar = useUpdateAiSystem();
+  const { data: personas = [] } = usePersonasCanonical({ person_type: "PF" });
   const [name, setName] = useState(system.name || "");
+  const [ownerId, setOwnerId] = useState(system.owner_id || "");
   const [systemType, setSystemType] = useState(system.system_type || "");
   const [vendor, setVendor] = useState(system.vendor || "");
   const [status, setStatus] = useState(system.status || "");
@@ -47,13 +52,13 @@ export default function EditarSistemaModal({ system, onClose }: EditarSistemaMod
           use_case: useCase,
           description,
           aims_reference_code: aimsCode,
+          owner_id: ownerId || null,
         },
       });
       toast.success("Ficha del sistema actualizada correctamente");
       onClose();
     } catch (err) {
-      const msg = (err as { message?: string })?.message ?? String(err);
-      toast.error(`Error al actualizar sistema: ${msg}`);
+      toast.error(`Error al actualizar sistema: ${mensajeUsuario(err)}`);
     }
   };
 
@@ -141,12 +146,34 @@ export default function EditarSistemaModal({ system, onClose }: EditarSistemaMod
                 className={CAMPO}
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
-                <option value="ACTIVO">ACTIVO (En producción)</option>
-                <option value="EN_EVALUACION">EN EVALUACIÓN</option>
-                <option value="SUSPENDIDO">SUSPENDIDO</option>
-                <option value="RETIRADO">RETIRADO</option>
+                {ESTADOS_SISTEMA.map((v) => (
+                  <option key={v} value={v}>{etiqueta("estadoSistema", v)}</option>
+                ))}
+                {/* Grafías anteriores al vocabulario (ARGA): se ofrecen tal cual
+                    para no reescribir el dato al guardar otra cosa. */}
+                {status && !(ESTADOS_SISTEMA as readonly string[]).includes(status) && (
+                  <option value={status}>{status}</option>
+                )}
               </select>
             </div>
+          </div>
+
+          <div>
+            <label htmlFor="sis-owner" className={ETIQUETA}>Responsable del sistema</label>
+            <select
+              id="sis-owner"
+              value={ownerId}
+              onChange={(e) => setOwnerId(e.target.value)}
+              className={CAMPO}
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <option value="">Sin asignar</option>
+              {personas.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.full_name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>

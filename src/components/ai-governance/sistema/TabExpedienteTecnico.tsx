@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Layers, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 import {
   useIniciarExpedienteTecnico,
   useUpdateTechnicalFileSection,
@@ -20,9 +21,8 @@ import VersionesSistema from "./VersionesSistema";
  *
  * Si el art. 11 vincula a este sistema NO lo decide esta pantalla: lo dice
  * `vinculaArt11` a partir del rol y del nivel, y sin uno de los dos no se
- * afirma nada. Registro interno sin hash de integridad: ni
- * `aims_technical_file_sections` ni `aims_system_versions` tienen columna donde
- * guardarlo.
+ * afirma nada. Registro interno sin hash de integridad: ninguna de las dos
+ * tablas del expediente tiene columna donde guardarlo.
  */
 
 export interface TabExpedienteTecnicoProps {
@@ -31,6 +31,9 @@ export interface TabExpedienteTecnicoProps {
   nivel: string | null | undefined;
   secciones: AimsTechnicalFileSection[];
   versiones: AimsSystemVersion[];
+  /** Errores de las dos consultas: «no se pudo leer» no es «no hay». */
+  errorSecciones?: unknown;
+  errorVersiones?: unknown;
   onClasificar: () => void;
 }
 
@@ -63,6 +66,8 @@ export default function TabExpedienteTecnico({
   nivel,
   secciones,
   versiones,
+  errorSecciones,
+  errorVersiones,
   onClasificar,
 }: TabExpedienteTecnicoProps) {
   const iniciar = useIniciarExpedienteTecnico();
@@ -90,8 +95,7 @@ export default function TabExpedienteTecnico({
       toast.success("Sección actualizada.");
       setEditando(null);
     } catch (err) {
-      const msg = (err as { message?: string })?.message ?? String(err);
-      toast.error(`No se pudo guardar la sección: ${msg}`);
+      toast.error(`No se pudo guardar la sección: ${mensajeUsuario(err)}`);
     }
   };
 
@@ -100,8 +104,7 @@ export default function TabExpedienteTecnico({
       await iniciar.mutateAsync(systemId);
       toast.success("Esqueleto del anexo IV registrado: 9 secciones pendientes.");
     } catch (err) {
-      const msg = (err as { message?: string })?.message ?? String(err);
-      toast.error(`No se pudo iniciar el expediente: ${msg}`);
+      toast.error(`No se pudo iniciar el expediente: ${mensajeUsuario(err)}`);
     }
   };
 
@@ -129,13 +132,10 @@ export default function TabExpedienteTecnico({
                 </button>
               )}
             </p>
-            <p className="text-xs text-[var(--g-text-secondary)]">
-              Registro interno sin hash de integridad: ni <code>aims_technical_file_sections</code> ni{" "}
-              <code>aims_system_versions</code> guardan ninguno.
-            </p>
+            <p className="text-xs text-[var(--g-text-secondary)]">Registro interno sin hash de integridad.</p>
           </div>
 
-          {secciones.length === 0 && (
+          {!errorSecciones && secciones.length === 0 && (
             <button
               type="button"
               onClick={iniciarExpediente}
@@ -151,7 +151,11 @@ export default function TabExpedienteTecnico({
         </div>
 
         <div className="space-y-3">
-          {secciones.length === 0 ? (
+          {errorSecciones ? (
+            <p className="p-8 text-center text-xs font-semibold text-[var(--g-text-secondary)]">
+              No se pudo leer las secciones del expediente ({mensajeUsuario(errorSecciones)}).
+            </p>
+          ) : secciones.length === 0 ? (
             <div
               className="p-8 text-center text-xs text-[var(--g-text-secondary)] bg-[var(--g-surface-subtle)]/30 border border-dashed border-[var(--g-border-subtle)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
@@ -266,7 +270,7 @@ export default function TabExpedienteTecnico({
         </div>
       </div>
 
-      <VersionesSistema systemId={systemId} versiones={versiones} />
+      <VersionesSistema systemId={systemId} versiones={versiones} error={errorVersiones} />
     </div>
   );
 }

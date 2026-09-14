@@ -58,7 +58,10 @@ describe("cuestionario guiado — la arista con la hoja del criterio", () => {
     const src = fuente("ClasificacionGuiada.tsx");
     expect(src).toContain("@/lib/aims/cuestionario-calificacion");
     expect(src).toContain("resultadoProvisional(");
-    expect(src).toContain("bloqueosParaConfirmar(");
+    // 2026-09-14: el modo viaja a la hoja, que redacta el bloqueo del art. 5
+    // según sea alta o reclasificación; y el banner lo pinta desde `bloqueos`.
+    expect(src).toContain("bloqueosParaConfirmar(respuestas, justificacion, tieneOwner, modo)");
+    expect(src).toContain("{bloqueos[0]}");
   });
 
   it("PreguntaGuiada pinta la ayuda desde la pregunta, no desde literales suyos", () => {

@@ -3,11 +3,9 @@
  *
  * QUÉ SE CITA EN PANTALLA: el artículo del Reglamento, que está cotejado y lo
  * pinta el catálogo. NADA MÁS. La atribución del método a una guía numerada de
- * la Agencia se retiró el 2026-09-06 de las siete superficies de texto —la nota
- * por defecto incluida, que se PERSISTE en `ai_risk_assessments.notes`— porque
- * la fuente de un requisito del Reglamento es el ARTÍCULO y porque esa
- * atribución nunca se cotejó contra publicación oficial. Se retiró la
- * afirmación de procedencia, no el contenido.
+ * la Agencia se retiró el 2026-09-06 de las siete superficies de texto (la nota
+ * persistida en `ai_risk_assessments.notes` incluida): se retiró la procedencia
+ * no cotejada, no el contenido.
  *
  * ESTA PANTALLA SÓLO COMPONE: todo criterio vive en `@/lib/aims/*`, los pasos
  * en `@/components/ai-governance/evaluacion` sólo pintan, y qué catálogo se
@@ -26,6 +24,7 @@ import { usePersonasCanonical } from "@/hooks/usePersonasCanonical";
 import { useCreateComplianceChecks, useDraftAssessment, useSaveAssessment } from "@/hooks/useAiAssessments";
 import { generarPlanDeAdaptacion, type AccionPDA } from "@/lib/aims/plan-adaptacion";
 import { perfilAplicable } from "@/lib/aims/perfil-aplicabilidad";
+import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 import { buildEvaluationPayload, restoreEvaluationState, type MedidaAdicionalRef } from "@/lib/aims/evaluacion-payload";
 import { getRequirementsForFramework, computeAssessmentStats, type RequirementDef } from "@/lib/aims/catalog-aesia";
 import PasoParametros, { type MarcoEvaluacion } from "@/components/ai-governance/evaluacion/PasoParametros";
@@ -35,21 +34,14 @@ import PasoResultado from "@/components/ai-governance/evaluacion/PasoResultado";
 import PerfilAplicabilidadBanner from "@/components/ai-governance/evaluacion/PerfilAplicabilidadBanner";
 import { ESTADO_VACIO, type MeasureEvaluationState } from "@/components/ai-governance/evaluacion/estado-medida";
 
-/**
- * Los dos marcos evaluables. Se declaran junto a la decisión de catálogo y no
- * en el paso que los pinta: quien elige contra qué se mide es esta pantalla.
- * `AESIA_RIA_REQUIREMENTS` es lo que `getRequirementsForFramework` resuelve
- * para el primero.
- */
+/** Los dos marcos evaluables: quien elige contra qué se mide es esta pantalla, no el paso. */
 const MARCOS: { value: MarcoEvaluacion; label: string }[] = [
-  { value: "EU_AI_ACT", label: "Reglamento de IA (UE 2024/1689) — 12 requisitos" },
+  { value: "EU_AI_ACT", label: "Reglamento de IA (UE 2024/1689)" },
   { value: "ISO_42001", label: "UNE-EN ISO/IEC 42001:2023 (Gestión de IA)" },
 ];
 
 /** Margen tras la última pulsación antes de guardar el borrador. */
 const AUTOGUARDADO_MS = 1500;
-
-const PASOS = ["Sistema y Marco", "Evaluación 84 MGs", "Plan de Adaptación (PDA)", "Resultado"];
 
 const chipPaso = (step: number, num: number) =>
   step === num
@@ -87,13 +79,9 @@ export default function EvaluacionNueva() {
 
   const selectedSystem = systems.find((s) => s.id === systemId);
 
-  /**
-   * Qué catálogo se evalúa. Las 84 medidas desarrollan los arts. 9 a 15, 17, 72
-   * y 73: las obligaciones del PROVEEDOR de alto riesgo. Medirlas a un
-   * responsable del despliegue de riesgo limitado da un porcentaje que no dice
-   * si cumple, sino que se le midió contra deberes que no le vinculan. El
-   * perfil lo acota por rol y nivel, y FALLA ABIERTO.
-   */
+  // Qué catálogo se evalúa. Las 84 medidas son las obligaciones del PROVEEDOR
+  // de alto riesgo: medirlas a un responsable del despliegue no dice si cumple.
+  // El perfil lo acota por rol y nivel, y FALLA ABIERTO.
   const perfil = useMemo(
     () =>
       framework === "ISO_42001"
@@ -114,6 +102,8 @@ export default function EvaluacionNueva() {
     () => requirements.flatMap((r) => r.measures.map((m) => ({ ...m, requirementCode: r.code, requirementTitle: r.title }))),
     [requirements],
   );
+  // El paso 2 cuenta las medidas del catálogo APLICADO (43, 84, 12…), no un 84 fijo.
+  const PASOS = ["Sistema y Marco", `Evaluación de medidas (${allMeasures.length})`, "Plan de Adaptación (PDA)", "Resultado"];
   // Que `activeReqCode` siga siendo válido al cambiar de marco o de perfil.
   useMemo(() => {
     if (requirements.length > 0 && !requirements.some((r) => r.code === activeReqCode)) {
@@ -183,10 +173,7 @@ export default function EvaluacionNueva() {
     return computeAssessmentStats(medidasEvaluables, conEvidencia);
   }, [medidasEvaluables, evaluations, cuentaEvidencias]);
 
-  // Borrador. El wizard tenía las 84 medidas en `useState` y nada más: cerrar
-  // la pestaña en el paso 2 —entre 30 y 60 minutos— lo perdía todo. El estado
-  // `BORRADOR` ya existía en la columna y en el filtro, pero ningún camino del
-  // producto lo producía.
+  // Borrador: cerrar la pestaña en el paso 2 (30-60 minutos) lo perdía todo.
   const { data: borrador } = useDraftAssessment(step >= 2 || Boolean(systemId) ? systemId || undefined : undefined, framework);
 
   const payloadActual = useMemo(
@@ -242,13 +229,15 @@ export default function EvaluacionNueva() {
     if (n > 0) toast.info(`Borrador recuperado: ${n} medida${n === 1 ? "" : "s"} ya evaluada${n === 1 ? "" : "s"}.`);
   }, [borrador, borradorCargado]);
 
-  // La función de guardado va por ref: si entrara en las dependencias del
-  // efecto, cada cambio de estado de la mutación reprogramaría el temporizador
-  // y el autoguardado se perseguiría a sí mismo.
+  // La función de guardado va por ref: en las dependencias del efecto, cada
+  // cambio de estado de la mutación reprogramaría el temporizador.
   const guardarRef = useRef(saveAssessment.mutateAsync);
   useEffect(() => {
     guardarRef.current = saveAssessment.mutateAsync;
   });
+  // Par vigente: una respuesta en vuelo de otro par no reinstala su draftId.
+  const parRef = useRef({ systemId, framework });
+  parRef.current = { systemId, framework };
 
   useEffect(() => {
     if (!systemId || createdId || !sucioRef.current) return;
@@ -257,6 +246,7 @@ export default function EvaluacionNueva() {
       try {
         const { fila } = construirPayload(false);
         const guardada = await guardarRef.current({ id: draftId, systemId, payload: fila });
+        if (parRef.current.systemId !== systemId || parRef.current.framework !== framework) return;
         setDraftId(guardada.id);
         setBorradorCargado(guardada.id);
         setAutoguardado("guardado");
@@ -264,12 +254,26 @@ export default function EvaluacionNueva() {
         // Se dice en pantalla. Un autoguardado que falla en silencio es peor
         // que no tenerlo: da confianza para cerrar la pestaña.
         setAutoguardado("error");
-        toast.error(`No se pudo guardar el borrador: ${err instanceof Error ? err.message : String(err)}`);
+        toast.error(`No se pudo guardar el borrador: ${mensajeUsuario(err)}`);
       }
     }, AUTOGUARDADO_MS);
     return () => clearTimeout(t);
     // `construirPayload` cambia con cada pulsación: es lo que reinicia el margen.
-  }, [construirPayload, systemId, draftId, createdId]);
+  }, [construirPayload, systemId, framework, draftId, createdId]);
+
+  // Cambiar de sistema o de marco: se vacía todo lo dependiente del par; el
+  // borrador del nuevo lo recupera el efecto.
+  const cambiarParametros = (next: () => void) => {
+    sucioRef.current = false;
+    setDraftId(null);
+    setBorradorCargado(null);
+    setEvaluations({});
+    setAdditionalMeasures([]);
+    setPlanEditado([]);
+    setNotes("");
+    setAutoguardado("limpio");
+    next();
+  };
 
   const handleNextStep = () => {
     if (step === 1 && !systemId) {
@@ -298,7 +302,7 @@ export default function EvaluacionNueva() {
       toast.success(`Autodiagnóstico registrado. Medidas evaluadas: ${payload.evaluadas}/${payload.totales}.`);
       setStep(4);
     } catch (err) {
-      toast.error(`Error al registrar la evaluación: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error(`Error al registrar la evaluación: ${mensajeUsuario(err)}`);
     }
   };
 
@@ -338,9 +342,9 @@ export default function EvaluacionNueva() {
         <PasoParametros
           systems={systems}
           systemId={systemId}
-          onSystemIdChange={setSystemId}
+          onSystemIdChange={(id) => cambiarParametros(() => setSystemId(id))}
           framework={framework}
-          onFrameworkChange={setFramework}
+          onFrameworkChange={(f) => cambiarParametros(() => setFramework(f))}
           marcos={MARCOS}
           selectedSystem={selectedSystem}
           onNext={handleNextStep}
@@ -365,7 +369,7 @@ export default function EvaluacionNueva() {
           bannerPerfil={
             <PerfilAplicabilidadBanner
               perfil={perfil}
-              totalMedidas={requirements.reduce((n, r) => n + r.measures.length, 0)}
+              totalMedidas={allMeasures.length}
               sistema={selectedSystem}
             />
           }

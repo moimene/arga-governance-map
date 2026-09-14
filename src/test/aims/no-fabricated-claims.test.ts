@@ -275,15 +275,15 @@ describe("A3 — un cero sin dato no se pinta como un cero bueno", () => {
     }
   });
 
-  it("no se afirma «Standalone-ready» ni «datos demo conectados» sin comprobarlo", () => {
+  it("no se afirma «Operable» ni «datos demo conectados» sin comprobarlo", () => {
     const src = read(DASHBOARD);
     // Los dos eran literales incondicionales, y el primero contradecía al
     // `standaloneReady` que el propio resumen calcula.
-    const ready = src.indexOf("Standalone-ready");
+    const ready = src.indexOf('"Operable"');
     expect(ready, "ha desaparecido el rótulo de readiness").toBeGreaterThan(0);
     expect(
-      /readiness\.standaloneReady \? "Standalone-ready"/.test(src),
-      "«Standalone-ready» vuelve a afirmarse sin mirar el resumen",
+      /readiness\.standaloneReady \? "Operable"/.test(src),
+      "«Operable» vuelve a afirmarse sin mirar el resumen",
     ).toBe(true);
     expect(
       /Estado de fuentes: datos demo conectados/.test(src),
@@ -419,6 +419,21 @@ describe("A3 — el documento descargable no afirma lo que no consta", () => {
     expect(/declara solemnemente/i.test(src), "declara solemnemente el cumplimiento").toBe(false);
     expect(/cumple con todos los requisitos/i.test(src), "afirma cumplimiento pleno").toBe(false);
     expect(/Imprimir Certificado/i.test(src), "llama certificado a un borrador").toBe(false);
+  });
+
+  it("2026-09-14 — si el art. 47 vincula lo dice la hoja, y sin rol no se declara proveedor", () => {
+    // Control positivo: el modal existe y llama a `vinculaArt47(`; con eso, la
+    // ausencia de abajo no es la de un fichero vacío.
+    const src = sinComentarios(read(DECLARACION));
+    expect(src).toContain('from "@/lib/aims/expediente-tecnico"');
+    expect(src).toContain("vinculaArt47(");
+    // El documento nombraba al tenant como «PROVEEDOR RESPONSABLE» fuera cual
+    // fuese su rol; ahora el rol lo pone `ETIQUETA_ROL` y sólo en la rama `true`.
+    expect(src).not.toContain("PROVEEDOR RESPONSABLE");
+    expect(src).not.toContain("Proveedor Responsable");
+    // Y los marcos no son una enumeración fija: salen de `derivarMarcos`.
+    expect(src).toContain("derivarMarcos(");
+    expect(src).not.toMatch(/9 a 17|84 medidas/);
   });
 
   it("un sistema sin clasificar NO se declara de alto riesgo del Anexo III", () => {
@@ -937,22 +952,27 @@ describe("2026-09-06 — la ausencia de dato se dice, no se rellena", () => {
       "la tarjeta de estado del inventario vuelve a pintarse sin inventario").toBe(true);
   });
 
-  it("el plazo del art. 73 dice que su tipología no se guarda", () => {
-    // El vencimiento se calcula desde estado de UI que se pierde al recargar.
-    // El control de edición ya lo advertía; en modo lectura no lo decía nadie.
-    // Los relojes viven en su componente desde la descomposición del
-    // 2026-09-08. Se leen los dos: si el panel volviera a la página, el
-    // invariante lo seguiría encontrando; si desapareciera, cae.
-    const src = sinComentarios(
-      read(INCIDENTE) + read("src/components/ai-governance/incidente/RelojesRegulatorios.tsx"),
-    );
+  it("el plazo del art. 73 dice cuándo su tipología se presume, y la edición la guarda", () => {
+    // Invertido el 2026-09-14: `ria_severity` es columna desde `20260907220000`
+    // y la ficha la escribe. La frase «no hay columna» pasó de honesta a falsa.
+    // Se leen los dos ficheros: si el panel volviera a la página, el invariante
+    // lo seguiría encontrando; si desapareciera, cae.
+    const relojes = sinComentarios(read("src/components/ai-governance/incidente/RelojesRegulatorios.tsx"));
+    const src = sinComentarios(read(INCIDENTE)) + relojes;
+    expect(/no hay columna|no se guarda con el incidente/.test(src),
+      "la ficha vuelve a negar la persistencia de la tipología del art. 73").toBe(false);
     const i = src.indexOf("formatDeadline(clocks.ria?.deadlineDate)");
     expect(i, "el reloj del art. 73 ya no pinta vencimiento").toBeGreaterThan(0);
     const ventana = src.slice(i, i + 700);
-    expect(/no registrada/.test(ventana),
-      "el vencimiento del art. 73 se presenta sin decir que su tipología no consta").toBe(true);
-    expect(/grave ordinario/i.test(ventana),
-      "no se dice qué tipología se está asumiendo para calcular el plazo").toBe(true);
+    // ARISTA: el aviso lo gobierna el flag del motor, no una constante.
+    expect(/clocks\.ria\?\.severityPresumed\s*&&/.test(ventana),
+      "el aviso de presunción ya no depende de `severityPresumed`").toBe(true);
+    expect(/no declarada/.test(ventana) && /grave\s+ordinario/i.test(ventana),
+      "no se dice que la tipología no está declarada ni cuál se presume").toBe(true);
+    // Y la edición la PERSISTE: el desplegable dejó de ser inerte.
+    const guardar = src.slice(src.indexOf("const handleSave"), src.indexOf("if (isLoading)"));
+    expect(/ria_severity:\s*riaSeverity \|\| null/.test(guardar),
+      "handleSave no envía ria_severity (o vuelve a presumir en vez de mandar NULL)").toBe(true);
   });
 
   it("los regímenes distinguen el catálogo de lo registrado, y la apertura se motiva", () => {

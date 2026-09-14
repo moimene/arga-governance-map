@@ -5,6 +5,7 @@ import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { useScope } from "@/context/ScopeContext";
 import { filterSystemsByScope, systemStatusChipClass, systemStatusLabel } from "@/lib/aims/readiness";
 import { claseNivelRiesgo, normalizeAimsStatus, opcionesFiltro } from "@/lib/aims/vocabulario";
+import { tieneClasificacionGuiada } from "@/lib/aims/cuestionario-calificacion";
 import FilterGroup from "@/components/ai-governance/FilterGroup";
 
 function formatDate(value: string | null) {
@@ -20,6 +21,20 @@ function systemRiskLabel(risk: string | null | undefined) {
   return risk ? `Riesgo ${risk}` : "Sin clasificación";
 }
 
+/** Chip de nivel: sólo lleva color con cuestionario completado; si no, neutro y lo dice. */
+function RiskChip({ system }: { system: { risk_level: string | null; regulatory_profile?: Record<string, unknown> | null } }) {
+  const guiada = tieneClasificacionGuiada(system);
+  return (
+    <span
+      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${claseNivelRiesgo(guiada ? system.risk_level : null)}`}
+      style={{ borderRadius: "var(--g-radius-sm)" }}
+      title={guiada ? undefined : "nivel declarado en ficha, sin cuestionario"}
+    >
+      {systemRiskLabel(system.risk_level)}
+    </span>
+  );
+}
+
 export default function Sistemas() {
   const navigate = useNavigate();
   const { scope } = useScope();
@@ -27,7 +42,7 @@ export default function Sistemas() {
   const [riskFilter, setRiskFilter] = useState("Todos");
   const [statusFilter, setStatusFilter] = useState("Todos");
 
-  const { data: rawSystems = [], isLoading } = useAiSystemsList(
+  const { data: rawSystems = [], isLoading, error } = useAiSystemsList(
     riskFilter !== "Todos" ? riskFilter : undefined
   );
 
@@ -41,7 +56,7 @@ export default function Sistemas() {
       (s.use_case?.toLowerCase().includes(q) ?? false) ||
       (s.system_type?.toLowerCase().includes(q) ?? false)
     );
-    const matchesStatus = statusFilter === "Todos" || s.status === statusFilter;
+    const matchesStatus = statusFilter === "Todos" || normalizeAimsStatus(s.status) === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -90,7 +105,7 @@ export default function Sistemas() {
             <ShieldCheck className="h-5 w-5 text-[var(--g-brand-3308)]" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-[var(--g-text-primary)]">Demo AIMS conectada</p>
+            <p className="text-sm font-semibold text-[var(--g-text-primary)]">Inventario conectado</p>
             <p className="mt-1 text-xs leading-5 text-[var(--g-text-secondary)]">
               Inventario propietario de AI Governance. Las decisiones de riesgo operativo se derivan hacia GRC sin escritura cruzada.
             </p>
@@ -139,7 +154,7 @@ export default function Sistemas() {
           {/* El de riesgo filtra en SERVIDOR (`.eq("risk_level")`): una grafía
               fuera del vocabulario no sería alcanzable por este filtro. */}
           <FilterGroup label="Riesgo" options={opcionesFiltro("nivel")} value={riskFilter} onChange={setRiskFilter} />
-          <FilterGroup label="Estado" options={opcionesFiltro("estadoSistema", systems.map((s) => s.status))} value={statusFilter} onChange={setStatusFilter} />
+          <FilterGroup label="Estado" options={opcionesFiltro("estadoSistema", systems.map((s) => normalizeAimsStatus(s.status)))} value={statusFilter} onChange={setStatusFilter} />
         </div>
       </section>
 
@@ -151,6 +166,15 @@ export default function Sistemas() {
         {isLoading ? (
           <div className="p-8 space-y-3">
             {[1,2,3].map((i) => <div key={i} className="skeleton h-12" style={{ borderRadius: "var(--g-radius-md)" }} />)}
+          </div>
+        ) : error ? (
+          <div role="alert" className="py-16 text-center text-sm text-[var(--g-text-primary)]">
+            No se pudo leer el inventario ({error.message})
+          </div>
+        ) : systems.length === 0 && riskFilter === "Todos" ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Cpu className="h-10 w-10 text-[var(--g-text-secondary)] mb-3" />
+            <p className="text-sm font-medium text-[var(--g-text-primary)]">Sin sistemas registrados en el inventario</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -175,7 +199,6 @@ export default function Sistemas() {
                 </thead>
                 <tbody className="divide-y divide-[var(--g-border-subtle)]">
                   {filtered.map((sys) => {
-                    const riskCls = claseNivelRiesgo(sys.risk_level);
                     const statusCls = systemStatusChipClass(sys.status);
                     return (
                       <tr
@@ -191,12 +214,7 @@ export default function Sistemas() {
                           <span className="block truncate">{sys.system_type ?? "Sin tipo"}</span>
                         </td>
                         <td className="px-6 py-4">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${riskCls}`}
-                            style={{ borderRadius: "var(--g-radius-sm)" }}
-                          >
-                            {systemRiskLabel(sys.risk_level)}
-                          </span>
+                          <RiskChip system={sys} />
                         </td>
                         <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">
                           <span className="block truncate">{sys.vendor ?? "Sin proveedor"}</span>
@@ -224,7 +242,6 @@ export default function Sistemas() {
 
             <div className="divide-y divide-[var(--g-border-subtle)] lg:hidden" role="list" aria-label="Lista móvil de sistemas IA">
               {filtered.map((sys) => {
-                const riskCls = claseNivelRiesgo(sys.risk_level);
                 const statusCls = systemStatusChipClass(sys.status);
                 return (
                   <article key={sys.id} role="listitem" className="p-4">
@@ -243,12 +260,7 @@ export default function Sistemas() {
                       <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-[var(--g-text-secondary)]" />
                     </button>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${riskCls}`}
-                        style={{ borderRadius: "var(--g-radius-sm)" }}
-                      >
-                        {systemRiskLabel(sys.risk_level)}
-                      </span>
+                      <RiskChip system={sys} />
                       <span
                         className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${statusCls}`}
                         style={{ borderRadius: "var(--g-radius-full)" }}
@@ -278,7 +290,7 @@ export default function Sistemas() {
         )}
       </div>
       <div className="text-xs text-[var(--g-text-secondary)]">
-        {filtered.length} sistema{filtered.length !== 1 ? "s" : ""}
+        {error ? "—" : `${filtered.length} sistema${filtered.length !== 1 ? "s" : ""}`}
       </div>
     </div>
   );

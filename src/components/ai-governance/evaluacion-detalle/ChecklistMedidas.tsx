@@ -65,7 +65,7 @@ export default function ChecklistMedidas({
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-[var(--g-text-primary)]">
-            Desglose de Requisitos y Medidas Guía (MG)
+            Desglose de requisitos y medidas
           </h2>
           <span className="text-xs text-[var(--g-text-secondary)]">
             {catalog.length} áreas normativas ({evaluatedCount} medidas evaluadas)
@@ -137,7 +137,7 @@ export default function ChecklistMedidas({
                   <thead>
                     <tr className="border-b border-[var(--g-border-subtle)] text-[var(--g-text-secondary)]">
                       <th className="pb-2 font-semibold">Código</th>
-                      <th className="pb-2 font-semibold">Descripción de la Medida (MG)</th>
+                      <th className="pb-2 font-semibold">Descripción de la medida</th>
                       <th className="pb-2 font-semibold">Bloque del requisito</th>
                       <th className="pb-2 font-semibold">Madurez</th>
                       <th className="pb-2 font-semibold">Dificultad</th>

@@ -8,6 +8,14 @@
 
 export type RiaIncidentSeverity = "ORDINARY_SERIOUS" | "WIDESPREAD_INFRINGEMENT" | "DEATH_INCIDENT";
 
+/** Opciones de la tipología del art. 73 para alta y edición. `""` = no declarado (NULL). */
+export const GRAVEDAD_RIA: { code: RiaIncidentSeverity | ""; label: string }[] = [
+  { code: "", label: "No declarado" },
+  { code: "ORDINARY_SERIOUS", label: "Incidente grave ordinario — 15 días (art. 73)" },
+  { code: "WIDESPREAD_INFRINGEMENT", label: "Infracción generalizada — 2 días (art. 73)" },
+  { code: "DEATH_INCIDENT", label: "Con resultado de fallecimiento — 10 días (art. 73)" },
+];
+
 export interface RiaClockResult {
   regime: "RIA";
   authority: "AESIA / Autoridad de Vigilancia de Mercado";
@@ -22,6 +30,12 @@ export interface RiaClockResult {
    * de ocultarse.
    */
   highRiskUnconfirmed?: boolean;
+  /**
+   * No se declaró tipología del art. 73: el plazo se calcula como incidente
+   * grave ordinario (15 días), que es el más largo de los tres. Se dice, porque
+   * si fuera infracción generalizada o con fallecimiento el real es más corto.
+   */
+  severityPresumed?: boolean;
 }
 
 export interface GdprClockResult {
@@ -245,6 +259,7 @@ export function evaluateMultiregimeIncident(params: {
     result.ria = {
       ...calculateRiaDeadline(params.knowledgeDate, params.riaSeverity || "ORDINARY_SERIOUS"),
       highRiskUnconfirmed: params.isAiHighRisk === undefined,
+      severityPresumed: !params.riaSeverity,
     };
   }
 

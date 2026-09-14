@@ -9,19 +9,24 @@ import {
   Lock,
   Printer,
 } from "lucide-react";
-import { assessmentAcreditaConformidad } from "@/lib/aims/readiness";
+import { useAuth } from "@/context/AuthContext";
 import {
   AVISO_COBERTURA_PROVISIONAL,
   AVISO_ISO_NO_ES_OBLIGACION,
 } from "@/lib/aims/perfil-aplicabilidad";
-import { normalizeAimsStatus } from "@/lib/aims/vocabulario";
+import { ETIQUETA_ROL, type RolRegulatorio } from "@/lib/aims/rol-regulatorio";
+import { chipClaseEstadoEvaluacion, etiqueta, normalizeAimsStatus } from "@/lib/aims/vocabulario";
 import type { AiRiskAssessment } from "@/hooks/useAiAssessments";
 
 export interface CabeceraInformeProps {
-  assessment: AiRiskAssessment & { ai_systems?: { name?: string | null } | null };
+  assessment: AiRiskAssessment & {
+    ai_systems?: { name?: string | null; risk_level?: string | null; regulatory_role?: string | null } | null;
+  };
   isIso: boolean;
   /** Resuelto en la página: el catálogo medido es el del desplegador. */
   catalogoDeDespliegue: boolean;
+  /** Resuelto en la página con `evaluadaContraOtroCatalogo`: el sistema se reclasificó después. */
+  anteriorAClasificacion: boolean;
   onExportJson: () => void;
   onPrint: () => void;
   onCongelar: () => void;
@@ -35,6 +40,7 @@ export default function CabeceraInforme({
   assessment,
   isIso,
   catalogoDeDespliegue,
+  anteriorAClasificacion,
   onExportJson,
   onPrint,
   onCongelar,
@@ -43,6 +49,15 @@ export default function CabeceraInforme({
   revisando,
 }: CabeceraInformeProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // La RPC rechaza que revise quien congeló (MISMO_EVALUADOR); se dice antes
+  // de pulsar en vez de después.
+  const mismaCuenta = !!user?.id && assessment.frozen_by_id === user.id;
+  // Quién congeló y quién revisó salen de la FILA: `user_profiles` es self-read
+  // por RLS, así que de otra cuenta sólo se puede pintar el id.
+  const autor = (id: string | null | undefined) =>
+    !id ? "sin autor registrado" : `por ${id.slice(0, 8)}…${user?.id === id ? " (esta cuenta)" : ""}`;
+  const rol = assessment.ai_systems?.regulatory_role;
 
   return (
     <>
@@ -123,14 +138,10 @@ export default function CabeceraInforme({
                   : `${assessment.score}%`}
               </span>
               <span
-                className={`px-2.5 py-1 text-xs font-semibold uppercase tracking-wider ${
-                  assessmentAcreditaConformidad(assessment.status)
-                    ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-                    : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
-                }`}
+                className={`px-2.5 py-1 text-xs font-semibold uppercase tracking-wider ${chipClaseEstadoEvaluacion(assessment.status)}`}
                 style={{ borderRadius: "var(--g-radius-full)" }}
               >
-                {assessment.status}
+                {etiqueta("estadoEvaluacion", assessment.status)}
               </span>
             </div>
             <span className="text-xs text-[var(--g-text-secondary)]">Madurez Global del Sistema</span>
@@ -187,9 +198,9 @@ export default function CabeceraInforme({
             <h2 className="text-sm font-bold text-[var(--g-text-primary)]">Custodia de la evaluación</h2>
             {assessment.frozen_at ? (
               <p className="text-xs text-[var(--g-text-secondary)]">
-                Congelada el {new Date(assessment.frozen_at).toLocaleString("es-ES")}.{" "}
+                Congelada el {new Date(assessment.frozen_at).toLocaleString("es-ES")} {autor(assessment.frozen_by_id)}.{" "}
                 {assessment.reviewed_at
-                  ? `Revisada el ${new Date(assessment.reviewed_at).toLocaleString("es-ES")}.`
+                  ? `Revisada el ${new Date(assessment.reviewed_at).toLocaleString("es-ES")} ${autor(assessment.reviewed_by_id)}.`
                   : "Pendiente de revisión por una persona distinta de quien la congeló."}
               </p>
             ) : (
@@ -220,9 +231,10 @@ export default function CabeceraInforme({
               <button
                 type="button"
                 onClick={onRevisar}
-                disabled={revisando}
+                disabled={revisando || mismaCuenta}
                 aria-busy={revisando}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] disabled:opacity-60 transition-colors"
+                title={mismaCuenta ? "La revisión la firma una persona distinta de quien congeló: entra con otra cuenta." : undefined}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 <FileCheck className="w-3.5 h-3.5 text-[var(--g-brand-3308)]" />
@@ -231,6 +243,11 @@ export default function CabeceraInforme({
             ) : null}
           </div>
         </div>
+        {mismaCuenta && !assessment.reviewed_at && (
+          <p className="text-[11px] text-[var(--status-warning)] print:hidden">
+            La revisión la firma una persona distinta de quien congeló: entra con otra cuenta.
+          </p>
+        )}
 
         {assessment.content_hash && (
           <div className="space-y-1 pt-2 border-t border-[var(--g-border-subtle)]">
@@ -245,6 +262,29 @@ export default function CabeceraInforme({
           </div>
         )}
       </section>
+
+      {anteriorAClasificacion && (
+        <div
+          className="p-4 bg-[var(--g-surface-subtle)] border-l-4 border-[var(--status-warning)] space-y-1"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <p className="text-xs font-bold text-[var(--g-text-primary)]">Evaluación anterior a la clasificación vigente</p>
+          <p className="text-xs text-[var(--g-text-secondary)]">
+            Se midió contra el catálogo del{" "}
+            {catalogoDeDespliegue ? "responsable del despliegue" : "proveedor de alto riesgo (84 medidas)"}; el
+            sistema está clasificado hoy como {(rol && ETIQUETA_ROL[rol as RolRegulatorio]) || rol || "sin rol"} ·{" "}
+            {etiqueta("nivel", assessment.ai_systems?.risk_level) || "sin nivel"}. El porcentaje no se recalcula.{" "}
+            {assessment.system_id && (
+              <Link
+                to={`/ai-governance/evaluaciones/nuevo?system_id=${assessment.system_id}`}
+                className="font-semibold text-[var(--g-link)] hover:text-[var(--g-link-hover)] underline"
+              >
+                Reevaluar contra su catálogo.
+              </Link>
+            )}
+          </p>
+        </div>
+      )}
 
       {catalogoDeDespliegue && (
         <div

@@ -17,6 +17,7 @@ import { useTenantContext } from "@/context/TenantContext";
 import { useBodyBySlug } from "@/hooks/useBodies";
 import { aiGovernanceBodySlug } from "@/lib/aims/governing-body";
 import { claseNivelRiesgo } from "@/lib/aims/vocabulario";
+import { tieneClasificacionGuiada } from "@/lib/aims/cuestionario-calificacion";
 import { ClasificacionGuiadaCard } from "@/components/ai-governance/dashboard/ClasificacionGuiadaCard";
 import { ComplianceMonitorPanel } from "@/components/ai-governance/dashboard/ComplianceMonitorPanel";
 import { IncidentesRecientes } from "@/components/ai-governance/dashboard/IncidentesRecientes";
@@ -24,15 +25,16 @@ import { OrganoRector } from "@/components/ai-governance/dashboard/OrganoRector"
 import { PrioridadAhora } from "@/components/ai-governance/dashboard/PrioridadAhora";
 import { ReadinessDomains } from "@/components/ai-governance/dashboard/ReadinessDomains";
 
-function RiskBadge({ level }: { level: string | null }) {
-  if (!level) return null;
-  const cls = claseNivelRiesgo(level);
+function RiskBadge({ system }: { system: { risk_level: string | null; regulatory_profile?: Record<string, unknown> | null } }) {
+  if (!system.risk_level) return null;
+  const guiada = tieneClasificacionGuiada(system);
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${cls}`}
+      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${claseNivelRiesgo(guiada ? system.risk_level : null)}`}
       style={{ borderRadius: "var(--g-radius-sm)" }}
+      title={guiada ? undefined : "nivel declarado en ficha, sin cuestionario"}
     >
-      {level}
+      {system.risk_level}
     </span>
   );
 }
@@ -102,10 +104,12 @@ export default function AiDashboard() {
   // nada — que es lo que corresponde cuando nadie ha constituido el órgano.
   const { tenantId } = useTenantContext();
   const { data: aiBody } = useBodyBySlug(aiGovernanceBodySlug(tenantId) ?? undefined);
-  const { data: rawSystems = [], isLoading: loadingSystems } = useAiSystemsList();
-  const { data: rawIncidents = [], isLoading: loadingIncidents } = useAiIncidentsList();
-  const { data: rawAssessments = [], isLoading: loadingAssessments } = useAllAssessments();
-  const { data: rawComplianceChecks = [], isLoading: loadingComplianceChecks } = useAllComplianceChecks();
+  const { data: rawSystems = [], isLoading: loadingSystems, error: errSystems } = useAiSystemsList();
+  const { data: rawIncidents = [], isLoading: loadingIncidents, error: errIncidents } = useAiIncidentsList();
+  const { data: rawAssessments = [], isLoading: loadingAssessments, error: errAssessments } = useAllAssessments();
+  const { data: rawComplianceChecks = [], isLoading: loadingComplianceChecks, error: errChecks } = useAllComplianceChecks();
+  // Una lectura fallida no es un inventario vacío: se dice el motivo, no «—».
+  const fallo = [errSystems, errIncidents, errAssessments, errChecks].find(Boolean) as Error | undefined;
 
   const systems = filterSystemsByScope(rawSystems, scope);
   const systemIds = new Set(systems.map((s) => s.id));
@@ -136,6 +140,7 @@ export default function AiDashboard() {
   const minimo  = systems.filter((s) => s.risk_level === "Mínimo").length;
 
   const sistemasClasificados = systems.filter((s) => (s.risk_level ?? "").trim() !== "").length;
+  const conClasificacionGuiada = systems.filter(tieneClasificacionGuiada).length;
 
   const incidentesAbiertos = incidents.filter(
     (i) => ["ABIERTO", "EN_INVESTIGACION"].includes(normalizeAimsStatus(i.status))
@@ -178,28 +183,38 @@ export default function AiDashboard() {
           </span>
         </div>
         <p className="max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
-          Sistemas IA, evaluaciones e incidentes materiales. AIMS conserva el alta y actualización; GRC y Secretaría reciben handoffs de solo lectura.
+          Sistemas IA, evaluaciones e incidentes materiales. AIMS conserva el alta y actualización; GRC y Secretaría reciben derivaciones de solo lectura.
         </p>
       </div>
 
       {aiBody && <OrganoRector slug={aiBody.slug} name={aiBody.name} />}
 
-      <PrioridadAhora
-        altosNoEvaluados={altosNoEvaluados}
-        materialIncidents={materialIncidents}
-        activos={activos}
-        totalSistemas={systems.length}
-        totalIncidentes={incidents.length}
-        detalleInventario={detalleInventario}
-        sistemasClasificados={sistemasClasificados}
-        loading={loading}
-      />
+      {!fallo && (
+        <PrioridadAhora
+          altosNoEvaluados={altosNoEvaluados}
+          materialIncidents={materialIncidents}
+          activos={activos}
+          totalSistemas={systems.length}
+          totalIncidentes={incidents.length}
+          detalleInventario={detalleInventario}
+          conClasificacionGuiada={conClasificacionGuiada}
+          loading={loading}
+        />
+      )}
 
       {loading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[1,2,3,4].map((i) => (
             <div key={i} className="h-32 skeleton" style={{ borderRadius: "var(--g-radius-lg)" }} />
           ))}
+        </div>
+      ) : fallo ? (
+        <div
+          role="alert"
+          className="border border-[var(--g-border-default)] bg-[var(--g-surface-card)] p-5 text-sm text-[var(--g-text-primary)]"
+          style={{ borderRadius: "var(--g-radius-lg)" }}
+        >
+          No se pudo leer el inventario ({fallo.message})
         </div>
       ) : (
         <>
@@ -245,7 +260,7 @@ export default function AiDashboard() {
 
           <ReadinessDomains
             readiness={readiness}
-            veredicto={readiness.standaloneReady ? "Standalone-ready" : "Standalone con gaps"}
+            veredicto={readiness.standaloneReady ? "Operable" : "Con carencias"}
             totalSistemas={systems.length}
             totalEvaluaciones={assessments.length}
             totalIncidentes={incidents.length}
@@ -328,7 +343,7 @@ export default function AiDashboard() {
                     <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[var(--g-text-secondary)]" />
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <RiskBadge level={sys.risk_level} />
+                    <RiskBadge system={sys} />
                     <span
                       className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${systemStatusChipClass(sys.status)}`}
                       style={{ borderRadius: "var(--g-radius-full)" }}
@@ -361,7 +376,7 @@ export default function AiDashboard() {
                     </td>
                     <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">{sys.system_type ?? "—"}</td>
                     <td className="px-6 py-4">
-                      <RiskBadge level={sys.risk_level} />
+                      <RiskBadge system={sys} />
                     </td>
                     <td className="px-6 py-4">
                       <span

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useRegistrarVersion, type AimsSystemVersion } from "@/hooks/useAimsTechnicalFile";
+import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 
 /**
  * Versiones registradas del sistema. «Registrado» y nada más: no hay sello, ni
@@ -11,6 +12,8 @@ import { useRegistrarVersion, type AimsSystemVersion } from "@/hooks/useAimsTech
 export interface VersionesSistemaProps {
   systemId: string;
   versiones: AimsSystemVersion[];
+  /** Error de la consulta: «no se pudo leer» no es «no hay». */
+  error?: unknown;
 }
 
 /** Los tres valores que la columna admite hoy; `DRAFT` es su DEFAULT. */
@@ -24,7 +27,7 @@ const CAMPO =
   "w-full h-9 px-3 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]";
 const ETIQUETA_CAMPO = "block font-semibold text-[var(--g-text-primary)] mb-1";
 
-export default function VersionesSistema({ systemId, versiones }: VersionesSistemaProps) {
+export default function VersionesSistema({ systemId, versiones, error }: VersionesSistemaProps) {
   const registrar = useRegistrarVersion();
   const [abierto, setAbierto] = useState(false);
   const [etiquetaVersion, setEtiquetaVersion] = useState("");
@@ -48,8 +51,7 @@ export default function VersionesSistema({ systemId, versiones }: VersionesSiste
       setDesde("");
       setResumen("");
     } catch (err) {
-      const msg = (err as { message?: string })?.message ?? String(err);
-      toast.error(`No se pudo registrar la versión: ${msg}`);
+      toast.error(`No se pudo registrar la versión: ${mensajeUsuario(err)}`);
     }
   };
 
@@ -149,7 +151,11 @@ export default function VersionesSistema({ systemId, versiones }: VersionesSiste
         </form>
       )}
 
-      {versiones.length === 0 ? (
+      {error ? (
+        <p className="text-xs font-semibold text-[var(--g-text-secondary)] py-2">
+          No se pudo leer las versiones ({mensajeUsuario(error)}).
+        </p>
+      ) : versiones.length === 0 ? (
         <p className="text-xs text-[var(--g-text-secondary)] italic py-2">
           No hay versiones registradas para este sistema.
         </p>

@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { AIMS_HANDOFFS } from "../handoffs";
+import { AESIA_RIA_REQUIREMENTS } from "../catalog-aesia";
 import {
+  apartarChecksDeOtroCatalogo,
   buildAimsComplianceMonitors,
   buildAimsReadiness,
   isAimsMaterialIncidentCandidate,
   isAimsTechnicalFileGapCandidate,
+  normalizeAimsStatus,
 } from "../readiness";
 
 describe("buildAimsReadiness", () => {
@@ -176,5 +179,113 @@ describe("buildAimsReadiness", () => {
     expect(monitors.find((monitor) => monitor.id === "prohibited-practices")?.status).toBe("gap");
     expect(monitors.find((monitor) => monitor.id === "incident-reporting-escalation")?.handoff).toBe("AIMS_INCIDENT_MATERIAL");
     expect(monitors.every((monitor) => monitor.route.startsWith("/ai-governance"))).toBe(true);
+  });
+});
+
+describe("D1 — las comprobaciones de otro catálogo se apartan, no se suman", () => {
+  // 12 comprobaciones del catálogo del PROVEEDOR de alto riesgo, con el título
+  // real de cada requisito para que caigan en algún monitor por keywords.
+  const checksProveedor = AESIA_RIA_REQUIREMENTS.slice(0, 12).map((req, i) => ({
+    id: `chk-${i}`,
+    system_id: "sys-1",
+    requirement_code: req.code,
+    requirement_title: req.title,
+    status: "NO_CONFORME",
+  }));
+  const desplegador = (regulatory_profile: Record<string, unknown> | null) => ({
+    id: "sys-1",
+    status: "ACTIVO",
+    risk_level: "Limitado",
+    regulatory_role: "RESPONSABLE_DESPLIEGUE",
+    regulatory_profile,
+  });
+
+  it("con clasificación guiada, las 12 se apartan y ningún monitor las cuenta como brecha", () => {
+    expect(checksProveedor.length).toBe(12);
+    const { medibles, otroCatalogo } = apartarChecksDeOtroCatalogo(
+      [desplegador({ cuestionario_id: "q-1" })],
+      checksProveedor,
+    );
+    expect(medibles.length).toBe(0);
+    expect(otroCatalogo.length).toBe(12);
+
+    const monitors = buildAimsComplianceMonitors({
+      systems: [desplegador({ cuestionario_id: "q-1" })],
+      assessments: [],
+      incidents: [],
+      complianceChecks: checksProveedor,
+    });
+    for (const m of monitors) expect(m.metric, m.id).not.toContain("conformes");
+    const data = monitors.find((m) => m.id === "data-governance")!;
+    expect(data.otroCatalogo).toBeGreaterThan(0);
+    expect(data.metric).toBe("Sin cobertura");
+  });
+
+  it("una comprobación ISO 42001 no es «otro catálogo RIA»: sigue contando aunque haya cuestionario", () => {
+    const iso = { id: "chk-iso", system_id: "sys-1", requirement_code: "ISO_POLICIES", requirement_title: "iso-42001-5", status: "CONFORME" };
+    const { medibles, otroCatalogo } = apartarChecksDeOtroCatalogo(
+      [desplegador({ cuestionario_id: "q-1" })],
+      [...checksProveedor, iso],
+    );
+    expect(otroCatalogo.length).toBe(12);
+    expect(medibles).toEqual([iso]);
+    const gov = buildAimsComplianceMonitors({
+      systems: [desplegador({ cuestionario_id: "q-1" })],
+      assessments: [],
+      incidents: [],
+      complianceChecks: [iso],
+    }).find((m) => m.id === "governance-accountability")!;
+    expect(gov.metric).toBe("1/1 conformes");
+    expect(gov.otroCatalogo).toBe(0);
+  });
+
+  it("control: el mismo sistema sin cuestionario cuenta las 12 (fail-open, ARGA cero cambio)", () => {
+    const { medibles, otroCatalogo } = apartarChecksDeOtroCatalogo([desplegador(null)], checksProveedor);
+    expect(medibles.length).toBe(12);
+    expect(otroCatalogo.length).toBe(0);
+
+    const data = buildAimsComplianceMonitors({
+      systems: [desplegador(null)],
+      assessments: [],
+      incidents: [],
+      complianceChecks: checksProveedor,
+    }).find((m) => m.id === "data-governance")!;
+    expect(data.status).toBe("gap");
+    expect(data.metric).toContain("conformes");
+    expect(data.otroCatalogo).toBe(0);
+  });
+});
+
+describe("D2 — un borrador es «no medido», no un gap", () => {
+  it("BORRADOR con score 0 y findings PENDIENTE no es candidato", () => {
+    expect(
+      isAimsTechnicalFileGapCandidate({
+        id: "draft",
+        status: "BORRADOR",
+        score: 0,
+        findings: [{ code: "QUALITY_MGMT", status: "PENDIENTE" }],
+      }),
+    ).toBe(false);
+  });
+
+  it("control: CON_GAPS con score 49 sí lo es", () => {
+    expect(isAimsTechnicalFileGapCandidate({ id: "gaps", status: "CON_GAPS", score: 49, findings: [] })).toBe(true);
+  });
+});
+
+describe("D3 — el estado se compara normalizado, como el KPI del Dashboard", () => {
+  it("una fila «Activo» cuenta igual en el KPI y en el dominio de inventario", () => {
+    const systems = [
+      { id: "s1", status: "Activo", risk_level: "Alto" },
+      { id: "s2", status: "RETIRADO", risk_level: "Alto" },
+    ];
+    const incidents = [{ id: "i1", status: "En investigación", severity: "BAJO" }];
+    // Mismo predicado que `Dashboard.tsx` para «Sistemas IA activos».
+    const kpi = systems.filter((s) => normalizeAimsStatus(s.status) === "ACTIVO").length;
+    expect(kpi).toBe(1);
+    const resumen = buildAimsReadiness({ systems, assessments: [], incidents });
+    expect(resumen.domains.find((d) => d.id === "inventory")?.metric).toBe(`${kpi}/2 activos`);
+    expect(resumen.complianceMonitors.find((m) => m.id === "inventory-classification")?.metric).toBe(`${kpi}/2 activos`);
+    expect(resumen.domains.find((d) => d.id === "incidents")?.metric).toBe("1 abiertos");
   });
 });

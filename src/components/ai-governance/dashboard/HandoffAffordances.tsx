@@ -1,6 +1,14 @@
 import { Link } from "react-router-dom";
 import { Route } from "lucide-react";
-import { AIMS_HANDOFFS } from "@/lib/aims/handoffs";
+import { AIMS_HANDOFFS, type AimsEvidencePosture } from "@/lib/aims/handoffs";
+
+const ETIQUETA_POSTURA: Record<AimsEvidencePosture, string> = {
+  REFERENCE: "Referencia",
+  BUNDLE_STUB: "Paquete provisional",
+  AUDITED_BUNDLE: "Paquete auditado",
+  LEGAL_HOLD_READY: "Apto para retención legal",
+  NOT_EVIDENCE: "No es evidencia",
+};
 
 /**
  * Rutas de entrada a los módulos responsables. El dato viene de la hoja
@@ -40,13 +48,12 @@ export function HandoffAffordances() {
                     className="bg-[var(--g-surface-muted)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--g-text-secondary)]"
                     style={{ borderRadius: "var(--g-radius-full)" }}
                   >
-                    {handoff.evidencePosture}
+                    {ETIQUETA_POSTURA[handoff.evidencePosture]}
                   </span>
                 </div>
                 <p className="mt-1 text-xs leading-relaxed text-[var(--g-text-secondary)]">
                   {handoff.trigger}. {handoff.targetOwner} conserva la decisión; AIMS solo enruta.
                 </p>
-                <p className="mt-2 font-mono text-[11px] text-[var(--g-text-secondary)]">{handoff.contractEvent}</p>
               </div>
             </div>
           </Link>

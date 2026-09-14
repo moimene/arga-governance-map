@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useRegistrarIndicador, type AimsMonitoringIndicator } from "@/hooks/useAimsTechnicalFile";
+import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 import { normalizeAimsStatus } from "@/lib/aims/vocabulario";
 
 /**
@@ -17,6 +18,8 @@ import { normalizeAimsStatus } from "@/lib/aims/vocabulario";
 export interface TabVigilanciaProps {
   systemId: string;
   indicators: AimsMonitoringIndicator[];
+  /** Error de la consulta: «no se pudo leer» no es «no hay». */
+  error?: unknown;
 }
 
 const CHIP_INDICADOR: Record<string, string> = {
@@ -30,7 +33,7 @@ const CAMPO =
   "w-full h-9 px-3 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]";
 const ETIQUETA_CAMPO = "block font-semibold text-[var(--g-text-primary)] mb-1";
 
-export default function TabVigilancia({ systemId, indicators }: TabVigilanciaProps) {
+export default function TabVigilancia({ systemId, indicators, error }: TabVigilanciaProps) {
   const registrar = useRegistrarIndicador();
   const [abierto, setAbierto] = useState(false);
   const [nombre, setNombre] = useState("");
@@ -52,8 +55,7 @@ export default function TabVigilancia({ systemId, indicators }: TabVigilanciaPro
       setMetrica("");
       setObservado("");
     } catch (err) {
-      const msg = (err as { message?: string })?.message ?? String(err);
-      toast.error(`No se pudo registrar el indicador: ${msg}`);
+      toast.error(`No se pudo registrar el indicador: ${mensajeUsuario(err)}`);
     }
   };
 
@@ -146,7 +148,11 @@ export default function TabVigilancia({ systemId, indicators }: TabVigilanciaPro
         </form>
       )}
 
-      {indicators.length === 0 ? (
+      {error ? (
+        <p className="text-xs font-semibold text-[var(--g-text-secondary)] py-4 text-center">
+          No se pudo leer los indicadores ({mensajeUsuario(error)}).
+        </p>
+      ) : indicators.length === 0 ? (
         <p className="text-xs text-[var(--g-text-secondary)] italic py-4 text-center">
           No hay indicadores de monitorización configurados para este sistema.
         </p>

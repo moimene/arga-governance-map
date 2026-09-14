@@ -11,6 +11,7 @@ import {
 } from "@/lib/aims/incident-clocks";
 import { isMaterialSeverity } from "@/lib/aims/readiness";
 import { normalizeAimsStatus } from "@/lib/aims/vocabulario";
+import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 import { isModuleEnabled } from "@/lib/tenant-modules";
 import { useTenantBranding } from "@/context/TenantBrandContext";
 import CabeceraIncidente from "@/components/ai-governance/incidente/CabeceraIncidente";
@@ -28,7 +29,7 @@ export default function AiIncidenteDetalle() {
 
   const [status, setStatus] = useState<string>("");
   const [severity, setSeverity] = useState<string>("");
-  const [riaSeverity, setRiaSeverity] = useState<RiaIncidentSeverity>("ORDINARY_SERIOUS");
+  const [riaSeverity, setRiaSeverity] = useState<RiaIncidentSeverity | "">("");
   const [rootCause, setRootCause] = useState<string>("");
   const [correctiveAction, setCorrectiveAction] = useState<string>("");
   const [isEditing, setIsEditing] = useState(false);
@@ -43,6 +44,7 @@ export default function AiIncidenteDetalle() {
     if (!incident) return;
     setStatus(incident.status);
     setSeverity(incident.severity || "");
+    setRiaSeverity((incident.ria_severity as RiaIncidentSeverity | null) ?? "");
     setRootCause(incident.root_cause || "");
     setCorrectiveAction(incident.corrective_action || "");
     setIsEditing(true);
@@ -60,14 +62,15 @@ export default function AiIncidenteDetalle() {
           severity,
           root_cause: rootCause,
           corrective_action: correctiveAction,
+          // `""` es «no declarado» y viaja como NULL: no se presume tipología.
+          ria_severity: riaSeverity || null,
           closed_at: cerrado ? closedAt : null,
         },
       });
       toast.success("Incidente actualizado correctamente");
       setIsEditing(false);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      toast.error(`Error al actualizar incidente: ${msg}`);
+      toast.error(`Error al actualizar incidente: ${mensajeUsuario(e)}`);
     }
   };
 
@@ -119,9 +122,11 @@ export default function AiIncidenteDetalle() {
     // El art. 73 alcanza a sistemas de alto riesgo: se toma del sistema
     // asociado, no se presupone. `undefined` cuando no consta clasificación.
     isAiHighRisk: altoRiesgoDeclarado(incident.ai_systems?.risk_level),
-    // La declarada en el alta manda; el desplegable de la ficha sólo la
-    // sustituye mientras se recalifica sin haber guardado.
-    riaSeverity: (incident.ria_severity as RiaIncidentSeverity | null) ?? riaSeverity,
+    // Editando manda el borrador (el plazo se recalcula en vivo); si no, la
+    // guardada. `""`/NULL llegan como `undefined`: el motor presume y lo marca.
+    riaSeverity: isEditing
+      ? riaSeverity || undefined
+      : (incident.ria_severity as RiaIncidentSeverity | null) ?? undefined,
     affectsPersonalData: declarado(incident.affects_personal_data) ?? false,
     isHighRiskToSubjects: declarado(incident.high_risk_to_subjects),
     isIctRelated: declarado(incident.ict_related) ?? false,

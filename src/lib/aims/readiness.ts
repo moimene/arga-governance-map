@@ -1,4 +1,7 @@
+import { AESIA_RIA_REQUIREMENTS } from "./catalog-aesia";
 import { acreditaConformidad } from "./conformidad";
+import { tieneClasificacionGuiada } from "./cuestionario-calificacion";
+import { DESPLIEGUE_REQUIREMENTS, codigosDelPerfil } from "./perfil-aplicabilidad";
 import { etiqueta, isMaterialSeverity, normalizeAimsStatus } from "./vocabulario";
 
 export type AimsSourcePosture = "legacy-ai" | "aims-ready" | "local-derived";
@@ -9,6 +12,8 @@ export interface AimsSystemLike {
   risk_level?: string | null;
   status?: string | null;
   vendor?: string | null;
+  regulatory_role?: string | null;
+  regulatory_profile?: Record<string, unknown> | null;
 }
 
 export interface AimsAssessmentLike {
@@ -64,6 +69,8 @@ export interface AimsComplianceMonitorDomain {
   route: string;
   source: "ai_systems" | "ai_risk_assessments" | "ai_compliance_checks" | "ai_incidents" | "derived";
   handoff?: string;
+  /** Comprobaciones del área medidas contra un catálogo que no es el del sistema: ni conformes ni brechas. */
+  otroCatalogo: number;
 }
 
 export interface AimsReadinessInput {
@@ -135,6 +142,9 @@ export function assessmentAcreditaConformidad(status: string | null | undefined)
 }
 
 export function isAimsTechnicalFileGapCandidate(assessment: AimsAssessmentLike) {
+  // Un borrador es «no medido», no un gap: su score 0 y sus findings PENDIENTE
+  // son artefactos del autoguardado, no una evaluación con brechas.
+  if (normalizeAimsStatus(assessment.status) === "BORRADOR") return false;
   const status = assessment.status ?? "";
   const hasUnapprovedStatus = status !== "" && !assessmentAcreditaConformidad(status);
   const hasWeakScore = typeof assessment.score === "number" && assessment.score < 80;
@@ -161,7 +171,7 @@ const COMPLIANT_STATUSES = new Set(["CONFORME", "APROBADO", "OK", "CERRADO", "CO
 const WATCH_STATUSES = new Set(["EN_CURSO", "EN_REVISION", "PENDIENTE", "PARCIAL", "BORRADOR"]);
 const GAP_STATUSES = new Set(["NO_CONFORME", "ABIERTO", "BLOQUEADO", "VENCIDO", "CRITICO"]);
 
-type MonitorDefinition = Omit<AimsComplianceMonitorDomain, "status" | "metric"> & {
+type MonitorDefinition = Omit<AimsComplianceMonitorDomain, "status" | "metric" | "otroCatalogo"> & {
   keywords: string[];
 };
 
@@ -252,7 +262,7 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     id: "provider-vendor-third-party",
     label: "Proveedor y terceros",
     area: "Operativo AIMS",
-    detail: "Identificación de vendor, dependencia crítica y handoff potencial a GRC TPRM.",
+    detail: "Identificación de vendor, dependencia crítica y posible derivación a GRC TPRM.",
     route: "/ai-governance/sistemas",
     source: "ai_systems",
     handoff: "AIMS_VENDOR_CONTEXT",
@@ -271,7 +281,7 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     id: "incident-reporting-escalation",
     label: "Reporting de incidentes y escalado",
     area: "Cross-module",
-    detail: "Incidentes materiales con posible intake GRC o escalado formal a Secretaría.",
+    detail: "Incidentes materiales con posible derivación a GRC o escalado formal a Secretaría.",
     route: "/ai-governance/incidentes",
     source: "ai_incidents",
     handoff: "AIMS_INCIDENT_MATERIAL",
@@ -339,7 +349,7 @@ function fallbackMonitorStatus(
 ): { status: AimsReadinessStatus; metric: string } {
   const { systems, assessments, incidents } = input;
   const totalSystems = systems.length;
-  const activeSystems = systems.filter((system) => system.status === "ACTIVO").length;
+  const activeSystems = systems.filter((system) => normalizeAimsStatus(system.status) === "ACTIVO").length;
   const highRiskSystems = systems.filter((system) => system.risk_level === "Alto");
   const inacceptableSystems = systems.filter((system) => system.risk_level === "Inaceptable");
   const assessedSystemIds = new Set(
@@ -417,8 +427,33 @@ function fallbackMonitorStatus(
   }
 }
 
+/** Códigos de los catálogos RIA (proveedor y desplegador): fuera de ellos no hay «otro catálogo RIA». */
+const CODIGOS_RIA = new Set([...AESIA_RIA_REQUIREMENTS, ...DESPLIEGUE_REQUIREMENTS].map((r) => r.code));
+
+/**
+ * Aparta las comprobaciones medidas contra un catálogo RIA que no es el del
+ * sistema. Sólo se aparta con clasificación guiada (`tieneClasificacionGuiada`):
+ * sin cuestionario no se sabe cuál es su catálogo y todo cuenta (fail-open).
+ * Un código de otro marco (ISO 42001) no se midió contra ningún catálogo RIA
+ * y sigue contando: mismo criterio que `evaluadaContraOtroCatalogo`.
+ */
+export function apartarChecksDeOtroCatalogo(systems: AimsSystemLike[], checks: AimsComplianceCheckLike[]) {
+  const codigosPorSistema = new Map<string, Set<string>>();
+  for (const system of systems) {
+    if (tieneClasificacionGuiada(system)) codigosPorSistema.set(system.id, codigosDelPerfil(system, AESIA_RIA_REQUIREMENTS));
+  }
+  const medibles: AimsComplianceCheckLike[] = [];
+  const otroCatalogo: AimsComplianceCheckLike[] = [];
+  for (const check of checks) {
+    const code = check.requirement_code ?? "";
+    const codigos = check.system_id ? codigosPorSistema.get(check.system_id) : undefined;
+    (codigos && CODIGOS_RIA.has(code) && !codigos.has(code) ? otroCatalogo : medibles).push(check);
+  }
+  return { medibles, otroCatalogo };
+}
+
 export function buildAimsComplianceMonitors(input: AimsReadinessInput): AimsComplianceMonitorDomain[] {
-  const checks = input.complianceChecks ?? [];
+  const { medibles: checks, otroCatalogo } = apartarChecksDeOtroCatalogo(input.systems, input.complianceChecks ?? []);
   const base = {
     systems: input.systems,
     assessments: input.assessments,
@@ -444,6 +479,7 @@ export function buildAimsComplianceMonitors(input: AimsReadinessInput): AimsComp
       route: definition.route,
       source: matchingChecks.length > 0 ? "ai_compliance_checks" : definition.source,
       handoff: definition.handoff,
+      otroCatalogo: checksForDefinition(otroCatalogo, definition).length,
     };
   });
 }
@@ -455,7 +491,7 @@ export function buildAimsReadiness({
   complianceChecks = [],
 }: AimsReadinessInput): AimsReadinessSummary {
   const totalSystems = systems.length;
-  const activeSystems = systems.filter((system) => system.status === "ACTIVO").length;
+  const activeSystems = systems.filter((system) => normalizeAimsStatus(system.status) === "ACTIVO").length;
   const assessedSystemIds = new Set(
     assessments
       .filter((assessment) => assessmentAcreditaConformidad(assessment.status) && assessment.system_id)
@@ -463,8 +499,8 @@ export function buildAimsReadiness({
   );
   const highRiskSystems = systems.filter((system) => system.risk_level === "Alto");
   const highRiskAssessed = highRiskSystems.filter((system) => assessedSystemIds.has(system.id)).length;
-  const openIncidents = incidents.filter(
-    (incident) => incident.status === "ABIERTO" || incident.status === "EN_INVESTIGACION",
+  const openIncidents = incidents.filter((incident) =>
+    ["ABIERTO", "EN_INVESTIGACION"].includes(normalizeAimsStatus(incident.status)),
   ).length;
   const incidentsWithClosureEvidence = incidents.filter(
     (incident) => incident.root_cause || incident.corrective_action || incident.closed_at,
@@ -542,13 +578,13 @@ export function buildAimsReadiness({
     {
       id: "migration",
       hasData: false,
-      label: "Migración ai_* → aims_*",
+      label: "Backbone técnico",
       status: "watch",
       // No se mide desde aquí: `buildAimsReadiness` sólo recibe `ai_*`.
       // Antes afirmaba "Sin schema nuevo", que además era falso — las tablas
       // `aims_*` del backbone existen desde abril.
       metric: "No medido",
-      detail: "Postura sobre ai_* legacy; el estado del backbone aims_* no se mide en este resumen.",
+      detail: "Postura sobre el inventario legado; el estado del backbone técnico no se mide en este resumen.",
       route: "/ai-governance",
     },
   ];
@@ -576,8 +612,8 @@ export function buildAimsReadiness({
       "Cerrar evaluación aprobada de cada sistema de riesgo Alto.",
       "Completar monitorización por dominios AI Act, ISO 42001, proveedores, post-market y derechos fundamentales.",
       "Convertir findings abiertos en controles GRC solo mediante contrato cross-module aprobado.",
-      "Preparar mapping ai_systems → aims_systems antes de cualquier migración.",
-      "Enlazar evidencia final únicamente cuando evidence_bundles y audit_log estén declarados aptos.",
+      "Preparar la correspondencia entre el inventario legado y el backbone técnico antes de cualquier migración.",
+      "Enlazar evidencia final únicamente cuando la custodia de evidencias y el registro de auditoría estén declarados aptos.",
     ],
   };
 }

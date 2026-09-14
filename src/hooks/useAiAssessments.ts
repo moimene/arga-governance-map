@@ -81,13 +81,21 @@ export function useAssessmentById(id: string | undefined) {
     queryFn: tenantId && id ? async () => {
       const { data, error } = await supabase
         .from("ai_risk_assessments")
-        .select("*, ai_systems!inner(id, name, risk_level, system_type, tenant_id)")
+        .select("*, ai_systems!inner(id, name, risk_level, system_type, tenant_id, regulatory_role, regulatory_profile)")
         .eq("ai_systems.tenant_id", tenantId!)
         .eq("id", id)
         .single();
       if (error) throw error;
       return data as AiRiskAssessment & {
-        ai_systems: { id: string; name: string; risk_level: string; system_type: string; tenant_id: string };
+        ai_systems: {
+          id: string;
+          name: string;
+          risk_level: string;
+          system_type: string;
+          tenant_id: string;
+          regulatory_role: string | null;
+          regulatory_profile: Record<string, unknown> | null;
+        };
       };
     } : skipToken,
   });
@@ -100,12 +108,12 @@ export function useAllAssessments() {
     queryFn: tenantId ? async () => {
       const { data, error } = await supabase
         .from("ai_risk_assessments")
-        .select("*, ai_systems!inner(name, risk_level, tenant_id)")
+        .select("*, ai_systems!inner(name, risk_level, tenant_id, regulatory_role, regulatory_profile)")
         .eq("ai_systems.tenant_id", tenantId!)
         .order("assessment_date", { ascending: false });
       if (error) throw error;
       return (data ?? []) as (AiRiskAssessment & {
-        ai_systems: { name: string; risk_level: string; tenant_id: string } | null;
+        ai_systems: { name: string; risk_level: string; tenant_id: string; regulatory_role: string | null; regulatory_profile: Record<string, unknown> | null } | null;
       })[];
     } : skipToken,
   });
@@ -212,7 +220,7 @@ export function useSaveAssessment() {
     }: {
       id?: string | null;
       systemId: string;
-      payload: Partial<AiRiskAssessment>;
+      payload: Partial<AiRiskAssessment> & { framework: string };
     }) => {
       // 1. La pertenencia del SISTEMA al tenant, con filtro por join. Es la
       //    única condición de tenant que esta tabla puede expresar: no tiene
@@ -238,13 +246,15 @@ export function useSaveAssessment() {
         return data as AiRiskAssessment;
       }
 
-      // 2. La escritura va acotada por el sistema ya comprobado, no sólo por
-      //    el `id` de la fila.
+      // 2. La escritura va acotada por el sistema ya comprobado Y por el marco,
+      //    no sólo por el `id` de la fila: cambiar de marco en el paso 1 con un
+      //    `draftId` vivo reescribía el borrador de EU_AI_ACT como ISO_42001.
       const { data, error } = await supabase
         .from("ai_risk_assessments")
         .update(payload)
         .eq("id", id)
         .eq("system_id", systemId)
+        .eq("framework", payload.framework)
         .select()
         .maybeSingle();
       if (error) throw error;

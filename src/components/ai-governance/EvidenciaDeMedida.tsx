@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Paperclip, Plus, Link2, FileCheck, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 import {
   AVISO_HASH_CLIENTE,
   useRegistrarEvidencia,
@@ -83,8 +84,7 @@ export default function EvidenciaDeMedida({
       toast.success("Evidencia registrada y vinculada a la medida.");
       limpiar();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`No se pudo registrar la evidencia: ${msg}`);
+      toast.error(`No se pudo registrar la evidencia: ${mensajeUsuario(err)}`);
     }
   };
 
@@ -96,8 +96,7 @@ export default function EvidenciaDeMedida({
       });
       toast.success("Evidencia vinculada. El fichero no se duplica.");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`No se pudo vincular: ${msg}`);
+      toast.error(`No se pudo vincular: ${mensajeUsuario(err)}`);
     }
   };
 
@@ -152,45 +151,53 @@ export default function EvidenciaDeMedida({
           className="p-3 bg-[var(--g-surface-subtle)] border border-[var(--g-border-subtle)] space-y-2"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
+          {/* Labels visibles, como ya lo eran las dos fechas: un `aria-label`
+              no se ve y el formulario no decía qué pedía cada caja. */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Título de la evidencia *"
-              className={INPUT}
-              style={{ borderRadius: "var(--g-radius-sm)" }}
-              aria-label="Título de la evidencia"
-            />
-            <select
-              value={kind}
-              onChange={(e) => setKind(e.target.value)}
-              className={INPUT}
-              style={{ borderRadius: "var(--g-radius-sm)" }}
-              aria-label="Tipo de evidencia"
-            >
-              {TIPOS.map((t) => (
-                <option key={t} value={t}>
-                  {t.charAt(0) + t.slice(1).toLowerCase()}
-                </option>
-              ))}
-            </select>
-            <input
-              type="file"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className={`${INPUT} py-1.5`}
-              style={{ borderRadius: "var(--g-radius-sm)" }}
-              aria-label="Fichero de la evidencia"
-            />
-            <input
-              type="text"
-              value={externalRef}
-              onChange={(e) => setExternalRef(e.target.value)}
-              placeholder="…o referencia documental externa"
-              className={INPUT}
-              style={{ borderRadius: "var(--g-radius-sm)" }}
-              aria-label="Referencia documental externa"
-            />
+            <label className="text-[11px] text-[var(--g-text-secondary)]">
+              Título de la evidencia *
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className={INPUT}
+                style={{ borderRadius: "var(--g-radius-sm)" }}
+              />
+            </label>
+            <label className="text-[11px] text-[var(--g-text-secondary)]">
+              Tipo de evidencia
+              <select
+                value={kind}
+                onChange={(e) => setKind(e.target.value)}
+                className={INPUT}
+                style={{ borderRadius: "var(--g-radius-sm)" }}
+              >
+                {TIPOS.map((t) => (
+                  <option key={t} value={t}>
+                    {t.charAt(0) + t.slice(1).toLowerCase()}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-[11px] text-[var(--g-text-secondary)]">
+              Fichero de la evidencia
+              <input
+                type="file"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                className={`${INPUT} py-1.5`}
+                style={{ borderRadius: "var(--g-radius-sm)" }}
+              />
+            </label>
+            <label className="text-[11px] text-[var(--g-text-secondary)]">
+              Referencia documental externa (si no hay fichero)
+              <input
+                type="text"
+                value={externalRef}
+                onChange={(e) => setExternalRef(e.target.value)}
+                className={INPUT}
+                style={{ borderRadius: "var(--g-radius-sm)" }}
+              />
+            </label>
             <label className="text-[11px] text-[var(--g-text-secondary)]">
               Fecha del documento
               <input

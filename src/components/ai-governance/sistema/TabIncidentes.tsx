@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import type { AiIncident } from "@/hooks/useAiIncidents";
+import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 import { isMaterialSeverity } from "@/lib/aims/readiness";
 import { etiqueta } from "@/lib/aims/vocabulario";
 
@@ -11,11 +12,13 @@ import { etiqueta } from "@/lib/aims/vocabulario";
 
 export interface TabIncidentesProps {
   incidents: AiIncident[];
+  /** Error de la consulta: «no se pudo leer» no es «no hay». */
+  error?: unknown;
   onNuevo: () => void;
   onAbrir: (incidentId: string) => void;
 }
 
-export default function TabIncidentes({ incidents, onNuevo, onAbrir }: TabIncidentesProps) {
+export default function TabIncidentes({ incidents, error, onNuevo, onAbrir }: TabIncidentesProps) {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -30,7 +33,11 @@ export default function TabIncidentes({ incidents, onNuevo, onAbrir }: TabIncide
         </button>
       </div>
 
-      {incidents.length === 0 ? (
+      {error ? (
+        <p className="p-8 text-center text-xs font-semibold text-[var(--g-text-secondary)]">
+          No se pudo leer los incidentes ({mensajeUsuario(error)}).
+        </p>
+      ) : incidents.length === 0 ? (
         <div
           className="p-8 text-center text-xs text-[var(--g-text-secondary)] bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)]"
           style={{ borderRadius: "var(--g-radius-lg)" }}

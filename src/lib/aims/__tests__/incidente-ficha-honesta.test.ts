@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { readFileSync } from "node:fs";
-import { altoRiesgoDeclarado, evaluateMultiregimeIncident } from "../incident-clocks";
+import { altoRiesgoDeclarado, evaluateMultiregimeIncident, GRAVEDAD_RIA } from "../incident-clocks";
 
 const FICHA = "src/pages/ai-governance/IncidenteDetalle.tsx";
 const DETALLE_SISTEMA = "src/pages/ai-governance/SistemaDetalle.tsx";
@@ -198,9 +198,115 @@ describe("los relojes se alimentan de lo DECLARADO, no de constantes", () => {
       expect(alta, `el alta no escribe ${campo}`).toContain(campo);
     }
     // Y el vocabulario de gravedad es EXACTAMENTE el que el motor sabe leer:
-    // otro valor caería al plazo genérico sin decirlo.
-    for (const nivel of ["ORDINARY_SERIOUS", "WIDESPREAD_INFRINGEMENT", "DEATH_INCIDENT"]) {
-      expect(alta, `el alta no ofrece ${nivel}`).toContain(nivel);
+    // desde 2026-09-14 la lista vive en la hoja del motor y el alta la importa.
+    expect(alta).toMatch(/import \{ GRAVEDAD_RIA \} from "@\/lib\/aims\/incident-clocks"/);
+    expect(alta).toContain("GRAVEDAD_RIA.map");
+    expect(GRAVEDAD_RIA.map((g) => g.code)).toEqual(["", "ORDINARY_SERIOUS", "WIDESPREAD_INFRINGEMENT", "DEATH_INCIDENT"]);
+  });
+});
+
+/**
+ * 2026-09-14 (carril C). Gates de ARISTA: que la pantalla importe y llame la
+ * hoja, no que pinte un rótulo. Se leen sin comentarios para que la prosa que
+ * explica una retirada no dispare al gate que la vigila.
+ */
+import { sinComentarios } from "@/test/helpers/sin-comentarios";
+
+const ALTA = "src/pages/ai-governance/IncidenteNuevo.tsx";
+const FORMULARIO = "src/components/ai-governance/incidente/FormularioIncidente.tsx";
+const EDICION = "src/components/ai-governance/incidente/EdicionIncidente.tsx";
+const RELOJES = "src/components/ai-governance/incidente/RelojesRegulatorios.tsx";
+const SUBEXP = "src/components/ai-governance/incidente/SubexpedientesRegimen.tsx";
+const LISTA = "src/pages/ai-governance/Incidentes.tsx";
+const limpio = (f: string) => sinComentarios(read(f));
+
+describe("C1 — la gravedad del art. 73 se declara, no se presume", () => {
+  it("el alta arranca en «no declarado» y lo ofrece como primera opción", () => {
+    expect(limpio(ALTA)).toMatch(/ria_severity:\s*"",/);
+    expect(GRAVEDAD_RIA[0]).toEqual({ code: "", label: "No declarado" });
+    // Control positivo: las tres tipologías reales siguen ofertándose.
+    expect(GRAVEDAD_RIA.length).toBe(4);
+  });
+
+  it("la ficha inicializa el borrador con el dato guardado y lo envía al guardar", () => {
+    const src = limpio(FICHA);
+    expect(src).toMatch(/useState<RiaIncidentSeverity \| "">\(""\)/);
+    expect(src).toMatch(/setRiaSeverity\(\(incident\.ria_severity as RiaIncidentSeverity \| null\) \?\? ""\)/);
+    const guardar = src.slice(src.indexOf("const handleSave"), src.indexOf("if (isLoading)"));
+    expect(guardar, "handleSave no persiste ria_severity").toMatch(/ria_severity:\s*riaSeverity \|\| null/);
+  });
+
+  it("el reloj lee el borrador al editar y el dato guardado si no", () => {
+    const src = limpio(FICHA);
+    const m = src.match(/riaSeverity:\s*isEditing\s*\?\s*riaSeverity \|\| undefined\s*:\s*\(incident\.ria_severity as RiaIncidentSeverity \| null\) \?\? undefined/);
+    expect(m, "el reloj no distingue borrador de dato guardado, o vuelve a presumir").not.toBeNull();
+  });
+
+  it("el desplegable de edición comparte la lista del alta y ya no dice que no se guarda", () => {
+    const src = limpio(EDICION);
+    expect(src).toMatch(/import \{[^}]*\bGRAVEDAD_RIA\b[^}]*\} from "@\/lib\/aims\/incident-clocks"/);
+    expect(src).toContain("GRAVEDAD_RIA.map");
+    expect(/no se guarda|Grave Ordinario/.test(src)).toBe(false);
+  });
+
+  it("la afirmación «no hay columna» no sobrevive en ningún fichero del módulo", () => {
+    for (const f of [FICHA, ALTA, FORMULARIO, EDICION, RELOJES, SUBEXP, LISTA]) {
+      expect(/no hay columna/.test(limpio(f)), `${f} sigue negando la columna`).toBe(false);
+    }
+    // ARISTA: el aviso de presunción lo gobierna el flag del motor.
+    expect(limpio(RELOJES)).toMatch(/clocks\.ria\?\.severityPresumed\s*&&/);
+  });
+});
+
+describe("C2 — el rótulo «Fecha de conocimiento» se alimenta de knowledge_at", () => {
+  it("pinta knowledge_at y, si falta, lo dice y cae a la de registro", () => {
+    const src = limpio(EDICION);
+    const i = src.indexOf("Fecha de conocimiento:");
+    expect(i).toBeGreaterThan(0);
+    const ventana = src.slice(i, src.indexOf("Fecha Cierre:"));
+    expect(ventana).toMatch(/incident\.knowledge_at\s*\?\s*formatIncidentDate\(incident\.knowledge_at\)/);
+    expect(ventana).toMatch(/no declarada; se usa la de registro/);
+    // El primer formatIncidentDate del rótulo NO es el de registro.
+    const primero = ventana.match(/formatIncidentDate\(([^)]+)\)/);
+    expect(primero![1]).toBe("incident.knowledge_at");
+    // Control positivo: la de cierre sigue leyendo su columna.
+    expect(src.slice(src.indexOf("Fecha Cierre:"))).toContain("formatIncidentDate(incident.closed_at)");
+  });
+});
+
+describe("C4 — el alta no expone jerga de postura interna", () => {
+  it("sin chip legacy_write ni «handoff read-only»", () => {
+    const src = limpio(ALTA);
+    expect(/legacy_write|handoff read-only|ShieldCheck/.test(src)).toBe(false);
+    expect(src).toContain("Registro del incidente en AIMS");
+  });
+});
+
+describe("C5 — un error de lectura no se pinta como «sin incidentes»", () => {
+  it("la lista lee isError y lo dice antes de la rama vacía; los KPI van a «—»", () => {
+    const src = limpio(LISTA);
+    expect(src).toMatch(/const \{ data: incidents = \[\], isLoading, isError, error \} = useAiIncidentsList\(\)/);
+    const iErr = src.indexOf("isError ? (");
+    const iVacio = src.indexOf("Sin incidentes registrados");
+    expect(iErr, "no hay rama de error").toBeGreaterThan(0);
+    expect(iVacio, "control positivo: la rama vacía sigue existiendo").toBeGreaterThan(0);
+    expect(iErr).toBeLessThan(iVacio);
+    expect(src).toMatch(/No se pudo leer los incidentes \(\{mensajeUsuario\(error\)\}\)/);
+    expect(src).toMatch(/isError \? \{ \.\.\.stat, value: "—", tone: "neutral" \} : stat/);
+  });
+});
+
+describe("C6 — los errores de RPC/mutación pasan por mensajeUsuario", () => {
+  it("cada catch del perímetro importa y llama la hoja; ninguno reimplementa el mensaje", () => {
+    for (const f of [ALTA, FICHA, SUBEXP, LISTA]) {
+      const src = limpio(f);
+      expect(src, `${f} no importa errores-rpc`).toMatch(/from "@\/lib\/aims\/errores-rpc"/);
+      expect(src, `${f} importa mensajeUsuario y no lo llama`).toMatch(/mensajeUsuario\(/);
+      expect(/instanceof Error \? \w+\.message : String\(/.test(src), `${f} reimplementa el mensaje`).toBe(false);
+    }
+    // Control positivo: los tres con catch lo tienen dentro de un catch.
+    for (const f of [ALTA, FICHA, SUBEXP]) {
+      expect(limpio(f)).toMatch(/catch \(\w+\) \{\s*toast\.error\([^\n]*mensajeUsuario\(/);
     }
   });
 });

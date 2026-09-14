@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Copy, History, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
+import type { AiSystem } from "@/hooks/useAiSystems";
+import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 import {
   aPayloadCuestionario,
   useCompletarCuestionario,
@@ -11,6 +13,7 @@ import {
 import {
   ETIQUETA_PERFIL,
   resultadoProvisional,
+  tieneClasificacionGuiada,
   type PerfilCatalogo,
   type Respuestas,
 } from "@/lib/aims/cuestionario-calificacion";
@@ -34,14 +37,10 @@ import HistorialClasificaciones from "@/components/ai-governance/clasificacion/H
  */
 
 export interface ClasificacionVigentePanelProps {
-  systemId: string;
-  tieneOwner: boolean;
+  system: AiSystem;
 }
 
 const MARGEN_AUTOGUARDADO_MS = 800;
-
-const mensaje = (e: unknown) =>
-  (e as { message?: string })?.message ?? (e instanceof Error ? e.message : String(e));
 
 const BOTON_PRIMARIO =
   "px-3 py-1.5 text-xs font-semibold bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-50";
@@ -55,7 +54,9 @@ function Dato({ rotulo, children }: { rotulo: string; children: React.ReactNode 
   );
 }
 
-export default function ClasificacionVigentePanel({ systemId, tieneOwner }: ClasificacionVigentePanelProps) {
+export default function ClasificacionVigentePanel({ system }: ClasificacionVigentePanelProps) {
+  const systemId = system.id;
+  const tieneOwner = !!system.owner_id;
   const { data: cuestionarios = [], refetch, isError, error } = useCuestionariosDeSistema(systemId);
   const vigente = cuestionarios.find((c) => c.status === "COMPLETED") ?? null;
   const borrador = cuestionarios.find((c) => c.status === "DRAFT") ?? null;
@@ -82,7 +83,7 @@ export default function ClasificacionVigentePanel({ systemId, tieneOwner }: Clas
         const existente = (data ?? []).find((c) => c.status === "DRAFT");
         if (existente) { setDraftId(existente.id); return; }
       }
-      toast.error(`No se pudo abrir la clasificación: ${mensaje(err)}`);
+      toast.error(`No se pudo abrir la clasificación: ${mensajeUsuario(err)}`);
     }
   };
 
@@ -114,7 +115,7 @@ export default function ClasificacionVigentePanel({ systemId, tieneOwner }: Clas
       toast.success(`Clasificación v${fila.version} registrada`);
       setDraftId(null);
     } catch (err) {
-      toast.error(mensaje(err));
+      toast.error(mensajeUsuario(err));
     }
   };
 
@@ -151,6 +152,9 @@ export default function ClasificacionVigentePanel({ systemId, tieneOwner }: Clas
           <button type="button" onClick={abrir} disabled={iniciar.isPending} className={BOTON_PRIMARIO} style={{ borderRadius: "var(--g-radius-md)" }}>
             {borrador ? "Continuar borrador" : vigente ? "Nueva clasificación" : "Iniciar clasificación guiada"}
           </button>
+          {borrador && (
+            <span className="text-xs text-[var(--g-text-secondary)]">El borrador se conserva hasta que se confirme.</span>
+          )}
           {cuestionarios.length > 0 && (
             <button
               type="button"
@@ -170,9 +174,9 @@ export default function ClasificacionVigentePanel({ systemId, tieneOwner }: Clas
         // ausencia de clasificación (la tarjeta hermana del Dashboard hace lo mismo).
         <p className="flex items-start gap-1.5 text-xs font-semibold text-[var(--g-text-secondary)]">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>No consta si hay clasificación guiada: no se pudo leer ({mensaje(error)}).</span>
+          <span>No consta si hay clasificación guiada: no se pudo leer ({mensajeUsuario(error)}).</span>
         </p>
-      ) : !vigente ? (
+      ) : !tieneClasificacionGuiada(system) || !vigente ? (
         <p className="flex items-start gap-1.5 text-xs font-semibold text-[var(--status-warning)]">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <span>Sin clasificación guiada — este sistema se mide contra el catálogo completo</span>
