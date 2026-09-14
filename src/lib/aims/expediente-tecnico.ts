@@ -41,6 +41,18 @@ export function vinculaArt11(
 }
 
 /**
+ * ¿Vincula el art. 47 (declaración UE de conformidad)? Mismo tri-estado que
+ * `vinculaArt11`: proveedor de alto riesgo (marco `RIA_ARTS_17_47`).
+ */
+export function vinculaArt47(
+  rol: string | null | undefined,
+  nivel: string | null | undefined,
+): boolean | null {
+  if (!rol || !nivel) return null;
+  return derivarMarcos(rol, nivel, false).some((m) => m.code === "RIA_ARTS_17_47");
+}
+
+/**
  * `aims_technical_file_sections.status` no tiene CHECK y en Cloud conviven el
  * inglés del diseño y el castellano que el seed escribió. Se reconocen los dos,
  * normalizados; lo desconocido se devuelve tal cual y la pantalla lo pinta

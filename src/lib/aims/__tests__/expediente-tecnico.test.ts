@@ -4,6 +4,7 @@ import {
   etiquetaEstadoSeccion,
   normalizarEstadoSeccion,
   vinculaArt11,
+  vinculaArt47,
 } from "../expediente-tecnico";
 
 describe("expediente técnico — anexo IV", () => {
@@ -21,6 +22,14 @@ describe("expediente técnico — anexo IV", () => {
     expect(vinculaArt11("PROVEEDOR", "Limitado")).toBe(false);
     expect(vinculaArt11(null, "Alto")).toBeNull();
     expect(vinculaArt11("PROVEEDOR", "")).toBeNull();
+  });
+
+  it("el art. 47 (declaración UE de conformidad) sigue el mismo tri-estado que el art. 11", () => {
+    expect(vinculaArt47("PROVEEDOR", "Alto")).toBe(true);
+    expect(vinculaArt47("RESPONSABLE_DESPLIEGUE", "Limitado")).toBe(false);
+    expect(vinculaArt47("PROVEEDOR", "Limitado")).toBe(false);
+    expect(vinculaArt47(null, "Alto")).toBeNull();
+    expect(vinculaArt47("PROVEEDOR", "")).toBeNull();
   });
 
   it("reconoce los dos vocabularios de estado que conviven en Cloud y no inventa un tercero", () => {

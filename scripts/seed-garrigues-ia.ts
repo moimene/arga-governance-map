@@ -56,6 +56,13 @@
  * creó, y su discriminante final admite que el tenant tenga MÁS sistemas que el
  * catálogo. Sólo caza que falte alguno del catálogo o que quede duplicado.
  *
+ * Y una cuarta (2026-09-14): sobre una fila que YA EXISTE —reconocida por
+ * código o adoptada por nombre— sólo se estampa el código y se rellenan las
+ * columnas vacías (`parcheDeFila`). Nunca se pisa lo que el usuario ya tocó:
+ * ni `status`, ni `description`, ni `owner_id`, ni la clasificación (rol y
+ * nivel, que desde 2026-09-08 sólo cambia el cuestionario guiado). Antes la
+ * rama «actualiza» escribía la fila entera y dejaba `owner_id` a null.
+ *
  * Contrato cero-cambio ARGA: este script NUNCA escribe fuera del tenant
  * Garrigues, y aborta si detecta que fuera a hacerlo.
  *
@@ -141,10 +148,26 @@ export type FilaSistemaIA = {
 
 export type PasoSiembra = {
   s: SistemaIA;
-  /** `adopta` = la fila ya existía SIN código: se le estampa y se respeta. */
+  /** `adopta` = la fila ya existía SIN código; `actualiza` = ya lo tenía. Las dos sólo rellenan vacíos. */
   accion: "alta" | "actualiza" | "adopta";
   fila?: FilaSistemaIA;
 };
+
+/**
+ * Lo ÚNICO que se escribe sobre una fila existente: el código del catálogo y
+ * las columnas que estén vacías. Lo que ya tiene valor se respeta, incluido un
+ * `status` distinto al del catálogo. `owner_id`, `risk_level` y
+ * `regulatory_role` no entran nunca.
+ */
+export function parcheDeFila(fila: FilaSistemaIA, s: SistemaIA): Record<string, unknown> {
+  const completo = aFila(s);
+  const parche: Record<string, unknown> = { aims_reference_code: s.code };
+  for (const col of ["name", "vendor", "use_case", "description", "status", "system_type"] as const) {
+    const actual = fila[col];
+    if (actual === null || actual === undefined || actual === "") parche[col] = completo[col];
+  }
+  return parche;
+}
 
 /**
  * Decide qué hacer con cada sistema del catálogo ANTES de escribir nada. Una
@@ -253,7 +276,7 @@ async function main() {
   let altas = 0, actualizaciones = 0, adopciones = 0;
   for (const { s, accion, fila } of plan) {
     console.log(`  ${accion.padEnd(10)} ${s.code.padEnd(12)} ${s.name.padEnd(24)} [${s.provenance}]` +
-      (accion === "adopta" ? `  ← fila existente «${fila!.name}»` : ""));
+      (accion === "adopta" ? `  ← fila existente «${fila!.name}»` : accion === "actualiza" ? "  (sólo rellena vacíos)" : ""));
     if (!COMMIT) {
       if (accion === "alta") altas++; else if (accion === "adopta") adopciones++; else actualizaciones++;
       continue;
@@ -263,31 +286,16 @@ async function main() {
       const { error: e } = await db.from("ai_systems").insert(aFila(s));
       if (e) fail(`${s.code}: ${e.message}`);
       altas++;
-    } else if (accion === "actualiza") {
-      // La clasificación (rol y nivel) NUNCA la escribe un seed sobre una fila
-      // que ya existe: desde 2026-09-08 sólo la cambia el cuestionario guiado
-      // (trigger CLASIFICACION_SOLO_POR_CUESTIONARIO), y pisarla con null
-      // pondría la corrida en rojo en cuanto alguien clasifique Harvey.
-      const { risk_level: _nivel, ...sinClasificacion } = aFila(s);
-      const { error: e } = await db.from("ai_systems").update(sinClasificacion)
-        .eq("tenant_id", GARRIGUES_TENANT).eq("id", fila!.id);
-      if (e) fail(`${s.code}: ${e.message}`);
-      actualizaciones++;
     } else {
-      // Adoptar NO es pisar: la fila la escribió otro, así que sólo se le
-      // estampa el código —para que la próxima pasada la reconozca sin
-      // heurística— y se rellena lo que esté vacío. Lo que ya tiene valor se
-      // respeta, incluido un `status` distinto al del catálogo.
-      const completo = aFila(s);
-      const parche: Record<string, unknown> = { aims_reference_code: s.code };
-      for (const col of ["name", "vendor", "use_case", "description", "status", "system_type"] as const) {
-        const actual = fila![col];
-        if (actual === null || actual === undefined || actual === "") parche[col] = completo[col];
-      }
+      // Existente (adoptada o ya con código): NO es pisar. Se estampa el
+      // código —para que la próxima pasada la reconozca sin heurística— y se
+      // rellena sólo lo vacío. La clasificación no entra: desde 2026-09-08 la
+      // cambia el cuestionario guiado (CLASIFICACION_SOLO_POR_CUESTIONARIO).
+      const parche = parcheDeFila(fila!, s);
       const { error: e } = await db.from("ai_systems").update(parche)
         .eq("tenant_id", GARRIGUES_TENANT).eq("id", fila!.id);
       if (e) fail(`${s.code}: ${e.message}`);
-      adopciones++;
+      if (accion === "adopta") adopciones++; else actualizaciones++;
     }
   }
 

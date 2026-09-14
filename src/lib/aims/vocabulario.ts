@@ -13,7 +13,8 @@
 
 export const NIVELES_RIESGO = ["Inaceptable", "Alto", "Limitado", "Mínimo"] as const;
 export type NivelRiesgo = (typeof NIVELES_RIESGO)[number];
-export const ESTADOS_SISTEMA = ["ACTIVO", "EN_EVALUACION", "RETIRADO"] as const;
+/** `PLANIFICADO`: plan no desplegado (lo siembra el catálogo de Garrigues, GARR-IA-201). */
+export const ESTADOS_SISTEMA = ["ACTIVO", "EN_EVALUACION", "PLANIFICADO", "RETIRADO"] as const;
 
 /** Los que ESCRIBE `evaluacion-payload.ts`. */
 export const ESTADOS_EVALUACION = ["CONFORME", "CON_GAPS", "BORRADOR"] as const;
@@ -44,7 +45,7 @@ const VALORES: Record<Dominio, readonly string[]> = {
 const ETIQUETAS: Record<Dominio, Record<string, string>> = {
   // El nivel se persiste ya en castellano: su etiqueta es el propio valor.
   nivel: {},
-  estadoSistema: { ACTIVO: "Activo", EN_EVALUACION: "En evaluación", RETIRADO: "Retirado" },
+  estadoSistema: { ACTIVO: "Activo", EN_EVALUACION: "En evaluación", PLANIFICADO: "Planificado", RETIRADO: "Retirado" },
   estadoEvaluacion: {
     CONFORME: "Conforme",
     CON_GAPS: "Con brechas",
@@ -59,7 +60,7 @@ const ETIQUETAS: Record<Dominio, Record<string, string>> = {
 
 /** Etiquetas del FILTRO: cada opción nombra un conjunto, no una fila. */
 const ETIQUETAS_FILTRO: Partial<Record<Dominio, Record<string, string>>> = {
-  estadoSistema: { ACTIVO: "Activos", RETIRADO: "Retirados" },
+  estadoSistema: { ACTIVO: "Activos", PLANIFICADO: "Planificados", RETIRADO: "Retirados" },
   estadoEvaluacion: { CONFORME: "Conformes", APROBADO: "Aprobadas (legado)" },
   severidad: { CRITICO: "Crítica", ALTO: "Alta", MEDIO: "Media", BAJO: "Baja" },
   estadoIncidente: { ABIERTO: "Abiertos", CERRADO: "Cerrados" },
@@ -120,6 +121,7 @@ const CHIP_NEUTRO =
 const CHIP_ESTADO_SISTEMA: Record<string, string> = {
   ACTIVO: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
   EN_EVALUACION: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
+  // PLANIFICADO sin entrada a propósito: un plan no desplegado cae al neutro.
   RETIRADO: CHIP_NEUTRO,
 };
 

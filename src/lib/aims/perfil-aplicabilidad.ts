@@ -33,7 +33,7 @@
  */
 
 import type { RequirementDef } from "./catalog-aesia";
-import { ROLES_DE_DESPLIEGUE, perfilCatalogo, type PerfilCatalogo } from "./cuestionario-calificacion";
+import { ROLES_DE_DESPLIEGUE, perfilCatalogo, tieneClasificacionGuiada, type PerfilCatalogo } from "./cuestionario-calificacion";
 
 export type FuenteMedida = "RIA" | "RGPD" | "ISO_42001" | "DEONTOLOGIA";
 export type CaracterMedida = "OBLIGACION" | "MARCO_OPERATIVO";
@@ -401,4 +401,33 @@ export function catalogoDeLosFindings(
     }
   }
   return mejor;
+}
+
+/** Códigos de medida (`code`) del catálogo que el perfil elige para el sistema. */
+export function codigosDelPerfil(
+  sistema: Parameters<typeof perfilAplicable>[0],
+  catalogoProveedor: RequirementDef[],
+): Set<string> {
+  return new Set(perfilAplicable(sistema, catalogoProveedor).requirements.map((r) => r.code));
+}
+
+/**
+ * ¿Se evaluó este sistema contra un catálogo distinto del que hoy le
+ * corresponde? Sólo se afirma con clasificación guiada COMPLETED: sin
+ * `cuestionario_id` (ARGA, `regulatory_profile` NULL) devuelve `false` siempre.
+ * Los catálogos se comparan por identidad: `perfilAplicable` y
+ * `catalogoDeLosFindings` devuelven las mismas referencias de array.
+ */
+export function evaluadaContraOtroCatalogo(
+  findings: { code?: string | null }[] | null | undefined,
+  sistema: (Parameters<typeof perfilAplicable>[0] & { regulatory_profile?: Record<string, unknown> | null }) | null | undefined,
+  catalogoProveedor: RequirementDef[],
+): boolean {
+  if (!tieneClasificacionGuiada(sistema)) return false;
+  const codigos = new Set((findings ?? []).map((f) => f.code).filter(Boolean));
+  const evaluado = catalogoDeLosFindings(findings, [catalogoProveedor, DESPLIEGUE_REQUIREMENTS]);
+  // Sin ningún acierto (findings vacíos, aún cargando, o de otro marco como
+  // ISO 42001) no hay evaluación RIA que comparar: no se afirma nada.
+  if (!evaluado.some((r) => r.measures.some((m) => codigos.has(m.id)))) return false;
+  return evaluado !== perfilAplicable(sistema, catalogoProveedor).requirements;
 }

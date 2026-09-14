@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { sinComentarios } from "../helpers/sin-comentarios";
 import {
+  parcheDeFila,
   planificarSiembra,
   type FilaSistemaIA,
 } from "../../../scripts/seed-garrigues-ia";
@@ -89,6 +90,42 @@ describe("el seed de IA reconoce lo ya sembrado en vez de duplicarlo", () => {
     ];
     expect(planificarSiembra(duplicado, SISTEMAS_IA).problemas.join(" "))
       .toMatch(/GARR-IA-002 duplicado/);
+  });
+});
+
+describe("sobre una fila existente el seed sólo rellena vacíos", () => {
+  it("a Harvey le estampa el código y rellena lo vacío; no toca status, owner ni clasificación", () => {
+    const parche = parcheDeFila(HARVEY_EN_CLOUD, catalogoHarvey);
+    expect(parche.aims_reference_code).toBe("GARR-IA-002");
+    expect(parche).toHaveProperty("use_case");
+    expect(parche).toHaveProperty("description");
+    expect(parche).toHaveProperty("system_type");
+    // Ya tiene EN_EVALUACION: el catálogo no lo pisa.
+    expect(parche).not.toHaveProperty("status");
+    expect(parche).not.toHaveProperty("owner_id");
+    expect(parche).not.toHaveProperty("risk_level");
+    expect(parche).not.toHaveProperty("regulatory_role");
+    // Y lo que ya tenía valor se respeta.
+    expect(parche).not.toHaveProperty("vendor");
+    expect(parche).not.toHaveProperty("name");
+  });
+
+  it("una fila completa que el usuario ya tocó sólo recibe el código", () => {
+    const tocada: FilaSistemaIA = {
+      id: "x", aims_reference_code: null,
+      name: "Harvey (piloto)", vendor: "otro vendor", use_case: "otro uso",
+      description: "descripción del usuario", status: "RETIRADO", system_type: "otro tipo",
+    };
+    expect(parcheDeFila(tocada, catalogoHarvey)).toEqual({ aims_reference_code: "GARR-IA-002" });
+  });
+
+  it("capa débil: toda escritura sobre fila existente pasa por el parche", () => {
+    const src = sinComentarios(readFileSync(join(process.cwd(), "scripts/seed-garrigues-ia.ts"), "utf8"));
+    const updates = src.match(/\.update\(/g) ?? [];
+    expect(updates.length, "control positivo: hay al menos un .update(").toBeGreaterThanOrEqual(1);
+    expect(src).not.toMatch(/\.update\((?!parche\b)/);
+    // Ata el nombre a la función: un señuelo `const parche = aFila(s)` no pasa.
+    expect(src).toMatch(/const parche = parcheDeFila\(fila!, s\)/);
   });
 });
 

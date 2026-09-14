@@ -100,7 +100,7 @@ describe("(a) comportamiento — lo que el producto escribe cabe en el vocabular
   it("el alta de sistemas genera su estado del vocabulario", () => {
     const src = sinComentarios(read("src/pages/ai-governance/SistemaNuevo.tsx"));
     expect(src).toContain("ESTADOS_SISTEMA.map");
-    expect([...ESTADOS_SISTEMA]).toEqual(["ACTIVO", "EN_EVALUACION", "RETIRADO"]);
+    expect([...ESTADOS_SISTEMA]).toEqual(["ACTIVO", "EN_EVALUACION", "PLANIFICADO", "RETIRADO"]);
   });
 });
 
