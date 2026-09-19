@@ -12,8 +12,9 @@ import { procedenciaDe } from "../perfil-aplicabilidad";
  * riesgos e impacto de la cláusula 6.1 (6.1.2, 6.1.3 y 6.1.4).
  *
  * Todo el catálogo es MARCO_OPERATIVO: ISO/IEC 42001 no es una obligación
- * jurídica autónoma. Se comprueba en la ARISTA que pinta la pantalla
- * (`procedenciaDe`, que usan el paso de medidas y el informe), no sólo en el dato.
+ * jurídica autónoma. Aquí se prueba la HOJA (`procedenciaDe`); que el paso de
+ * medidas y el informe la pinten se prueba renderizándolos, en
+ * `src/test/aims/procedencia-iso-arista.test.ts`.
  */
 const OBJETIVOS = ["A.2", "A.3", "A.4", "A.5", "A.6", "A.7", "A.8", "A.9", "A.10"];
 
@@ -51,6 +52,16 @@ describe("ISO/IEC 42001 — anexo A renumerado y completo", () => {
       "ISO_POLICIES", "ISO_POLICIES", "ISO_ORG_ROLES", "ISO_ORG_ROLES",
       "ISO_IMPACT_ASSESS", "ISO_IMPACT_ASSESS", "ISO_LIFECYCLE", "ISO_LIFECYCLE",
     ]);
+  });
+
+  it("MG_ISO_IMP_02 cuelga del A.5.3 y habla de lo que pide el A.5.3: documentar la evaluación", () => {
+    // El A.5.3 es «Documentación de las evaluaciones de impacto»; unos «planes
+    // de mitigación» son tratamiento del riesgo (6.1.3, MG_ISO_RIE_02).
+    const imp = ISO_42001_REQUIREMENTS.find((r) => r.code === "ISO_IMPACT_ASSESS");
+    const m = imp.measures.find((x) => x.id === "MG_ISO_IMP_02");
+    expect(m.subpartId).toBe("A.5.3");
+    expect(m.description).toMatch(/^Documentar/);
+    expect(m.description).toMatch(/evaluaci(ón|ones) de impacto/);
   });
 
   it("las medidas nuevas declaran la versión en que entran", () => {

@@ -102,7 +102,7 @@ export default function TabEvaluaciones({ system, assessments, error, onNueva, o
                       Evaluada contra otro catálogo
                     </span>
                   )}
-                  {cambiosDelCatalogoDesde(ass.findings).anterior && (
+                  {cambiosDelCatalogoDesde(ass.findings, ass.assessment_date ?? ass.created_at).anterior && (
                     <span className={`px-2 py-0.5 font-semibold text-[11px] ${claseNivelRiesgo(null)}`} style={{ borderRadius: "var(--g-radius-full)" }}>
                       Respondida con una versión anterior del catálogo
                     </span>

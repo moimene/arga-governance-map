@@ -62,6 +62,25 @@ con el literal (EUR-Lex consolidado 27-07-2026) antes de usarla.
 
 (ninguna todavía)
 
+### Pantallas de ARGA que cambian sin tocar filas (F1.T12/T13 + corrector D-catalogo, 19-09)
+
+Medido en Cloud (SELECT): ARGA tiene 7 evaluaciones y ninguna usa códigos del catálogo — 6 `EU_AI_ACT`
+con `VAL-*`/`ART_*` y 1 `ISO_42001` (`132042ee…`, BORRADOR) con `ISO-05`…`ISO-10`. Sin acierto,
+`EvaluacionDetalle` cae al primer catálogo candidato y el desglose pinta el catálogo entero como
+«Pendiente» (con el aviso, que ya existía, de que no corresponde a la evaluación). El cambio es del
+catálogo, no del dato:
+
+| Pantalla | Antes | Después |
+|---|---|---|
+| Informe de las 6 evaluaciones `EU_AI_ACT` | «12 áreas normativas (0 medidas evaluadas)», 84 medidas pendientes | 12 áreas, **99** medidas pendientes, con los textos corregidos |
+| Informe de la evaluación ISO `132042ee…` | «4 áreas normativas», 8 medidas, numeración A.5/A.6/A.8/A.9 | **10** áreas, **16** medidas, numeración A.2…A.10 y 6.1, y en cada fila «Marco operativo · ISO/IEC 42001, anexo A, A.x» |
+| Aviso «Respondida con una versión anterior del catálogo» y marca de fila | — | No aparece en ARGA: sin códigos del catálogo no se afirma nada (probado con `ISO-05` y fecha antigua) |
+| Monitores de readiness del Dashboard | — | Sin cambio: los checks de ARGA llevan códigos de legado y siguen por palabras clave |
+| Asistente de evaluación nueva | 84 medidas RIA / 8 ISO | 99 RIA / 16 ISO (el catálogo recotejado) |
+
+En Garrigues, el informe de Harvey (`fdcccf9e…`, 07-09) pasa a decir que 32 medidas respondidas
+cambiaron de texto (marcadas fila a fila) y que entraron 15 nuevas sin evaluar. Nada se escribe.
+
 ## Estado por fase
 
 | Fase | Estado | Notas |
@@ -71,6 +90,29 @@ con el literal (EUR-Lex consolidado 27-07-2026) antes de usarla.
 | F2-F11 | PENDIENTE | |
 
 ## Deudas y hallazgos durante la ejecución
+
+- **Títulos persistidos con la numeración o el destinatario anteriores (corrector D-catalogo).**
+  `ai_compliance_checks.requirement_title` guarda el título del día de la evaluación y el Board Pack
+  (`BPSistemasIA.tsx:135`) lo pinta tal cual: ARGA conserva «Política de IA (A.5)», «Organización
+  interna (A.6)», «Recursos de IA (A.7)», «Evaluación de impacto… (A.8)», «(A.9)» y «Gestión de datos
+  para IA (A.10)» (códigos `ISO-05`…`ISO-10`, numeración desplazada ya antes de esta rama), y el
+  check `TRANSPARENCY` de Harvey dice «Transparencia e información a usuarios». No se corrige sin
+  escribir en Cloud o sin resolver el título en la presentación. Dueño: producto (presentación) o
+  usuario (corrección de dato).
+- **Monitores de readiness congelados por código (corrector D-catalogo).** `MONITORES_POR_REQUISITO`
+  (`readiness.ts`) conserva para los requisitos existentes lo que medía la base por palabras clave,
+  con sus artefactos: `POST_MARKET` no alimenta «Post-market monitoring», `ISO_POLICIES` e
+  `ISO_RESOURCES` no alimentan ninguno, y «rol» casa con «control». Corregirlo mueve el Dashboard de
+  Garrigues (checks de Harvey). Dueño: producto.
+- **Lote H-11 (Harvey), añadir:** las correcciones literales de la revisión — MG_INCI_01 «grave e
+  irreversible de la gestión o el funcionamiento» (art. 3.49.b), 10.4 «entorno geográfico,
+  contextual, conductual o funcional» (MG_DATA_09 y su bloque), salvedad del 73.6 párrafo segundo en
+  MG_INCI_02, y MG_ISO_IMP_02 reubicada en su sentido (A.5.3, documentar la evaluación de impacto).
+  Y la clasificación de las 33 medidas cuyo texto cambió (18 de sentido, 13 de alcance, 2 de
+  terminología; lista en la cabecera de `catalog-aesia.ts`).
+- **`catalog_version` (F2.T3).** Sin versión en la fila, la detección de «versión anterior» usa el
+  texto y la fecha de la evaluación contra `desde`; con varias subidas de versión en el mismo día o
+  sin fecha, hará falta la columna.
 
 - **Defecto vivo detectado en el diseño:** `fn_sync_obligation_to_backbone` manda al `ELSE 'risk'`
   24 obligaciones: las 21 de PBC/FT de Garrigues (el patrón espera `OBL-GARR-PBC-%` y están

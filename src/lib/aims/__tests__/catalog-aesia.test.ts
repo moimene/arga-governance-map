@@ -427,6 +427,17 @@ describe("Recotejo — art. 10 (datos y gobernanza de datos)", () => {
     expect(g.map((m) => m.description).join(" ")).toMatch(/sesgos/);
   });
 
+  it("el 10.4 con su literal: entorno geográfico, contextual, conductual o funcional", () => {
+    // Art. 10.4: «…del entorno geográfico, contextual, conductual o funcional
+    // específico…». No dice «de población» ni «demográficas».
+    const literal = /geográfico, contextual, conductual o funcional/;
+    expect(subpartTitle(dg, "10.4")).toMatch(literal);
+    const m = medida(dg, "MG_DATA_09");
+    expect(m.subpartId).toBe("10.4");
+    expect(m.description).toMatch(literal);
+    expect(`${subpartTitle(dg, "10.4")} ${m.description}`).not.toMatch(/demográfic|de población/);
+  });
+
   it("el 10.5 está suprimido: las categorías especiales cuelgan del art. 4 bis", () => {
     expect(JSON.stringify(dg)).not.toMatch(/"10\.5"/);
     expect(JSON.stringify(dg)).toMatch(/"10\.4"/);
@@ -474,6 +485,26 @@ describe("Recotejo — art. 73 (incidentes graves)", () => {
     expect(d).toMatch(/\b15 días/);
     expect(d).toMatch(/\b10 días/);
     expect(d).toMatch(/\b2 días/);
+  });
+
+  it("el plazo de 2 días del art. 3.49.b) exige una alteración grave E IRREVERSIBLE", () => {
+    // Art. 3, punto 49, letra b): «una alteración grave e irreversible de la
+    // gestión o el funcionamiento de infraestructuras críticas».
+    const d = medida(inc, "MG_INCI_01").description;
+    expect(d).toMatch(/alteración grave e irreversible de la gestión o el funcionamiento de infraestructuras críticas/);
+  });
+
+  it("la salvedad del 73.6, párrafo segundo: no modificar el sistema sin informar antes", () => {
+    // «…no emprenderá acción alguna que suponga la modificación del sistema de IA
+    // afectado de un modo que pueda repercutir en cualquier evaluación posterior
+    // de las causas del incidente sin haber informado antes…». MG_INCI_02 pide
+    // contención y remediación: sin la salvedad, empuja a modificar antes.
+    const d = medida(inc, "MG_INCI_02").description;
+    expect(d).toMatch(/modific/);
+    expect(d).toMatch(/evaluación posterior de las causas/);
+    expect(d).toMatch(/sin haber informado antes a las autoridades competentes/);
+    // Control: la medida de notificación no la lleva.
+    expect(medida(inc, "MG_INCI_01").description).not.toMatch(/evaluación posterior de las causas/);
   });
 
   it("sin «afectados»: el art. 73 notifica a la autoridad de vigilancia del mercado", () => {

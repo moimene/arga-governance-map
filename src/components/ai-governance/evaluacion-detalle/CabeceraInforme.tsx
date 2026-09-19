@@ -297,11 +297,16 @@ export default function CabeceraInforme({
         >
           <p className="text-xs font-bold text-[var(--g-text-primary)]">Respondida con una versión anterior del catálogo</p>
           <p className="text-xs text-[var(--g-text-secondary)]">
-            Desde que se respondió han cambiado de texto {cambiosCatalogo.corregidas.length}{" "}
-            {cambiosCatalogo.corregidas.length === 1 ? "medida respondida" : "medidas respondidas"}
-            {cambiosCatalogo.nuevas.length > 0 &&
-              ` y han entrado ${cambiosCatalogo.nuevas.length} ${cambiosCatalogo.nuevas.length === 1 ? "medida nueva" : "medidas nuevas"}, que aparecen sin evaluar`}
-            . Las respuestas se dieron a la formulación anterior y el porcentaje no se recalcula.{" "}
+            Desde que se respondió{" "}
+            {[
+              cambiosCatalogo.corregidas.length > 0 &&
+                `han cambiado de texto ${cambiosCatalogo.corregidas.length} ${cambiosCatalogo.corregidas.length === 1 ? "medida respondida, marcada en el desglose" : "medidas respondidas, marcadas en el desglose"}`,
+              cambiosCatalogo.nuevas.length > 0 &&
+                `han entrado ${cambiosCatalogo.nuevas.length} ${cambiosCatalogo.nuevas.length === 1 ? "medida nueva, que aparece" : "medidas nuevas, que aparecen"} sin evaluar`,
+            ]
+              .filter(Boolean)
+              .join(" y ")}
+            . Las respuestas se dieron a la versión anterior y el porcentaje no se recalcula.{" "}
             {assessment.system_id && (
               <Link
                 to={`/ai-governance/evaluaciones/nuevo?system_id=${assessment.system_id}`}

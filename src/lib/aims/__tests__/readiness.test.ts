@@ -222,7 +222,9 @@ describe("D1 — las comprobaciones de otro catálogo se apartan, no se suman", 
   });
 
   it("una comprobación ISO 42001 no es «otro catálogo RIA»: sigue contando aunque haya cuestionario", () => {
-    const iso = { id: "chk-iso", system_id: "sys-1", requirement_code: "ISO_POLICIES", requirement_title: "iso-42001-5", status: "CONFORME" };
+    // Un código del catálogo ISO alimenta su monitor por CÓDIGO
+    // (`MONITORES_POR_REQUISITO`): ISO_ORG_ROLES → gobierno, con su título real.
+    const iso = { id: "chk-iso", system_id: "sys-1", requirement_code: "ISO_ORG_ROLES", requirement_title: "Organización interna y roles (A.3)", status: "CONFORME" };
     const { medibles, otroCatalogo } = apartarChecksDeOtroCatalogo(
       [desplegador({ cuestionario_id: "q-1" })],
       [...checksProveedor, iso],

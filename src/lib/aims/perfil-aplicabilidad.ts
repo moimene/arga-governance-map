@@ -459,32 +459,41 @@ const SIN_CAMBIOS: CambiosDelCatalogo = { anterior: false, corregidas: [], nueva
 /**
  * ¿Se respondió esta evaluación con una versión anterior del catálogo?
  *
- * La fila no guarda la versión (la columna `catalog_version` llega con F2.T3),
- * pero cada finding guarda el texto de la medida tal como se preguntó
- * (`title`). Si ya no coincide con el vigente, la respuesta se dio a otra
- * formulación, y la pantalla debe decirlo en vez de pintarla bajo el texto
- * nuevo como si respondiera a él. Sin texto guardado, o sin ningún código de
- * los catálogos (el legado `VAL-*` de ARGA), no se afirma nada.
+ * La fila no guarda la versión (la columna `catalog_version` llega con F2.T3).
+ * Dos señales la delatan:
+ *  - cada finding guarda el texto de la medida tal como se preguntó (`title`):
+ *    si ya no coincide con el vigente, la respuesta se dio a otra formulación;
+ *  - con la fecha de la evaluación, las medidas cuya versión de entrada
+ *    (`desde`) es posterior entraron después: la evaluación es anterior aunque
+ *    ningún texto respondido haya cambiado.
+ * En los dos casos la pantalla debe decirlo en vez de pintar la respuesta vieja
+ * bajo el texto nuevo, o las medidas nuevas como si faltaran por descuido.
  *
- * Una evaluación que sólo respondió medidas cuyo texto no cambió no se marca:
- * las nuevas le salen «sin evaluar», que es verdad.
+ * Sin ningún código de los catálogos (el legado `VAL-*`/`ISO-05` de ARGA) no se
+ * afirma nada; sin fecha, sólo afirma la señal del texto.
  */
 export function cambiosDelCatalogoDesde(
   findings: { code?: string | null; title?: string | null }[] | null | undefined,
+  fecha?: string | null,
 ): CambiosDelCatalogo {
   const lista = findings ?? [];
   if (lista.length === 0) return SIN_CAMBIOS;
   const catalogo = catalogoDeLosFindings(lista, [AESIA_RIA_REQUIREMENTS, DESPLIEGUE_REQUIREMENTS, ISO_42001_REQUIREMENTS]);
   const medidas = catalogo.flatMap((r) => r.measures);
   const vigente = new Map(medidas.map((m) => [m.id, m.description.trim()]));
+  // `catalogoDeLosFindings` devuelve el primero si no hay ningún acierto.
+  if (!lista.some((f) => f.code && vigente.has(f.code))) return SIN_CAMBIOS;
   const corregidas = lista
     .filter((f) => f.code && vigente.has(f.code) && typeof f.title === "string" && f.title.trim() !== "")
     .filter((f) => f.title.trim() !== vigente.get(f.code))
     .map((f) => f.code as string);
-  if (corregidas.length === 0) return SIN_CAMBIOS;
+  const dia = fecha ? fecha.slice(0, 10) : null;
   const respondidas = new Set(lista.map((f) => f.code));
-  // ponytail: sin versión en la fila, «nuevas» son las de la versión vigente;
-  // con varias subidas hará falta `catalog_version` (F2.T3) para acotarlas.
-  const nuevas = medidas.filter((m) => m.desde === VERSION_CATALOGO_RIA && !respondidas.has(m.id)).map((m) => m.id);
+  // ponytail: sin fecha, «nuevas» son las de la versión vigente; con varias
+  // subidas hará falta `catalog_version` (F2.T3) para acotarlas sin fecha.
+  const nuevas = medidas
+    .filter((m) => m.desde && !respondidas.has(m.id) && (dia ? dia < m.desde : m.desde === VERSION_CATALOGO_RIA))
+    .map((m) => m.id);
+  if (corregidas.length === 0 && !(dia && nuevas.length > 0)) return SIN_CAMBIOS;
   return { anterior: true, corregidas, nuevas };
 }

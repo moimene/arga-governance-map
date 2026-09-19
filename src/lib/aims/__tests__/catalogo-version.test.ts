@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { AESIA_RIA_REQUIREMENTS, VERSION_CATALOGO_RIA } from "../catalog-aesia";
+import { AESIA_RIA_REQUIREMENTS, ISO_42001_REQUIREMENTS, VERSION_CATALOGO_RIA } from "../catalog-aesia";
 import { cambiosDelCatalogoDesde } from "../perfil-aplicabilidad";
 
 /**
@@ -20,9 +20,36 @@ const vigente = (id: string) => {
 const nuevasDeEstaVersion = medidas.filter((m) => m.desde === VERSION_CATALOGO_RIA).map((m) => m.id);
 
 describe("versión del catálogo con que se respondió una evaluación", () => {
-  it("respondida con el texto vigente: no es anterior", () => {
+  it("respondida con el texto vigente y sin fecha: no se puede afirmar nada", () => {
     const findings = ["MG_QUAL_01", "MG_TRANS_01"].map((code) => ({ code, title: vigente(code), status: "L5" }));
     expect(cambiosDelCatalogoDesde(findings)).toEqual({ anterior: false, corregidas: [], nuevas: [] });
+  });
+
+  it("respondida con el texto vigente ANTES de que entraran medidas nuevas: es anterior", () => {
+    // Las medidas nuevas suben la versión aunque ningún texto respondido cambiara.
+    const findings = ["MG_QUAL_01", "MG_TRANS_02"].map((code) => ({ code, title: vigente(code), status: "L5" }));
+    const c = cambiosDelCatalogoDesde(findings, "2026-09-07");
+    expect(c.anterior).toBe(true);
+    expect(c.corregidas).toEqual([]);
+    expect(nuevasDeEstaVersion.length).toBeGreaterThan(0);
+    expect(c.nuevas).toEqual(nuevasDeEstaVersion);
+  });
+
+  it("control: respondida con el texto vigente el día de la versión o después, no es anterior", () => {
+    const findings = ["MG_QUAL_01", "MG_TRANS_02"].map((code) => ({ code, title: vigente(code), status: "L5" }));
+    expect(cambiosDelCatalogoDesde(findings, VERSION_CATALOGO_RIA).anterior).toBe(false);
+    expect(cambiosDelCatalogoDesde(findings, "2026-10-01T09:00:00Z").anterior).toBe(false);
+  });
+
+  it("una evaluación ISO con códigos del catálogo, anterior a las medidas nuevas, lo dice", () => {
+    const iso = ISO_42001_REQUIREMENTS.flatMap((r) => r.measures);
+    const nuevasIso = iso.filter((m) => m.desde === VERSION_CATALOGO_RIA).map((m) => m.id);
+    const findings = iso.filter((m) => !m.desde).map((m) => ({ code: m.id, title: m.description, status: "L5" }));
+    expect(findings.length).toBeGreaterThan(0);
+    const c = cambiosDelCatalogoDesde(findings, "2026-07-31");
+    expect(c.anterior).toBe(true);
+    expect(nuevasIso.length).toBeGreaterThan(0);
+    expect(c.nuevas).toEqual(nuevasIso);
   });
 
   it("respondida a una formulación ya corregida: es anterior y dice qué cambió y qué entró", () => {
@@ -51,12 +78,12 @@ describe("versión del catálogo con que se respondió una evaluación", () => {
     expect(cambiosDelCatalogoDesde([{ code: "MG_TRANS_01" }]).anterior).toBe(false);
   });
 
-  it("códigos que no están en ningún catálogo (legado de ARGA) no afirman nada", () => {
-    expect(cambiosDelCatalogoDesde([{ code: "VAL-01", title: "Validación antigua" }])).toEqual({
-      anterior: false,
-      corregidas: [],
-      nuevas: [],
-    });
+  it("códigos que no están en ningún catálogo (legado de ARGA) no afirman nada, tampoco con fecha antigua", () => {
+    const legado = [{ code: "VAL-01", title: "Validación antigua" }];
+    const vacio = { anterior: false, corregidas: [], nuevas: [] };
+    expect(cambiosDelCatalogoDesde(legado)).toEqual(vacio);
+    expect(cambiosDelCatalogoDesde(legado, "2025-10-01")).toEqual(vacio);
+    expect(cambiosDelCatalogoDesde([{ code: "ISO-05", title: "Política de IA (A.5)" }], "2026-07-31")).toEqual(vacio);
   });
 
   it("sin findings no hay nada que comparar", () => {

@@ -36,10 +36,23 @@
  * (p. ej., «solo anexo III, punto 1, letra a)» en los mínimos del art. 12.3).
  *
  * Los códigos MG_* anteriores NO cambian: en Cloud hay respuestas guardadas con
- * ellos. Donde el texto de una medida se corrigió, la corrección conserva lo
- * que se preguntaba. Las medidas que entran nuevas llevan `desde` con la
- * versión del catálogo en que entran (`VERSION_CATALOGO_RIA`); una evaluación
- * respondida con otra versión la detecta `cambiosDelCatalogoDesde`.
+ * ellos. Pero el texto de 33 medidas SÍ cambió, y no siempre conservando lo que
+ * se preguntaba (base b1721a5 → versión 2026-09-19):
+ *  - Cambian de SENTIDO (una respuesta a la pregunta anterior no contesta la
+ *    nueva) — 18: MG_QUAL_10, MG_RISK_06, MG_DATA_08, MG_DATA_09, MG_TRANS_01,
+ *    MG_TRANS_05, MG_TRANS_08, MG_TRANS_11, MG_ROBU_01, MG_ROBU_03, MG_LOGG_03,
+ *    MG_LOGG_04, MG_LOGG_05, MG_LOGG_06, MG_LOGG_07, MG_INCI_01, MG_INCI_02 y
+ *    MG_ISO_IMP_02.
+ *  - Cambian de ALCANCE (misma pregunta, acotada o completada con el literal)
+ *    — 13: MG_QUAL_02, MG_QUAL_03, MG_QUAL_07, MG_RISK_08, MG_RISK_09,
+ *    MG_DATA_02, MG_TRANS_02, MG_TRANS_09, MG_TRANS_10, MG_ACCU_02, MG_LOGG_02,
+ *    MG_POST_02 y MG_POST_04.
+ *  - Sólo TERMINOLOGÍA («responsables del despliegue») — 2: MG_TDOC_04 y
+ *    MG_POST_05.
+ * Las medidas que entran nuevas llevan `desde` con la versión del catálogo en
+ * que entran (`VERSION_CATALOGO_RIA`). Una evaluación respondida con otra
+ * versión la detecta `cambiosDelCatalogoDesde`, y el informe marca en el
+ * desglose cada medida cuyo texto cambió desde la respuesta.
  *
  * Segunda lectura pendiente: el lote H-11 de Harvey (§9 de la especificación)
  * no se ha enviado. Hasta su veredicto, el cotejo es de TGMS.
@@ -449,7 +462,7 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
       { subpartId: "10.2.g", articleNumber: "Art. 10", titleShort: "Medidas para detectar, prevenir y mitigar sesgos", orderIndex: 7 },
       { subpartId: "10.2.h", articleNumber: "Art. 10", titleShort: "Lagunas o deficiencias de los datos y cómo subsanarlas", orderIndex: 8 },
       { subpartId: "10.3", articleNumber: "Art. 10", titleShort: "Conjuntos pertinentes, representativos y libres de errores", orderIndex: 9 },
-      { subpartId: "10.4", articleNumber: "Art. 10", titleShort: "Consideración de características contextuales geográficas y de población", orderIndex: 10 },
+      { subpartId: "10.4", articleNumber: "Art. 10", titleShort: "Características del entorno geográfico, contextual, conductual o funcional de uso", orderIndex: 10 },
       { subpartId: "4bis.1", articleNumber: "Art. 4 bis", titleShort: "Categorías especiales de datos para detectar y corregir sesgos (art. 4 bis)", orderIndex: 11 },
     ],
     measures: [
@@ -462,7 +475,7 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
       { id: "MG_DATA_11", code: "MG_DATA_11", description: "Adoptar medidas adecuadas para detectar, prevenir y mitigar los posibles sesgos detectados", subpartId: "10.2.g", desde: VERSION_CATALOGO_RIA },
       { id: "MG_DATA_07", code: "MG_DATA_07", description: "Identificar lagunas informativas y aplicar medidas correctivas de enriquecimiento", subpartId: "10.2.h" },
       { id: "MG_DATA_08", code: "MG_DATA_08", description: "Asegurar que los conjuntos de entrenamiento, validación y prueba sean pertinentes, suficientemente representativos y, en la mayor medida posible, sin errores y completos", subpartId: "10.3" },
-      { id: "MG_DATA_09", code: "MG_DATA_09", description: "Considerar las características contextuales y demográficas del entorno de despliegue", subpartId: "10.4" },
+      { id: "MG_DATA_09", code: "MG_DATA_09", description: "Tener en cuenta en los conjuntos de datos las características del entorno geográfico, contextual, conductual o funcional específico en que está previsto usar el sistema", subpartId: "10.4" },
       { id: "MG_DATA_10", code: "MG_DATA_10", description: "Garantizar las salvaguardas estrictas si se tratan categorías especiales bajo RGPD", subpartId: "4bis.1" },
     ],
   },
@@ -681,8 +694,8 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
       { subpartId: "17.1.k", articleNumber: "Art. 17", titleShort: "Registro de incidentes y lecciones aprendidas", orderIndex: 4 },
     ],
     measures: [
-      { id: "MG_INCI_01", code: "MG_INCI_01", description: "Protocolo para notificar los incidentes graves a la autoridad de vigilancia del mercado del Estado miembro donde ocurran: de inmediato y, como máximo, a los 15 días de conocerlos; a los 10 días si hay un fallecimiento; y a los 2 días si hay una infracción generalizada o una alteración grave de infraestructuras críticas. Admite una notificación inicial incompleta", subpartId: "73.1" },
-      { id: "MG_INCI_02", code: "MG_INCI_02", description: "Adoptar medidas de contención y remediación inmediata ante fallos críticos", subpartId: "73.6.p1" },
+      { id: "MG_INCI_01", code: "MG_INCI_01", description: "Protocolo para notificar los incidentes graves a la autoridad de vigilancia del mercado del Estado miembro donde ocurran: de inmediato y, como máximo, a los 15 días de conocerlos; a los 10 días si hay un fallecimiento; y a los 2 días si hay una infracción generalizada o una alteración grave e irreversible de la gestión o el funcionamiento de infraestructuras críticas. Admite una notificación inicial incompleta", subpartId: "73.1" },
+      { id: "MG_INCI_02", code: "MG_INCI_02", description: "Adoptar medidas de contención y remediación ante fallos críticos sin modificar el sistema afectado de un modo que pueda repercutir en la evaluación posterior de las causas sin haber informado antes a las autoridades competentes", subpartId: "73.6.p1" },
       { id: "MG_INCI_03", code: "MG_INCI_03", description: "Investigar la causa raíz técnica y documentar las medidas correctoras", subpartId: "73.6.p1" },
       { id: "MG_INCI_04", code: "MG_INCI_04", description: "Proporcionar a las autoridades toda la información técnica requerida sobre el incidente", subpartId: "73.6.p2" },
       { id: "MG_INCI_05", code: "MG_INCI_05", description: "Custodiar el registro histórico de incidentes y lecciones aprendidas", subpartId: "17.1.k" },
@@ -760,7 +773,7 @@ export const ISO_42001_REQUIREMENTS: RequirementDef[] = [
     ],
     measures: [
       { id: "MG_ISO_IMP_01", code: "MG_ISO_IMP_01", description: "Ejecutar evaluación de impacto ético y de derechos fundamentales previa", subpartId: "A.5.2" },
-      { id: "MG_ISO_IMP_02", code: "MG_ISO_IMP_02", description: "Establecer planes de mitigación para los riesgos éticos identificados", subpartId: "A.5.3" },
+      { id: "MG_ISO_IMP_02", code: "MG_ISO_IMP_02", description: "Documentar los resultados de las evaluaciones de impacto, con los riesgos identificados y su tratamiento, y conservarlos durante un período definido", subpartId: "A.5.3" },
     ],
   },
   {

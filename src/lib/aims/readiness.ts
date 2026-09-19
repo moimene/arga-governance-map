@@ -326,9 +326,56 @@ function normalizeSearchText(...parts: Array<string | null | undefined>) {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
+/**
+ * Monitores que alimenta cada requisito de los catálogos (RIA del proveedor,
+ * responsable del despliegue e ISO/IEC 42001), por CÓDIGO.
+ *
+ * Por palabras clave, el monitor dependía del título y la descripción, que el
+ * payload persiste: corregir un texto del catálogo movía de monitor las
+ * evaluaciones futuras sin que nadie lo decidiera (TRANSPARENCY entraba en
+ * gobierno por «responsables del despliegue»). Los requisitos que ya existían
+ * conservan lo que medía la base (b1721a5), que es lo que alimentan hoy las
+ * comprobaciones guardadas; los seis de ISO nuevos van a su monitor más
+ * próximo. Los códigos de legado (`VAL-*`, `AIA-*`, `ISO-05`… de ARGA) siguen
+ * por palabras clave: cero cambio. Ancla: `monitores-por-requisito.test.ts`.
+ */
+export const MONITORES_POR_REQUISITO: ReadonlyMap<string, readonly string[]> = new Map([
+  ["ACCURACY", ["accuracy-robustness-cybersecurity"]],
+  ["CYBERSECURITY", ["data-governance", "accuracy-robustness-cybersecurity"]],
+  ["DATA_GOVERNANCE", ["governance-accountability", "data-governance"]],
+  ["HUMAN_OVERSIGHT", ["governance-accountability", "high-risk-obligations", "human-oversight"]],
+  ["INCIDENT_MGMT", ["incident-reporting-escalation"]],
+  ["LOGGING", ["evidence-recordkeeping"]],
+  ["POST_MARKET", ["data-governance"]],
+  ["QUALITY_MGMT", ["data-governance", "iso-42001-management-system"]],
+  ["RISK_MGMT", ["fundamental-rights-dpia", "iso-42001-management-system"]],
+  ["ROBUSTNESS", ["data-governance", "accuracy-robustness-cybersecurity"]],
+  ["TECHNICAL_DOC", ["technical-documentation"]],
+  ["TRANSPARENCY", ["transparency-user-information"]],
+  ["ALFABETIZACION", ["governance-accountability", "provider-vendor-third-party"]],
+  ["CADENA_SUMINISTRO", ["provider-vendor-third-party", "evidence-recordkeeping"]],
+  ["GOBERNANZA_AIMS", ["iso-42001-management-system"]],
+  ["INCIDENTES_IA", ["governance-accountability", "high-risk-obligations", "data-governance", "provider-vendor-third-party", "incident-reporting-escalation", "evidence-recordkeeping"]],
+  ["PROTECCION_DATOS", ["data-governance"]],
+  ["SUPERVISION_USO", ["governance-accountability", "high-risk-obligations", "human-oversight"]],
+  ["TRANSPARENCIA", ["transparency-user-information"]],
+  ["ISO_POLICIES", []],
+  ["ISO_ORG_ROLES", ["governance-accountability"]],
+  ["ISO_IMPACT_ASSESS", ["fundamental-rights-dpia"]],
+  ["ISO_LIFECYCLE", ["governance-accountability", "data-governance"]],
+  ["ISO_RESOURCES", []],
+  ["ISO_DATA", ["data-governance"]],
+  ["ISO_INFO_PARTIES", ["transparency-user-information"]],
+  ["ISO_RESPONSIBLE_USE", ["governance-accountability"]],
+  ["ISO_THIRD_PARTIES", ["provider-vendor-third-party"]],
+  ["ISO_RISK_PLANNING", ["iso-42001-management-system"]],
+]);
+
 function checksForDefinition(checks: AimsComplianceCheckLike[], definition: MonitorDefinition) {
   const keywords = definition.keywords.map((keyword) => normalizeSearchText(keyword));
   return checks.filter((check) => {
+    const porCodigo = MONITORES_POR_REQUISITO.get(check.requirement_code ?? "");
+    if (porCodigo) return porCodigo.includes(definition.id);
     const haystack = normalizeSearchText(check.requirement_code, check.requirement_title, check.description);
     return keywords.some((keyword) => haystack.includes(keyword));
   });
