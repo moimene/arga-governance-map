@@ -32,7 +32,7 @@
  * valide, la pantalla lo declara provisional.
  */
 
-import type { RequirementDef } from "./catalog-aesia";
+import { AESIA_RIA_REQUIREMENTS, ISO_42001_REQUIREMENTS, VERSION_CATALOGO_RIA, type RequirementDef } from "./catalog-aesia";
 import {
   ROLES_DE_DESPLIEGUE,
   ROTULO_PROVISIONAL,
@@ -375,7 +375,7 @@ export function perfilAplicable(
       requirements: DESPLIEGUE_REQUIREMENTS,
       etiqueta: `Responsable del despliegue · riesgo ${nivel.toLowerCase()}`,
       motivo:
-        "Las 84 medidas guía desarrollan las obligaciones del PROVEEDOR de un sistema de alto riesgo (arts. 9 a 15, 17, 72 y 73). Este perfil se mide contra las que sí vinculan a esta posición regulatoria.",
+        "Las medidas guía del catálogo del proveedor desarrollan las obligaciones del PROVEEDOR de un sistema de alto riesgo (arts. 9 a 15, 17, 72 y 73). Este perfil se mide contra las que sí vinculan a esta posición regulatoria.",
       provisional: true,
       sinRolDeclarado: false,
       catalogProfile: perfilCatalogo(rol, nivel),
@@ -395,9 +395,22 @@ export function perfilAplicable(
   };
 }
 
-/** Procedencia de una medida, si el perfil la declara. */
+/**
+ * Procedencia de las medidas de ISO/IEC 42001, derivada del carácter que declara
+ * cada requisito del catálogo (siempre MARCO_OPERATIVO) y de su número.
+ */
+const PROCEDENCIA_ISO: Record<string, ProcedenciaMedida> = Object.fromEntries(
+  ISO_42001_REQUIREMENTS.filter((r) => r.caracter).flatMap((r) =>
+    r.measures.map((m) => {
+      const bloque = r.subparts.find((s) => s.subpartId === m.subpartId);
+      return [m.id, p("ISO_42001", r.caracter, `ISO/IEC 42001, ${bloque?.articleNumber ?? r.articleRef}`)] as const;
+    }),
+  ),
+);
+
+/** Procedencia de una medida, si el perfil o el catálogo ISO la declaran. */
 export function procedenciaDe(measureId: string): ProcedenciaMedida | null {
-  return PROCEDENCIA_DESPLIEGUE[measureId] ?? null;
+  return PROCEDENCIA_DESPLIEGUE[measureId] ?? PROCEDENCIA_ISO[measureId] ?? null;
 }
 
 /**
@@ -462,4 +475,57 @@ export function evaluadaContraOtroCatalogo(
   // ISO 42001) no hay evaluación RIA que comparar: no se afirma nada.
   if (!evaluado.some((r) => r.measures.some((m) => codigos.has(m.id)))) return false;
   return evaluado !== perfilAplicable(sistema, catalogoProveedor).requirements;
+}
+
+export type CambiosDelCatalogo = {
+  /** La evaluación respondió al menos una medida con un texto que ya no es el vigente. */
+  anterior: boolean;
+  /** Medidas respondidas cuyo texto ha cambiado desde entonces. */
+  corregidas: string[];
+  /** Medidas que entraron en la versión vigente y la evaluación no respondió. */
+  nuevas: string[];
+};
+
+const SIN_CAMBIOS: CambiosDelCatalogo = { anterior: false, corregidas: [], nuevas: [] };
+
+/**
+ * ¿Se respondió esta evaluación con una versión anterior del catálogo?
+ *
+ * La fila no guarda la versión (la columna `catalog_version` llega con F2.T3).
+ * Dos señales la delatan:
+ *  - cada finding guarda el texto de la medida tal como se preguntó (`title`):
+ *    si ya no coincide con el vigente, la respuesta se dio a otra formulación;
+ *  - con la fecha de la evaluación, las medidas cuya versión de entrada
+ *    (`desde`) es posterior entraron después: la evaluación es anterior aunque
+ *    ningún texto respondido haya cambiado.
+ * En los dos casos la pantalla debe decirlo en vez de pintar la respuesta vieja
+ * bajo el texto nuevo, o las medidas nuevas como si faltaran por descuido.
+ *
+ * Sin ningún código de los catálogos (el legado `VAL-*`/`ISO-05` de ARGA) no se
+ * afirma nada; sin fecha, sólo afirma la señal del texto.
+ */
+export function cambiosDelCatalogoDesde(
+  findings: { code?: string | null; title?: string | null }[] | null | undefined,
+  fecha?: string | null,
+): CambiosDelCatalogo {
+  const lista = findings ?? [];
+  if (lista.length === 0) return SIN_CAMBIOS;
+  const catalogo = catalogoDeLosFindings(lista, [AESIA_RIA_REQUIREMENTS, DESPLIEGUE_REQUIREMENTS, ISO_42001_REQUIREMENTS]);
+  const medidas = catalogo.flatMap((r) => r.measures);
+  const vigente = new Map(medidas.map((m) => [m.id, m.description.trim()]));
+  // `catalogoDeLosFindings` devuelve el primero si no hay ningún acierto.
+  if (!lista.some((f) => f.code && vigente.has(f.code))) return SIN_CAMBIOS;
+  const corregidas = lista
+    .filter((f) => f.code && vigente.has(f.code) && typeof f.title === "string" && f.title.trim() !== "")
+    .filter((f) => f.title.trim() !== vigente.get(f.code))
+    .map((f) => f.code as string);
+  const dia = fecha ? fecha.slice(0, 10) : null;
+  const respondidas = new Set(lista.map((f) => f.code));
+  // ponytail: sin fecha, «nuevas» son las de la versión vigente; con varias
+  // subidas hará falta `catalog_version` (F2.T3) para acotarlas sin fecha.
+  const nuevas = medidas
+    .filter((m) => m.desde && !respondidas.has(m.id) && (dia ? dia < m.desde : m.desde === VERSION_CATALOGO_RIA))
+    .map((m) => m.id);
+  if (corregidas.length === 0 && !(dia && nuevas.length > 0)) return SIN_CAMBIOS;
+  return { anterior: true, corregidas, nuevas };
 }

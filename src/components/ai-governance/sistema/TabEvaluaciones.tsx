@@ -3,7 +3,7 @@ import type { AiRiskAssessment } from "@/hooks/useAiAssessments";
 import type { AiSystem } from "@/hooks/useAiSystems";
 import { AESIA_RIA_REQUIREMENTS } from "@/lib/aims/catalog-aesia";
 import { mensajeUsuario } from "@/lib/aims/errores-rpc";
-import { evaluadaContraOtroCatalogo } from "@/lib/aims/perfil-aplicabilidad";
+import { cambiosDelCatalogoDesde, evaluadaContraOtroCatalogo } from "@/lib/aims/perfil-aplicabilidad";
 import { chipClaseEvaluacion, rotuloEvaluacion } from "@/lib/aims/legado";
 import { claseNivelRiesgo, etiqueta } from "@/lib/aims/vocabulario";
 
@@ -101,6 +101,11 @@ export default function TabEvaluaciones({ system, assessments, error, onNueva, o
                   {evaluadaContraOtroCatalogo(ass.findings, system, AESIA_RIA_REQUIREMENTS) && (
                     <span className={`px-2 py-0.5 font-semibold text-[11px] ${claseNivelRiesgo(null)}`} style={{ borderRadius: "var(--g-radius-full)" }}>
                       Evaluada contra otro catálogo
+                    </span>
+                  )}
+                  {cambiosDelCatalogoDesde(ass.findings, ass.assessment_date ?? ass.created_at).anterior && (
+                    <span className={`px-2 py-0.5 font-semibold text-[11px] ${claseNivelRiesgo(null)}`} style={{ borderRadius: "var(--g-radius-full)" }}>
+                      Respondida con una versión anterior del catálogo
                     </span>
                   )}
                 </span>

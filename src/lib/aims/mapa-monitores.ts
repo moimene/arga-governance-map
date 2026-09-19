@@ -33,6 +33,13 @@ export const MONITOR_DE_CODIGO = {
   ISO_ORG_ROLES: "governance-accountability",
   ISO_IMPACT_ASSESS: "fundamental-rights-dpia",
   ISO_LIFECYCLE: "iso-42001-management-system",
+  // Los seis del recotejo del anexo A (F1.T13): uno por requisito, como los demás.
+  ISO_RESOURCES: "iso-42001-management-system", // A.4
+  ISO_DATA: "data-governance", // A.7
+  ISO_INFO_PARTIES: "transparency-user-information", // A.8
+  ISO_RESPONSIBLE_USE: "governance-accountability", // A.9
+  ISO_THIRD_PARTIES: "provider-vendor-third-party", // A.10
+  ISO_RISK_PLANNING: "iso-42001-management-system", // 6.1
   // Responsable del despliegue (`DESPLIEGUE_REQUIREMENTS`).
   ALFABETIZACION: "governance-accountability", // art. 4
   TRANSPARENCIA: "transparency-user-information", // art. 50

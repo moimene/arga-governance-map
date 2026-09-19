@@ -18,6 +18,8 @@ export interface ChecklistMedidasProps {
   findingsPersistidos: number;
   /** Hay findings guardados y NINGUNO casa con el catálogo del marco. */
   findingsSinReconciliar: boolean;
+  /** Medidas respondidas cuyo texto ha cambiado desde entonces (`cambiosDelCatalogoDesde`). */
+  corregidas?: string[];
   expandedRequirements: Record<string, boolean>;
   onToggleRequirement: (code: string) => void;
 }
@@ -39,6 +41,7 @@ export default function ChecklistMedidas({
   evaluatedCount,
   findingsPersistidos,
   findingsSinReconciliar,
+  corregidas = [],
   expandedRequirements,
   onToggleRequirement,
 }: ChecklistMedidasProps) {
@@ -154,7 +157,15 @@ export default function ChecklistMedidas({
                       return (
                         <tr key={m.id} className="hover:bg-[var(--g-surface-subtle)]/30 transition-colors">
                           <td className="py-2.5 font-mono text-[var(--g-brand-3308)] font-semibold">{m.id}</td>
-                          <td className="py-2.5 pr-4 text-[var(--g-text-primary)]">{m.description}</td>
+                          <td className="py-2.5 pr-4 text-[var(--g-text-primary)]">
+                            {m.description}
+                            {/* La respuesta de esta fila se dio a otra formulación. */}
+                            {corregidas.includes(m.id) && (
+                              <div className="mt-1 text-[10px] font-semibold text-[var(--status-warning)]">
+                                Texto corregido desde la respuesta
+                              </div>
+                            )}
+                          </td>
                           <td className="py-2.5 text-[var(--g-text-secondary)]">
                             {subpartTitle(req, m.subpartId)}
                             {(() => {

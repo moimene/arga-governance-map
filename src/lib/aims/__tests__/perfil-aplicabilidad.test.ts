@@ -26,11 +26,12 @@ const medidasDe = (cat: typeof AESIA_RIA_REQUIREMENTS) =>
   cat.reduce((n, r) => n + r.measures.length, 0);
 
 describe("el catálogo se acota por rol y nivel de riesgo", () => {
-  it("un responsable del despliegue de riesgo limitado no se mide con las 84 del proveedor", () => {
+  it("un responsable del despliegue de riesgo limitado no se mide con el catálogo del proveedor", () => {
     // Control positivo del instrumento: el catálogo de proveedor es el que se
     // dice que es. Sin esto, un perfil que devolviera siempre lo mismo dejaría
     // el resto de aserciones verdes.
-    expect(medidasDe(AESIA_RIA_REQUIREMENTS), "el catálogo de proveedor ya no son 84 medidas").toBe(84);
+    // 84 → 93 → 99 con el recotejo contra el consolidado (F1.T12 y F1.T13, 2026-09-19).
+    expect(medidasDe(AESIA_RIA_REQUIREMENTS), "el catálogo de proveedor ya no son 99 medidas").toBe(99);
 
     const perfil = perfilAplicable(
       { regulatory_role: "RESPONSABLE_DESPLIEGUE", risk_level: "Limitado" },
@@ -38,7 +39,7 @@ describe("el catálogo se acota por rol y nivel de riesgo", () => {
     );
     expect(perfil.requirements).toBe(DESPLIEGUE_REQUIREMENTS);
     expect(perfil.provisional, "el catálogo del despliegue no se declara provisional").toBe(true);
-    expect(medidasDe(perfil.requirements)).toBeLessThan(84);
+    expect(medidasDe(perfil.requirements)).toBeLessThan(medidasDe(AESIA_RIA_REQUIREMENTS));
     expect(medidasDe(perfil.requirements)).toBeGreaterThanOrEqual(30);
   });
 

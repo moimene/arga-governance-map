@@ -28,6 +28,7 @@ function montar(assessment: Record<string, unknown>) {
         isIso: false,
         catalogoDeDespliegue: false,
         anteriorAClasificacion: false,
+        cambiosCatalogo: { anterior: false, corregidas: [], nuevas: [] },
         onExportJson: nada,
         onPrint: nada,
         onCongelar: nada,
