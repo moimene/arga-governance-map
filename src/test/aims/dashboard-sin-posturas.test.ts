@@ -27,7 +27,15 @@ const consulta = () =>
   modo === "error"
     ? { data: undefined, isLoading: false, isError: true, error: new Error("permiso denegado") }
     : { data: [], isLoading: false, isError: false, error: null };
+// El Dashboard lee además secciones e indicadores del tenant (F1.T3). El resto
+// del módulo se conserva real: lo importan otras pantallas.
+const expedienteReal = await import("@/hooks/useAimsTechnicalFile");
 const restaurarMocks = await mockearModulos([
+  ["@/hooks/useAimsTechnicalFile", () => ({
+    ...expedienteReal,
+    useAimsTechnicalFileSectionsDelTenant: consulta,
+    useAimsMonitoringIndicatorsDelTenant: consulta,
+  })],
   ["@/hooks/useAiSystems", () => ({ useAiSystemsList: consulta })],
   ["@/hooks/useAiIncidents", () => ({ useAiIncidentsList: consulta })],
   ["@/hooks/useAiAssessments", () => ({ useAllAssessments: consulta, useAllComplianceChecks: consulta })],

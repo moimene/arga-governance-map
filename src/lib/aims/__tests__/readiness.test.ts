@@ -180,7 +180,12 @@ describe("buildAimsReadiness", () => {
 
     expect(monitors.find((monitor) => monitor.id === "data-governance")?.status).toBe("gap");
     expect(monitors.find((monitor) => monitor.id === "human-oversight")?.status).toBe("ready");
-    expect(monitors.find((monitor) => monitor.id === "prohibited-practices")?.status).toBe("gap");
+    // F1.T3: el nivel «Inaceptable» declarado en la ficha no es un análisis del
+    // art. 5. Sin análisis, «no medido» — y el control positivo es que, con la
+    // misma entrada, las áreas con comprobaciones sí salen medidas (arriba).
+    const prohibidas = monitors.find((monitor) => monitor.id === "prohibited-practices")!;
+    expect(prohibidas.status).toBe("unmeasured");
+    expect(prohibidas.metric).toBe("Sin análisis del art. 5");
     expect(monitors.find((monitor) => monitor.id === "incident-reporting-escalation")?.handoff).toBe("AIMS_INCIDENT_MATERIAL");
     expect(monitors.every((monitor) => monitor.route.startsWith("/ai-governance"))).toBe(true);
   });
@@ -367,6 +372,75 @@ describe("F1.T2 — cierres, hallazgos y 0/0", () => {
     const r = buildAimsReadiness({ systems, assessments: [], incidents: [] });
     expect(r.domains.find((d) => d.id === "inventory")?.metric).toBe("1/2 con clasificación guiada");
     expect(r.complianceMonitors.find((m) => m.id === "inventory-classification")?.metric).toBe("1/2 con clasificación guiada");
+  });
+
+  it("F1.T3 — sin su objeto, expediente, precisión, recordkeeping, post-market y supervisión dicen «no medido» y no caen a incidentes", () => {
+    const materiales = [
+      { id: "i1", system_id: "s1", status: "ABIERTO", severity: "CRITICO" },
+      { id: "i2", system_id: "s1", status: "CERRADO", severity: "MEDIO", root_cause: "x", closed_at: "2026-01-01" },
+    ];
+    const r = buildAimsComplianceMonitors({
+      systems: [{ id: "s1", status: "ACTIVO", risk_level: "Alto" }],
+      assessments: [{ id: "a1", system_id: "s1", status: "CON_GAPS", score: 30, findings: [{ code: "X", status: "L1" }] }],
+      incidents: materiales,
+    });
+    for (const id of [
+      "technical-documentation",
+      "accuracy-robustness-cybersecurity",
+      "evidence-recordkeeping",
+      "post-market-monitoring",
+      "human-oversight",
+    ]) {
+      const m = r.find((x) => x.id === id)!;
+      expect({ id, status: m.status }).toEqual({ id, status: "unmeasured" });
+      expect(m.source, `${id} vuelve a leer incidentes`).not.toBe("ai_incidents");
+      expect(m.source, `${id} vuelve a leer evaluaciones`).not.toBe("ai_risk_assessments");
+    }
+    // Control positivo: el monitor cuyo objeto SÍ son los incidentes los lee.
+    expect(r.find((x) => x.id === "incident-reporting-escalation")).toMatchObject({ source: "ai_incidents", metric: "1 materiales" });
+  });
+
+  it("F1.T3 — el expediente lee sus secciones: sin revisor no acredita (ARGA medido: 0/5)", () => {
+    // Secciones del «Motor de triaje» leídas en Cloud el 2026-09-19: «Conforme»
+    // con fecha de revisión pero sin revisor, y una segunda versión pendiente.
+    const s1 = "90000000-0000-0000-0000-000000000001";
+    const seccion = (code: string, status: string, extra = {}) => ({ system_id: s1, section_code: code, status, reviewed_by_id: null, ...extra });
+    const technicalFileSections = [
+      seccion("AIV-01", "Conforme"), seccion("AIV-02", "Conforme"), seccion("AIV-03", "Conforme"),
+      seccion("AIV-04", "Conforme"), seccion("AIV-01", "Pendiente"),
+    ];
+    const base = { systems: [{ id: s1, status: "En revision", risk_level: "Alto" }], assessments: [], incidents: [] };
+    const r = buildAimsComplianceMonitors({ ...base, technicalFileSections });
+    expect(r.find((m) => m.id === "technical-documentation")).toMatchObject({
+      status: "watch", metric: "0/5 secciones con revisor", source: "aims_technical_file_sections",
+    });
+    expect(r.find((m) => m.id === "human-oversight")).toMatchObject({ status: "watch", metric: "0/1 secciones con revisor" });
+    expect(r.find((m) => m.id === "accuracy-robustness-cybersecurity")).toMatchObject({ status: "watch", metric: "0/1 secciones con revisor" });
+
+    // Una sección no conforme es brecha.
+    const noConforme = buildAimsComplianceMonitors({ ...base, technicalFileSections: [seccion("AIV-03", "NO_CONFORME")] });
+    expect(noConforme.find((m) => m.id === "technical-documentation")?.status).toBe("gap");
+
+    // Control positivo: las nueve del anexo IV, conformes y con revisor, sí dan Listo.
+    const nueve = Array.from({ length: 9 }, (_, i) => seccion(`AIV-0${i + 1}`, "APPROVED", { reviewed_by_id: "p-1" }));
+    expect(buildAimsComplianceMonitors({ ...base, technicalFileSections: nueve })
+      .find((m) => m.id === "technical-documentation")).toMatchObject({ status: "ready", metric: "9/9 secciones con revisor" });
+    // …pero cuatro de nueve no son un expediente completo, aunque las cuatro acrediten.
+    expect(buildAimsComplianceMonitors({ ...base, technicalFileSections: nueve.slice(0, 4) })
+      .find((m) => m.id === "technical-documentation")?.status).toBe("watch");
+  });
+
+  it("F1.T3 — post-market lee los indicadores: sin valor medido no hay medición, diga lo que diga `status`", () => {
+    const base = { systems: [{ id: "s1", status: "ACTIVO" }], assessments: [], incidents: [] };
+    // Indicador de ARGA leído en Cloud el 2026-09-19: «Override humano en rechazos», 6,4 %.
+    const medido = { system_id: "s1", status: "OK", current_value: { unit: "%", value: 6.4 } };
+    const r = buildAimsComplianceMonitors({ ...base, monitoringIndicators: [medido] });
+    // Con medición pero sin umbral evaluado: vigilancia, no Listo.
+    expect(r.find((m) => m.id === "post-market-monitoring")).toMatchObject({
+      status: "watch", metric: "1/1 indicadores con medición", source: "aims_monitoring_indicators",
+    });
+    const sinValor = buildAimsComplianceMonitors({ ...base, monitoringIndicators: [{ ...medido, current_value: null }] });
+    expect(sinValor.find((m) => m.id === "post-market-monitoring")).toMatchObject({ status: "unmeasured", metric: "1 indicadores sin medición" });
   });
 
   it("terceros: tener un proveedor escrito no es haber evaluado al tercero", () => {

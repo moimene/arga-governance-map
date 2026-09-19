@@ -20,7 +20,7 @@ import { checksVigentes } from "@/lib/aims/checks-vigentes";
 type Dato = Required<AimsReadinessInput>;
 
 async function leer(cliente: SupabaseClient, tenant: string): Promise<Dato> {
-  const [sys, asm, inc, chk] = await Promise.all([
+  const [sys, asm, inc, chk, sec, ind] = await Promise.all([
     cliente.from("ai_systems").select("*").eq("tenant_id", tenant),
     cliente
       .from("ai_risk_assessments")
@@ -33,13 +33,17 @@ async function leer(cliente: SupabaseClient, tenant: string): Promise<Dato> {
       .select("*, ai_systems!inner(tenant_id)")
       .eq("ai_systems.tenant_id", tenant)
       .order("created_at", { ascending: true }),
+    cliente.from("aims_technical_file_sections").select("system_id, section_code, status, reviewed_by_id").eq("tenant_id", tenant),
+    cliente.from("aims_monitoring_indicators").select("system_id, current_value").eq("tenant_id", tenant),
   ]);
-  for (const r of [sys, asm, inc, chk]) if (r.error) throw new Error(`lectura AIMS: ${r.error.message}`);
+  for (const r of [sys, asm, inc, chk, sec, ind]) if (r.error) throw new Error(`lectura AIMS: ${r.error.message}`);
   return {
     systems: sys.data ?? [],
     assessments: asm.data ?? [],
     incidents: inc.data ?? [],
     complianceChecks: checksVigentes(chk.data ?? []),
+    technicalFileSections: sec.data ?? [],
+    monitoringIndicators: ind.data ?? [],
   };
 }
 

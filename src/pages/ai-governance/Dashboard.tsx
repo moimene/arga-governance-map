@@ -1,8 +1,9 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { AlertTriangle, ArrowRight, Brain, Clock, Cpu } from "lucide-react";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { useAiIncidentsList } from "@/hooks/useAiIncidents";
 import { useAllAssessments, useAllComplianceChecks } from "@/hooks/useAiAssessments";
+import { useAimsMonitoringIndicatorsDelTenant, useAimsTechnicalFileSectionsDelTenant } from "@/hooks/useAimsTechnicalFile";
 import {
   assessmentAcreditaConformidad,
   buildAimsReadiness,
@@ -22,6 +23,7 @@ import { tieneClasificacionGuiada } from "@/lib/aims/cuestionario-calificacion";
 import { ClasificacionGuiadaCard } from "@/components/ai-governance/dashboard/ClasificacionGuiadaCard";
 import { ComplianceMonitorPanel } from "@/components/ai-governance/dashboard/ComplianceMonitorPanel";
 import { IncidentesRecientes } from "@/components/ai-governance/dashboard/IncidentesRecientes";
+import { KpiCard } from "@/components/ai-governance/dashboard/KpiCard";
 import { OrganoRector } from "@/components/ai-governance/dashboard/OrganoRector";
 import { PrioridadAhora } from "@/components/ai-governance/dashboard/PrioridadAhora";
 import { ReadinessDomains } from "@/components/ai-governance/dashboard/ReadinessDomains";
@@ -40,63 +42,6 @@ function RiskBadge({ system }: { system: { risk_level: string | null; regulatory
   );
 }
 
-function KpiCard({
-  label,
-  value,
-  sub,
-  icon: Icon,
-  tone,
-  to,
-}: {
-  label: string;
-  value: string | number;
-  sub?: string;
-  icon: React.ElementType;
-  tone?: "success" | "error" | "warning" | "info" | "neutral";
-  to?: string;
-}) {
-  const navigate = useNavigate();
-  // `neutral` para el cero SIN dato: un 0 verde afirma «no hay ninguno» cuando
-  // en realidad no hay nada con que contarlo.
-  const toneColor: Record<string, string> = {
-    success: "text-[var(--status-success)]",
-    error:   "text-[var(--status-error)]",
-    warning: "text-[var(--status-warning)]",
-    info:    "text-[var(--status-info)]",
-    neutral: "text-[var(--g-text-secondary)]",
-  };
-  const iconBg: Record<string, string> = {
-    success: "bg-[var(--status-success)]/10",
-    error:   "bg-[var(--status-error)]/10",
-    warning: "bg-[var(--status-warning)]/10",
-    info:    "bg-[var(--status-info)]/10",
-    neutral: "bg-[var(--g-surface-muted)]",
-  };
-  const t = tone ?? "info";
-  return (
-    <div
-      className={`bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-5 flex flex-col gap-3 ${to ? "cursor-pointer hover:border-[var(--g-brand-3308)] transition-colors" : ""}`}
-      style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-      onClick={to ? () => navigate(to) : undefined}
-      role={to ? "button" : undefined}
-      tabIndex={to ? 0 : undefined}
-      onKeyDown={to ? (e) => e.key === "Enter" && navigate(to) : undefined}
-    >
-      <div className="flex items-start justify-between">
-        <div className={`flex h-10 w-10 items-center justify-center ${iconBg[t]}`} style={{ borderRadius: "var(--g-radius-md)" }}>
-          <Icon className={`h-5 w-5 ${toneColor[t]}`} />
-        </div>
-        {to && <ArrowRight className="h-4 w-4 text-[var(--g-text-secondary)]" />}
-      </div>
-      <div>
-        <div className={`text-2xl font-bold ${toneColor[t]}`}>{value}</div>
-        <div className="text-sm font-medium text-[var(--g-text-primary)] mt-0.5">{label}</div>
-        {sub && <div className="text-xs text-[var(--g-text-secondary)] mt-1">{sub}</div>}
-      </div>
-    </div>
-  );
-}
-
 export default function AiDashboard() {
   const { scope } = useScope();
   // Órgano de gobierno de la IA del tenant. Doble puerta: el mapa no devuelve
@@ -109,8 +54,11 @@ export default function AiDashboard() {
   const { data: rawIncidents = [], isLoading: loadingIncidents, error: errIncidents } = useAiIncidentsList();
   const { data: rawAssessments = [], isLoading: loadingAssessments, error: errAssessments } = useAllAssessments();
   const { data: rawComplianceChecks = [], isLoading: loadingComplianceChecks, error: errChecks } = useAllComplianceChecks();
+  // Objetos propios de los monitores (F1.T3); `readiness` los acota a los sistemas visibles.
+  const { data: technicalFileSections = [], isLoading: loadingSections, error: errSections } = useAimsTechnicalFileSectionsDelTenant();
+  const { data: monitoringIndicators = [], isLoading: loadingIndicators, error: errIndicators } = useAimsMonitoringIndicatorsDelTenant();
   // Una lectura fallida no es un inventario vacío: se dice el motivo, no «—».
-  const fallo = [errSystems, errIncidents, errAssessments, errChecks].find(Boolean) as Error | undefined;
+  const fallo = [errSystems, errIncidents, errAssessments, errChecks, errSections, errIndicators].find(Boolean) as Error | undefined;
 
   const systems = filterSystemsByScope(rawSystems, scope);
   const systemIds = new Set(systems.map((s) => s.id));
@@ -161,8 +109,8 @@ export default function AiDashboard() {
     ? Math.floor((Date.now() - new Date(lastAssessment.assessment_date).getTime()) / 86400000)
     : null;
 
-  const readiness = buildAimsReadiness({ systems, assessments, incidents, complianceChecks });
-  const loading = loadingSystems || loadingIncidents || loadingAssessments || loadingComplianceChecks;
+  const readiness = buildAimsReadiness({ systems, assessments, incidents, complianceChecks, technicalFileSections, monitoringIndicators });
+  const loading = loadingSystems || loadingIncidents || loadingAssessments || loadingComplianceChecks || loadingSections || loadingIndicators;
   // Un solo predicado para «incidente material», el mismo que decide el handoff.
   // Aquí se comparaba a mano contra tres grafías, y una de ellas ('CRÍTICO')
   // no la escribe ningún camino del producto.

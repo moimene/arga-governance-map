@@ -243,8 +243,13 @@ describe("A3 — un cero sin dato no se pinta como un cero bueno", () => {
     // verde: «Riesgo Alto sin eval. aprobada: 0» leído como logro cuando lo que
     // pasa es que no hay inventario con que contarlo.
     const src = read(DASHBOARD);
+    // `KpiCard` vive en su componente desde F1.T3 (2026-09-19): el tono se lee
+    // allí y la arista es que el Dashboard lo importe y lo monte.
+    const kpi = read("src/components/ai-governance/dashboard/KpiCard.tsx");
+    expect(src).toMatch(/import \{ KpiCard \} from "@\/components\/ai-governance\/dashboard\/KpiCard"/);
+    expect((src.match(/<KpiCard\b/g) ?? []).length, "el Dashboard ya no monta las KPI").toBeGreaterThanOrEqual(4);
     expect(
-      /neutral:/.test(src),
+      /neutral:/.test(kpi),
       "KpiCard ya no tiene tono neutro: el cero sin dato vuelve a ser verde",
     ).toBe(true);
 
@@ -253,7 +258,7 @@ describe("A3 — un cero sin dato no se pinta como un cero bueno", () => {
     // `var(--status-success)` devolvía el cero sin dato al verde y el gate
     // seguía pasando (derrotado por mutación en la review adversarial).
     for (const clave of ["neutral:"]) {
-      for (const bloque of src.split(clave).slice(1)) {
+      for (const bloque of kpi.split(clave).slice(1)) {
         const valor = bloque.slice(0, 80);
         expect(
           /status-(success|active)/.test(valor),

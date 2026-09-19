@@ -119,6 +119,40 @@ export function useAimsMonitoringIndicators(systemId: string | undefined) {
 }
 
 /**
+ * Secciones e indicadores de TODO el tenant, para los monitores del Dashboard
+ * (F1.T3): cada monitor lee su objeto y, sin él, dice «no medido».
+ */
+export function useAimsTechnicalFileSectionsDelTenant() {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    queryKey: ["aims_technical_file_sections", tenantId, "all"],
+    queryFn: tenantId ? async () => {
+      const { data, error } = await supabase
+        .from("aims_technical_file_sections")
+        .select("system_id, section_code, status, reviewed_by_id")
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+      return (data ?? []) as Pick<AimsTechnicalFileSection, "system_id" | "section_code" | "status" | "reviewed_by_id">[];
+    } : skipToken,
+  });
+}
+
+export function useAimsMonitoringIndicatorsDelTenant() {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    queryKey: ["aims_monitoring_indicators", tenantId, "all"],
+    queryFn: tenantId ? async () => {
+      const { data, error } = await supabase
+        .from("aims_monitoring_indicators")
+        .select("system_id, current_value")
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+      return (data ?? []) as Pick<AimsMonitoringIndicator, "system_id" | "current_value">[];
+    } : skipToken,
+  });
+}
+
+/**
  * Actualiza una sección del expediente técnico.
  *
  * La escritura va acotada por tenant Y por id, y se comprueba que vuelve fila:

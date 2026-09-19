@@ -20,6 +20,8 @@ const ETIQUETA_FUENTE: Record<AimsComplianceMonitorDomain["source"], string> = {
   ai_risk_assessments: "Evaluaciones",
   ai_compliance_checks: "Comprobaciones",
   ai_incidents: "Incidentes",
+  aims_technical_file_sections: "Expediente técnico",
+  aims_monitoring_indicators: "Indicadores",
   derived: "Derivado",
   ninguna: "Sin fuente",
 };

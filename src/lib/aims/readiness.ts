@@ -2,6 +2,7 @@ import { AESIA_RIA_REQUIREMENTS } from "./catalog-aesia";
 import { evaluacionesVigentes } from "./checks-vigentes";
 import { acreditaConformidad } from "./conformidad";
 import { tieneClasificacionGuiada } from "./cuestionario-calificacion";
+import { ANEXO_IV_SECCIONES, normalizarEstadoSeccion } from "./expediente-tecnico";
 import { monitorDeCodigo } from "./mapa-monitores";
 import { DESPLIEGUE_REQUIREMENTS, codigosDelPerfil } from "./perfil-aplicabilidad";
 import { etiqueta, isMaterialSeverity, normalizeAimsStatus } from "./vocabulario";
@@ -54,6 +55,20 @@ export interface AimsComplianceCheckLike {
   evidence_url?: string | null;
 }
 
+/** Sección del expediente técnico (`aims_technical_file_sections`). */
+export interface AimsSectionLike {
+  system_id?: string | null;
+  section_code?: string | null;
+  status?: string | null;
+  reviewed_by_id?: string | null;
+}
+
+/** Indicador de vigilancia (`aims_monitoring_indicators`). `status` no se lee: nace «OK» sin medir. */
+export interface AimsIndicatorLike {
+  system_id?: string | null;
+  current_value?: unknown;
+}
+
 export interface AimsReadinessDomain {
   id: string;
   label: string;
@@ -81,7 +96,15 @@ export interface AimsComplianceMonitorDomain {
    * del área, es el objeto propio del monitor —nunca `ai_compliance_checks`—,
    * y `ninguna` cuando no hay nada que leer.
    */
-  source: "ai_systems" | "ai_risk_assessments" | "ai_compliance_checks" | "ai_incidents" | "derived" | "ninguna";
+  source:
+    | "ai_systems"
+    | "ai_risk_assessments"
+    | "ai_compliance_checks"
+    | "ai_incidents"
+    | "aims_technical_file_sections"
+    | "aims_monitoring_indicators"
+    | "derived"
+    | "ninguna";
   handoff?: string;
   /** Comprobaciones del área medidas contra un catálogo que no es el del sistema: ni conformes ni brechas. */
   otroCatalogo: number;
@@ -92,6 +115,8 @@ export interface AimsReadinessInput {
   assessments: AimsAssessmentLike[];
   incidents: AimsIncidentLike[];
   complianceChecks?: AimsComplianceCheckLike[];
+  technicalFileSections?: AimsSectionLike[];
+  monitoringIndicators?: AimsIndicatorLike[];
 }
 
 export interface AimsReadinessSummary {
@@ -227,7 +252,7 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "EU AI Act",
     detail: "Detección temprana de usos inaceptables o prácticas no permitidas.",
     route: "/ai-governance/sistemas",
-    source: "derived",
+    source: "ninguna",
   },
   {
     id: "high-risk-obligations",
@@ -243,7 +268,7 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "EU AI Act",
     detail: "Documentación técnica, trazabilidad y gaps derivables a GRC como intake.",
     route: "/ai-governance/evaluaciones",
-    source: "ai_risk_assessments",
+    source: "aims_technical_file_sections",
     handoff: "AIMS_TECHNICAL_FILE_GAP",
   },
   {
@@ -268,7 +293,7 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "EU AI Act",
     detail: "Human-in-the-loop, intervención, override y responsabilidades operativas.",
     route: "/ai-governance/evaluaciones",
-    source: "ninguna",
+    source: "aims_technical_file_sections",
   },
   {
     id: "accuracy-robustness-cybersecurity",
@@ -276,7 +301,7 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "EU AI Act",
     detail: "Rendimiento, resiliencia, drift, seguridad y fallos materiales.",
     route: "/ai-governance/incidentes",
-    source: "ai_incidents",
+    source: "aims_technical_file_sections",
   },
   {
     id: "provider-vendor-third-party",
@@ -293,7 +318,7 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "EU AI Act",
     detail: "Seguimiento operativo, causa raíz, acciones correctivas e incidentes recurrentes.",
     route: "/ai-governance/incidentes",
-    source: "ai_incidents",
+    source: "aims_monitoring_indicators",
   },
   {
     id: "incident-reporting-escalation",
@@ -327,7 +352,7 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "Operativo AIMS",
     detail: "Referencias, evidencias operativas y límites probatorios explícitos.",
     route: "/ai-governance/evaluaciones",
-    source: "ai_incidents",
+    source: "ninguna",
   },
 ];
 
@@ -345,23 +370,51 @@ function statusFromChecks(checks: AimsComplianceCheckLike[]): AimsReadinessStatu
   return "watch";
 }
 
+/** Una sección acredita si está conforme (o cerrada) y tiene revisor: la fecha de revisión sola no. */
+function seccionAcredita(seccion: AimsSectionLike): boolean {
+  return ["APPROVED", "SEALED"].includes(normalizarEstadoSeccion(seccion.status)) && Boolean(seccion.reviewed_by_id);
+}
+
+/**
+ * Lectura de secciones. `anexoCompleto`: sólo es Listo si cada sistema con
+ * expediente tiene las nueve secciones del anexo IV acreditadas — cuatro de
+ * nueve, aunque las cuatro acrediten, no son un expediente.
+ */
+function medirSecciones(
+  secciones: AimsSectionLike[],
+  anexoCompleto: boolean,
+): { status: AimsReadinessStatus; metric: string } | null {
+  if (secciones.length === 0) return null;
+  const acreditadas = secciones.filter(seccionAcredita);
+  const metric = `${acreditadas.length}/${secciones.length} secciones con revisor`;
+  if (secciones.some((s) => normalizarEstadoSeccion(s.status) === "NON_CONFORMING")) return { status: "gap", metric };
+  const completo =
+    !anexoCompleto ||
+    [...new Set(secciones.map((s) => s.system_id))].every((id) =>
+      ANEXO_IV_SECCIONES.every((a) => acreditadas.some((s) => s.system_id === id && s.section_code === a.code)),
+    );
+  return { status: acreditadas.length === secciones.length && completo ? "ready" : "watch", metric };
+}
+
 function fallbackMonitorStatus(
   definition: MonitorDefinition,
-  input: Required<Pick<AimsReadinessInput, "systems" | "assessments" | "incidents">>,
+  input: AimsReadinessInput,
 ): { status: AimsReadinessStatus; metric: string } {
   const { systems, assessments, incidents } = input;
+  // Cada monitor lee su objeto, y sólo el de los sistemas que se están mirando.
+  const ids = new Set(systems.map((system) => system.id));
+  const secciones = (input.technicalFileSections ?? []).filter((s) => s.system_id && ids.has(s.system_id));
+  const indicadores = (input.monitoringIndicators ?? []).filter((i) => i.system_id && ids.has(i.system_id));
+  const seccion = (code: string) => secciones.filter((s) => s.section_code === code);
   const totalSystems = systems.length;
   const highRiskSystems = systems.filter((system) => system.risk_level === "Alto");
-  const inacceptableSystems = systems.filter((system) => system.risk_level === "Inaceptable");
   const assessedSystemIds = new Set(
     assessments
       .filter((assessment) => assessmentAcreditaConformidad(assessment.status) && assessment.system_id)
       .map((assessment) => assessment.system_id as string),
   );
   const highRiskAssessed = highRiskSystems.filter((system) => assessedSystemIds.has(system.id)).length;
-  const technicalGaps = assessments.filter(isAimsTechnicalFileGapCandidate).length;
   const materialIncidents = incidents.filter(isAimsMaterialIncidentCandidate).length;
-  const incidentesCerrados = incidents.filter(incidenteCerrado).length;
   const conClasificacionGuiada = systems.filter(tieneClasificacionGuiada).length;
   const isoAssessments = assessments.filter((assessment) => assessment.framework === "ISO_42001");
   const approvedIsoAssessments = isoAssessments.filter((assessment) =>
@@ -374,33 +427,43 @@ function fallbackMonitorStatus(
         status: domainStatus(pct(conClasificacionGuiada, totalSystems), 50, 80),
         metric: totalSystems === 0 ? "0 sistemas" : `${conClasificacionGuiada}/${totalSystems} con clasificación guiada`,
       };
+    // El nivel «Inaceptable» de la ficha no es un análisis del art. 5, y ese
+    // valor ya no lo escribe ningún camino. Hasta que el análisis exista, no se
+    // afirma nada.
     case "prohibited-practices":
-      return {
-        status: inacceptableSystems.length > 0 ? "gap" : totalSystems > 0 ? "watch" : "gap",
-        metric: systems.length === 0 ? "Sin inventario" : `${inacceptableSystems.length} inaceptables`,
-      };
+      return { status: "unmeasured", metric: "Sin análisis del art. 5" };
     case "high-risk-obligations":
       return {
         status: highRiskSystems.length === 0 ? "na" : domainStatus(pct(highRiskAssessed, highRiskSystems.length), 50, 100),
         metric: highRiskSystems.length === 0 ? "Sin sistemas de alto riesgo" : `${highRiskAssessed}/${highRiskSystems.length} alto riesgo`,
       };
+    // Expediente: sus secciones. Precisión: la del anexo IV.4 (métricas de
+    // rendimiento). Supervisión: la del anexo IV.3 (supervisión, funcionamiento
+    // y control). Sin la sección, «no medido»: ya no se cae a incidentes.
     case "technical-documentation":
-      return {
-        status: technicalGaps === 0 && assessments.length > 0 ? "ready" : technicalGaps <= 2 ? "watch" : "gap",
-        metric: assessments.length === 0 ? "Sin evaluaciones" : `${technicalGaps} gaps`,
-      };
+      return medirSecciones(secciones, true) ?? { status: "unmeasured", metric: "Sin expediente técnico" };
     case "accuracy-robustness-cybersecurity":
+      return medirSecciones(seccion("AIV-04"), false) ?? { status: "unmeasured", metric: "Sin sección del anexo IV.4" };
+    case "human-oversight":
+      return medirSecciones(seccion("AIV-03"), false) ?? { status: "unmeasured", metric: "Sin sección del anexo IV.3" };
     case "incident-reporting-escalation":
       return {
         status: incidents.length === 0 ? "unmeasured" : materialIncidents === 0 ? "ready" : materialIncidents <= 2 ? "watch" : "gap",
         metric: incidents.length === 0 ? "Sin incidentes registrados" : `${materialIncidents} materiales`,
       };
-    case "post-market-monitoring":
+    // Indicadores. `status` no se lee (nace «OK» sin medir): mide quien tiene
+    // valor. Con valor y sin umbral evaluado, vigilancia — nunca Listo.
+    case "post-market-monitoring": {
+      if (indicadores.length === 0) return { status: "unmeasured", metric: "Sin indicadores de vigilancia" };
+      const medidos = indicadores.filter((i) => i.current_value !== null && i.current_value !== undefined).length;
+      return medidos === 0
+        ? { status: "unmeasured", metric: `${indicadores.length} indicadores sin medición` }
+        : { status: "watch", metric: `${medidos}/${indicadores.length} indicadores con medición` };
+    }
+    // Registro: su objeto es el protocolo de conservación de registros, que
+    // todavía no existe como dato. Sin él, «no medido».
     case "evidence-recordkeeping":
-      return {
-        status: incidents.length === 0 ? "unmeasured" : domainStatus(pct(incidentesCerrados, incidents.length), 50, 80),
-        metric: incidents.length === 0 ? "Sin incidentes" : metricaCierre(incidents),
-      };
+      return { status: "unmeasured", metric: "Sin protocolo de registro" };
     case "iso-42001-management-system":
       return {
         status: isoAssessments.length === 0 ? "unmeasured" : domainStatus(pct(approvedIsoAssessments, isoAssessments.length), 50, 80),
@@ -443,16 +506,10 @@ export function apartarChecksDeOtroCatalogo(systems: AimsSystemLike[], checks: A
 
 export function buildAimsComplianceMonitors(input: AimsReadinessInput): AimsComplianceMonitorDomain[] {
   const { medibles: checks, otroCatalogo } = apartarChecksDeOtroCatalogo(input.systems, input.complianceChecks ?? []);
-  const base = {
-    systems: input.systems,
-    assessments: input.assessments,
-    incidents: input.incidents,
-  };
-
   return complianceMonitorDefinitions.map((definition) => {
     const matchingChecks = checksForDefinition(checks, definition);
     const checkedStatus = statusFromChecks(matchingChecks);
-    const fallback = fallbackMonitorStatus(definition, base);
+    const fallback = fallbackMonitorStatus(definition, input);
     const status = checkedStatus ?? fallback.status;
     const metric = matchingChecks.length > 0
       ? `${matchingChecks.filter((check) => COMPLIANT_STATUSES.has(normalizeAimsStatus(check.status))).length}/${matchingChecks.length} conformes`
@@ -487,17 +544,15 @@ export function buildAimsComplianceMonitorsPorSistema(
         assessments: delSistema(input.assessments, system.id),
         incidents: delSistema(input.incidents, system.id),
         complianceChecks: delSistema(input.complianceChecks, system.id),
+        technicalFileSections: delSistema(input.technicalFileSections, system.id),
+        monitoringIndicators: delSistema(input.monitoringIndicators, system.id),
       }),
     ]),
   );
 }
 
-export function buildAimsReadiness({
-  systems,
-  assessments,
-  incidents,
-  complianceChecks = [],
-}: AimsReadinessInput): AimsReadinessSummary {
+export function buildAimsReadiness(input: AimsReadinessInput): AimsReadinessSummary {
+  const { systems, assessments, incidents } = input;
   const totalSystems = systems.length;
   const assessedSystemIds = new Set(
     assessments
@@ -595,7 +650,7 @@ export function buildAimsReadiness({
       route: "/ai-governance",
     },
   ];
-  const complianceMonitors = buildAimsComplianceMonitors({ systems, assessments, incidents, complianceChecks });
+  const complianceMonitors = buildAimsComplianceMonitors(input);
 
   return {
     sourcePosture: "legacy-ai",
