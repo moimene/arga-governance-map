@@ -905,6 +905,10 @@ describe("2026-09-06 — la ausencia de dato se dice, no se rellena", () => {
     // La pestaña de vigilancia se extrajo el 2026-09-08 y el mapa se renombró
     // (`INDICATOR_STATUS_CHIP` → `CHIP_INDICADOR`, `SECTION_STATUS_CHIP_NEUTRO`
     // → `CHIP_NEUTRO`): el invariante no cambia, sólo dónde se mide.
+    // Desde el 2026-09-19 (F1.T6) la clave del chip la da la hoja
+    // `estadoIndicador`, que devuelve SIN_MEDICION sin valor medido: el mapa
+    // no la conoce y cae al neutro. Su comportamiento se renderiza en
+    // `tab-vigilancia.test.tsx`; aquí sigue vigilado el fallback.
     const src = sinComentarios(read(TAB_VIGILANCIA));
     expect(
       /ind\.status\s*===\s*"OPTIMAL"/.test(src),
@@ -916,7 +920,7 @@ describe("2026-09-06 — la ausencia de dato se dice, no se rellena", () => {
     const cuerpo = mapa.slice(0, mapa.indexOf("};"));
     expect(/\bOK:/.test(cuerpo), "el estado 'OK', que es el DEFAULT de la columna, no se reconoce").toBe(true);
     // El fallback es el chip neutro, no el de aviso ni el de éxito.
-    const uso = src.slice(src.indexOf("CHIP_INDICADOR[normalizeAimsStatus(ind.status)]"));
+    const uso = src.slice(src.indexOf("CHIP_INDICADOR[estado.clave]"));
     expect(/\?\?\s*CHIP_NEUTRO/.test(uso.slice(0, 160)),
       "el estado desconocido de un indicador ya no cae al chip neutro").toBe(true);
     // Control positivo del propio chip neutro: mapearlo a un color de éxito o
@@ -1113,5 +1117,22 @@ describe("2026-09-07 — el escalado no redacta la justificación por el oficial
       "el escalado ya no manda el órgano destino").toBe(true);
     expect(/buildMeetingHandoffPath/.test(src),
       "el escalado ya no construye el handoff de Secretaría").toBe(true);
+  });
+});
+
+describe("2026-09-19 — F1.T6: la vigilancia no promete lo que no mide", () => {
+  it("ninguna superficie promete monitorización continua", () => {
+    // La pestaña de vigilancia se presentaba como «monitorización continua de
+    // deriva» sobre indicadores que nacen sin medición, sin umbral y sin forma
+    // de actualizarlos. Se juzga lo renderizable, no la prosa que lo explica.
+    const re = /monitorizaci[oó]n\s+continua|monitoreo\s+continuo|continuous\s+monitoring/i;
+    // Control del instrumento: el patrón casa con la frase que se retiró.
+    expect(re.test("Monitorización continua de deriva (drift)")).toBe(true);
+    const ficheros = superficieAims();
+    expect(ficheros).toContain(TAB_VIGILANCIA);
+    for (const f of ficheros) {
+      const hit = sinComentarios(read(f)).match(re);
+      expect(hit, `${f}: promete una monitorización que no existe → ${hit?.[0]}`).toBeNull();
+    }
   });
 });

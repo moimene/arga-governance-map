@@ -238,9 +238,11 @@ export function useRegistrarVersion() {
 /**
  * Registra un indicador de vigilancia poscomercialización.
  *
- * `status` se fija en `OK`, el único valor que la columna escribe por defecto y
- * el único que consta en el dato: ofrecer una escala que la tabla no declara
- * (no hay CHECK) sería inventarla.
+ * No escribe `status`: la columna lo rellena con su DEFAULT 'OK', que no es un
+ * resultado medido. El estado que se pinta lo deriva `estadoIndicador` (hoja
+ * `@/lib/aims/vigilancia`) de `current_value`, y un alta sin valor figura «sin
+ * medición». Ofrecer una escala que la tabla no declara (no hay CHECK) sería
+ * inventarla.
  */
 export function useRegistrarIndicador() {
   const qc = useQueryClient();
@@ -261,7 +263,6 @@ export function useRegistrarIndicador() {
           indicator_name: v.indicatorName,
           metric_key: v.metricKey,
           last_observed_at: v.lastObservedAt,
-          status: "OK",
         })
         .select()
         .single();
