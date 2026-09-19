@@ -223,6 +223,22 @@ export function buildEvaluationPayload(
 }
 
 /**
+ * Filas de `ai_compliance_checks` de UNA evaluación (M01, F1.T14): cada
+ * comprobación lleva su sistema y el autodiagnóstico del que sale.
+ *
+ * `checked_by_id` NO va a propósito: es FK a `persons` y la resuelve el servidor
+ * desde el perfil de la sesión (enmienda E-01); lo que mandara el cliente se
+ * pisaría. Sin evaluación no se construye nada: una comprobación suelta es
+ * legado y no acredita.
+ */
+export function checksDeLaEvaluacion(checks: EvaluationCheck[], systemId: string, assessmentId: string) {
+  if (!systemId || !assessmentId) {
+    throw new Error("No se registran comprobaciones sin el sistema y la evaluación de la que salen.");
+  }
+  return checks.map((c) => ({ ...c, system_id: systemId, assessment_id: assessmentId }));
+}
+
+/**
  * Reconstruye el estado del wizard desde los findings persistidos.
  *
  * Es la otra mitad del borrador: sin esto, «guardar» sería escribir en un pozo.

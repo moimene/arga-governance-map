@@ -75,6 +75,63 @@ describe("de cada requisito manda la comprobación más reciente", () => {
   });
 });
 
+/**
+ * M01 (F1.T14): cada comprobación nueva lleva la evaluación de la que sale, y la
+ * lectura la embebe (`evaluacion`). Sin eso, cerrar un autodiagnóstico SIN
+ * contestar nada —que el camino de escritura deja en `BORRADOR` y aun así
+ * inserta un `PENDIENTE` por requisito— tapaba una evaluación ya revisada por
+ * el mero hecho de ser posterior.
+ */
+describe("un borrador no desplaza a una evaluación cerrada", () => {
+  const deEvaluacion = (
+    created_at: string,
+    status: string,
+    evaluacion: { status: string; reviewed_at: string | null } | null,
+  ) => ({ ...fila("R1", created_at, status), assessment_id: evaluacion ? "a" : null, evaluacion });
+
+  it("una revisada gana a un borrador posterior", () => {
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-09-01T10:00:00Z", "CONFORME", { status: "CON_GAPS", reviewed_at: "2026-09-02T10:00:00Z" }),
+      deEvaluacion("2026-09-10T10:00:00Z", "PENDIENTE", { status: "BORRADOR", reviewed_at: null }),
+    ]);
+    expect(vigentes).toHaveLength(1);
+    expect(vigentes[0].status, "el borrador posterior tapó la evaluación revisada").toBe("CONFORME");
+  });
+
+  it("el orden de llegada no cambia el resultado", () => {
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-09-10T10:00:00Z", "PENDIENTE", { status: "BORRADOR", reviewed_at: null }),
+      deEvaluacion("2026-09-01T10:00:00Z", "CONFORME", { status: "CON_GAPS", reviewed_at: "2026-09-02T10:00:00Z" }),
+    ]);
+    expect(vigentes[0].status).toBe("CONFORME");
+  });
+
+  it("control positivo: una evaluación cerrada posterior SÍ desplaza a la anterior", () => {
+    // Sin esto, un filtro que congelara la primera comprobación para siempre
+    // pasaría el caso de arriba.
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-09-01T10:00:00Z", "CONFORME", { status: "CON_GAPS", reviewed_at: "2026-09-02T10:00:00Z" }),
+      deEvaluacion("2026-09-10T10:00:00Z", "NO_CONFORME", { status: "CON_GAPS", reviewed_at: null }),
+    ]);
+    expect(vigentes[0].status).toBe("NO_CONFORME");
+  });
+
+  it("un borrador que es lo único que hay se conserva: no se pierde dato", () => {
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-09-10T10:00:00Z", "PENDIENTE", { status: "BORRADOR", reviewed_at: null }),
+    ]);
+    expect(vigentes).toHaveLength(1);
+  });
+
+  it("las legacy (sin evaluación) siguen el criterio de siempre: manda la más reciente", () => {
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-05-21T10:00:00Z", "NO_CONFORME", null),
+      deEvaluacion("2026-07-19T10:00:00Z", "CONFORME", null),
+    ]);
+    expect(vigentes[0].status).toBe("CONFORME");
+  });
+});
+
 describe("la lectura del módulo pasa por el filtro", () => {
   it("todo lector de ai_compliance_checks en src/hooks lo aplica", () => {
     // 2026-09-08 (revisión adversarial): el Board Pack leía el histórico entero

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { buildEvaluationPayload } from "../evaluacion-payload";
+import { buildEvaluationPayload, checksDeLaEvaluacion } from "../evaluacion-payload";
 
 /**
  * A2 — Una evaluación sin contestar no puede persistirse como conforme.
@@ -159,5 +159,38 @@ describe("A2 — no se imputa conformidad a lo no contestado", () => {
         REQUISITOS,
       ).status,
     ).toBe("CONFORME");
+  });
+});
+
+/**
+ * M01 (F1.T14): la comprobación sabe de qué evaluación sale. Sin ese enlace, un
+ * autodiagnóstico en borrador y uno revisado son indistinguibles en la tabla, y
+ * el más reciente tapa al otro aunque no acredite nada.
+ */
+describe("M01 — las comprobaciones de una evaluación llevan su enlace", () => {
+  const checks = buildEvaluationPayload({ M1: { maturity: "L5" } }, MEDIDAS, REQUISITOS).checks;
+
+  it("cada fila lleva el sistema y la evaluación", () => {
+    const filas = checksDeLaEvaluacion(checks, "sys-1", "eval-1");
+    expect(filas.length, "control: el payload trae requisitos").toBeGreaterThan(0);
+    expect(filas).toHaveLength(checks.length);
+    for (const f of filas) {
+      expect(f.system_id).toBe("sys-1");
+      expect(f.assessment_id).toBe("eval-1");
+    }
+  });
+
+  it("no manda la autoría: la resuelve el servidor desde el perfil de la sesión (E-01)", () => {
+    // `checked_by_id` es FK a `persons`, no a `auth.users`. Lo que mandara el
+    // cliente lo pisaría el trigger; mandarlo sólo daría la ilusión de elegirlo.
+    for (const f of checksDeLaEvaluacion(checks, "sys-1", "eval-1")) {
+      expect(Object.keys(f)).not.toContain("checked_by_id");
+    }
+  });
+
+  it("sin evaluación o sin sistema no se construye nada: una comprobación suelta no acredita", () => {
+    expect(() => checksDeLaEvaluacion(checks, "sys-1", "")).toThrow();
+    expect(() => checksDeLaEvaluacion(checks, "", "eval-1")).toThrow();
+    expect(() => checksDeLaEvaluacion(checks, "sys-1", null)).toThrow();
   });
 });

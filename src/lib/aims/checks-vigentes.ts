@@ -21,6 +21,11 @@ type ChequeoConHistoria = {
   requirement_code?: string | null;
   created_at?: string | null;
   checked_at?: string | null;
+  /**
+   * La evaluación de la que sale, embebida por su FK (M01, 2026-09-19). `null`
+   * o ausente en las comprobaciones legacy, que no la tienen.
+   */
+  evaluacion?: { status?: string | null; reviewed_at?: string | null } | null;
 };
 
 /**
@@ -31,6 +36,17 @@ type ChequeoConHistoria = {
 function marca(c: ChequeoConHistoria): number {
   const t = Date.parse(c.created_at ?? "");
   return Number.isNaN(t) ? 0 : t;
+}
+
+/**
+ * Una comprobación de un autodiagnóstico en `BORRADOR` no desplaza a la de una
+ * evaluación cerrada, por reciente que sea: cerrar un autodiagnóstico sin
+ * contestar nada lo deja en `BORRADOR` e inserta igualmente un `PENDIENTE` por
+ * requisito, que tapaba lo ya revisado. Si el borrador es lo único que hay, se
+ * conserva: no se pierde dato.
+ */
+function peso(c: ChequeoConHistoria): number {
+  return c.evaluacion?.status === "BORRADOR" ? 0 : 1;
 }
 
 export function checksVigentes<T extends ChequeoConHistoria>(rows: T[] | null | undefined): T[] {
@@ -46,7 +62,11 @@ export function checksVigentes<T extends ChequeoConHistoria>(rows: T[] | null | 
     const previo = porRequisito.get(clave);
     // `>=` y no `>`: con marcas iguales gana la última del array, que llega en
     // orden ascendente de escritura desde PostgREST.
-    if (!previo || marca(c) >= marca(previo)) porRequisito.set(clave, c);
+    const gana =
+      !previo ||
+      peso(c) > peso(previo) ||
+      (peso(c) === peso(previo) && marca(c) >= marca(previo));
+    if (gana) porRequisito.set(clave, c);
   });
   return [...porRequisito.values()];
 }

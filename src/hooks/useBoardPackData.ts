@@ -337,17 +337,26 @@ export function useBoardPackData(meetingId: string, entityId?: string | null): {
             .eq("risk_level", "Alto");
           if (error) throw error;
           const systemIds = (systems ?? []).map((s) => s.id);
+          // Con su evaluación embebida: un borrador no tapa lo revisado (M01).
+          type FilaCheck = {
+            system_id: string;
+            requirement_code: string;
+            requirement_title: string;
+            status: string;
+            created_at: string | null;
+            evaluacion: { status: string | null; reviewed_at: string | null } | null;
+          };
           const { data: checks } = systemIds.length
             ? await supabase
                 .from("ai_compliance_checks")
-                .select("system_id, requirement_code, requirement_title, status, created_at")
+                .select("system_id, requirement_code, requirement_title, status, created_at, evaluacion:ai_risk_assessments!assessment_id(status, reviewed_at)")
                 .in("system_id", systemIds)
-            : { data: [] as Array<{ system_id: string; requirement_code: string; requirement_title: string; status: string; created_at: string | null }> };
+            : { data: [] as FilaCheck[] };
           // Reevaluar no borra el histórico de comprobaciones: «Motor de triaje»
           // tiene 28 filas para 7 códigos. Sin el filtro, un sistema reevaluado
           // cuatro veces multiplicaba por cuatro sus no conformidades en el
           // informe ejecutivo. Manda la más reciente por requisito.
-          const vigentes = checksVigentes(checks ?? []);
+          const vigentes = checksVigentes((checks ?? []) as FilaCheck[]);
           return (systems ?? []).map((sys) => {
             const sysChecks = vigentes.filter((c) => c.system_id === sys.id);
             return {

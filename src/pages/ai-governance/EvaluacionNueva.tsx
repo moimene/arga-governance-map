@@ -297,7 +297,7 @@ export default function EvaluacionNueva() {
       // trabajo dentro.
       const createdAssessment = await saveAssessment.mutateAsync({ id: draftId, systemId, payload: fila });
       // Un requisito con medidas sin contestar queda NO_EVALUADO, no CONFORME.
-      await createChecks.mutateAsync(payload.checks.map((c) => ({ ...c, system_id: systemId })));
+      await createChecks.mutateAsync({ systemId, assessmentId: createdAssessment.id, checks: payload.checks });
       setCreatedId(createdAssessment.id);
       toast.success(`Autodiagnóstico registrado. Medidas evaluadas: ${payload.evaluadas}/${payload.totales}.`);
       setStep(4);
