@@ -370,7 +370,7 @@ export function perfilAplicable(
     };
   }
 
-  if (rol === "RESPONSABLE_DESPLIEGUE") {
+  if (ROLES_DE_DESPLIEGUE.has(rol)) {
     return {
       requirements: DESPLIEGUE_REQUIREMENTS,
       etiqueta: `Responsable del despliegue · riesgo ${nivel.toLowerCase()}`,
