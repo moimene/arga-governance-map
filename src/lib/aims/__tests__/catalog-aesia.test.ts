@@ -158,9 +158,10 @@ describe("Catálogo interno de requisitos y motor de conversión", () => {
     expect(emptyStats.maturityScore).toBe(0);
 
     // Scenario 2: Half L5 (conforming) and half L1 (gap)
-    const mixedMap: Record<string, { maturity: string }> = {};
+    // L5 con evidencia, como lo escribe el wizard: sin ella no acredita (F1.T5).
+    const mixedMap: Record<string, { maturity: string; evidenceCount?: number }> = {};
     allMeasures.slice(0, 42).forEach((m) => {
-      mixedMap[m.id] = { maturity: "L5" };
+      mixedMap[m.id] = { maturity: "L5", evidenceCount: 1 };
     });
     allMeasures.slice(42).forEach((m) => {
       mixedMap[m.id] = { maturity: "L1" };

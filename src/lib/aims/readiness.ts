@@ -1,11 +1,27 @@
 import { AESIA_RIA_REQUIREMENTS } from "./catalog-aesia";
+import { checksVigentes, evaluacionesVigentes } from "./checks-vigentes";
 import { acreditaConformidad } from "./conformidad";
 import { tieneClasificacionGuiada } from "./cuestionario-calificacion";
+import { ANEXO_IV_SECCIONES, normalizarEstadoSeccion } from "./expediente-tecnico";
+import {
+  evaluacionAcredita,
+  evaluacionFirme,
+  seccionAcredita,
+  sistemasConEvaluacionFirme,
+  sistemasCubiertos,
+  traducirLegado,
+} from "./legado";
+import { monitorDeCodigo } from "./mapa-monitores";
 import { DESPLIEGUE_REQUIREMENTS, codigosDelPerfil } from "./perfil-aplicabilidad";
 import { etiqueta, isMaterialSeverity, normalizeAimsStatus } from "./vocabulario";
 
 export type AimsSourcePosture = "legacy-ai" | "aims-ready" | "local-derived";
-export type AimsReadinessStatus = "ready" | "watch" | "gap";
+/**
+ * `unmeasured`: no hay ningún dato del objeto que el monitor lee — no se
+ * afirma nada. `na`: la población es vacía por hecho (0/0, p. ej. ningún
+ * sistema de alto riesgo) y se pinta gris, no en rojo.
+ */
+export type AimsReadinessStatus = "ready" | "watch" | "gap" | "unmeasured" | "na";
 
 export interface AimsSystemLike {
   id: string;
@@ -21,8 +37,12 @@ export interface AimsAssessmentLike {
   system_id?: string | null;
   status?: string | null;
   score?: number | null;
-  findings?: { code?: string | null; status?: string | null; justification?: string | null }[] | null;
+  findings?: { code?: string | null; status?: string | null; justification?: string | null; evidenceCount?: number | null }[] | null;
   assessment_date?: string | null;
+  framework?: string | null;
+  created_at?: string | null;
+  frozen_at?: string | null;
+  reviewed_at?: string | null;
 }
 
 export interface AimsIncidentLike {
@@ -43,6 +63,23 @@ export interface AimsComplianceCheckLike {
   description?: string | null;
   status?: string | null;
   evidence_url?: string | null;
+  created_at?: string | null;
+  /** Código original si se leyó como legado (`traducirLegado`): no acredita. */
+  codigo_legado?: string;
+}
+
+/** Sección del expediente técnico (`aims_technical_file_sections`). */
+export interface AimsSectionLike {
+  system_id?: string | null;
+  section_code?: string | null;
+  status?: string | null;
+  reviewed_by_id?: string | null;
+}
+
+/** Indicador de vigilancia (`aims_monitoring_indicators`). `status` no se lee: nace «OK» sin medir. */
+export interface AimsIndicatorLike {
+  system_id?: string | null;
+  current_value?: unknown;
 }
 
 export interface AimsReadinessDomain {
@@ -67,7 +104,21 @@ export interface AimsComplianceMonitorDomain {
   metric: string;
   detail: string;
   route: string;
-  source: "ai_systems" | "ai_risk_assessments" | "ai_compliance_checks" | "ai_incidents" | "derived";
+  /**
+   * El objeto del que sale la métrica. Con comprobaciones del área,
+   * `ai_compliance_checks` (y, en los monitores con objeto propio, la métrica
+   * añade el objeto y el estado es el peor de los dos). Sin ellas, el objeto
+   * propio del monitor, y `ninguna` cuando no hay nada que leer.
+   */
+  source:
+    | "ai_systems"
+    | "ai_risk_assessments"
+    | "ai_compliance_checks"
+    | "ai_incidents"
+    | "aims_technical_file_sections"
+    | "aims_monitoring_indicators"
+    | "derived"
+    | "ninguna";
   handoff?: string;
   /** Comprobaciones del área medidas contra un catálogo que no es el del sistema: ni conformes ni brechas. */
   otroCatalogo: number;
@@ -78,6 +129,8 @@ export interface AimsReadinessInput {
   assessments: AimsAssessmentLike[];
   incidents: AimsIncidentLike[];
   complianceChecks?: AimsComplianceCheckLike[];
+  technicalFileSections?: AimsSectionLike[];
+  monitoringIndicators?: AimsIndicatorLike[];
 }
 
 export interface AimsReadinessSummary {
@@ -88,7 +141,14 @@ export interface AimsReadinessSummary {
   standaloneReady: boolean;
   domains: AimsReadinessDomain[];
   complianceMonitors: AimsComplianceMonitorDomain[];
-  nextSteps: string[];
+  /** Pasos derivados del dato: qué falta, cuánto y dónde se hace. Nunca una lista fija. */
+  nextSteps: AimsPaso[];
+}
+
+export interface AimsPaso {
+  label: string;
+  detalle: string;
+  to: string;
 }
 
 // Aquí vivían `aimsScreenPostures` y `aimsReadOnlyHandoffs`. El primero era una
@@ -155,6 +215,23 @@ export function isAimsTechnicalFileGapCandidate(assessment: AimsAssessmentLike) 
   return hasUnapprovedStatus || hasWeakScore || hasOpenFinding;
 }
 
+/**
+ * Un incidente está cerrado SÓLO con estado CERRADO y fecha de cierre. Tener
+ * escritas la causa raíz o la acción correctiva no lo cierra: medido en
+ * Garrigues el 2026-09-19, el incidente de Harvey en investigación salía
+ * «1/1 con cierre» por eso.
+ */
+export function incidenteCerrado(incident: AimsIncidentLike): boolean {
+  return normalizeAimsStatus(incident.status) === "CERRADO" && Boolean(incident.closed_at);
+}
+
+/** «0/1 cerrados · 1 en investigación»: lo que no está cerrado se dice qué es. */
+function metricaCierre(incidents: AimsIncidentLike[]): string {
+  const cerrados = incidents.filter(incidenteCerrado).length;
+  const enInvestigacion = incidents.filter((i) => normalizeAimsStatus(i.status) === "EN_INVESTIGACION").length;
+  return `${cerrados}/${incidents.length} cerrados${enInvestigacion > 0 ? ` · ${enInvestigacion} en investigación` : ""}`;
+}
+
 export function isAimsMaterialIncidentCandidate(incident: AimsIncidentLike) {
   const severity = incident.severity ?? "";
   const status = incident.status ?? "";
@@ -171,9 +248,7 @@ const COMPLIANT_STATUSES = new Set(["CONFORME", "APROBADO", "OK", "CERRADO", "CO
 const WATCH_STATUSES = new Set(["EN_CURSO", "EN_REVISION", "PENDIENTE", "PARCIAL", "BORRADOR"]);
 const GAP_STATUSES = new Set(["NO_CONFORME", "ABIERTO", "BLOQUEADO", "VENCIDO", "CRITICO"]);
 
-type MonitorDefinition = Omit<AimsComplianceMonitorDomain, "status" | "metric" | "otroCatalogo"> & {
-  keywords: string[];
-};
+type MonitorDefinition = Omit<AimsComplianceMonitorDomain, "status" | "metric" | "otroCatalogo">;
 
 const complianceMonitorDefinitions: MonitorDefinition[] = [
   {
@@ -182,8 +257,7 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "ISO 42001",
     detail: "Responsables, aprobación, segregación y gobernanza del sistema de gestión IA.",
     route: "/ai-governance/sistemas",
-    source: "derived",
-    keywords: ["governance", "accountability", "responsable", "owner", "rol", "iso-42001-5", "iso-42001-6"],
+    source: "ninguna",
   },
   {
     id: "inventory-classification",
@@ -192,7 +266,6 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     detail: "Registro completo, estado operativo, riesgo AI Act y uso previsto.",
     route: "/ai-governance/sistemas",
     source: "ai_systems",
-    keywords: ["inventario", "clasificacion", "clasificación", "risk classification", "risk_level", "aia-6"],
   },
   {
     id: "prohibited-practices",
@@ -200,17 +273,15 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "EU AI Act",
     detail: "Detección temprana de usos inaceptables o prácticas no permitidas.",
     route: "/ai-governance/sistemas",
-    source: "derived",
-    keywords: ["prohibited", "prohibida", "inaceptable", "aia-5"],
+    source: "ninguna",
   },
   {
     id: "high-risk-obligations",
     label: "Obligaciones alto riesgo",
     area: "EU AI Act",
-    detail: "Cobertura aprobada para sistemas de alto riesgo y estado de evaluación.",
+    detail: "Gestión de riesgos (art. 9), sistema de gestión de la calidad (art. 17) y cobertura de evaluación de los sistemas de alto riesgo.",
     route: "/ai-governance/evaluaciones",
     source: "ai_risk_assessments",
-    keywords: ["high-risk", "alto riesgo", "aia-8", "aia-9", "aia-10", "aia-14", "aia-15"],
   },
   {
     id: "technical-documentation",
@@ -218,9 +289,8 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "EU AI Act",
     detail: "Documentación técnica, trazabilidad y gaps derivables a GRC como intake.",
     route: "/ai-governance/evaluaciones",
-    source: "ai_risk_assessments",
+    source: "aims_technical_file_sections",
     handoff: "AIMS_TECHNICAL_FILE_GAP",
-    keywords: ["technical file", "expediente tecnico", "expediente técnico", "documentacion tecnica", "documentación técnica", "aia-11"],
   },
   {
     id: "data-governance",
@@ -228,8 +298,7 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "EU AI Act",
     detail: "Calidad, linaje, sesgo, representatividad y control de datasets.",
     route: "/ai-governance/evaluaciones",
-    source: "ai_compliance_checks",
-    keywords: ["data governance", "datos", "dataset", "sesgo", "bias", "calidad", "linaje", "aia-10"],
+    source: "ninguna",
   },
   {
     id: "transparency-user-information",
@@ -237,8 +306,7 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "EU AI Act",
     detail: "Información a usuarios, instrucciones de uso, explicación y avisos.",
     route: "/ai-governance/evaluaciones",
-    source: "ai_compliance_checks",
-    keywords: ["transparency", "transparencia", "usuario", "informacion", "información", "explicabilidad", "aia-13"],
+    source: "ninguna",
   },
   {
     id: "human-oversight",
@@ -246,8 +314,7 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "EU AI Act",
     detail: "Human-in-the-loop, intervención, override y responsabilidades operativas.",
     route: "/ai-governance/evaluaciones",
-    source: "ai_compliance_checks",
-    keywords: ["human oversight", "supervision humana", "supervisión humana", "override", "intervencion", "intervención", "aia-14"],
+    source: "aims_technical_file_sections",
   },
   {
     id: "accuracy-robustness-cybersecurity",
@@ -255,18 +322,16 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "EU AI Act",
     detail: "Rendimiento, resiliencia, drift, seguridad y fallos materiales.",
     route: "/ai-governance/incidentes",
-    source: "ai_incidents",
-    keywords: ["accuracy", "precision", "precisión", "robustez", "robustness", "cyber", "ciber", "drift", "aia-15"],
+    source: "aims_technical_file_sections",
   },
   {
     id: "provider-vendor-third-party",
     label: "Proveedor y terceros",
     area: "Operativo AIMS",
-    detail: "Identificación de vendor, dependencia crítica y posible derivación a GRC TPRM.",
+    detail: "Evaluación del proveedor y de la cadena de suministro; el nombre del proveedor en la ficha no la acredita.",
     route: "/ai-governance/sistemas",
-    source: "ai_systems",
+    source: "ninguna",
     handoff: "AIMS_VENDOR_CONTEXT",
-    keywords: ["vendor", "proveedor", "third party", "tercero", "outsourcing"],
   },
   {
     id: "post-market-monitoring",
@@ -274,8 +339,7 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "EU AI Act",
     detail: "Seguimiento operativo, causa raíz, acciones correctivas e incidentes recurrentes.",
     route: "/ai-governance/incidentes",
-    source: "ai_incidents",
-    keywords: ["post-market", "monitoring", "seguimiento", "corrective", "correctiva", "root cause", "causa raiz", "causa raíz"],
+    source: "aims_monitoring_indicators",
   },
   {
     id: "incident-reporting-escalation",
@@ -285,7 +349,6 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     route: "/ai-governance/incidentes",
     source: "ai_incidents",
     handoff: "AIMS_INCIDENT_MATERIAL",
-    keywords: ["incident", "incidente", "material", "reporting", "escalado", "notificacion", "notificación"],
   },
   {
     id: "fundamental-rights-dpia",
@@ -293,9 +356,8 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "Cross-module",
     detail: "Impacto sobre personas, privacidad, no discriminación y enlace con GDPR cuando proceda.",
     route: "/ai-governance/evaluaciones",
-    source: "derived",
+    source: "ninguna",
     handoff: "AIMS_GDPR_CONTEXT",
-    keywords: ["fundamental rights", "derechos fundamentales", "dpia", "privacidad", "gdpr", "discriminacion", "discriminación"],
   },
   {
     id: "iso-42001-management-system",
@@ -304,7 +366,6 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     detail: "Políticas, objetivos, mejora continua, auditoría interna y revisión de dirección.",
     route: "/ai-governance/evaluaciones",
     source: "ai_risk_assessments",
-    keywords: ["iso 42001", "iso_42001", "management system", "sistema de gestion", "sistema de gestión", "auditoria interna"],
   },
   {
     id: "evidence-recordkeeping",
@@ -312,118 +373,189 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "Operativo AIMS",
     detail: "Referencias, evidencias operativas y límites probatorios explícitos.",
     route: "/ai-governance/evaluaciones",
-    source: "ai_compliance_checks",
-    keywords: ["evidence", "evidencia", "recordkeeping", "registro", "logs", "trazabilidad", "aia-12"],
+    source: "ninguna",
   },
 ];
 
-function normalizeSearchText(...parts: Array<string | null | undefined>) {
-  return parts
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
-
+/** Comprobaciones del monitor, por el código del requisito (`mapa-monitores`), nunca por el texto. */
 function checksForDefinition(checks: AimsComplianceCheckLike[], definition: MonitorDefinition) {
-  const keywords = definition.keywords.map((keyword) => normalizeSearchText(keyword));
-  return checks.filter((check) => {
-    const haystack = normalizeSearchText(check.requirement_code, check.requirement_title, check.description);
-    return keywords.some((keyword) => haystack.includes(keyword));
-  });
+  return checks.filter((check) => monitorDeCodigo(check.requirement_code) === definition.id);
 }
 
-function statusFromChecks(checks: AimsComplianceCheckLike[]): AimsReadinessStatus | null {
+/**
+ * Conforme, no de legado y de un sistema cuya evaluación vigente es firme
+ * (`sistemasConEvaluacionFirme`). Lo demás se cuenta, pero no acredita.
+ */
+function checkAcredita(check: AimsComplianceCheckLike, firmes: Set<string>): boolean {
+  return (
+    !check.codigo_legado &&
+    Boolean(check.system_id && firmes.has(check.system_id)) &&
+    COMPLIANT_STATUSES.has(normalizeAimsStatus(check.status))
+  );
+}
+
+/** Una no conformidad declarada es brecha aunque no esté firmada; una conformidad sin acreditar, sólo vigilancia. */
+function statusFromChecks(checks: AimsComplianceCheckLike[], firmes: Set<string>): AimsReadinessStatus | null {
   if (checks.length === 0) return null;
-  const statuses = checks.map((check) => normalizeAimsStatus(check.status));
+  const statuses = checks.map((check) => {
+    const st = normalizeAimsStatus(check.status);
+    return !GAP_STATUSES.has(st) && !checkAcredita(check, firmes) && (check.codigo_legado || COMPLIANT_STATUSES.has(st)) ? "PENDIENTE" : st;
+  });
   if (statuses.some((status) => GAP_STATUSES.has(status))) return "gap";
   if (statuses.every((status) => COMPLIANT_STATUSES.has(status))) return "ready";
   if (statuses.some((status) => WATCH_STATUSES.has(status))) return "watch";
   return "watch";
 }
 
+function metricaChecks(checks: AimsComplianceCheckLike[], firmes: Set<string>): string {
+  const legado = checks.filter((c) => c.codigo_legado).length;
+  const sinFirmar = checks.filter(
+    (c) => !c.codigo_legado && COMPLIANT_STATUSES.has(normalizeAimsStatus(c.status)) && !checkAcredita(c, firmes),
+  ).length;
+  return [
+    `${checks.filter((c) => checkAcredita(c, firmes)).length}/${checks.length} acreditadas`,
+    legado > 0 ? `${legado} de legado, no acredita` : null,
+    sinFirmar > 0 ? `${sinFirmar} declaradas conformes sin congelar y revisar` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/**
+ * Monitores con objeto propio (F1.T3): las comprobaciones no mandan sobre él.
+ * El estado es el peor de los dos, y sin el objeto medido nunca es «Listo».
+ */
+const MONITORES_CON_OBJETO = new Set([
+  "technical-documentation",
+  "human-oversight",
+  "accuracy-robustness-cybersecurity",
+  "post-market-monitoring",
+  "evidence-recordkeeping",
+]);
+
+function peor(a: AimsReadinessStatus, b: AimsReadinessStatus): AimsReadinessStatus {
+  const orden: AimsReadinessStatus[] = ["gap", "watch", "ready"];
+  const rango = (s: AimsReadinessStatus) => (s === "unmeasured" || s === "na" ? 1 : orden.indexOf(s));
+  return orden[Math.min(rango(a), rango(b))];
+}
+
+/**
+ * Cobertura de alto riesgo, contada SÓLO entre sistemas clasificados por
+ * cuestionario (`tieneClasificacionGuiada`): el «Alto» declarado en ficha no es
+ * un nivel medido. Con algún sistema sin cuestionario no se afirma «no aplica»
+ * (no medido) ni «Listo» (puede haber más de alto riesgo).
+ */
+function medirAltoRiesgo(systems: AimsSystemLike[], cubiertos: Set<string>) {
+  const guiados = systems.filter(tieneClasificacionGuiada);
+  const sinCuestionario = systems.length - guiados.length;
+  const altos = guiados.filter((system) => system.risk_level === "Alto");
+  const acreditados = altos.filter((system) => cubiertos.has(system.id)).length;
+  const declaradosAlto = systems.filter((s) => !tieneClasificacionGuiada(s) && s.risk_level === "Alto").length;
+  const base = { altos: altos.length, acreditados, declaradosAlto };
+  if (altos.length === 0) {
+    return sinCuestionario > 0
+      ? { ...base, status: "unmeasured" as AimsReadinessStatus, metric: `${sinCuestionario} sistemas sin cuestionario` }
+      : { ...base, status: "na" as AimsReadinessStatus, metric: "Sin sistemas de alto riesgo" };
+  }
+  const medido = domainStatus(pct(acreditados, altos.length), 50, 100);
+  return {
+    ...base,
+    status: medido === "ready" && sinCuestionario > 0 ? ("watch" as AimsReadinessStatus) : medido,
+    metric: `${acreditados}/${altos.length} alto riesgo${sinCuestionario > 0 ? ` · ${sinCuestionario} sistemas sin cuestionario` : ""}`,
+  };
+}
+
+/**
+ * Lectura de secciones. `anexoCompleto`: sólo es Listo si cada sistema con
+ * expediente tiene las nueve secciones del anexo IV acreditadas — cuatro de
+ * nueve, aunque las cuatro acrediten, no son un expediente.
+ */
+function medirSecciones(
+  secciones: AimsSectionLike[],
+  anexoCompleto: boolean,
+): { status: AimsReadinessStatus; metric: string } | null {
+  if (secciones.length === 0) return null;
+  const acreditadas = secciones.filter(seccionAcredita);
+  const metric = `${acreditadas.length}/${secciones.length} secciones con revisor`;
+  if (secciones.some((s) => normalizarEstadoSeccion(s.status) === "NON_CONFORMING")) return { status: "gap", metric };
+  const completo =
+    !anexoCompleto ||
+    [...new Set(secciones.map((s) => s.system_id))].every((id) =>
+      ANEXO_IV_SECCIONES.every((a) => acreditadas.some((s) => s.system_id === id && s.section_code === a.code)),
+    );
+  return { status: acreditadas.length === secciones.length && completo ? "ready" : "watch", metric };
+}
+
 function fallbackMonitorStatus(
   definition: MonitorDefinition,
-  input: Required<Pick<AimsReadinessInput, "systems" | "assessments" | "incidents">>,
+  input: AimsReadinessInput,
 ): { status: AimsReadinessStatus; metric: string } {
   const { systems, assessments, incidents } = input;
+  // Cada monitor lee su objeto, y sólo el de los sistemas que se están mirando.
+  const ids = new Set(systems.map((system) => system.id));
+  const secciones = (input.technicalFileSections ?? []).filter((s) => s.system_id && ids.has(s.system_id));
+  const indicadores = (input.monitoringIndicators ?? []).filter((i) => i.system_id && ids.has(i.system_id));
+  const seccion = (code: string) => secciones.filter((s) => s.section_code === code);
   const totalSystems = systems.length;
-  const activeSystems = systems.filter((system) => normalizeAimsStatus(system.status) === "ACTIVO").length;
-  const highRiskSystems = systems.filter((system) => system.risk_level === "Alto");
-  const inacceptableSystems = systems.filter((system) => system.risk_level === "Inaceptable");
-  const assessedSystemIds = new Set(
-    assessments
-      .filter((assessment) => assessmentAcreditaConformidad(assessment.status) && assessment.system_id)
-      .map((assessment) => assessment.system_id as string),
-  );
-  const highRiskAssessed = highRiskSystems.filter((system) => assessedSystemIds.has(system.id)).length;
-  const technicalGaps = assessments.filter(isAimsTechnicalFileGapCandidate).length;
+  // Cubierto = su evaluación vigente (la más reciente no borrador) acredita.
+  const altoRiesgo = medirAltoRiesgo(systems, sistemasCubiertos(assessments));
   const materialIncidents = incidents.filter(isAimsMaterialIncidentCandidate).length;
-  const incidentsWithClosureEvidence = incidents.filter(
-    (incident) => incident.root_cause || incident.corrective_action || incident.closed_at,
-  ).length;
-  const systemsWithVendor = systems.filter((system) => Boolean(system.vendor)).length;
-  const isoAssessments = assessments.filter((assessment) =>
-    normalizeSearchText((assessment as { framework?: string | null }).framework).includes("iso"),
-  );
-  const approvedIsoAssessments = isoAssessments.filter((assessment) =>
-    assessmentAcreditaConformidad(assessment.status),
-  ).length;
+  const conClasificacionGuiada = systems.filter(tieneClasificacionGuiada).length;
+  const isoAssessments = evaluacionesVigentes(assessments).filter((assessment) => assessment.framework === "ISO_42001");
+  const approvedIsoAssessments = isoAssessments.filter(evaluacionAcredita).length;
 
   switch (definition.id) {
     case "inventory-classification":
       return {
-        status: domainStatus(pct(activeSystems, totalSystems), 50, 80),
-        metric: totalSystems === 0 ? "0 sistemas" : `${activeSystems}/${totalSystems} activos`,
+        status: domainStatus(pct(conClasificacionGuiada, totalSystems), 50, 80),
+        metric: totalSystems === 0 ? "0 sistemas" : `${conClasificacionGuiada}/${totalSystems} con clasificación guiada`,
       };
+    // El nivel «Inaceptable» de la ficha no es un análisis del art. 5, y ese
+    // valor ya no lo escribe ningún camino. Hasta que el análisis exista, no se
+    // afirma nada.
     case "prohibited-practices":
-      return {
-        status: inacceptableSystems.length > 0 ? "gap" : totalSystems > 0 ? "watch" : "gap",
-        metric: systems.length === 0 ? "Sin inventario" : `${inacceptableSystems.length} inaceptables`,
-      };
+      return { status: "unmeasured", metric: "Sin análisis del art. 5" };
     case "high-risk-obligations":
-      return {
-        status: domainStatus(pct(highRiskAssessed, highRiskSystems.length), 50, 100),
-        metric: highRiskSystems.length === 0 ? "Sin alto riesgo" : `${highRiskAssessed}/${highRiskSystems.length} alto riesgo`,
-      };
+      return { status: altoRiesgo.status, metric: altoRiesgo.metric };
+    // Expediente: sus secciones. Precisión: la del anexo IV.4 (métricas de
+    // rendimiento). Supervisión: la del anexo IV.3 (supervisión, funcionamiento
+    // y control). Sin la sección, «no medido»: ya no se cae a incidentes.
     case "technical-documentation":
-      return {
-        status: technicalGaps === 0 && assessments.length > 0 ? "ready" : technicalGaps <= 2 ? "watch" : "gap",
-        metric: assessments.length === 0 ? "Sin evaluaciones" : `${technicalGaps} gaps`,
-      };
+      return medirSecciones(secciones, true) ?? { status: "unmeasured", metric: "Sin expediente técnico" };
     case "accuracy-robustness-cybersecurity":
+      return medirSecciones(seccion("AIV-04"), false) ?? { status: "unmeasured", metric: "Sin sección del anexo IV.4" };
+    case "human-oversight":
+      return medirSecciones(seccion("AIV-03"), false) ?? { status: "unmeasured", metric: "Sin sección del anexo IV.3" };
     case "incident-reporting-escalation":
       return {
-        status: incidents.length === 0 ? "watch" : materialIncidents === 0 ? "ready" : materialIncidents <= 2 ? "watch" : "gap",
+        status: incidents.length === 0 ? "unmeasured" : materialIncidents === 0 ? "ready" : materialIncidents <= 2 ? "watch" : "gap",
         metric: incidents.length === 0 ? "Sin incidentes registrados" : `${materialIncidents} materiales`,
       };
-    case "provider-vendor-third-party":
-      return {
-        status: domainStatus(pct(systemsWithVendor, totalSystems), 50, 80),
-        metric: totalSystems === 0 ? "0 proveedores" : `${systemsWithVendor}/${totalSystems} con vendor`,
-      };
-    case "post-market-monitoring":
+    // Indicadores. `status` no se lee (nace «OK» sin medir): mide quien tiene
+    // valor. Con valor y sin umbral evaluado, vigilancia — nunca Listo.
+    case "post-market-monitoring": {
+      if (indicadores.length === 0) return { status: "unmeasured", metric: "Sin indicadores de vigilancia" };
+      const medidos = indicadores.filter((i) => i.current_value !== null && i.current_value !== undefined).length;
+      return medidos === 0
+        ? { status: "unmeasured", metric: `${indicadores.length} indicadores sin medición` }
+        : { status: "watch", metric: `${medidos}/${indicadores.length} indicadores con medición` };
+    }
+    // Registro: su objeto es el protocolo de conservación de registros, que
+    // todavía no existe como dato. Sin él, «no medido».
     case "evidence-recordkeeping":
-      return {
-        status: incidents.length === 0 ? "watch" : domainStatus(pct(incidentsWithClosureEvidence, incidents.length), 50, 80),
-        metric: incidents.length === 0 ? "Sin incidentes" : `${incidentsWithClosureEvidence}/${incidents.length} con cierre`,
-      };
+      return { status: "unmeasured", metric: "Sin protocolo de registro" };
     case "iso-42001-management-system":
       return {
-        status: isoAssessments.length === 0 ? "gap" : domainStatus(pct(approvedIsoAssessments, isoAssessments.length), 50, 80),
-        metric: isoAssessments.length === 0 ? "Sin ISO" : `${approvedIsoAssessments}/${isoAssessments.length} aprobadas`,
+        status: isoAssessments.length === 0 ? "unmeasured" : domainStatus(pct(approvedIsoAssessments, isoAssessments.length), 50, 80),
+        metric: isoAssessments.length === 0 ? "Sin evaluaciones ISO 42001" : `${approvedIsoAssessments}/${isoAssessments.length} acreditadas`,
       };
-    case "governance-accountability":
-    case "fundamental-rights-dpia":
-    case "data-governance":
-    case "transparency-user-information":
-    case "human-oversight":
+    // Sin comprobaciones con el código del área no hay nada medido: que exista
+    // alguna evaluación del sistema no dice nada de ESTA área. Terceros entra
+    // aquí: tener el proveedor escrito en la ficha no es haber evaluado al
+    // tercero.
+    case "provider-vendor-third-party":
     default:
-      return {
-        status: assessments.length > 0 ? "watch" : "gap",
-        metric: assessments.length > 0 ? "Derivado" : "Sin cobertura",
-      };
+      return { status: "unmeasured", metric: "Sin comprobaciones del área" };
   }
 }
 
@@ -453,20 +585,19 @@ export function apartarChecksDeOtroCatalogo(systems: AimsSystemLike[], checks: A
 }
 
 export function buildAimsComplianceMonitors(input: AimsReadinessInput): AimsComplianceMonitorDomain[] {
-  const { medibles: checks, otroCatalogo } = apartarChecksDeOtroCatalogo(input.systems, input.complianceChecks ?? []);
-  const base = {
-    systems: input.systems,
-    assessments: input.assessments,
-    incidents: input.incidents,
-  };
-
+  // El legado se LEE con su código vigente (sin tocar la fila) y, tras
+  // traducirlo, manda la comprobación más reciente de cada requisito.
+  const traducidas = checksVigentes((input.complianceChecks ?? []).map(traducirLegado));
+  const { medibles: checks, otroCatalogo } = apartarChecksDeOtroCatalogo(input.systems, traducidas);
+  const firmes = sistemasConEvaluacionFirme(input.assessments);
   return complianceMonitorDefinitions.map((definition) => {
     const matchingChecks = checksForDefinition(checks, definition);
-    const checkedStatus = statusFromChecks(matchingChecks);
-    const fallback = fallbackMonitorStatus(definition, base);
-    const status = checkedStatus ?? fallback.status;
+    const checkedStatus = statusFromChecks(matchingChecks, firmes);
+    const fallback = fallbackMonitorStatus(definition, input);
+    const conObjeto = MONITORES_CON_OBJETO.has(definition.id);
+    const status = checkedStatus === null ? fallback.status : conObjeto ? peor(checkedStatus, fallback.status) : checkedStatus;
     const metric = matchingChecks.length > 0
-      ? `${matchingChecks.filter((check) => COMPLIANT_STATUSES.has(normalizeAimsStatus(check.status))).length}/${matchingChecks.length} conformes`
+      ? [metricaChecks(matchingChecks, firmes), conObjeto ? fallback.metric : null].filter(Boolean).join(" · ")
       : fallback.metric;
 
     return {
@@ -484,28 +615,75 @@ export function buildAimsComplianceMonitors(input: AimsReadinessInput): AimsComp
   });
 }
 
-export function buildAimsReadiness({
-  systems,
-  assessments,
-  incidents,
-  complianceChecks = [],
-}: AimsReadinessInput): AimsReadinessSummary {
+/**
+ * Siguientes pasos, derivados del dato disponible (F1.T8). Sustituye a la lista
+ * fija que decía lo mismo con cualquier inventario. Sólo aparece lo que el dato
+ * señala, con su cuenta y su pantalla.
+ */
+function pasosDelDato(n: {
+  totalSystems: number;
+  sinClasificar: number;
+  sinFirmar: number;
+  altoSinAcreditar: number;
+  declaradosAlto: number;
+  abiertos: number;
+  conBrechas: number;
+}): AimsPaso[] {
+  if (n.totalSystems === 0) {
+    return [{ label: "Dar de alta un sistema IA", detalle: "Sin sistemas en el inventario.", to: "/ai-governance/sistemas/nuevo" }];
+  }
+  const pasos: Array<AimsPaso | false> = [
+    n.sinClasificar > 0 && {
+      label: "Clasificar con el cuestionario guiado",
+      detalle: `${n.sinClasificar} sistemas sin clasificación guiada completada.`,
+      to: "/ai-governance/sistemas",
+    },
+    n.sinFirmar > 0 && {
+      label: "Congelar y revisar autodiagnósticos",
+      detalle: `${n.sinFirmar} autodiagnósticos vigentes sin congelar y revisar: no acreditan.`,
+      to: "/ai-governance/evaluaciones",
+    },
+    n.altoSinAcreditar > 0 && {
+      label: "Acreditar los sistemas de alto riesgo",
+      detalle: `${n.altoSinAcreditar} sistemas de alto riesgo sin autodiagnóstico acreditado.`,
+      to: "/ai-governance/evaluaciones",
+    },
+    n.declaradosAlto > 0 && {
+      label: "Clasificar los declarados de alto riesgo",
+      detalle: `${n.declaradosAlto} declarados Alto en ficha, sin cuestionario.`,
+      to: "/ai-governance/sistemas",
+    },
+    n.abiertos > 0 && {
+      label: "Seguir los incidentes",
+      detalle: `${n.abiertos} incidentes abiertos o en investigación.`,
+      to: "/ai-governance/incidentes",
+    },
+    n.conBrechas > 0 && {
+      label: "Proponer riesgo a GRC",
+      detalle: `${n.conBrechas} autodiagnósticos con brechas que pueden derivarse a GRC (solo lectura).`,
+      to: "/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP",
+    },
+  ];
+  return pasos.filter((paso): paso is AimsPaso => Boolean(paso));
+}
+
+export function buildAimsReadiness(input: AimsReadinessInput): AimsReadinessSummary {
+  const { systems, assessments, incidents } = input;
   const totalSystems = systems.length;
-  const activeSystems = systems.filter((system) => normalizeAimsStatus(system.status) === "ACTIVO").length;
-  const assessedSystemIds = new Set(
-    assessments
-      .filter((assessment) => assessmentAcreditaConformidad(assessment.status) && assessment.system_id)
-      .map((assessment) => assessment.system_id as string),
-  );
-  const highRiskSystems = systems.filter((system) => system.risk_level === "Alto");
-  const highRiskAssessed = highRiskSystems.filter((system) => assessedSystemIds.has(system.id)).length;
-  const openIncidents = incidents.filter((incident) =>
-    ["ABIERTO", "EN_INVESTIGACION"].includes(normalizeAimsStatus(incident.status)),
-  ).length;
-  const incidentsWithClosureEvidence = incidents.filter(
-    (incident) => incident.root_cause || incident.corrective_action || incident.closed_at,
-  ).length;
-  const findings = assessments.flatMap((assessment) => assessment.findings ?? []);
+  const altoRiesgo = medirAltoRiesgo(systems, sistemasCubiertos(assessments));
+  const openIncidents = incidents.filter((incident) => !incidenteCerrado(incident)).length;
+  const incidentesCerrados = incidents.filter(incidenteCerrado).length;
+  const conClasificacionGuiada = systems.filter(tieneClasificacionGuiada).length;
+  // Sólo la última evaluación no borrador de cada sistema y marco: los
+  // borradores y las repeticiones no son hallazgos vigentes.
+  const vigentes = evaluacionesVigentes(assessments);
+  const findings = vigentes.flatMap((assessment) => assessment.findings ?? []);
+  // Hallazgos de evaluaciones sin congelar y revisar: se cuentan, pero no
+  // pueden llevar «Controles» a Listo (acredita sólo lo congelado y revisado).
+  const sinFirmar = vigentes
+    .filter((assessment) => !evaluacionFirme(assessment))
+    .flatMap((assessment) => assessment.findings ?? [])
+    .filter((finding) => finding.code || finding.status).length;
   const controlFindings = findings.filter((finding) => finding.code || finding.status);
   // El vocabulario que el producto ESCRIBE en `findings[].status` es el nivel
   // de madurez (`L1`…`L8`), no una palabra de estado: `buildEvaluationPayload`
@@ -517,14 +695,13 @@ export function buildAimsReadiness({
     const st = normalizeAimsStatus(finding.status);
     if (["CERRADO", "APROBADO", "CONFORME", "OK"].includes(st)) return true;
     // Mismo criterio que el wizard y que el payload: `L8` sin justificación no
-    // cierra nada. Se pasa el finding ENTERO, no sólo su `status`, porque la
-    // regla necesita la justificación.
-    return acreditaConformidad({ status: st, justification: finding.justification });
+    // cierra nada, ni `L5` sin evidencia (F1.T5). Se pasan la justificación y
+    // el recuento de evidencia, que la regla necesita.
+    return acreditaConformidad({ status: st, justification: finding.justification, evidenceCount: finding.evidenceCount });
   }).length;
 
-  const inventoryCoverage = pct(activeSystems, totalSystems);
-  const assessmentCoverage = pct(highRiskAssessed, highRiskSystems.length);
-  const incidentClosureCoverage = pct(incidentsWithClosureEvidence, incidents.length);
+  const inventoryCoverage = pct(conClasificacionGuiada, totalSystems);
+  const incidentClosureCoverage = pct(incidentesCerrados, incidents.length);
   const controlCoverage = pct(closedControlFindings, controlFindings.length);
 
   const domains: AimsReadinessDomain[] = [
@@ -533,17 +710,17 @@ export function buildAimsReadiness({
       hasData: systems.length > 0,
       label: "Inventario",
       status: domainStatus(inventoryCoverage, 50, 80),
-      metric: totalSystems === 0 ? "0 sistemas" : `${activeSystems}/${totalSystems} activos`,
-      detail: "Registro operativo de sistemas IA, proveedor, tipo, estado y riesgo.",
+      metric: totalSystems === 0 ? "0 sistemas" : `${conClasificacionGuiada}/${totalSystems} con clasificación guiada`,
+      detail: "Registro operativo de sistemas IA, clasificados por cuestionario guiado completado.",
       route: "/ai-governance/sistemas",
     },
     {
       id: "ai-act-assessments",
       hasData: assessments.length > 0,
-      label: "Evaluaciones AI Act",
-      status: domainStatus(assessmentCoverage, 50, 100),
-      metric: highRiskSystems.length === 0 ? "Sin alto riesgo" : `${highRiskAssessed}/${highRiskSystems.length} alto riesgo`,
-      detail: "Cobertura aprobada para sistemas de riesgo alto y trazabilidad de evaluaciones.",
+      label: "Autodiagnóstico de madurez · alto riesgo",
+      status: altoRiesgo.status,
+      metric: altoRiesgo.metric,
+      detail: "Sistemas clasificados de alto riesgo por cuestionario cuyo autodiagnóstico vigente está congelado, revisado y conforme.",
       route: "/ai-governance/evaluaciones",
     },
     {
@@ -552,7 +729,7 @@ export function buildAimsReadiness({
       label: "Incidentes",
       // Sin un solo incidente registrado no se sabe si hay incidencias: es
       // ausencia de dato, no conformidad.
-      status: incidents.length === 0 ? "watch" : openIncidents === 0 ? "ready" : openIncidents <= 2 ? "watch" : "gap",
+      status: incidents.length === 0 ? "unmeasured" : openIncidents === 0 ? "ready" : openIncidents <= 2 ? "watch" : "gap",
       metric: incidents.length === 0 ? "Sin incidentes registrados" : `${openIncidents} abiertos`,
       detail: "Registro de severidad, investigación, causa raíz y acción correctiva.",
       route: "/ai-governance/incidentes",
@@ -561,17 +738,26 @@ export function buildAimsReadiness({
       id: "controls",
       hasData: controlFindings.length > 0,
       label: "Controles",
-      status: controlFindings.length === 0 ? "watch" : domainStatus(controlCoverage, 40, 75),
-      metric: controlFindings.length === 0 ? "Derivado" : `${closedControlFindings}/${controlFindings.length} cerrados`,
-      detail: "Postura derivada de findings de evaluación; no crea controles paralelos.",
+      status:
+        controlFindings.length === 0
+          ? "unmeasured"
+          : domainStatus(controlCoverage, 40, 75) === "ready" && sinFirmar > 0
+            ? "watch"
+            : domainStatus(controlCoverage, 40, 75),
+      metric:
+        controlFindings.length === 0
+          ? "Sin hallazgos de evaluación"
+          : `${closedControlFindings}/${controlFindings.length} cerrados${sinFirmar > 0 ? ` · ${sinFirmar} sin congelar y revisar` : ""}`,
+      detail: "Hallazgos de la última evaluación no borrador de cada sistema; no crea controles paralelos.",
       route: "/ai-governance/evaluaciones",
     },
     {
       id: "operational-evidence",
       hasData: incidents.length > 0,
       label: "Evidencias operativas",
-      status: incidents.length === 0 ? "watch" : domainStatus(incidentClosureCoverage, 50, 80),
-      metric: incidents.length === 0 ? "Pendiente" : `${incidentsWithClosureEvidence}/${incidents.length} con cierre`,
+      // 0/0: sin incidentes no hay nada que cerrar — gris, no brecha.
+      status: incidents.length === 0 ? "na" : domainStatus(incidentClosureCoverage, 50, 80),
+      metric: incidents.length === 0 ? "Sin incidentes que cerrar" : metricaCierre(incidents),
       detail: "Evidencia funcional para demo; no se presenta como evidencia probatoria final.",
       route: "/ai-governance/incidentes",
     },
@@ -588,7 +774,7 @@ export function buildAimsReadiness({
       route: "/ai-governance",
     },
   ];
-  const complianceMonitors = buildAimsComplianceMonitors({ systems, assessments, incidents, complianceChecks });
+  const complianceMonitors = buildAimsComplianceMonitors(input);
 
   return {
     sourcePosture: "legacy-ai",
@@ -603,18 +789,21 @@ export function buildAimsReadiness({
     // `migration` queda fuera del cómputo: es una nota de postura sobre el
     // backbone, no un dominio de cumplimiento con dato propio, y por eso su
     // `hasData` es false por definición.
+    // «No medido» tampoco sostiene la operabilidad, aunque haya filas.
     standaloneReady: domains
       .filter((domain) => domain.id !== "migration")
-      .every((domain) => domain.status !== "gap" && domain.hasData),
+      .every((domain) => domain.status !== "gap" && domain.status !== "unmeasured" && domain.hasData),
     domains,
     complianceMonitors,
-    nextSteps: [
-      "Cerrar evaluación aprobada de cada sistema de riesgo Alto.",
-      "Completar monitorización por dominios AI Act, ISO 42001, proveedores, post-market y derechos fundamentales.",
-      "Convertir findings abiertos en controles GRC solo mediante contrato cross-module aprobado.",
-      "Preparar la correspondencia entre el inventario legado y el backbone técnico antes de cualquier migración.",
-      "Enlazar evidencia final únicamente cuando la custodia de evidencias y el registro de auditoría estén declarados aptos.",
-    ],
+    nextSteps: pasosDelDato({
+      totalSystems,
+      sinClasificar: totalSystems - conClasificacionGuiada,
+      sinFirmar: vigentes.filter((assessment) => !evaluacionFirme(assessment)).length,
+      altoSinAcreditar: altoRiesgo.altos - altoRiesgo.acreditados,
+      declaradosAlto: altoRiesgo.declaradosAlto,
+      abiertos: openIncidents,
+      conBrechas: vigentes.filter(isAimsTechnicalFileGapCandidate).length,
+    }),
   };
 }
 

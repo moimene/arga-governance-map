@@ -87,7 +87,7 @@ export type EvaluationFinding = {
    * Evidencias VIGENTES atadas a la medida en el momento de guardar. Se
    * persiste para que el read model del dashboard pueda aplicar la regla sin
    * volver a consultar. `undefined` en las filas anteriores al 2026-09-07:
-   * entonces no había dónde guardar evidencia, así que es «no medido».
+   * «pendiente de evidencia», que desde F1.T5 tampoco acredita.
    */
   evidenceCount?: number;
 };
@@ -160,8 +160,8 @@ export function buildEvaluationPayload(
   additionalMeasures: MedidaAdicionalRef[] = [],
   /**
    * Evidencias vigentes por código de medida. Se omite cuando el llamante no
-   * las ha medido: entonces el finding no lleva `evidenceCount` y la regla no
-   * degrada nada, que es lo correcto para «no medido».
+   * las ha medido: entonces el finding no lleva `evidenceCount` y un L5 queda
+   * «pendiente de evidencia», que no acredita (F1.T5). El wizard la pasa siempre.
    */
   evidenciasPorMedida?: Record<string, number>,
 ): EvaluationPayload {

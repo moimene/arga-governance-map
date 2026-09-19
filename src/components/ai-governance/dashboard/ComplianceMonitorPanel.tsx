@@ -20,7 +20,10 @@ const ETIQUETA_FUENTE: Record<AimsComplianceMonitorDomain["source"], string> = {
   ai_risk_assessments: "Evaluaciones",
   ai_compliance_checks: "Comprobaciones",
   ai_incidents: "Incidentes",
+  aims_technical_file_sections: "Expediente técnico",
+  aims_monitoring_indicators: "Indicadores",
   derived: "Derivado",
+  ninguna: "Sin fuente",
 };
 
 const COMPLIANCE_MONITOR_ICONS: Record<string, React.ElementType> = {
@@ -46,6 +49,8 @@ export function ComplianceMonitorPanel({ monitors }: { monitors: AimsComplianceM
     ready: monitors.filter((monitor) => monitor.status === "ready").length,
     watch: monitors.filter((monitor) => monitor.status === "watch").length,
     gap: monitors.filter((monitor) => monitor.status === "gap").length,
+    sinMedir: monitors.filter((monitor) => monitor.status === "unmeasured").length,
+    noAplica: monitors.filter((monitor) => monitor.status === "na").length,
   };
 
   return (
@@ -86,6 +91,20 @@ export function ComplianceMonitorPanel({ monitors }: { monitors: AimsComplianceM
             >
               {summary.gap} gaps
             </span>
+            {[
+              [summary.sinMedir, "no medidos"],
+              [summary.noAplica, "no aplican"],
+            ].map(([n, rotulo]) =>
+              Number(n) > 0 ? (
+                <span
+                  key={rotulo}
+                  className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] px-2.5 py-1 text-xs font-semibold text-[var(--g-text-secondary)]"
+                  style={{ borderRadius: "var(--g-radius-full)" }}
+                >
+                  {n} {rotulo}
+                </span>
+              ) : null,
+            )}
           </div>
         </div>
       </div>

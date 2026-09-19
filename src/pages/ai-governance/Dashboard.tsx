@@ -1,12 +1,13 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { AlertTriangle, ArrowRight, Brain, Clock, Cpu } from "lucide-react";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { useAiIncidentsList } from "@/hooks/useAiIncidents";
 import { useAllAssessments, useAllComplianceChecks } from "@/hooks/useAiAssessments";
+import { useAimsMonitoringIndicatorsDelTenant, useAimsTechnicalFileSectionsDelTenant } from "@/hooks/useAimsTechnicalFile";
 import {
-  assessmentAcreditaConformidad,
   buildAimsReadiness,
   filterSystemsByScope,
+  incidenteCerrado,
   isAimsMaterialIncidentCandidate,
   normalizeAimsStatus,
   systemStatusChipClass,
@@ -17,10 +18,12 @@ import { useTenantContext } from "@/context/TenantContext";
 import { useBodyBySlug } from "@/hooks/useBodies";
 import { aiGovernanceBodySlug } from "@/lib/aims/governing-body";
 import { claseNivelRiesgo } from "@/lib/aims/vocabulario";
+import { sistemasCubiertos } from "@/lib/aims/legado";
 import { tieneClasificacionGuiada } from "@/lib/aims/cuestionario-calificacion";
 import { ClasificacionGuiadaCard } from "@/components/ai-governance/dashboard/ClasificacionGuiadaCard";
 import { ComplianceMonitorPanel } from "@/components/ai-governance/dashboard/ComplianceMonitorPanel";
 import { IncidentesRecientes } from "@/components/ai-governance/dashboard/IncidentesRecientes";
+import { KpiCard } from "@/components/ai-governance/dashboard/KpiCard";
 import { OrganoRector } from "@/components/ai-governance/dashboard/OrganoRector";
 import { PrioridadAhora } from "@/components/ai-governance/dashboard/PrioridadAhora";
 import { ReadinessDomains } from "@/components/ai-governance/dashboard/ReadinessDomains";
@@ -39,63 +42,6 @@ function RiskBadge({ system }: { system: { risk_level: string | null; regulatory
   );
 }
 
-function KpiCard({
-  label,
-  value,
-  sub,
-  icon: Icon,
-  tone,
-  to,
-}: {
-  label: string;
-  value: string | number;
-  sub?: string;
-  icon: React.ElementType;
-  tone?: "success" | "error" | "warning" | "info" | "neutral";
-  to?: string;
-}) {
-  const navigate = useNavigate();
-  // `neutral` para el cero SIN dato: un 0 verde afirma «no hay ninguno» cuando
-  // en realidad no hay nada con que contarlo.
-  const toneColor: Record<string, string> = {
-    success: "text-[var(--status-success)]",
-    error:   "text-[var(--status-error)]",
-    warning: "text-[var(--status-warning)]",
-    info:    "text-[var(--status-info)]",
-    neutral: "text-[var(--g-text-secondary)]",
-  };
-  const iconBg: Record<string, string> = {
-    success: "bg-[var(--status-success)]/10",
-    error:   "bg-[var(--status-error)]/10",
-    warning: "bg-[var(--status-warning)]/10",
-    info:    "bg-[var(--status-info)]/10",
-    neutral: "bg-[var(--g-surface-muted)]",
-  };
-  const t = tone ?? "info";
-  return (
-    <div
-      className={`bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-5 flex flex-col gap-3 ${to ? "cursor-pointer hover:border-[var(--g-brand-3308)] transition-colors" : ""}`}
-      style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-      onClick={to ? () => navigate(to) : undefined}
-      role={to ? "button" : undefined}
-      tabIndex={to ? 0 : undefined}
-      onKeyDown={to ? (e) => e.key === "Enter" && navigate(to) : undefined}
-    >
-      <div className="flex items-start justify-between">
-        <div className={`flex h-10 w-10 items-center justify-center ${iconBg[t]}`} style={{ borderRadius: "var(--g-radius-md)" }}>
-          <Icon className={`h-5 w-5 ${toneColor[t]}`} />
-        </div>
-        {to && <ArrowRight className="h-4 w-4 text-[var(--g-text-secondary)]" />}
-      </div>
-      <div>
-        <div className={`text-2xl font-bold ${toneColor[t]}`}>{value}</div>
-        <div className="text-sm font-medium text-[var(--g-text-primary)] mt-0.5">{label}</div>
-        {sub && <div className="text-xs text-[var(--g-text-secondary)] mt-1">{sub}</div>}
-      </div>
-    </div>
-  );
-}
-
 export default function AiDashboard() {
   const { scope } = useScope();
   // Órgano de gobierno de la IA del tenant. Doble puerta: el mapa no devuelve
@@ -108,8 +54,11 @@ export default function AiDashboard() {
   const { data: rawIncidents = [], isLoading: loadingIncidents, error: errIncidents } = useAiIncidentsList();
   const { data: rawAssessments = [], isLoading: loadingAssessments, error: errAssessments } = useAllAssessments();
   const { data: rawComplianceChecks = [], isLoading: loadingComplianceChecks, error: errChecks } = useAllComplianceChecks();
+  // Objetos propios de los monitores (F1.T3); `readiness` los acota a los sistemas visibles.
+  const { data: technicalFileSections = [], isLoading: loadingSections, error: errSections } = useAimsTechnicalFileSectionsDelTenant();
+  const { data: monitoringIndicators = [], isLoading: loadingIndicators, error: errIndicators } = useAimsMonitoringIndicatorsDelTenant();
   // Una lectura fallida no es un inventario vacío: se dice el motivo, no «—».
-  const fallo = [errSystems, errIncidents, errAssessments, errChecks].find(Boolean) as Error | undefined;
+  const fallo = [errSystems, errIncidents, errAssessments, errChecks, errSections, errIndicators].find(Boolean) as Error | undefined;
 
   const systems = filterSystemsByScope(rawSystems, scope);
   const systemIds = new Set(systems.map((s) => s.id));
@@ -135,34 +84,35 @@ export default function AiDashboard() {
   ]
     .filter(Boolean)
     .join(" · ");
-  const alto    = systems.filter((s) => s.risk_level === "Alto").length;
-  const limitado = systems.filter((s) => s.risk_level === "Limitado").length;
-  const minimo  = systems.filter((s) => s.risk_level === "Mínimo").length;
+  // El gráfico sólo colorea el nivel que sale de un cuestionario; el declarado
+  // en ficha va aparte y neutro, como el chip del inventario (F1.T8).
+  const guiados = systems.filter(tieneClasificacionGuiada);
+  const alto    = guiados.filter((s) => s.risk_level === "Alto").length;
+  const limitado = guiados.filter((s) => s.risk_level === "Limitado").length;
+  const minimo  = guiados.filter((s) => s.risk_level === "Mínimo").length;
 
   const sistemasClasificados = systems.filter((s) => (s.risk_level ?? "").trim() !== "").length;
-  const conClasificacionGuiada = systems.filter(tieneClasificacionGuiada).length;
+  const declaradoSinCuestionario = sistemasClasificados - guiados.filter((s) => (s.risk_level ?? "").trim() !== "").length;
+  const conClasificacionGuiada = guiados.length;
+  // Con algún sistema sin cuestionario, el «Alto» contado no es un nivel medido.
+  const nivelDeclarado = systems.some((s) => !tieneClasificacionGuiada(s));
 
-  const incidentesAbiertos = incidents.filter(
-    (i) => ["ABIERTO", "EN_INVESTIGACION"].includes(normalizeAimsStatus(i.status))
-  ).length;
+  // Mismo criterio que el dominio «Incidentes»: abierto = no cerrado con fecha.
+  const incidentesAbiertos = incidents.filter((i) => !incidenteCerrado(i)).length;
 
-  // `APROBADO` es legado: el producto escribe `CONFORME`. Predicado único en
-  // `readiness.ts` para que escritura y lectura no vuelvan a divergir.
-  const approvedSysIds = new Set(
-    assessments.filter((a) => assessmentAcreditaConformidad(a.status)).map((a) => a.system_id)
-  );
-  const altosNoEvaluados = systems.filter(
-    (s) => s.risk_level === "Alto" && !approvedSysIds.has(s.id)
-  ).length;
+  // Cubierto = su evaluación vigente acredita (conforme, congelada y
+  // revisada). Criterio único en `legado.ts`, el mismo que usa `readiness`.
+  const cubiertos = sistemasCubiertos(assessments);
+  const altosNoEvaluados = systems.filter((s) => s.risk_level === "Alto" && !cubiertos.has(s.id)).length;
 
-  // Días desde última evaluación
-  const lastAssessment = assessments.find((a) => a.assessment_date);
+  // Días desde el último autodiagnóstico que no es borrador.
+  const lastAssessment = assessments.find((a) => a.assessment_date && normalizeAimsStatus(a.status) !== "BORRADOR");
   const diasDesdeEval = lastAssessment?.assessment_date
     ? Math.floor((Date.now() - new Date(lastAssessment.assessment_date).getTime()) / 86400000)
     : null;
 
-  const readiness = buildAimsReadiness({ systems, assessments, incidents, complianceChecks });
-  const loading = loadingSystems || loadingIncidents || loadingAssessments || loadingComplianceChecks;
+  const readiness = buildAimsReadiness({ systems, assessments, incidents, complianceChecks, technicalFileSections, monitoringIndicators });
+  const loading = loadingSystems || loadingIncidents || loadingAssessments || loadingComplianceChecks || loadingSections || loadingIndicators;
   // Un solo predicado para «incidente material», el mismo que decide el handoff.
   // Aquí se comparaba a mano contra tres grafías, y una de ellas ('CRÍTICO')
   // no la escribe ningún camino del producto.
@@ -198,6 +148,8 @@ export default function AiDashboard() {
           totalIncidentes={incidents.length}
           detalleInventario={detalleInventario}
           conClasificacionGuiada={conClasificacionGuiada}
+          nivelDeclarado={nivelDeclarado}
+          pasos={readiness.nextSteps}
           loading={loading}
         />
       )}
@@ -231,11 +183,11 @@ export default function AiDashboard() {
               to="/ai-governance/sistemas"
             />
             <KpiCard
-              label="Riesgo Alto sin eval. aprobada"
+              label="Alto riesgo sin autodiagnóstico acreditado"
               value={systems.length === 0 ? "—" : altosNoEvaluados}
-              sub={systems.length === 0 ? "Sin inventario registrado" : "Requieren evaluación EU AI Act"}
+              sub={systems.length === 0 ? "Sin inventario registrado" : nivelDeclarado ? "Nivel declarado en ficha, sin cuestionario" : "Congelado, revisado y conforme"}
               icon={AlertTriangle}
-              tone={systems.length === 0 ? "neutral" : altosNoEvaluados > 0 ? "error" : "success"}
+              tone={systems.length === 0 ? "neutral" : nivelDeclarado ? "neutral" : altosNoEvaluados > 0 ? "error" : "success"}
               to="/ai-governance/evaluaciones"
             />
             <KpiCard
@@ -247,7 +199,7 @@ export default function AiDashboard() {
               to="/ai-governance/incidentes"
             />
             <KpiCard
-              label="Última evaluación"
+              label="Último autodiagnóstico"
               value={diasDesdeEval !== null ? `${diasDesdeEval}d` : "—"}
               sub={lastAssessment?.assessment_date ?? "Sin evaluaciones"}
               icon={Clock}
@@ -280,6 +232,7 @@ export default function AiDashboard() {
                   { label: "Alto", count: alto, total: systems.length, color: "bg-[var(--status-error)]" },
                   { label: "Limitado", count: limitado, total: systems.length, color: "bg-[var(--status-warning)]" },
                   { label: "Mínimo", count: minimo, total: systems.length, color: "bg-[var(--status-success)]" },
+                  { label: "Declarado, sin cuestionario", count: declaradoSinCuestionario, total: systems.length, color: "bg-[var(--g-border-default)]" },
                   // Cuarta fila obligatoria: las tres anteriores sólo cuentan
                   // los tres literales de clasificación, así que un sistema sin
                   // `risk_level` desaparecía de una «distribución» que dejaba
@@ -295,7 +248,7 @@ export default function AiDashboard() {
                   },
                 ].map((row) => (
                   <div key={row.label} className="flex items-center gap-3">
-                    <div className="w-20 text-xs font-medium text-[var(--g-text-secondary)]">{row.label}</div>
+                    <div className="w-36 text-xs font-medium text-[var(--g-text-secondary)]">{row.label}</div>
                     <div className="flex-1 h-2 bg-[var(--g-surface-muted)]" style={{ borderRadius: "var(--g-radius-full)" }}>
                       <div
                         className={`h-2 ${row.color} transition-all`}

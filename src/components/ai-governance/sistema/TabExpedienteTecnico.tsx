@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Layers, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { mensajeUsuario } from "@/lib/aims/errores-rpc";
+import { rotuloSeccion } from "@/lib/aims/legado";
 import {
   useIniciarExpedienteTecnico,
   useUpdateTechnicalFileSection,
@@ -183,7 +184,8 @@ export default function TabExpedienteTecnico({
                   </div>
 
                   <div className="flex items-center gap-3">
-                    {sec.reviewed_at && (
+                    {rotuloSeccion(sec) && <span className="text-[11px] text-[var(--g-text-secondary)]">{rotuloSeccion(sec)}</span>}
+                    {sec.reviewed_at && sec.reviewed_by_id && (
                       <div className="text-right">
                         <span className="text-xs font-bold text-[var(--g-brand-3308)]">
                           {new Date(sec.reviewed_at).toLocaleDateString("es-ES")}

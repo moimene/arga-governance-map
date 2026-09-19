@@ -50,3 +50,29 @@ export function checksVigentes<T extends ChequeoConHistoria>(rows: T[] | null | 
   });
   return [...porRequisito.values()];
 }
+
+type EvaluacionConHistoria = {
+  system_id?: string | null;
+  framework?: string | null;
+  status?: string | null;
+  created_at?: string | null;
+};
+
+/**
+ * La misma regla para las evaluaciones: de cada sistema y marco manda la más
+ * reciente que no es borrador. Medido en ARGA el 2026-09-19: el «Motor de
+ * triaje» tiene cuatro evaluaciones iguales y el dominio «Controles» sumaba
+ * los hallazgos de las cuatro y de un borrador (35/38 en vez de 8/11).
+ *
+ * El borrador no manda: es trabajo sin terminar, no una evaluación.
+ */
+export function evaluacionesVigentes<T extends EvaluacionConHistoria>(rows: T[] | null | undefined): T[] {
+  const porClave = new Map<string, T>();
+  (rows ?? []).forEach((a, i) => {
+    if ((a.status ?? "").trim().toUpperCase() === "BORRADOR") return;
+    const clave = a.system_id ? `${a.system_id}::${a.framework ?? ""}` : `__huerfana__::${i}`;
+    const previa = porClave.get(clave);
+    if (!previa || marca(a) > marca(previa)) porClave.set(clave, a);
+  });
+  return [...porClave.values()];
+}

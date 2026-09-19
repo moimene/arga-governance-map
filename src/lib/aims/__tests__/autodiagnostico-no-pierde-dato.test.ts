@@ -84,11 +84,13 @@ describe("el autodiagnóstico no pierde lo que el formulario recoge", () => {
 
     // Control positivo del instrumento: SIN la MA el requisito sale conforme.
     // Si este control fallara, el test de abajo pasaría por otra razón.
-    const sinMa = buildEvaluationPayload(evaluaciones, MEDIDAS, REQUISITOS);
+    // Con evidencia en las L5, como las escribe el wizard (F1.T5).
+    const evidencia = { MG_RISK_01: 1, MG_RISK_02: 1 };
+    const sinMa = buildEvaluationPayload(evaluaciones, MEDIDAS, REQUISITOS, undefined, [], evidencia);
     expect(sinMa.checks[0].status).toBe("CONFORME");
     expect(sinMa.findings).toHaveLength(2);
 
-    const conMa = buildEvaluationPayload(evaluaciones, MEDIDAS, REQUISITOS, undefined, [MA]);
+    const conMa = buildEvaluationPayload(evaluaciones, MEDIDAS, REQUISITOS, undefined, [MA], evidencia);
     expect(conMa.findings.map((f) => f.code)).toContain(MA.id);
     expect(conMa.findings.find((f) => f.code === MA.id)?.kind).toBe("MA");
     expect(conMa.totales, "la MA no cuenta en el denominador").toBe(3);
@@ -175,13 +177,13 @@ describe("una medida declarada hecha sin evidencia no acredita", () => {
     expect(motivoNoAcredita({ status: "L5", evidenceCount: 1 })).toBeNull();
   });
 
-  it("«no medido» NO es «cero»: las filas antiguas no se degradan", () => {
-    // Las 8 evaluaciones que ya están en Cloud se hicieron cuando el módulo no
-    // tenía dónde guardar evidencia. `undefined` significa que nadie la midió,
-    // y el proyecto ya aplica esa regla a los KPI: un error de lectura se
-    // propaga como «no medido», nunca como cero.
-    expect(acreditaConformidad({ status: "L5" })).toBe(true);
-    expect(acreditaConformidad({ status: "L5", evidenceCount: null })).toBe(true);
+  it("«no medido» NO es «cero», pero tampoco acredita (F1.T5, GC-54)", () => {
+    // Hasta el 2026-09-19 las filas sin recuento acreditaban «porque nadie la
+    // midió»: así sostenían el 49 % de Harvey 40 L5 sin evidencia. Se sigue
+    // distinguiendo no medido de cero —en el motivo—, pero ninguno acredita.
+    expect(acreditaConformidad({ status: "L5" })).toBe(false);
+    expect(acreditaConformidad({ status: "L5", evidenceCount: null })).toBe(false);
+    expect(motivoNoAcredita({ status: "L5" })).not.toBe(motivoNoAcredita({ status: "L5", evidenceCount: 0 }));
   });
 
   it("el payload sólo escribe evidenceCount cuando el llamante lo ha medido", () => {

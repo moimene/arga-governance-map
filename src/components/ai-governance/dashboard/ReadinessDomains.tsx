@@ -26,6 +26,15 @@ const READINESS_STATUS: Record<AimsReadinessStatus, { label: string; className: 
     label: "Gap",
     className: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
   },
+  // Gris: sin dato no se afirma nada, y una población vacía no es una brecha.
+  unmeasured: {
+    label: "No medido",
+    className: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
+  },
+  na: {
+    label: "No aplica",
+    className: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
+  },
 };
 
 const DOMAIN_ICONS: Record<string, React.ElementType> = {
@@ -153,7 +162,8 @@ export function ReadinessDomains({
         ))}
       </div>
 
-      <div className="mt-5 grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-4">
+      {/* Los «Próximos pasos» ya no son una lista fija aquí: se derivan del dato y los pinta «Prioridad ahora». */}
+      <div className="mt-5 grid grid-cols-1 gap-4">
         <div
           className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
           style={{ borderRadius: "var(--g-radius-lg)" }}
@@ -165,7 +175,7 @@ export function ReadinessDomains({
             <div>
               <dt className="text-[11px] text-[var(--g-text-secondary)]">Fuentes</dt>
               <dd className="mt-1 text-xs font-medium text-[var(--g-text-primary)]">
-                Inventario, evaluaciones e incidentes
+                Inventario, autodiagnósticos, comprobaciones, incidentes, expediente e indicadores
               </dd>
             </div>
             <div>
@@ -186,25 +196,6 @@ export function ReadinessDomains({
           </p>
         </div>
 
-        <div
-          className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
-          style={{ borderRadius: "var(--g-radius-lg)" }}
-        >
-          <h3 className="text-xs font-semibold uppercase text-[var(--g-text-primary)]">
-            Próximos pasos
-          </h3>
-          <ul className="mt-3 space-y-2">
-            {readiness.nextSteps.map((step) => (
-              <li key={step} className="flex items-start gap-2 text-xs text-[var(--g-text-secondary)] leading-relaxed">
-                <span
-                  className="mt-1 h-1.5 w-1.5 shrink-0 bg-[var(--g-brand-3308)]"
-                  style={{ borderRadius: "var(--g-radius-full)" }}
-                />
-                <span>{step}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
       </div>
 
       <HandoffAffordances />

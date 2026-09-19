@@ -15,7 +15,9 @@ import {
   AVISO_ISO_NO_ES_OBLIGACION,
 } from "@/lib/aims/perfil-aplicabilidad";
 import { ETIQUETA_ROL, type RolRegulatorio } from "@/lib/aims/rol-regulatorio";
-import { chipClaseEstadoEvaluacion, etiqueta, normalizeAimsStatus } from "@/lib/aims/vocabulario";
+import { etiqueta, normalizeAimsStatus } from "@/lib/aims/vocabulario";
+import { chipClaseEvaluacion, rotuloEvaluacion } from "@/lib/aims/legado";
+import { pendientesDeEvidencia } from "@/lib/aims/conformidad";
 import type { AiRiskAssessment } from "@/hooks/useAiAssessments";
 
 export interface CabeceraInformeProps {
@@ -110,7 +112,7 @@ export default function CabeceraInforme({
               </span>
             </div>
             <h1 className="text-2xl font-bold text-[var(--g-text-primary)]">
-              Informe de Autodiagnóstico de Conformidad
+              Informe de autodiagnóstico de madurez
             </h1>
             <p className="text-sm text-[var(--g-text-secondary)]">
               Sistema Evaluado:{" "}
@@ -138,13 +140,22 @@ export default function CabeceraInforme({
                   : `${assessment.score}%`}
               </span>
               <span
-                className={`px-2.5 py-1 text-xs font-semibold uppercase tracking-wider ${chipClaseEstadoEvaluacion(assessment.status)}`}
+                className={`px-2.5 py-1 text-xs font-semibold uppercase tracking-wider ${chipClaseEvaluacion(assessment)}`}
                 style={{ borderRadius: "var(--g-radius-full)" }}
               >
                 {etiqueta("estadoEvaluacion", assessment.status)}
               </span>
             </div>
             <span className="text-xs text-[var(--g-text-secondary)]">Madurez Global del Sistema</span>
+            {rotuloEvaluacion(assessment) && (
+              <span className="text-xs font-semibold text-[var(--g-text-primary)]">{rotuloEvaluacion(assessment)}</span>
+            )}
+            {/* Aparte: las L5 de filas que no midieron evidencia ya no acreditan (F1.T5), pero el porcentaje guardado sí las contó. */}
+            {pendientesDeEvidencia(assessment.findings) > 0 && (
+              <span className="max-w-xs text-right text-xs text-[var(--g-text-secondary)]">
+                {pendientesDeEvidencia(assessment.findings)} medidas en L5 pendientes de evidencia: no acreditan, aunque el porcentaje guardado las contó.
+              </span>
+            )}
           </div>
         </div>
 

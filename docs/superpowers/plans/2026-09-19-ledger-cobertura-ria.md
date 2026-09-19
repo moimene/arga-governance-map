@@ -72,6 +72,112 @@ con el literal (EUR-Lex consolidado 27-07-2026) antes de usarla.
 | F1 | EN CURSO | Seis cadenas en worktrees aislados (A monitores, B sistema, C cuestionario, D catálogo, E migración M01, F documentos de F0) |
 | F2-F11 | PENDIENTE | |
 
+## F1 — cadena A-monitores: cambios visibles medidos (corrector, 19-09)
+
+Medido con `buildAimsReadiness` sobre el dato vivo de los dos tenants, leído con login real (solo
+SELECT) y con la entrada exacta del Dashboard: `checksVigentes` sobre `ai_compliance_checks`
+ordenadas por `created_at`, evaluaciones con su sistema embebido, secciones e indicadores del tenant.
+**Base** = `5e66496` (librería de `b1721a5`), **después** = `84d91e5` (F1.T1–T8 más las correcciones
+de la revisión adversarial). Esta lista **sustituye** a la que acompañaba al informe de F1: tres
+«antes» no eran los que pinta la base (expediente, precisión, proveedor), el «0/5 secciones con
+revisor» del expediente no llegaba a pintarse, y faltaban siete cambios de monitor.
+
+Reglas que mueven las cifras: asignación por código (F1.T1); cierre = CERRADO con fecha (F1.T2);
+cada monitor lee su objeto (F1.T3); solo acredita lo congelado y revisado, manda lo más reciente y
+el legado se lee traducido y no acredita (F1.T4); L5 sin recuento no acredita (F1.T5); y, de la
+revisión: **una comprobación solo acredita si la evaluación vigente de su sistema es firme**, en los
+monitores con objeto propio el estado es **el peor de comprobaciones y objeto**, y el alto riesgo
+se cuenta **solo entre sistemas con cuestionario**. En las métricas, «conformes» pasa a «acreditadas».
+
+### ARGA (…0001) — 8 sistemas, 0 con cuestionario, 6 «Alto» declarados en ficha
+
+| Superficie | Base | Después |
+|---|---|---|
+| D · Inventario | watch «4/8 activos» | gap «0/8 con clasificación guiada» |
+| D · Autodiagnóstico · alto riesgo | gap «2/6 alto riesgo» | **no medido** «8 sistemas sin cuestionario» |
+| D · Incidentes | watch «1 abiertos» | igual |
+| D · Controles | Listo «35/38 cerrados» | watch «8/11 cerrados · 11 sin congelar y revisar» |
+| D · Evidencias operativas | gap «0/1 con cierre» | gap «0/1 cerrados · 1 en investigación» |
+| M · Gobierno, roles | Listo «3/3 conformes» | watch «0/1 acreditadas · 1 de legado, no acredita» |
+| M · Inventario y clasificación | watch «4/8 activos» | gap «0/8 con clasificación guiada» |
+| M · Prácticas prohibidas | watch «0 inaceptables» | no medido «Sin análisis del art. 5» |
+| M · Obligaciones alto riesgo | watch «4/6 conformes» | watch «0/4 acreditadas · 4 de legado, no acredita» |
+| M · Expediente técnico | gap «1/2 conformes» | gap «0/2 acreditadas · 2 de legado, no acredita · 0/5 secciones con revisor» |
+| M · Gobierno del dato | **gap** «4/6 conformes» | **watch** «0/3 acreditadas · 3 de legado, no acredita» |
+| M · Transparencia | gap «2/5 conformes» | gap «0/3 acreditadas · 3 de legado, no acredita» |
+| M · Supervisión humana | watch «3/4 conformes» | watch «0/4 acreditadas · 4 de legado, no acredita · 0/1 secciones con revisor» |
+| M · Precisión, robustez y ciberseguridad | Listo «1/1 conformes» | watch «0/1 acreditadas · 1 de legado, no acredita · 0/1 secciones con revisor» |
+| M · Proveedor y terceros | gap «0/1 conformes» | no medido «Sin comprobaciones del área» |
+| M · Post-market | **gap** «0/1 con cierre» | **watch** «1/1 indicadores con medición» |
+| M · Reporting de incidentes | watch «1 materiales» | igual |
+| M · Derechos fundamentales / DPIA | Listo «1/1 conformes» | watch «0/1 acreditadas · 1 de legado, no acredita» |
+| M · Sistema de gestión ISO 42001 | watch «4/5 conformes» | watch «0/2 acreditadas · 2 de legado, no acredita» |
+| M · Evidencia y recordkeeping | **gap** «3/4 conformes» | **watch** «0/1 acreditadas · 1 de legado, no acredita · Sin protocolo de registro» |
+| Pasos | lista fija | 5 derivados: 8 sin clasificación guiada · 3 autodiagnósticos sin firmar · **«6 declarados Alto en ficha, sin cuestionario»** (antes «6 sistemas de alto riesgo sin autodiagnóstico acreditado») · 1 incidente · 2 con brechas a GRC |
+| Consola TGMS «IA alto riesgo sin evaluar» (`useModuleStatus`) | 4 | **6** (APROBADO sin firmar de Motor de triaje y ARGA Score ya no cuentan) |
+| Chips «Aprobada (legado)» (5 filas) en lista e informe | verde | aviso (`--status-warning`) |
+| Chip del BORRADOR ISO en la pestaña del sistema | aviso | neutro (el del vocabulario, como en la lista) |
+
+**Los tres cambios de gap a vigilancia, con su causa** (ninguno es una mejora de cumplimiento; los
+tres dejan de afirmar algo que la base no sostenía):
+
+- **Gobierno del dato.** Lo ponía en gap el `EU_AI_ACT_ART_10` NO_CONFORME de FraudGuard (18-04).
+  Traducido el legado, él y el `AIA-10` «Conforme» de FraudGuard (19-04) son el mismo requisito,
+  `DATA_GOVERNANCE`, del mismo sistema, y **manda el más reciente**: la no conformidad declarada
+  queda desplazada por una conformidad de legado que no acredita. El monitor queda en vigilancia,
+  nunca en Listo. Efecto de la regla de F1.T4, declarado aquí para que el controlador decida si una
+  no conformidad de legado debe prevalecer sobre una conformidad de legado posterior.
+- **Evidencia y recordkeeping.** El gap de la base salía de comprobaciones que la subcadena le
+  atribuía y que no son del art. 12 (entre ellas el `AIA-13` «No conforme» de FraudGuard, que ahora
+  cuenta en Transparencia). Por código solo le corresponde `VAL-04` → `LOGGING`, de legado.
+- **Post-market.** Leía el cierre de incidentes (0/1); ahora lee su objeto, los indicadores de
+  vigilancia (F1.T3): 1 con medición y sin umbral evaluado, vigilancia.
+
+### Garrigues (…0002) — 6 sistemas, 0 con cuestionario, Harvey «Limitado» declarado
+
+| Superficie | Base | Después |
+|---|---|---|
+| D · Inventario | watch «4/6 activos» | gap «0/6 con clasificación guiada» |
+| D · Autodiagnóstico · alto riesgo | gap «Sin alto riesgo» | **no medido** «6 sistemas sin cuestionario» |
+| D · Controles | watch «40/84 cerrados» | gap «0/84 cerrados · 84 sin congelar y revisar» (F1.T5: 40 L5 sin recuento) |
+| D · Evidencias operativas | **Listo** «1/1 con cierre» | **gap** «0/1 cerrados · 1 en investigación» |
+| M · Gobierno, roles | gap «0/2 conformes» | no medido «Sin comprobaciones del área» |
+| M · Inventario y clasificación | watch «4/6 activos» | gap «0/6 con clasificación guiada» |
+| M · Prácticas prohibidas | watch «0 inaceptables» | no medido «Sin análisis del art. 5» |
+| M · Obligaciones alto riesgo | gap «0/1 conformes» | gap «0/2 acreditadas» |
+| M · Expediente técnico | gap «0/1 conformes» | gap «0/1 acreditadas · Sin expediente técnico» |
+| M · Gobierno del dato | gap «2/5 conformes» | gap «0/1 acreditadas» |
+| M · Supervisión humana | gap «0/1 conformes» | gap «0/1 acreditadas · Sin sección del anexo IV.3» |
+| M · Precisión, robustez y ciberseguridad | gap «2/3 conformes» | gap «0/3 acreditadas · 2 declaradas conformes sin congelar y revisar · Sin sección del anexo IV.4» |
+| M · Proveedor y terceros | **Listo** «5/6 con vendor» | no medido «Sin comprobaciones del área» |
+| M · Post-market | **Listo** «1/1 con cierre» | **gap** «0/1 acreditadas · Sin indicadores de vigilancia» |
+| M · Reporting de incidentes | gap «0/1 conformes» | gap «0/1 acreditadas» |
+| M · Derechos fundamentales / DPIA | gap «0/1 conformes» | no medido «Sin comprobaciones del área» |
+| M · Sistema de gestión ISO 42001 | gap «0/2 conformes» | no medido «Sin evaluaciones ISO 42001» |
+| M · Evidencia y recordkeeping | gap «0/1 conformes» | gap «0/1 acreditadas · Sin protocolo de registro» |
+| Consola TGMS «IA alto riesgo sin evaluar» | 0 | 0 |
+
+### Retirado y pendiente
+
+- **Monitor por sistema** (`buildAimsComplianceMonitorsPorSistema`): se retira. Estaba exportado y
+  con test, pero ninguna superficie lo montaba (código sin arista). La parte «por sistema» de F1.T1
+  queda **PENDIENTE**: montarlo en la ficha del sistema con su test de render. Tarea a asignar por el
+  controlador (propuesta: F1.T1-bis). El monitor por tenant sigue en el Dashboard.
+- **Comprobación ↔ evaluación sin enlace.** Mientras M01 (F1.T14) no dé `assessment_id` a
+  `ai_compliance_checks`, `sistemasConEvaluacionFirme` exige que **todas** las evaluaciones vigentes
+  del sistema estén congeladas y revisadas: una ISO sin firmar impide acreditar las comprobaciones
+  RIA del mismo sistema. Es conservador (nunca acredita de más); con M01, atar cada comprobación a
+  la suya.
+
+### Corrección de la especificación
+
+- **F1.T5 decía «los trece L5 de Harvey»; son 40.** Medido el 19-09-2026 con el login de Garrigues
+  (solo SELECT): `ai_risk_assessments` `fdcccf9e-fff0-4346-a2f2-17e610981be3` (Harvey, EU_AI_ACT,
+  CON_GAPS, score 49, sin congelar ni revisar) tiene 84 findings, **40 en L5** y **0 con
+  `evidenceCount`**. Consulta: `select findings from ai_risk_assessments where id = 'fdcccf9e…'`,
+  contando `status = 'L5'` y `typeof evidenceCount = 'number'`. Corregido también en la
+  especificación (F1.T5).
+
 ## Deudas y hallazgos durante la ejecución
 
 - **Defecto vivo detectado en el diseño:** `fn_sync_obligation_to_backbone` manda al `ELSE 'risk'`

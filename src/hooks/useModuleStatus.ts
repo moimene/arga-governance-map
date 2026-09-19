@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { sistemasCubiertos } from "@/lib/aims/legado";
 
 /**
  * Read model de la consola (contratos `console.<owner>.<objeto>.v1`).
@@ -58,13 +59,6 @@ export type ModuleStatus = {
 export const INCIDENT_OPEN_STATUSES = ["Abierto", "En investigación"];
 export const INCIDENT_CLOSED_STATUSES = ["Cerrado", "Resuelto"];
 
-/**
- * Estados de `ai_risk_assessments` que valen como evaluación resuelta.
- * El write path del producto persiste CONFORME (src/lib/aims/evaluacion-payload.ts);
- * el dato legacy de Cloud usa APROBADO. El contrato de lectura tolera ambos.
- */
-export const AI_ASSESSMENT_RESOLVED = ["APROBADO", "CONFORME"];
-
 export type CountResult = { count: number | null; error: unknown };
 
 /**
@@ -93,7 +87,7 @@ export function useModuleStatus() {
         incidentesMayoresRes,
         notifRes,
         aiSystemsRes,
-        aiAssessResolvedRes,
+        aiAssessRes,
         aiIncRes,
         siiRes,
       ] = await Promise.all([
@@ -146,14 +140,15 @@ export function useModuleStatus() {
           .eq("tenant_id", tenantId!)
           .eq("risk_level", "Alto"),
 
-        // AI: evaluaciones resueltas (para filtrar sistemas ya evaluados).
+        // AI: evaluaciones, para decidir con el criterio de AIMS (`sistemasCubiertos`:
+        // la vigente acredita si es conforme, congelada y revisada). Filtrar por
+        // estado daba por evaluados sistemas con un APROBADO sin firmar.
         // `ai_risk_assessments` no tiene tenant_id: el aislamiento lo da la política
         // por join contra ai_systems, y el cruce final se hace en memoria contra
         // los sistemas del tenant, que sí van filtrados.
         supabase
           .from("ai_risk_assessments")
-          .select("system_id")
-          .in("status", AI_ASSESSMENT_RESOLVED),
+          .select("system_id, framework, status, created_at, frozen_at, reviewed_at"),
 
         // AI: incidentes abiertos
         supabase
@@ -178,14 +173,12 @@ export function useModuleStatus() {
       ]);
 
       // Sin sistemas legibles no se puede afirmar 0 sistemas de alto riesgo sin evaluar.
-      const altosNoAprobados: Measured = aiSystemsRes.error || aiAssessResolvedRes.error
+      const altosNoAprobados: Measured = aiSystemsRes.error || aiAssessRes.error
         ? null
         : (() => {
             const altoSysIds = new Set((aiSystemsRes.data ?? []).map((s: { id: string }) => s.id));
-            const resolvedIds = new Set(
-              (aiAssessResolvedRes.data ?? []).map((a: { system_id: string }) => a.system_id),
-            );
-            return [...altoSysIds].filter((id) => !resolvedIds.has(id)).length;
+            const cubiertos = sistemasCubiertos(aiAssessRes.data ?? []);
+            return [...altoSysIds].filter((id) => !cubiertos.has(id)).length;
           })();
 
       return {
