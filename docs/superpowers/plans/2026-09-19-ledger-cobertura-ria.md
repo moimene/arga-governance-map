@@ -55,17 +55,19 @@ Cómo se resuelve cada punto: el Comité emite un dictamen, que se registra en S
 asunto indicado (F5.T13) y queda enlazado al sistema, sin posibilidad de edición una vez
 aprobado.
 
-Las fechas límite son **propuestas del controlador**, calculadas desde la tarea que consume
-cada punto. Las confirma el Comité.
+Las fechas límite son **propuesta del implementador de F0.T5, a confirmar por el Comité**,
+calculadas desde la tarea que consume cada punto.
 
-Mientras no haya dictamen, el punto sigue PENDIENTE y **la herramienta falla cerrado y lo dice**
-en la pantalla afectada. En ningún caso deduce ella la respuesta.
+Mientras no haya dictamen, el punto sigue PENDIENTE. **Requisito** para las pantallas afectadas,
+que hoy no existen: fallar cerrado y decirlo, sin deducir nunca la respuesta. Lo implementan
+F6.T13 (requerimientos, CP-1), F4 (pregunta S10 F_2 del cuestionario v2) y F9.T1 (versiones con
+`change_class`, CP-2), y F9.T8 (ficha del sujeto, CP-3), todas sobre el dictamen de F5.T13.
 
-| # | Punto | Tenant | Responsable del dictamen | Aporta Legal | Fecha límite propuesta | Lo consume | Mientras no haya dictamen | Estado |
+| # | Punto | Tenant | Responsable del dictamen | Aporta Legal | Fecha límite propuesta | Lo consume | Requisito mientras no haya dictamen (tarea) | Estado |
 |---|---|---|---|---|---|---|---|---|
-| CP-1 | Secreto profesional frente a la cooperación (arts. 21 y 26.12) y al acceso a documentación y código (art. 74) | Garrigues | Comité de Gobernanza de la IA (ver la pregunta previa de CP-1) | Contraste H-16 (§9 de la especificación); base del art. 78, del Derecho nacional sobre secreto profesional y de la Carta | H-16 enviado antes del 30-11-2026. Posición aprobada antes del 18-12-2026 | F6.T13 (registro de requerimientos); dictamen SECRETO_PROFESIONAL (F5.T13) | Requerimientos: «posición del despacho sobre secreto profesional pendiente del Comité de IA». La herramienta no decide si se entrega | PENDIENTE |
-| CP-2 | Procedimiento de consulta interna para decidir un «cambio significativo» del art. 111.2 | Garrigues y ARGA | Garrigues: Comité de Gobernanza de la IA. ARGA: órgano de D-U2 | Criterios de apoyo de H-02 P9 (§9); redacción de la ayuda (111.2 no es el 3.23) | 13-11-2026 (tope del cuestionario v2) | Pregunta S10 F_2 del cuestionario v2 (F4); F9.T1 (versiones); dictamen CAMBIO_SIGNIFICATIVO_111_2 (F5.T13) | Cuestionario: F_2 = SÍ no se admite sin la referencia del dictamen. Versiones: SIGNIFICATIVO_111_2 se rechaza sin dictamen | PENDIENTE |
-| CP-3 | Acuerdos intragrupo entre proveedor y responsable del despliegue: GA_IA entre la matriz y NewLaw, y contenido mínimo del acuerdo | Garrigues (y su correlato en ARGA, D-U1) | Garrigues: Comité de Gobernanza de la IA. ARGA: órgano de D-U2 | Cotejo con los arts. 3.3, 3.4, 3.11 y 25; guion del contenido mínimo | 13-11-2026 (antes de M10 y de clasificar GA_IA antes del 2-12-2026) | D-U3; F4.T15 (ACUERDO_INTRAGRUPO); F9.T8; F11.T3; dictamen ACUERDO_INTRAGRUPO (F5.T13) | Ficha del sujeto: «reparto intragrupo no documentado». El sujeto de GA_IA sigue como hipótesis | PENDIENTE |
+| CP-1 | Secreto profesional frente a la cooperación (arts. 21 y 26.12) y al acceso a documentación y código (art. 74) | Garrigues | Comité de Gobernanza de la IA (ver la pregunta previa de CP-1) | Contraste H-16 (§9 de la especificación); base del art. 78, del Derecho nacional sobre secreto profesional y de la Carta | H-16 enviado antes del 30-11-2026. Posición aprobada antes del 18-12-2026 | F6.T13 (registro de requerimientos); dictamen SECRETO_PROFESIONAL (F5.T13) | Requerimientos (F6.T13): «posición del despacho sobre secreto profesional pendiente del Comité de IA». La herramienta no decide si se entrega | PENDIENTE |
+| CP-2 | Procedimiento de consulta interna para decidir un «cambio significativo» del art. 111.2 | Garrigues y ARGA | Garrigues: Comité de Gobernanza de la IA. ARGA: órgano de D-U2 | Criterios de apoyo de H-02 P9 (§9); redacción de la ayuda (111.2 no es el 3.23) | 13-11-2026 (tope del cuestionario v2) | Pregunta S10 F_2 del cuestionario v2 (F4); F9.T1 (versiones); dictamen CAMBIO_SIGNIFICATIVO_111_2 (F5.T13) | Cuestionario (F4): F_2 = SÍ no se admite sin la referencia del dictamen. Versiones (F9.T1): SIGNIFICATIVO_111_2 se rechaza sin dictamen | PENDIENTE |
+| CP-3 | Acuerdos intragrupo entre proveedor y responsable del despliegue: GA_IA entre la matriz y NewLaw, y contenido mínimo del acuerdo | Garrigues (y su correlato en ARGA, D-U1) | Garrigues: Comité de Gobernanza de la IA. ARGA: órgano de D-U2 | Cotejo con los arts. 3.3, 3.4, 3.11 y 25; guion del contenido mínimo | 13-11-2026 (antes de M10 y de clasificar GA_IA antes del 2-12-2026) | D-U3; F4.T15 (ACUERDO_INTRAGRUPO); F9.T8; F11.T1 (clasificación de GA_IA); F11.T3 (correlato en ARGA); dictamen ACUERDO_INTRAGRUPO (F5.T13) | Ficha del sujeto (F9.T8): «reparto intragrupo no documentado». El sujeto de GA_IA sigue como hipótesis | PENDIENTE |
 
 ### CP-1 Secreto profesional frente a los arts. 21 y 74 (RH-8, DS-40, GC-111)
 
@@ -124,7 +126,7 @@ Propuesta para el debate, no criterio:
 **Prueba.**
 - **Literal.** El art. 111.2, en la redacción del 2026/1744, solo sujeta a los sistemas puestos
   en servicio antes de la fecha de aplicación del capítulo III si sufren «cambios significativos
-  en su diseño», y no define la expresión. El art. 3.23 define «modificación sustancial», que es
+  en sus diseños», y no define la expresión. El art. 3.23 define «modificación sustancial», que es
   otro concepto (Harvey H-01, consideración 2). El considerando 39 computa por tipo y modelo
   (Harvey, C7).
 - **Consecuencia medida.** Todo el régimen de alto riesgo de ARGA Score (anexo III 5 c), en
@@ -205,3 +207,10 @@ ARGA Salud y ARGA Vida ponen en servicio y acumulan los dos roles. La misma preg
   24 obligaciones: las 21 de PBC/FT de Garrigues (el patrón espera `OBL-GARR-PBC-%` y están
   sembradas como `OBL-PBC-%`), que hoy se sincronizan al módulo de riesgos penales en vez de al de
   PBC/FT, y 3 de ARGA. Tarea en F5 (sin convertir el ELSE en RAISE).
+- **Siete celdas del Excel del experto vienen cortadas en el propio libro (I-11 del documento de
+  incidencias, P-08).** Medido en el original `Dashboard_control_RIA.xlsx`, uniendo todos los
+  `<t>` de cada `<si>`: `Obligaciones!I11`, `I16`, `I43`, `I49`, `I54`, `I56` e `I65` miden
+  exactamente 180 caracteres, el máximo de la columna. **F3 no puede recuperarlas reextrayendo el
+  Excel**: el texto no está en el fichero. OB-48 toma el de d62 del HTML; las otras seis esperan a
+  P-08, y el HTML no es un sustituto general (d15 acaba donde `I11`; d53 es más corto que
+  `I43`).
