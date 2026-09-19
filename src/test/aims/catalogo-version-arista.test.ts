@@ -45,7 +45,9 @@ describe("la versión del catálogo la decide una hoja", () => {
 
   it("ninguna pantalla compara por su cuenta el texto guardado con el vigente", () => {
     // Control positivo del patrón: la hoja SÍ hace esa comparación.
-    const patron = /\.title(\.trim\(\))?\s*!==?\s*(?!["'`])/;
+    // Una comparación con un literal («!== ""») no compara versiones: se excluye.
+    const patron = /\.title(\.trim\(\))?\s*!==?(?!=)\s*(?![\s"'`])/;
+    expect(patron.test('if (f.title.trim() !== "") x()'), "el patrón confunde un literal con una versión").toBe(false);
     expect(patron.test(fuente(HOJA)), "el patrón no casa ni con la hoja: está ciego").toBe(true);
     const ficheros = SUPERFICIES.flatMap((dir) =>
       (readdirSync(dir, { recursive: true }) as string[]).map((f) => `${dir}/${f}`),
