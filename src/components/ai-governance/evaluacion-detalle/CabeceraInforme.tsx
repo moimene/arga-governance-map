@@ -17,6 +17,7 @@ import {
 import { ETIQUETA_ROL, type RolRegulatorio } from "@/lib/aims/rol-regulatorio";
 import { chipClaseEstadoEvaluacion, etiqueta, normalizeAimsStatus } from "@/lib/aims/vocabulario";
 import { rotuloEvaluacion } from "@/lib/aims/legado";
+import { pendientesDeEvidencia } from "@/lib/aims/conformidad";
 import type { AiRiskAssessment } from "@/hooks/useAiAssessments";
 
 export interface CabeceraInformeProps {
@@ -148,6 +149,12 @@ export default function CabeceraInforme({
             <span className="text-xs text-[var(--g-text-secondary)]">Madurez Global del Sistema</span>
             {rotuloEvaluacion(assessment) && (
               <span className="text-xs font-semibold text-[var(--g-text-primary)]">{rotuloEvaluacion(assessment)}</span>
+            )}
+            {/* Aparte: las L5 de filas que no midieron evidencia ya no acreditan (F1.T5), pero el porcentaje guardado sí las contó. */}
+            {pendientesDeEvidencia(assessment.findings) > 0 && (
+              <span className="max-w-xs text-right text-xs text-[var(--g-text-secondary)]">
+                {pendientesDeEvidencia(assessment.findings)} medidas en L5 pendientes de evidencia: no acreditan, aunque el porcentaje guardado las contó.
+              </span>
             )}
           </div>
         </div>

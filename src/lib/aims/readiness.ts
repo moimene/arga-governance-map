@@ -30,7 +30,7 @@ export interface AimsAssessmentLike {
   system_id?: string | null;
   status?: string | null;
   score?: number | null;
-  findings?: { code?: string | null; status?: string | null; justification?: string | null }[] | null;
+  findings?: { code?: string | null; status?: string | null; justification?: string | null; evidenceCount?: number | null }[] | null;
   assessment_date?: string | null;
   framework?: string | null;
   created_at?: string | null;
@@ -586,9 +586,9 @@ export function buildAimsReadiness(input: AimsReadinessInput): AimsReadinessSumm
     const st = normalizeAimsStatus(finding.status);
     if (["CERRADO", "APROBADO", "CONFORME", "OK"].includes(st)) return true;
     // Mismo criterio que el wizard y que el payload: `L8` sin justificación no
-    // cierra nada. Se pasa el finding ENTERO, no sólo su `status`, porque la
-    // regla necesita la justificación.
-    return acreditaConformidad({ status: st, justification: finding.justification });
+    // cierra nada, ni `L5` sin evidencia (F1.T5). Se pasan la justificación y
+    // el recuento de evidencia, que la regla necesita.
+    return acreditaConformidad({ status: st, justification: finding.justification, evidenceCount: finding.evidenceCount });
   }).length;
 
   const inventoryCoverage = pct(conClasificacionGuiada, totalSystems);

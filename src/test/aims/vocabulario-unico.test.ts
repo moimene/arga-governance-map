@@ -58,7 +58,7 @@ function estadosQueElProductoEscribe(): string[] {
   const MEDIDAS = [{ id: "M1", description: "Identificar" }, { id: "M2", description: "Evaluar" }];
   const L8 = { maturity: "L8", justification: "El sistema no trata datos biométricos." };
   return [
-    buildEvaluationPayload({ M1: { maturity: "L5" }, M2: L8 }, MEDIDAS, [REQ]).status,
+    buildEvaluationPayload({ M1: { maturity: "L5" }, M2: L8 }, MEDIDAS, [REQ], undefined, [], { M1: 1 }).status,
     buildEvaluationPayload({ M1: { maturity: "L1" }, M2: { maturity: "L5" } }, MEDIDAS, [REQ]).status,
     buildEvaluationPayload({}, MEDIDAS, [REQ]).status,
   ];

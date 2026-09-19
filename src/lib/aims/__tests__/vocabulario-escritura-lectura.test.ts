@@ -47,10 +47,13 @@ const MEDIDAS = [
 const L8_JUSTIFICADA = { maturity: "L8", justification: "El sistema no trata datos biométricos." };
 /** Congelada y revisada: desde F1.T4 sólo esas llevan «Controles» a su valor pleno. */
 const FIRME = { frozen_at: "2026-01-01", reviewed_at: "2026-01-02" };
+/** Evidencia por medida, como la pasa el wizard. */
+const EVIDENCIA = { MG_RISK_01: 1, MG_RISK_02: 1 };
 
 /** Los tres estados que el camino de escritura puede producir, producidos. */
 function estadosQueElProductoEscribe(): string[] {
-  const conforme = buildEvaluationPayload({ MG_RISK_01: { maturity: "L5" }, MG_RISK_02: L8_JUSTIFICADA }, MEDIDAS, [REQ]);
+  // Con evidencia en la L5, como la escribe el wizard: sin ella no acredita (F1.T5).
+  const conforme = buildEvaluationPayload({ MG_RISK_01: { maturity: "L5" }, MG_RISK_02: L8_JUSTIFICADA }, MEDIDAS, [REQ], undefined, [], EVIDENCIA);
   const conGaps = buildEvaluationPayload({ MG_RISK_01: { maturity: "L1" }, MG_RISK_02: { maturity: "L5" } }, MEDIDAS, [REQ]);
   const borrador = buildEvaluationPayload({}, MEDIDAS, [REQ]);
   return [conforme.status, conGaps.status, borrador.status];
@@ -103,6 +106,9 @@ describe("vocabulario de evaluaciones: escritura ↔ lectura", () => {
       { MG_RISK_01: { maturity: "L5" }, MG_RISK_02: L8_JUSTIFICADA },
       MEDIDAS,
       [REQ],
+      undefined,
+      [],
+      EVIDENCIA,
     );
     // Control positivo: el camino de escritura produce de verdad niveles, no
     // palabras de estado. Sin esto, un payload que emitiera "CONFORME" dejaría
@@ -123,6 +129,9 @@ describe("vocabulario de evaluaciones: escritura ↔ lectura", () => {
       { MG_RISK_01: { maturity: "L3" }, MG_RISK_02: { maturity: "L5" } },
       MEDIDAS,
       [REQ],
+      undefined,
+      [],
+      EVIDENCIA,
     );
     const resumenGaps = buildAimsReadiness({
       systems: [{ id: "sys-1", status: "ACTIVO", risk_level: "Alto" }],
@@ -141,6 +150,9 @@ describe("vocabulario de evaluaciones: escritura ↔ lectura", () => {
       { MG_RISK_01: { maturity: "L5" }, MG_RISK_02: { maturity: "L8" } },
       MEDIDAS,
       [REQ],
+      undefined,
+      [],
+      EVIDENCIA,
     );
     expect(sinMotivo.status, "una L8 sin motivo sigue dando el requisito por conforme").toBe("CON_GAPS");
     expect(sinMotivo.checks[0].status).toBe("NO_CONFORME");
@@ -158,6 +170,9 @@ describe("vocabulario de evaluaciones: escritura ↔ lectura", () => {
       { MG_RISK_01: { maturity: "L5" }, MG_RISK_02: L8_JUSTIFICADA },
       MEDIDAS,
       [REQ],
+      undefined,
+      [],
+      EVIDENCIA,
     );
     expect(conMotivo.status).toBe("CONFORME");
   });

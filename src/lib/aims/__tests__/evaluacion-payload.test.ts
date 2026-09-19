@@ -18,6 +18,8 @@ const REQUISITOS = [
   { code: "R1", title: "Requisito uno", description: "d1", measures: [{ id: "M1" }, { id: "M2" }] },
   { code: "R2", title: "Requisito dos", description: "d2", measures: [{ id: "M3" }] },
 ];
+/** Evidencia por medida, como la pasa el wizard (`EvaluacionNueva`). */
+const CON_EVIDENCIA = { M1: 1, M2: 1, M3: 1 };
 
 describe("A2 — no se imputa conformidad a lo no contestado", () => {
   it("sin contestar nada no se persiste ni un solo finding", () => {
@@ -37,10 +39,14 @@ describe("A2 — no se imputa conformidad a lo no contestado", () => {
   });
 
   it("un requisito completo y sin brechas sí es CONFORME", () => {
+    // Con evidencia, como la escribe el wizard: un L5 sin ella no acredita (F1.T5).
     const out = buildEvaluationPayload(
       { M1: { maturity: "L5" }, M2: { maturity: "L5" }, M3: { maturity: "L5" } },
       MEDIDAS,
       REQUISITOS,
+      undefined,
+      [],
+      CON_EVIDENCIA,
     );
     expect(out.checks.every((c) => c.status === "CONFORME")).toBe(true);
     expect(out.findings).toHaveLength(3);
@@ -110,6 +116,9 @@ describe("A2 — no se imputa conformidad a lo no contestado", () => {
       { M3: { maturity: nivel, justification } },
       MEDIDAS,
       [{ code: "R2", title: "Requisito dos", measures: [{ id: "M3" }] }],
+      undefined,
+      [],
+      CON_EVIDENCIA,
     );
     expect(out.checks[0].status).toBe("CONFORME");
   });
@@ -157,6 +166,9 @@ describe("A2 — no se imputa conformidad a lo no contestado", () => {
         { M1: { maturity: "L5" }, M2: { maturity: "L5" }, M3: { maturity: "L5" } },
         MEDIDAS,
         REQUISITOS,
+        undefined,
+        [],
+        CON_EVIDENCIA,
       ).status,
     ).toBe("CONFORME");
   });
