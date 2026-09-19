@@ -21,6 +21,11 @@ type ChequeoConHistoria = {
   requirement_code?: string | null;
   created_at?: string | null;
   checked_at?: string | null;
+  /**
+   * La evaluación de la que sale, embebida por su FK (M01, 2026-09-19). `null`
+   * o ausente en las comprobaciones legacy, que no la tienen.
+   */
+  evaluacion?: { status?: string | null; reviewed_at?: string | null } | null;
 };
 
 /**
@@ -31,6 +36,21 @@ type ChequeoConHistoria = {
 function marca(c: ChequeoConHistoria): number {
   const t = Date.parse(c.created_at ?? "");
   return Number.isNaN(t) ? 0 : t;
+}
+
+/**
+ * Solo pesa una comprobación enlazada a una evaluación CERRADA (`status`
+ * distinto de `BORRADOR`). Un borrador y una legacy (sin evaluación) no
+ * acreditan: empatan entre ellos y decide la fecha, como antes de M01. Así, un
+ * `PENDIENTE` de un autodiagnóstico cerrado sin contestar no tapa lo ya
+ * cerrado, y una fila de seed tampoco tapa a un borrador posterior. Si lo único
+ * que hay es un borrador o una legacy, se conserva: no se pierde dato.
+ *
+ * `reviewed_at` no se lee aquí: el criterio es «cerrada», no «revisada». Viaja
+ * en el embebido para F1.T4 (`legado.ts`).
+ */
+function peso(c: ChequeoConHistoria): number {
+  return c.evaluacion && c.evaluacion.status !== "BORRADOR" ? 1 : 0;
 }
 
 export function checksVigentes<T extends ChequeoConHistoria>(rows: T[] | null | undefined): T[] {
@@ -46,7 +66,11 @@ export function checksVigentes<T extends ChequeoConHistoria>(rows: T[] | null | 
     const previo = porRequisito.get(clave);
     // `>=` y no `>`: con marcas iguales gana la última del array, que llega en
     // orden ascendente de escritura desde PostgREST.
-    if (!previo || marca(c) >= marca(previo)) porRequisito.set(clave, c);
+    const gana =
+      !previo ||
+      peso(c) > peso(previo) ||
+      (peso(c) === peso(previo) && marca(c) >= marca(previo));
+    if (gana) porRequisito.set(clave, c);
   });
   return [...porRequisito.values()];
 }
