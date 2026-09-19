@@ -402,8 +402,11 @@ describe("F1.T8 — rótulos de madurez y portada honesta", () => {
     // El BORRADOR del 31-07 no es la última evaluación: lo es la del 19-07.
     expect(screen.getByText("2026-07-19")).toBeTruthy();
     expect(screen.queryByText("2026-07-31")).toBeNull();
-    // Los dos «Alto» son nivel declarado en ficha, sin cuestionario.
-    expect(screen.getByText("Declarado, sin cuestionario")).toBeTruthy();
+    // Los dos «Alto» son nivel declarado en ficha, sin cuestionario: van a su
+    // fila neutra y la fila «Alto» (sólo nivel de cuestionario) queda a cero.
+    const fila = screen.getByText("Declarado, sin cuestionario").parentElement!;
+    const filas = [...fila.parentElement!.children].map((e) => e.textContent);
+    expect(filas).toEqual(["Alto0", "Limitado0", "Mínimo0", "Declarado, sin cuestionario2", "Sin clasificar0"]);
     expect(screen.getByText(/Nivel declarado en ficha, sin cuestionario/)).toBeTruthy();
     modo = "vacio";
   });
