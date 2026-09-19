@@ -26,6 +26,15 @@ const READINESS_STATUS: Record<AimsReadinessStatus, { label: string; className: 
     label: "Gap",
     className: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
   },
+  // Gris: sin dato no se afirma nada, y una población vacía no es una brecha.
+  unmeasured: {
+    label: "No medido",
+    className: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
+  },
+  na: {
+    label: "No aplica",
+    className: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
+  },
 };
 
 const DOMAIN_ICONS: Record<string, React.ElementType> = {

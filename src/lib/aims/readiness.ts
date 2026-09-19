@@ -1,11 +1,17 @@
 import { AESIA_RIA_REQUIREMENTS } from "./catalog-aesia";
 import { acreditaConformidad } from "./conformidad";
 import { tieneClasificacionGuiada } from "./cuestionario-calificacion";
+import { monitorDeCodigo } from "./mapa-monitores";
 import { DESPLIEGUE_REQUIREMENTS, codigosDelPerfil } from "./perfil-aplicabilidad";
 import { etiqueta, isMaterialSeverity, normalizeAimsStatus } from "./vocabulario";
 
 export type AimsSourcePosture = "legacy-ai" | "aims-ready" | "local-derived";
-export type AimsReadinessStatus = "ready" | "watch" | "gap";
+/**
+ * `unmeasured`: no hay ningún dato del objeto que el monitor lee — no se
+ * afirma nada. `na`: la población es vacía por hecho (0/0, p. ej. ningún
+ * sistema de alto riesgo) y se pinta gris, no en rojo.
+ */
+export type AimsReadinessStatus = "ready" | "watch" | "gap" | "unmeasured" | "na";
 
 export interface AimsSystemLike {
   id: string;
@@ -23,6 +29,7 @@ export interface AimsAssessmentLike {
   score?: number | null;
   findings?: { code?: string | null; status?: string | null; justification?: string | null }[] | null;
   assessment_date?: string | null;
+  framework?: string | null;
 }
 
 export interface AimsIncidentLike {
@@ -67,7 +74,12 @@ export interface AimsComplianceMonitorDomain {
   metric: string;
   detail: string;
   route: string;
-  source: "ai_systems" | "ai_risk_assessments" | "ai_compliance_checks" | "ai_incidents" | "derived";
+  /**
+   * El objeto del que sale la métrica. Si no hay comprobaciones con el código
+   * del área, es el objeto propio del monitor —nunca `ai_compliance_checks`—,
+   * y `ninguna` cuando no hay nada que leer.
+   */
+  source: "ai_systems" | "ai_risk_assessments" | "ai_compliance_checks" | "ai_incidents" | "derived" | "ninguna";
   handoff?: string;
   /** Comprobaciones del área medidas contra un catálogo que no es el del sistema: ni conformes ni brechas. */
   otroCatalogo: number;
@@ -171,9 +183,7 @@ const COMPLIANT_STATUSES = new Set(["CONFORME", "APROBADO", "OK", "CERRADO", "CO
 const WATCH_STATUSES = new Set(["EN_CURSO", "EN_REVISION", "PENDIENTE", "PARCIAL", "BORRADOR"]);
 const GAP_STATUSES = new Set(["NO_CONFORME", "ABIERTO", "BLOQUEADO", "VENCIDO", "CRITICO"]);
 
-type MonitorDefinition = Omit<AimsComplianceMonitorDomain, "status" | "metric" | "otroCatalogo"> & {
-  keywords: string[];
-};
+type MonitorDefinition = Omit<AimsComplianceMonitorDomain, "status" | "metric" | "otroCatalogo">;
 
 const complianceMonitorDefinitions: MonitorDefinition[] = [
   {
@@ -182,8 +192,7 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "ISO 42001",
     detail: "Responsables, aprobación, segregación y gobernanza del sistema de gestión IA.",
     route: "/ai-governance/sistemas",
-    source: "derived",
-    keywords: ["governance", "accountability", "responsable", "owner", "rol", "iso-42001-5", "iso-42001-6"],
+    source: "ninguna",
   },
   {
     id: "inventory-classification",
@@ -192,7 +201,6 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     detail: "Registro completo, estado operativo, riesgo AI Act y uso previsto.",
     route: "/ai-governance/sistemas",
     source: "ai_systems",
-    keywords: ["inventario", "clasificacion", "clasificación", "risk classification", "risk_level", "aia-6"],
   },
   {
     id: "prohibited-practices",
@@ -201,16 +209,14 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     detail: "Detección temprana de usos inaceptables o prácticas no permitidas.",
     route: "/ai-governance/sistemas",
     source: "derived",
-    keywords: ["prohibited", "prohibida", "inaceptable", "aia-5"],
   },
   {
     id: "high-risk-obligations",
     label: "Obligaciones alto riesgo",
     area: "EU AI Act",
-    detail: "Cobertura aprobada para sistemas de alto riesgo y estado de evaluación.",
+    detail: "Gestión de riesgos (art. 9), sistema de gestión de la calidad (art. 17) y cobertura de evaluación de los sistemas de alto riesgo.",
     route: "/ai-governance/evaluaciones",
     source: "ai_risk_assessments",
-    keywords: ["high-risk", "alto riesgo", "aia-8", "aia-9", "aia-10", "aia-14", "aia-15"],
   },
   {
     id: "technical-documentation",
@@ -220,7 +226,6 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     route: "/ai-governance/evaluaciones",
     source: "ai_risk_assessments",
     handoff: "AIMS_TECHNICAL_FILE_GAP",
-    keywords: ["technical file", "expediente tecnico", "expediente técnico", "documentacion tecnica", "documentación técnica", "aia-11"],
   },
   {
     id: "data-governance",
@@ -228,8 +233,7 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "EU AI Act",
     detail: "Calidad, linaje, sesgo, representatividad y control de datasets.",
     route: "/ai-governance/evaluaciones",
-    source: "ai_compliance_checks",
-    keywords: ["data governance", "datos", "dataset", "sesgo", "bias", "calidad", "linaje", "aia-10"],
+    source: "ninguna",
   },
   {
     id: "transparency-user-information",
@@ -237,8 +241,7 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "EU AI Act",
     detail: "Información a usuarios, instrucciones de uso, explicación y avisos.",
     route: "/ai-governance/evaluaciones",
-    source: "ai_compliance_checks",
-    keywords: ["transparency", "transparencia", "usuario", "informacion", "información", "explicabilidad", "aia-13"],
+    source: "ninguna",
   },
   {
     id: "human-oversight",
@@ -246,8 +249,7 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "EU AI Act",
     detail: "Human-in-the-loop, intervención, override y responsabilidades operativas.",
     route: "/ai-governance/evaluaciones",
-    source: "ai_compliance_checks",
-    keywords: ["human oversight", "supervision humana", "supervisión humana", "override", "intervencion", "intervención", "aia-14"],
+    source: "ninguna",
   },
   {
     id: "accuracy-robustness-cybersecurity",
@@ -256,7 +258,6 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     detail: "Rendimiento, resiliencia, drift, seguridad y fallos materiales.",
     route: "/ai-governance/incidentes",
     source: "ai_incidents",
-    keywords: ["accuracy", "precision", "precisión", "robustez", "robustness", "cyber", "ciber", "drift", "aia-15"],
   },
   {
     id: "provider-vendor-third-party",
@@ -266,7 +267,6 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     route: "/ai-governance/sistemas",
     source: "ai_systems",
     handoff: "AIMS_VENDOR_CONTEXT",
-    keywords: ["vendor", "proveedor", "third party", "tercero", "outsourcing"],
   },
   {
     id: "post-market-monitoring",
@@ -275,7 +275,6 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     detail: "Seguimiento operativo, causa raíz, acciones correctivas e incidentes recurrentes.",
     route: "/ai-governance/incidentes",
     source: "ai_incidents",
-    keywords: ["post-market", "monitoring", "seguimiento", "corrective", "correctiva", "root cause", "causa raiz", "causa raíz"],
   },
   {
     id: "incident-reporting-escalation",
@@ -285,7 +284,6 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     route: "/ai-governance/incidentes",
     source: "ai_incidents",
     handoff: "AIMS_INCIDENT_MATERIAL",
-    keywords: ["incident", "incidente", "material", "reporting", "escalado", "notificacion", "notificación"],
   },
   {
     id: "fundamental-rights-dpia",
@@ -293,9 +291,8 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "Cross-module",
     detail: "Impacto sobre personas, privacidad, no discriminación y enlace con GDPR cuando proceda.",
     route: "/ai-governance/evaluaciones",
-    source: "derived",
+    source: "ninguna",
     handoff: "AIMS_GDPR_CONTEXT",
-    keywords: ["fundamental rights", "derechos fundamentales", "dpia", "privacidad", "gdpr", "discriminacion", "discriminación"],
   },
   {
     id: "iso-42001-management-system",
@@ -304,7 +301,6 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     detail: "Políticas, objetivos, mejora continua, auditoría interna y revisión de dirección.",
     route: "/ai-governance/evaluaciones",
     source: "ai_risk_assessments",
-    keywords: ["iso 42001", "iso_42001", "management system", "sistema de gestion", "sistema de gestión", "auditoria interna"],
   },
   {
     id: "evidence-recordkeeping",
@@ -312,26 +308,13 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     area: "Operativo AIMS",
     detail: "Referencias, evidencias operativas y límites probatorios explícitos.",
     route: "/ai-governance/evaluaciones",
-    source: "ai_compliance_checks",
-    keywords: ["evidence", "evidencia", "recordkeeping", "registro", "logs", "trazabilidad", "aia-12"],
+    source: "ai_incidents",
   },
 ];
 
-function normalizeSearchText(...parts: Array<string | null | undefined>) {
-  return parts
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
-
+/** Comprobaciones del monitor, por el código del requisito (`mapa-monitores`), nunca por el texto. */
 function checksForDefinition(checks: AimsComplianceCheckLike[], definition: MonitorDefinition) {
-  const keywords = definition.keywords.map((keyword) => normalizeSearchText(keyword));
-  return checks.filter((check) => {
-    const haystack = normalizeSearchText(check.requirement_code, check.requirement_title, check.description);
-    return keywords.some((keyword) => haystack.includes(keyword));
-  });
+  return checks.filter((check) => monitorDeCodigo(check.requirement_code) === definition.id);
 }
 
 function statusFromChecks(checks: AimsComplianceCheckLike[]): AimsReadinessStatus | null {
@@ -364,9 +347,7 @@ function fallbackMonitorStatus(
     (incident) => incident.root_cause || incident.corrective_action || incident.closed_at,
   ).length;
   const systemsWithVendor = systems.filter((system) => Boolean(system.vendor)).length;
-  const isoAssessments = assessments.filter((assessment) =>
-    normalizeSearchText((assessment as { framework?: string | null }).framework).includes("iso"),
-  );
+  const isoAssessments = assessments.filter((assessment) => assessment.framework === "ISO_42001");
   const approvedIsoAssessments = isoAssessments.filter((assessment) =>
     assessmentAcreditaConformidad(assessment.status),
   ).length;
@@ -414,16 +395,10 @@ function fallbackMonitorStatus(
         status: isoAssessments.length === 0 ? "gap" : domainStatus(pct(approvedIsoAssessments, isoAssessments.length), 50, 80),
         metric: isoAssessments.length === 0 ? "Sin ISO" : `${approvedIsoAssessments}/${isoAssessments.length} aprobadas`,
       };
-    case "governance-accountability":
-    case "fundamental-rights-dpia":
-    case "data-governance":
-    case "transparency-user-information":
-    case "human-oversight":
+    // Sin comprobaciones con el código del área no hay nada medido: que exista
+    // alguna evaluación del sistema no dice nada de ESTA área.
     default:
-      return {
-        status: assessments.length > 0 ? "watch" : "gap",
-        metric: assessments.length > 0 ? "Derivado" : "Sin cobertura",
-      };
+      return { status: "unmeasured", metric: "Sin comprobaciones del área" };
   }
 }
 
@@ -482,6 +457,25 @@ export function buildAimsComplianceMonitors(input: AimsReadinessInput): AimsComp
       otroCatalogo: checksForDefinition(otroCatalogo, definition).length,
     };
   });
+}
+
+/** El mismo monitor, sistema a sistema: cada uno sólo con sus comprobaciones, evaluaciones e incidentes. */
+export function buildAimsComplianceMonitorsPorSistema(
+  input: AimsReadinessInput,
+): Record<string, AimsComplianceMonitorDomain[]> {
+  const delSistema = <T extends { system_id?: string | null }>(rows: T[] | undefined, id: string) =>
+    (rows ?? []).filter((row) => row.system_id === id);
+  return Object.fromEntries(
+    input.systems.map((system) => [
+      system.id,
+      buildAimsComplianceMonitors({
+        systems: [system],
+        assessments: delSistema(input.assessments, system.id),
+        incidents: delSistema(input.incidents, system.id),
+        complianceChecks: delSistema(input.complianceChecks, system.id),
+      }),
+    ]),
+  );
 }
 
 export function buildAimsReadiness({

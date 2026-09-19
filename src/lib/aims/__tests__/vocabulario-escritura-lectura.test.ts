@@ -206,7 +206,7 @@ describe("normalización de estados: el dato de Cloud no viene en una sola graf�
       incidents: [],
       // Grafía tal cual está escrita en Cloud, con tilde y espacio.
       complianceChecks: [
-        { id: "c-1", system_id: "sys-1", requirement_code: "AIA-12", requirement_title: "Evidencia y trazabilidad", description: "registro", status: "No conforme" },
+        { id: "c-1", system_id: "sys-1", requirement_code: "LOGGING", requirement_title: "Evidencia y trazabilidad", description: "registro", status: "No conforme" },
       ],
     });
     const monitor = resumen.complianceMonitors.find((m) => m.id === "evidence-recordkeeping");

@@ -159,15 +159,16 @@ describe("buildAimsReadiness", () => {
         { id: "incident-1", status: "ABIERTO", severity: "CRITICO" },
       ],
       complianceChecks: [
+        // Por CÓDIGO del catálogo (`mapa-monitores`): el título ya no decide.
         {
           id: "check-data",
-          requirement_code: "AIA-10",
+          requirement_code: "DATA_GOVERNANCE",
           requirement_title: "Data governance",
           status: "NO_CONFORME",
         },
         {
           id: "check-human",
-          requirement_code: "AIA-14",
+          requirement_code: "HUMAN_OVERSIGHT",
           requirement_title: "Supervisión humana",
           status: "CONFORME",
         },
@@ -218,7 +219,7 @@ describe("D1 — las comprobaciones de otro catálogo se apartan, no se suman", 
     for (const m of monitors) expect(m.metric, m.id).not.toContain("conformes");
     const data = monitors.find((m) => m.id === "data-governance")!;
     expect(data.otroCatalogo).toBeGreaterThan(0);
-    expect(data.metric).toBe("Sin cobertura");
+    expect(data.status).toBe("unmeasured");
   });
 
   it("una comprobación ISO 42001 no es «otro catálogo RIA»: sigue contando aunque haya cuestionario", () => {
@@ -229,12 +230,13 @@ describe("D1 — las comprobaciones de otro catálogo se apartan, no se suman", 
     );
     expect(otroCatalogo.length).toBe(12);
     expect(medibles).toEqual([iso]);
+    // `ISO_POLICIES` es del monitor del sistema de gestión ISO por su código.
     const gov = buildAimsComplianceMonitors({
       systems: [desplegador({ cuestionario_id: "q-1" })],
       assessments: [],
       incidents: [],
       complianceChecks: [iso],
-    }).find((m) => m.id === "governance-accountability")!;
+    }).find((m) => m.id === "iso-42001-management-system")!;
     expect(gov.metric).toBe("1/1 conformes");
     expect(gov.otroCatalogo).toBe(0);
   });
