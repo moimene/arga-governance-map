@@ -32,7 +32,7 @@
  * valide, la pantalla lo declara provisional.
  */
 
-import type { RequirementDef } from "./catalog-aesia";
+import { AESIA_RIA_REQUIREMENTS, ISO_42001_REQUIREMENTS, VERSION_CATALOGO_RIA, type RequirementDef } from "./catalog-aesia";
 import { ROLES_DE_DESPLIEGUE, perfilCatalogo, tieneClasificacionGuiada, type PerfilCatalogo } from "./cuestionario-calificacion";
 
 export type FuenteMedida = "RIA" | "RGPD" | "ISO_42001" | "DEONTOLOGIA";
@@ -343,7 +343,7 @@ export function perfilAplicable(
       requirements: DESPLIEGUE_REQUIREMENTS,
       etiqueta: `Responsable del despliegue · riesgo ${nivel.toLowerCase()}`,
       motivo:
-        "Las 84 medidas guía desarrollan las obligaciones del PROVEEDOR de un sistema de alto riesgo (arts. 9 a 15, 17, 72 y 73). Este perfil se mide contra las que sí vinculan a esta posición regulatoria.",
+        "Las medidas guía del catálogo del proveedor desarrollan las obligaciones del PROVEEDOR de un sistema de alto riesgo (arts. 9 a 15, 17, 72 y 73). Este perfil se mide contra las que sí vinculan a esta posición regulatoria.",
       provisional: true,
       sinRolDeclarado: false,
       catalogProfile: perfilCatalogo(rol, nivel),
@@ -430,4 +430,48 @@ export function evaluadaContraOtroCatalogo(
   // ISO 42001) no hay evaluación RIA que comparar: no se afirma nada.
   if (!evaluado.some((r) => r.measures.some((m) => codigos.has(m.id)))) return false;
   return evaluado !== perfilAplicable(sistema, catalogoProveedor).requirements;
+}
+
+export type CambiosDelCatalogo = {
+  /** La evaluación respondió al menos una medida con un texto que ya no es el vigente. */
+  anterior: boolean;
+  /** Medidas respondidas cuyo texto ha cambiado desde entonces. */
+  corregidas: string[];
+  /** Medidas que entraron en la versión vigente y la evaluación no respondió. */
+  nuevas: string[];
+};
+
+const SIN_CAMBIOS: CambiosDelCatalogo = { anterior: false, corregidas: [], nuevas: [] };
+
+/**
+ * ¿Se respondió esta evaluación con una versión anterior del catálogo?
+ *
+ * La fila no guarda la versión (la columna `catalog_version` llega con F2.T3),
+ * pero cada finding guarda el texto de la medida tal como se preguntó
+ * (`title`). Si ya no coincide con el vigente, la respuesta se dio a otra
+ * formulación, y la pantalla debe decirlo en vez de pintarla bajo el texto
+ * nuevo como si respondiera a él. Sin texto guardado, o sin ningún código de
+ * los catálogos (el legado `VAL-*` de ARGA), no se afirma nada.
+ *
+ * Una evaluación que sólo respondió medidas cuyo texto no cambió no se marca:
+ * las nuevas le salen «sin evaluar», que es verdad.
+ */
+export function cambiosDelCatalogoDesde(
+  findings: { code?: string | null; title?: string | null }[] | null | undefined,
+): CambiosDelCatalogo {
+  const lista = findings ?? [];
+  if (lista.length === 0) return SIN_CAMBIOS;
+  const catalogo = catalogoDeLosFindings(lista, [AESIA_RIA_REQUIREMENTS, DESPLIEGUE_REQUIREMENTS, ISO_42001_REQUIREMENTS]);
+  const medidas = catalogo.flatMap((r) => r.measures);
+  const vigente = new Map(medidas.map((m) => [m.id, m.description.trim()]));
+  const corregidas = lista
+    .filter((f) => f.code && vigente.has(f.code) && typeof f.title === "string" && f.title.trim() !== "")
+    .filter((f) => f.title.trim() !== vigente.get(f.code))
+    .map((f) => f.code as string);
+  if (corregidas.length === 0) return SIN_CAMBIOS;
+  const respondidas = new Set(lista.map((f) => f.code));
+  // ponytail: sin versión en la fila, «nuevas» son las de la versión vigente;
+  // con varias subidas hará falta `catalog_version` (F2.T3) para acotarlas.
+  const nuevas = medidas.filter((m) => m.desde === VERSION_CATALOGO_RIA && !respondidas.has(m.id)).map((m) => m.id);
+  return { anterior: true, corregidas, nuevas };
 }

@@ -9,7 +9,12 @@ import {
   calculateAdaptationPlan,
 } from "@/lib/aims/catalog-aesia";
 import type { AccionPDA } from "@/lib/aims/plan-adaptacion";
-import { DESPLIEGUE_REQUIREMENTS, catalogoDeLosFindings, evaluadaContraOtroCatalogo } from "@/lib/aims/perfil-aplicabilidad";
+import {
+  DESPLIEGUE_REQUIREMENTS,
+  cambiosDelCatalogoDesde,
+  catalogoDeLosFindings,
+  evaluadaContraOtroCatalogo,
+} from "@/lib/aims/perfil-aplicabilidad";
 import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 import CabeceraInforme from "@/components/ai-governance/evaluacion-detalle/CabeceraInforme";
 import ChecklistMedidas from "@/components/ai-governance/evaluacion-detalle/ChecklistMedidas";
@@ -117,6 +122,8 @@ export default function EvaluacionDetalle() {
   // ¿Se midió contra un catálogo distinto del que hoy le corresponde al sistema?
   // Sólo se afirma con clasificación guiada COMPLETED; sin perfil, `false`.
   const anteriorAClasificacion = evaluadaContraOtroCatalogo(assessment.findings, assessment.ai_systems, AESIA_RIA_REQUIREMENTS);
+  // ¿Se respondió con una versión anterior del catálogo? (texto de medida corregido desde entonces)
+  const cambiosCatalogo = cambiosDelCatalogoDesde(assessment.findings);
 
   const handleCongelar = async () => {
     try {
@@ -166,6 +173,7 @@ export default function EvaluacionDetalle() {
         isIso={isIso}
         catalogoDeDespliegue={catalog === DESPLIEGUE_REQUIREMENTS}
         anteriorAClasificacion={anteriorAClasificacion}
+        cambiosCatalogo={cambiosCatalogo}
         onExportJson={handleExportJson}
         onPrint={handlePrint}
         onCongelar={handleCongelar}

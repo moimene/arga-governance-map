@@ -23,19 +23,56 @@
  * un cotejo documentado guía a guía, puede volver con su fecha de verificación.
  *
  * `subpartId` ("17.1.a", "9.2.a", "A.5.1"…) ES UNA CLAVE INTERNA de
- * agrupación, NO una cita del apartado y la letra del artículo: su desglose no
- * se ha cotejado contra el texto del Reglamento. Por eso NO se pinta como
- * referencia legal en ninguna pantalla — se muestra `titleShort`, que es la
- * descripción del bloque, y para eso está `subpartTitle()`.
+ * agrupación y NO se pinta en ninguna pantalla — se muestra `titleShort`, que
+ * es la descripción del bloque, y para eso está `subpartTitle()`.
+ *
+ * RECOTEJO CONTRA EL TEXTO CONSOLIDADO (2026-09-19)
+ * -------------------------------------------------
+ * Cada requisito con `verificadoEl` se cotejó, clave a clave y título a título,
+ * contra el texto consolidado del Reglamento a 27-07-2026 (`TEXTO_COTEJADO_RIA`,
+ * tras el Reglamento (UE) 2026/1744). En esos requisitos la clave interna SÍ
+ * sigue al apartado y la letra del artículo, aunque siga sin pintarse: lo
+ * visible son los títulos, y son ellos los que llevan la cita cuando hace falta
+ * (p. ej., «solo anexo III, punto 1, letra a)» en los mínimos del art. 12.3).
+ *
+ * Los códigos MG_* anteriores NO cambian: en Cloud hay respuestas guardadas con
+ * ellos. Donde el texto de una medida se corrigió, la corrección conserva lo
+ * que se preguntaba. Las medidas que entran nuevas llevan `desde` con la
+ * versión del catálogo en que entran (`VERSION_CATALOGO_RIA`); una evaluación
+ * respondida con otra versión la detecta `cambiosDelCatalogoDesde`.
+ *
+ * Segunda lectura pendiente: el lote H-11 de Harvey (§9 de la especificación)
+ * no se ha enviado. Hasta su veredicto, el cotejo es de TGMS.
  */
 
 import { acreditaConformidad } from "./conformidad";
+
+/**
+ * Versión del catálogo de medidas. Sube cuando entra una medida o cambia el
+ * sentido de una existente; las medidas nuevas la llevan en `desde`.
+ */
+export const VERSION_CATALOGO_RIA = "2026-09-19";
+
+/** Texto contra el que se hizo el recotejo de los requisitos con `verificadoEl`. */
+export const TEXTO_COTEJADO_RIA = {
+  norma: "Reglamento (UE) 2024/1689, texto consolidado a 27-07-2026 (modificado por el Reglamento (UE) 2026/1744)",
+  celex: "02024R1689-20260727",
+  url: "https://eur-lex.europa.eu/legal-content/ES/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+  /** SHA-256 del HTML descargado el 2026-09-19 (conversor EUR-Lex del 11-08-2026). */
+  sha256Html: "ed11ce60514e9030bda35bfc2de78ff83306980ece16b095695d9ff5c93ad904",
+  segundaLectura: "Pendiente: lote H-11 de Harvey",
+} as const;
 
 export interface RequirementDef {
   code: string;
   title: string;
   articleRef: string;
   description: string;
+  /**
+   * Fecha del cotejo contra `TEXTO_COTEJADO_RIA` (AAAA-MM-DD). `null` =
+   * declarado y todavía sin cotejar. Los catálogos que no son del RIA no lo usan.
+   */
+  verificadoEl?: string | null;
   subparts: SubpartDef[];
   measures: MeasureGuideDef[];
 }
@@ -53,6 +90,8 @@ export interface MeasureGuideDef {
   description: string;
   subpartId: string;
   guidanceQuestions?: string[];
+  /** Versión del catálogo en que entra la medida. Sin valor: estaba antes del recotejo. */
+  desde?: string;
 }
 
 export interface MaturityLevelDef {
@@ -268,7 +307,9 @@ export function deriveDiagnosisStatus(maturityLevel: string | null | undefined):
 }
 
 /**
- * Catálogo Maestro de los 12 Requisitos Oficiales del RIA con sus 84 Medidas Guía (MG)
+ * Catálogo del proveedor de un sistema de alto riesgo: los 12 requisitos del
+ * RIA con sus medidas guía (MG). Lo que es cita se cotejó contra el texto
+ * consolidado (ver cabecera); la procedencia AESIA del catálogo, no.
  */
 export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
   {
@@ -276,31 +317,39 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     title: "Sistema de gestión de la calidad",
     articleRef: "Art. 17",
     description: "Establecer, documentar y mantener un sistema de gestión de calidad que asegure el cumplimiento continuado del Reglamento de IA a lo largo de todo el ciclo de vida del sistema.",
+    verificadoEl: "2026-09-19",
+    // Una clave por letra del 17.1. Antes la «d» llevaba la f), la «e» la g)…
+    // hasta la «k», que llevaba la m); la «b» y la «c» estaban cruzadas; y la
+    // d) y la e) no tenían medida.
     subparts: [
       { subpartId: "17.1.a", articleNumber: "Art. 17", titleShort: "Estrategia de cumplimiento normativo", orderIndex: 1 },
-      { subpartId: "17.1.b", articleNumber: "Art. 17", titleShort: "Técnicas, procedimientos y acciones sistemáticas", orderIndex: 2 },
-      { subpartId: "17.1.c", articleNumber: "Art. 17", titleShort: "Técnicas para diseño, control y verificación", orderIndex: 3 },
-      { subpartId: "17.1.d", articleNumber: "Art. 17", titleShort: "Procedimientos para gestión de datos", orderIndex: 4 },
-      { subpartId: "17.1.e", articleNumber: "Art. 17", titleShort: "Sistema de gestión de riesgos documentado", orderIndex: 5 },
-      { subpartId: "17.1.f", articleNumber: "Art. 17", titleShort: "Vigilancia poscomercialización", orderIndex: 6 },
-      { subpartId: "17.1.g", articleNumber: "Art. 17", titleShort: "Procedimientos de notificación", orderIndex: 7 },
-      { subpartId: "17.1.h", articleNumber: "Art. 17", titleShort: "Comunicación con autoridades", orderIndex: 8 },
-      { subpartId: "17.1.i", articleNumber: "Art. 17", titleShort: "Documentación y mantenimiento de información", orderIndex: 9 },
-      { subpartId: "17.1.j", articleNumber: "Art. 17", titleShort: "Gestión de recursos y personal cualificado", orderIndex: 10 },
-      { subpartId: "17.1.k", articleNumber: "Art. 17", titleShort: "Marco de responsabilidad de la dirección", orderIndex: 11 },
+      { subpartId: "17.1.b", articleNumber: "Art. 17", titleShort: "Diseño, control y verificación del diseño", orderIndex: 2 },
+      { subpartId: "17.1.c", articleNumber: "Art. 17", titleShort: "Desarrollo, control y aseguramiento de la calidad", orderIndex: 3 },
+      { subpartId: "17.1.d", articleNumber: "Art. 17", titleShort: "Examen, prueba y validación, con su frecuencia", orderIndex: 4 },
+      { subpartId: "17.1.e", articleNumber: "Art. 17", titleShort: "Especificaciones técnicas y normas aplicadas", orderIndex: 5 },
+      { subpartId: "17.1.f", articleNumber: "Art. 17", titleShort: "Sistemas y procedimientos de gestión de datos", orderIndex: 6 },
+      { subpartId: "17.1.g", articleNumber: "Art. 17", titleShort: "Sistema de gestión de riesgos", orderIndex: 7 },
+      { subpartId: "17.1.h", articleNumber: "Art. 17", titleShort: "Vigilancia poscomercialización", orderIndex: 8 },
+      { subpartId: "17.1.i", articleNumber: "Art. 17", titleShort: "Notificación de incidentes graves", orderIndex: 9 },
+      { subpartId: "17.1.j", articleNumber: "Art. 17", titleShort: "Comunicación con autoridades, organismos notificados y otras partes", orderIndex: 10 },
+      { subpartId: "17.1.k", articleNumber: "Art. 17", titleShort: "Registro de la documentación y la información", orderIndex: 11 },
+      { subpartId: "17.1.l", articleNumber: "Art. 17", titleShort: "Gestión de los recursos y seguridad del suministro", orderIndex: 12 },
+      { subpartId: "17.1.m", articleNumber: "Art. 17", titleShort: "Marco de rendición de cuentas", orderIndex: 13 },
     ],
     measures: [
       { id: "MG_QUAL_01", code: "MG_QUAL_01", description: "Establecer una estrategia de cumplimiento normativo formal aprobada por la dirección", subpartId: "17.1.a" },
-      { id: "MG_QUAL_02", code: "MG_QUAL_02", description: "Implementar técnicas y procedimientos sistemáticos para garantizar la calidad", subpartId: "17.1.b" },
-      { id: "MG_QUAL_03", code: "MG_QUAL_03", description: "Aplicar técnicas de diseño, control de cambios y verificación formal", subpartId: "17.1.c" },
-      { id: "MG_QUAL_04", code: "MG_QUAL_04", description: "Establecer procedimientos rigurosos para la gestión de datos en el SGC", subpartId: "17.1.d" },
-      { id: "MG_QUAL_05", code: "MG_QUAL_05", description: "Documentar el sistema de gestión de riesgos integrado en el SGC", subpartId: "17.1.e" },
-      { id: "MG_QUAL_06", code: "MG_QUAL_06", description: "Implementar un protocolo de vigilancia poscomercialización continuo", subpartId: "17.1.f" },
-      { id: "MG_QUAL_07", code: "MG_QUAL_07", description: "Establecer procedimientos de notificación interna y externa de incidentes", subpartId: "17.1.g" },
-      { id: "MG_QUAL_08", code: "MG_QUAL_08", description: "Definir los canales y responsables de comunicación con autoridades supervisoras", subpartId: "17.1.h" },
-      { id: "MG_QUAL_09", code: "MG_QUAL_09", description: "Mantener la documentación e información técnica actualizada y custodiada", subpartId: "17.1.i" },
-      { id: "MG_QUAL_10", code: "MG_QUAL_10", description: "Gestionar los recursos computacionales y competencias del personal", subpartId: "17.1.j" },
-      { id: "MG_QUAL_11", code: "MG_QUAL_11", description: "Establecer un marco claro de rendición de cuentas de la alta dirección", subpartId: "17.1.k" },
+      { id: "MG_QUAL_03", code: "MG_QUAL_03", description: "Aplicar técnicas y procedimientos sistemáticos de diseño, control y verificación del diseño", subpartId: "17.1.b" },
+      { id: "MG_QUAL_02", code: "MG_QUAL_02", description: "Implementar técnicas y procedimientos sistemáticos de desarrollo, control y aseguramiento de la calidad", subpartId: "17.1.c" },
+      { id: "MG_QUAL_12", code: "MG_QUAL_12", description: "Definir los procedimientos de examen, prueba y validación antes, durante y después del desarrollo, y su frecuencia", subpartId: "17.1.d", desde: VERSION_CATALOGO_RIA },
+      { id: "MG_QUAL_13", code: "MG_QUAL_13", description: "Identificar las especificaciones técnicas y normas aplicadas y, donde las normas armonizadas no cubran todos los requisitos, los medios para cumplirlos", subpartId: "17.1.e", desde: VERSION_CATALOGO_RIA },
+      { id: "MG_QUAL_04", code: "MG_QUAL_04", description: "Establecer procedimientos rigurosos para la gestión de datos en el SGC", subpartId: "17.1.f" },
+      { id: "MG_QUAL_05", code: "MG_QUAL_05", description: "Documentar el sistema de gestión de riesgos integrado en el SGC", subpartId: "17.1.g" },
+      { id: "MG_QUAL_06", code: "MG_QUAL_06", description: "Implementar un protocolo de vigilancia poscomercialización continuo", subpartId: "17.1.h" },
+      { id: "MG_QUAL_07", code: "MG_QUAL_07", description: "Establecer los procedimientos de notificación de incidentes graves", subpartId: "17.1.i" },
+      { id: "MG_QUAL_08", code: "MG_QUAL_08", description: "Definir los canales y responsables de comunicación con autoridades supervisoras", subpartId: "17.1.j" },
+      { id: "MG_QUAL_09", code: "MG_QUAL_09", description: "Mantener la documentación e información técnica actualizada y custodiada", subpartId: "17.1.k" },
+      { id: "MG_QUAL_10", code: "MG_QUAL_10", description: "Gestionar los recursos, incluidas las medidas de seguridad del suministro", subpartId: "17.1.l" },
+      { id: "MG_QUAL_11", code: "MG_QUAL_11", description: "Establecer un marco claro de rendición de cuentas de la alta dirección", subpartId: "17.1.m" },
     ],
   },
   {
@@ -308,6 +357,7 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     title: "Sistema de gestión de riesgos",
     articleRef: "Art. 9",
     description: "Establecer, aplicar, documentar y mantener un sistema de gestión de riesgos continuo y sistemático que identifique, evalúe y mitigue los riesgos conocidos y previsibles para la salud, la seguridad y los derechos fundamentales.",
+    verificadoEl: null,
     subparts: [
       { subpartId: "9.2.a", articleNumber: "Art. 9", titleShort: "Identificación y análisis de riesgos previsibles", orderIndex: 1 },
       { subpartId: "9.2.b", articleNumber: "Art. 9", titleShort: "Estimación y evaluación de riesgos sistemática", orderIndex: 2 },
@@ -336,6 +386,7 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     title: "Supervisión humana",
     articleRef: "Art. 14",
     description: "Diseñar y desarrollar los sistemas de IA de alto riesgo de modo que puedan ser supervisados eficazmente por personas físicas durante su uso para prevenir o minimizar riesgos.",
+    verificadoEl: null,
     subparts: [
       { subpartId: "14.1", articleNumber: "Art. 14", titleShort: "Diseño para supervisión humana efectiva", orderIndex: 1 },
       { subpartId: "14.2", articleNumber: "Art. 14", titleShort: "Prevención o minimización de riesgos para la salud y derechos", orderIndex: 2 },
@@ -364,6 +415,7 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     title: "Datos y gobernanza de datos",
     articleRef: "Art. 10",
     description: "Aplicar prácticas adecuadas de gobernanza y gestión de datos a los conjuntos de entrenamiento, validación y prueba para asegurar calidad, representatividad y mitigación de sesgos.",
+    verificadoEl: null,
     subparts: [
       { subpartId: "10.2.a", articleNumber: "Art. 10", titleShort: "Decisiones de diseño de datos pertinentes", orderIndex: 1 },
       { subpartId: "10.2.b", articleNumber: "Art. 10", titleShort: "Procesos de recogida de datos y origen", orderIndex: 2 },
@@ -391,34 +443,44 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
   },
   {
     code: "TRANSPARENCY",
-    title: "Transparencia e información a usuarios",
+    // Título oficial del art. 13 consolidado. El destinatario de la información
+    // es el RESPONSABLE DEL DESPLIEGUE, no el «usuario final».
+    title: "Transparencia y comunicación de información a los responsables del despliegue",
     articleRef: "Art. 13",
-    description: "Diseñar los sistemas de modo que su funcionamiento sea transparente para que los usuarios puedan interpretar los resultados y utilizarlos de manera adecuada.",
+    description: "Diseñar y desarrollar el sistema con un nivel de transparencia suficiente para que los responsables del despliegue interpreten y usen correctamente sus resultados de salida, y acompañarlo de instrucciones de uso con el contenido mínimo del art. 13.3.",
+    verificadoEl: "2026-09-19",
     subparts: [
-      { subpartId: "13.1", articleNumber: "Art. 13", titleShort: "Transparencia suficiente e interpretación de resultados", orderIndex: 1 },
+      { subpartId: "13.1", articleNumber: "Art. 13", titleShort: "Transparencia suficiente para interpretar y usar los resultados", orderIndex: 1 },
       { subpartId: "13.3.a", articleNumber: "Art. 13", titleShort: "Identidad y datos de contacto del proveedor", orderIndex: 2 },
-      { subpartId: "13.3.b.i", articleNumber: "Art. 13", titleShort: "Características, capacidades y límites de rendimiento", orderIndex: 3 },
-      { subpartId: "13.3.b.ii", articleNumber: "Art. 13", titleShort: "Nivel de precisión y métricas de rendimiento pertinentes", orderIndex: 4 },
-      { subpartId: "13.3.b.iii", articleNumber: "Art. 13", titleShort: "Circunstancias previsibles de uso indebido o anomalías", orderIndex: 5 },
-      { subpartId: "13.3.b.iv", articleNumber: "Art. 13", titleShort: "Especificaciones de datos de entrada y requisitos técnicos", orderIndex: 6 },
-      { subpartId: "13.3.b.v", articleNumber: "Art. 13", titleShort: "Información sobre datos de entrenamiento utilizados", orderIndex: 7 },
-      { subpartId: "13.3.c", articleNumber: "Art. 13", titleShort: "Cambios previstos durante el ciclo de vida del sistema", orderIndex: 8 },
-      { subpartId: "13.3.d", articleNumber: "Art. 13", titleShort: "Medidas de supervisión humana y recomendaciones de uso", orderIndex: 9 },
-      { subpartId: "13.3.e", articleNumber: "Art. 13", titleShort: "Recursos computacionales y vida útil prevista", orderIndex: 10 },
-      { subpartId: "13.3.f", articleNumber: "Art. 13", titleShort: "Mecanismos de registro de decisiones y trazabilidad", orderIndex: 11 },
+      { subpartId: "13.3.b", articleNumber: "Art. 13", titleShort: "Características, capacidades y limitaciones del funcionamiento", orderIndex: 3 },
+      { subpartId: "13.3.b.i", articleNumber: "Art. 13", titleShort: "Finalidad prevista", orderIndex: 4 },
+      { subpartId: "13.3.b.ii", articleNumber: "Art. 13", titleShort: "Precisión, solidez y ciberseguridad esperables", orderIndex: 5 },
+      { subpartId: "13.3.b.iii", articleNumber: "Art. 13", titleShort: "Circunstancias que pueden generar riesgos", orderIndex: 6 },
+      { subpartId: "13.3.b.iv", articleNumber: "Art. 13", titleShort: "Capacidades para explicar los resultados", orderIndex: 7 },
+      { subpartId: "13.3.b.v", articleNumber: "Art. 13", titleShort: "Funcionamiento respecto de personas o colectivos", orderIndex: 8 },
+      { subpartId: "13.3.b.vi", articleNumber: "Art. 13", titleShort: "Datos de entrada y conjuntos de entrenamiento, validación y prueba", orderIndex: 9 },
+      { subpartId: "13.3.b.vii", articleNumber: "Art. 13", titleShort: "Información para interpretar y usar los resultados", orderIndex: 10 },
+      { subpartId: "13.3.c", articleNumber: "Art. 13", titleShort: "Cambios predeterminados en la evaluación de la conformidad inicial", orderIndex: 11 },
+      { subpartId: "13.3.d", articleNumber: "Art. 13", titleShort: "Medidas de supervisión humana", orderIndex: 12 },
+      { subpartId: "13.3.e", articleNumber: "Art. 13", titleShort: "Recursos, vida útil y mantenimiento", orderIndex: 13 },
+      { subpartId: "13.3.f", articleNumber: "Art. 13", titleShort: "Mecanismos para recabar e interpretar los archivos de registro", orderIndex: 14 },
     ],
     measures: [
-      { id: "MG_TRANS_01", code: "MG_TRANS_01", description: "Diseñar el sistema para que su funcionamiento sea transparente para el usuario final", subpartId: "13.1" },
-      { id: "MG_TRANS_02", code: "MG_TRANS_02", description: "Proporcionar de forma visible la identidad y datos de contacto del proveedor", subpartId: "13.3.a" },
-      { id: "MG_TRANS_03", code: "MG_TRANS_03", description: "Documentar con claridad las características, capacidades y limitaciones del modelo", subpartId: "13.3.b.i" },
+      { id: "MG_TRANS_01", code: "MG_TRANS_01", description: "Diseñar el sistema para que su funcionamiento sea transparente para los responsables del despliegue", subpartId: "13.1" },
+      { id: "MG_TRANS_02", code: "MG_TRANS_02", description: "Proporcionar en las instrucciones de uso la identidad y datos de contacto del proveedor", subpartId: "13.3.a" },
+      { id: "MG_TRANS_03", code: "MG_TRANS_03", description: "Documentar con claridad las características, capacidades y limitaciones del modelo", subpartId: "13.3.b" },
+      { id: "MG_TRANS_12", code: "MG_TRANS_12", description: "Indicar en las instrucciones de uso la finalidad prevista del sistema", subpartId: "13.3.b.i", desde: VERSION_CATALOGO_RIA },
       { id: "MG_TRANS_04", code: "MG_TRANS_04", description: "Declarar de forma explícita el nivel de precisión y las métricas evaluadas", subpartId: "13.3.b.ii" },
-      { id: "MG_TRANS_05", code: "MG_TRANS_05", description: "Describir las circunstancias en que el sistema puede degradar su rendimiento o fallar", subpartId: "13.3.b.iii" },
-      { id: "MG_TRANS_06", code: "MG_TRANS_06", description: "Especificar los requisitos de formato y calidad exigidos a los datos de entrada", subpartId: "13.3.b.iv" },
-      { id: "MG_TRANS_07", code: "MG_TRANS_07", description: "Informar sobre el tipo y alcance de los datos de entrenamiento empleados", subpartId: "13.3.b.v" },
-      { id: "MG_TRANS_08", code: "MG_TRANS_08", description: "Documentar la política de actualizaciones y cambios continuos del sistema", subpartId: "13.3.c" },
-      { id: "MG_TRANS_09", code: "MG_TRANS_09", description: "Describir las medidas de supervisión humana requeridas al usuario", subpartId: "13.3.d" },
-      { id: "MG_TRANS_10", code: "MG_TRANS_10", description: "Especificar los recursos de hardware y software requeridos para la ejecución", subpartId: "13.3.e" },
-      { id: "MG_TRANS_11", code: "MG_TRANS_11", description: "Proporcionar a los usuarios acceso al historial de decisiones y registro automático", subpartId: "13.3.f" },
+      { id: "MG_TRANS_05", code: "MG_TRANS_05", description: "Describir las circunstancias, de uso conforme o de uso indebido previsible, en que el sistema puede fallar y generar riesgos para la salud, la seguridad o los derechos fundamentales", subpartId: "13.3.b.iii" },
+      { id: "MG_TRANS_13", code: "MG_TRANS_13", description: "Describir, cuando las haya, las capacidades técnicas del sistema para explicar sus resultados de salida", subpartId: "13.3.b.iv", desde: VERSION_CATALOGO_RIA },
+      { id: "MG_TRANS_14", code: "MG_TRANS_14", description: "Informar, cuando proceda, del funcionamiento del sistema respecto de las personas o colectivos con los que está previsto utilizarlo", subpartId: "13.3.b.v", desde: VERSION_CATALOGO_RIA },
+      { id: "MG_TRANS_06", code: "MG_TRANS_06", description: "Especificar los requisitos de formato y calidad exigidos a los datos de entrada", subpartId: "13.3.b.vi" },
+      { id: "MG_TRANS_07", code: "MG_TRANS_07", description: "Informar sobre el tipo y alcance de los datos de entrenamiento empleados", subpartId: "13.3.b.vi" },
+      { id: "MG_TRANS_15", code: "MG_TRANS_15", description: "Dar a los responsables del despliegue la información necesaria para interpretar los resultados de salida y usarlos adecuadamente", subpartId: "13.3.b.vii", desde: VERSION_CATALOGO_RIA },
+      { id: "MG_TRANS_08", code: "MG_TRANS_08", description: "Documentar los cambios del sistema y de su funcionamiento predeterminados en la evaluación de la conformidad inicial", subpartId: "13.3.c" },
+      { id: "MG_TRANS_09", code: "MG_TRANS_09", description: "Describir las medidas de supervisión humana, incluidas las técnicas que facilitan a los responsables del despliegue interpretar los resultados", subpartId: "13.3.d" },
+      { id: "MG_TRANS_10", code: "MG_TRANS_10", description: "Especificar los recursos informáticos y de hardware necesarios, la vida útil prevista y las medidas de mantenimiento y cuidado, con su frecuencia, incluidas las actualizaciones del software", subpartId: "13.3.e" },
+      { id: "MG_TRANS_11", code: "MG_TRANS_11", description: "Describir los mecanismos que permiten a los responsables del despliegue recabar, almacenar e interpretar los archivos de registro", subpartId: "13.3.f" },
     ],
   },
   {
@@ -426,6 +488,7 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     title: "Precisión",
     articleRef: "Art. 15",
     description: "Alcanzar un nivel adecuado de precisión y declarar las métricas de rendimiento alcanzadas a lo largo de todo el ciclo de vida del sistema de IA.",
+    verificadoEl: null,
     subparts: [
       { subpartId: "15.1.prec", articleNumber: "Art. 15", titleShort: "Nivel adecuado de precisión según finalidad prevista", orderIndex: 1 },
       { subpartId: "15.2.prec", articleNumber: "Art. 15", titleShort: "Declaración y comunicación de métricas de precisión", orderIndex: 2 },
@@ -442,6 +505,7 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     title: "Solidez y robustez",
     articleRef: "Art. 15",
     description: "Asegurar que el sistema de IA sea resistente frente a errores, fallos técnicos, anomalías en los datos de entrada o intentos maliciosos de alteración.",
+    verificadoEl: null,
     subparts: [
       { subpartId: "15.4.a", articleNumber: "Art. 15", titleShort: "Resistencia técnica frente a errores e imprevistos", orderIndex: 1 },
       { subpartId: "15.4.b", articleNumber: "Art. 15", titleShort: "Soluciones de redundancia y tolerancia a fallos", orderIndex: 2 },
@@ -458,6 +522,7 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     title: "Ciberseguridad",
     articleRef: "Art. 15",
     description: "Proteger el sistema de IA contra accesos no autorizados, ataques adversarios, envenenamiento de datos y manipulación maliciosa.",
+    verificadoEl: null,
     subparts: [
       { subpartId: "15.4.ciber.a", articleNumber: "Art. 15", titleShort: "Protección contra accesos no autorizados e intrusiones", orderIndex: 1 },
       { subpartId: "15.4.ciber.b", articleNumber: "Art. 15", titleShort: "Prevención de envenenamiento de datos de entrenamiento", orderIndex: 2 },
@@ -475,24 +540,37 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     code: "LOGGING",
     title: "Conservación de registros / Trazabilidad",
     articleRef: "Art. 12",
-    description: "Habilitar el registro automático de eventos (logs) a lo largo del ciclo de vida del sistema para garantizar la trazabilidad de su funcionamiento.",
+    description: "Habilitar el registro automático de acontecimientos (archivos de registro) a lo largo del ciclo de vida del sistema, con la trazabilidad adecuada a su finalidad prevista, y conservarlos el tiempo que exige el Reglamento.",
+    verificadoEl: "2026-09-19",
+    // El art. 12 tiene tres apartados. Los fines generales están en el 12.2; los
+    // mínimos del 12.3 (período de uso, base de datos de referencia, datos con
+    // correspondencia, personas que verifican) SOLO rigen para la identificación
+    // biométrica remota del anexo III, punto 1, letra a), y antes se pintaban
+    // como generales. La conservación de al menos seis meses no es del art. 12:
+    // es del 19.1 (proveedor) y del 26.6 (responsable del despliegue).
     subparts: [
-      { subpartId: "12.1", articleNumber: "Art. 12", titleShort: "Capacidad de registro automático continuo de eventos", orderIndex: 1 },
-      { subpartId: "12.2.a", articleNumber: "Art. 12", titleShort: "Registro de períodos de uso y sesiones de ejecución", orderIndex: 2 },
-      { subpartId: "12.2.b", articleNumber: "Art. 12", titleShort: "Mantenimiento de bases de datos de referencia consultadas", orderIndex: 3 },
-      { subpartId: "12.2.c", articleNumber: "Art. 12", titleShort: "Registro de datos de entrada y consultas formuladas", orderIndex: 4 },
-      { subpartId: "12.2.d", articleNumber: "Art. 12", titleShort: "Identificación de personas físicas implicadas en la supervisión", orderIndex: 5 },
-      { subpartId: "12.3", articleNumber: "Art. 12", titleShort: "Adecuación y proporcionalidad de los registros a la finalidad", orderIndex: 6 },
-      { subpartId: "12.4", articleNumber: "Art. 12", titleShort: "Requisitos reforzados para sistemas de identificación biométrica", orderIndex: 7 },
+      { subpartId: "12.1", articleNumber: "Art. 12", titleShort: "Registro automático de acontecimientos durante todo el ciclo de vida", orderIndex: 1 },
+      { subpartId: "12.2.a", articleNumber: "Art. 12", titleShort: "Fin del registro: detectar situaciones de riesgo o de modificación sustancial", orderIndex: 2 },
+      { subpartId: "12.2.b", articleNumber: "Art. 12", titleShort: "Fin del registro: facilitar la vigilancia poscomercialización", orderIndex: 3 },
+      { subpartId: "12.2.c", articleNumber: "Art. 12", titleShort: "Fin del registro: vigilar el funcionamiento por el responsable del despliegue", orderIndex: 4 },
+      { subpartId: "12.3", articleNumber: "Art. 12", titleShort: "Mínimos reforzados: solo sistemas del anexo III, punto 1, letra a)", orderIndex: 5 },
+      { subpartId: "12.3.a", articleNumber: "Art. 12", titleShort: "Período de cada uso (solo anexo III, punto 1, letra a))", orderIndex: 6 },
+      { subpartId: "12.3.b", articleNumber: "Art. 12", titleShort: "Base de datos de referencia cotejada (solo anexo III, punto 1, letra a))", orderIndex: 7 },
+      { subpartId: "12.3.c", articleNumber: "Art. 12", titleShort: "Datos de entrada con correspondencia (solo anexo III, punto 1, letra a))", orderIndex: 8 },
+      { subpartId: "12.3.d", articleNumber: "Art. 12", titleShort: "Personas que verifican los resultados (solo anexo III, punto 1, letra a))", orderIndex: 9 },
+      { subpartId: "19.1-26.6", articleNumber: "Arts. 19.1 y 26.6", titleShort: "Conservación de los archivos de registro, al menos seis meses (arts. 19 y 26.6)", orderIndex: 10 },
     ],
     measures: [
       { id: "MG_LOGG_01", code: "MG_LOGG_01", description: "Habilitar capacidades de registro automático de eventos técnicos y funcionales", subpartId: "12.1" },
-      { id: "MG_LOGG_02", code: "MG_LOGG_02", description: "Registrar con marca de tiempo precisa cada período de uso y ejecución del sistema", subpartId: "12.2.a" },
-      { id: "MG_LOGG_03", code: "MG_LOGG_03", description: "Mantener registro de las bases de datos externas consultadas para cada inferencia", subpartId: "12.2.b" },
-      { id: "MG_LOGG_04", code: "MG_LOGG_04", description: "Registrar los datos de entrada clave asociados a cada resultado o recomendación", subpartId: "12.2.c" },
-      { id: "MG_LOGG_05", code: "MG_LOGG_05", description: "Identificar inequívocamente a los operadores o supervisores involucrados", subpartId: "12.2.d" },
-      { id: "MG_LOGG_06", code: "MG_LOGG_06", description: "Adecuar los períodos de retención y custodia de logs a las obligaciones legales", subpartId: "12.3" },
-      { id: "MG_LOGG_07", code: "MG_LOGG_07", description: "Cumplir requisitos reforzados de trazabilidad en sistemas biométricos de alto riesgo", subpartId: "12.4" },
+      { id: "MG_LOGG_08", code: "MG_LOGG_08", description: "Registrar los acontecimientos que permitan detectar situaciones en que el sistema pueda presentar un riesgo (art. 79.1) o una modificación sustancial", subpartId: "12.2.a", desde: VERSION_CATALOGO_RIA },
+      { id: "MG_LOGG_09", code: "MG_LOGG_09", description: "Registrar los acontecimientos que faciliten la vigilancia poscomercialización del art. 72", subpartId: "12.2.b", desde: VERSION_CATALOGO_RIA },
+      { id: "MG_LOGG_10", code: "MG_LOGG_10", description: "Registrar los acontecimientos que permitan al responsable del despliegue vigilar el funcionamiento del sistema (art. 26.5)", subpartId: "12.2.c", desde: VERSION_CATALOGO_RIA },
+      { id: "MG_LOGG_07", code: "MG_LOGG_07", description: "Determinar si el sistema es de identificación biométrica remota del anexo III, punto 1, letra a), y, si lo es, cumplir los mínimos reforzados de registro", subpartId: "12.3" },
+      { id: "MG_LOGG_02", code: "MG_LOGG_02", description: "Registrar con marca de tiempo precisa el inicio y el fin de cada uso del sistema", subpartId: "12.3.a" },
+      { id: "MG_LOGG_03", code: "MG_LOGG_03", description: "Registrar la base de datos de referencia con la que el sistema ha cotejado los datos de entrada", subpartId: "12.3.b" },
+      { id: "MG_LOGG_04", code: "MG_LOGG_04", description: "Registrar los datos de entrada con los que la búsqueda ha arrojado una correspondencia", subpartId: "12.3.c" },
+      { id: "MG_LOGG_05", code: "MG_LOGG_05", description: "Identificar a las personas físicas que verifican los resultados", subpartId: "12.3.d" },
+      { id: "MG_LOGG_06", code: "MG_LOGG_06", description: "Conservar los archivos de registro bajo su control durante un período adecuado a la finalidad, de al menos seis meses, salvo que otra norma disponga otra cosa", subpartId: "19.1-26.6" },
     ],
   },
   {
@@ -500,6 +578,7 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     title: "Documentación técnica",
     articleRef: "Art. 11",
     description: "Elaborar y mantener la documentación técnica completa del sistema antes de su introducción en el mercado o puesta en servicio con arreglo al Anexo IV.",
+    verificadoEl: null,
     subparts: [
       { subpartId: "11.1", articleNumber: "Art. 11", titleShort: "Elaboración de documentación técnica previa", orderIndex: 1 },
       { subpartId: "11.2", articleNumber: "Art. 11", titleShort: "Mantenimiento y actualización continua del expediente", orderIndex: 2 },
@@ -524,6 +603,7 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     title: "Vigilancia poscomercialización",
     articleRef: "Art. 72",
     description: "Establecer y documentar un sistema de vigilancia poscomercialización continuo para recopilar, analizar y evaluar datos sobre el rendimiento del sistema en producción.",
+    verificadoEl: null,
     subparts: [
       { subpartId: "72.1", articleNumber: "Art. 72", titleShort: "Establecimiento del sistema de vigilancia poscomercialización", orderIndex: 1 },
       { subpartId: "72.2", articleNumber: "Art. 72", titleShort: "Recogida, documentación y análisis activo de datos de uso", orderIndex: 2 },
@@ -544,6 +624,7 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     title: "Gestión de incidentes graves",
     articleRef: "Art. 73",
     description: "Notificar a las autoridades competentes y a los afectados cualquier incidente grave o mal funcionamiento del sistema en los plazos reglamentarios y adoptar medidas correctoras.",
+    verificadoEl: null,
     subparts: [
       { subpartId: "73.1", articleNumber: "Art. 73", titleShort: "Notificación de incidentes graves en un plazo máximo de 15 días", orderIndex: 1 },
       { subpartId: "73.2", articleNumber: "Art. 73", titleShort: "Adopción de medidas correctoras inmediatas", orderIndex: 2 },

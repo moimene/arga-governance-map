@@ -13,6 +13,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   AVISO_COBERTURA_PROVISIONAL,
   AVISO_ISO_NO_ES_OBLIGACION,
+  type CambiosDelCatalogo,
 } from "@/lib/aims/perfil-aplicabilidad";
 import { ETIQUETA_ROL, type RolRegulatorio } from "@/lib/aims/rol-regulatorio";
 import { chipClaseEstadoEvaluacion, etiqueta, normalizeAimsStatus } from "@/lib/aims/vocabulario";
@@ -27,6 +28,8 @@ export interface CabeceraInformeProps {
   catalogoDeDespliegue: boolean;
   /** Resuelto en la página con `evaluadaContraOtroCatalogo`: el sistema se reclasificó después. */
   anteriorAClasificacion: boolean;
+  /** Resuelto en la página con `cambiosDelCatalogoDesde`: respondida con otra versión del catálogo. */
+  cambiosCatalogo: CambiosDelCatalogo;
   onExportJson: () => void;
   onPrint: () => void;
   onCongelar: () => void;
@@ -41,6 +44,7 @@ export default function CabeceraInforme({
   isIso,
   catalogoDeDespliegue,
   anteriorAClasificacion,
+  cambiosCatalogo,
   onExportJson,
   onPrint,
   onCongelar,
@@ -271,7 +275,7 @@ export default function CabeceraInforme({
           <p className="text-xs font-bold text-[var(--g-text-primary)]">Evaluación anterior a la clasificación vigente</p>
           <p className="text-xs text-[var(--g-text-secondary)]">
             Se midió contra el catálogo del{" "}
-            {catalogoDeDespliegue ? "responsable del despliegue" : "proveedor de alto riesgo (84 medidas)"}; el
+            {catalogoDeDespliegue ? "responsable del despliegue" : "proveedor de alto riesgo"}; el
             sistema está clasificado hoy como {(rol && ETIQUETA_ROL[rol as RolRegulatorio]) || rol || "sin rol"} ·{" "}
             {etiqueta("nivel", assessment.ai_systems?.risk_level) || "sin nivel"}. El porcentaje no se recalcula.{" "}
             {assessment.system_id && (
@@ -280,6 +284,30 @@ export default function CabeceraInforme({
                 className="font-semibold text-[var(--g-link)] hover:text-[var(--g-link-hover)] underline"
               >
                 Reevaluar contra su catálogo.
+              </Link>
+            )}
+          </p>
+        </div>
+      )}
+
+      {cambiosCatalogo.anterior && (
+        <div
+          className="p-4 bg-[var(--g-surface-subtle)] border-l-4 border-[var(--status-warning)] space-y-1"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <p className="text-xs font-bold text-[var(--g-text-primary)]">Respondida con una versión anterior del catálogo</p>
+          <p className="text-xs text-[var(--g-text-secondary)]">
+            Desde que se respondió han cambiado de texto {cambiosCatalogo.corregidas.length}{" "}
+            {cambiosCatalogo.corregidas.length === 1 ? "medida respondida" : "medidas respondidas"}
+            {cambiosCatalogo.nuevas.length > 0 &&
+              ` y han entrado ${cambiosCatalogo.nuevas.length} ${cambiosCatalogo.nuevas.length === 1 ? "medida nueva" : "medidas nuevas"}, que aparecen sin evaluar`}
+            . Las respuestas se dieron a la formulación anterior y el porcentaje no se recalcula.{" "}
+            {assessment.system_id && (
+              <Link
+                to={`/ai-governance/evaluaciones/nuevo?system_id=${assessment.system_id}`}
+                className="font-semibold text-[var(--g-link)] hover:text-[var(--g-link-hover)] underline"
+              >
+                Reevaluar con el catálogo vigente.
               </Link>
             )}
           </p>
@@ -296,7 +324,7 @@ export default function CabeceraInforme({
           </p>
           <p className="text-xs text-[var(--g-text-secondary)]">
             Este autodiagnóstico se ha medido contra el catálogo del responsable del despliegue, no
-            contra las 84 medidas del proveedor de un sistema de alto riesgo. {AVISO_ISO_NO_ES_OBLIGACION}
+            contra el catálogo del proveedor de un sistema de alto riesgo. {AVISO_ISO_NO_ES_OBLIGACION}
           </p>
         </div>
       )}
