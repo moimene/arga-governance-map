@@ -31,6 +31,39 @@ describe("el universo del mapa está cerrado contra el catálogo", () => {
     expect(Object.keys(MONITOR_DE_CODIGO).sort()).toEqual(delCatalogo);
   });
 
+  it("cada fila se fija contra el ARTÍCULO del requisito en el catálogo, no contra el propio mapa", () => {
+    // Tabla independiente: artículo o norma del catálogo → monitor. Una fila del
+    // mapa que se mueva de monitor no casa con su artículo.
+    const POR_ARTICULO: Record<string, string> = {
+      "Art. 17": "high-risk-obligations",
+      "Art. 9": "high-risk-obligations",
+      "Art. 14": "human-oversight",
+      "Art. 10": "data-governance",
+      "Art. 13": "transparency-user-information",
+      "Art. 15": "accuracy-robustness-cybersecurity",
+      "Art. 12": "evidence-recordkeeping",
+      "Art. 11": "technical-documentation",
+      "Art. 72": "post-market-monitoring",
+      "Art. 73": "incident-reporting-escalation",
+      "ISO 42001 A.5": "iso-42001-management-system",
+      "ISO 42001 A.6": "governance-accountability",
+      "ISO 42001 A.8": "fundamental-rights-dpia",
+      "ISO 42001 A.9": "iso-42001-management-system",
+      "Art. 4": "governance-accountability",
+      "Art. 50": "transparency-user-information",
+      RGPD: "fundamental-rights-dpia",
+      "Cap. V y art. 25": "provider-vendor-third-party",
+      "Art. 26": "human-oversight",
+      "ISO/IEC 42001": "governance-accountability",
+      "Art. 73 RIA y art. 33 RGPD": "incident-reporting-escalation",
+    };
+    expect(CATALOGO.length).toBe(Object.keys(MONITOR_DE_CODIGO).length);
+    for (const r of CATALOGO) {
+      expect(r.articleRef in POR_ARTICULO, `${r.code}: artículo «${r.articleRef}» sin monitor esperado`).toBe(true);
+      expect({ code: r.code, monitor: monitorDeCodigo(r.code) }).toEqual({ code: r.code, monitor: POR_ARTICULO[r.articleRef] });
+    }
+  });
+
   it("todo monitor del mapa existe en el Dashboard", () => {
     const ids = new Set(buildAimsComplianceMonitors(VACIO).map((m) => m.id));
     expect(ids.size).toBeGreaterThan(10);
@@ -68,24 +101,25 @@ describe("la asignación es por código, nunca por el texto", () => {
     });
     const dpia = monitores.find((m) => m.id === "fundamental-rights-dpia")!;
     const gobierno = monitores.find((m) => m.id === "governance-accountability")!;
-    expect(dpia.status).not.toBe("ready");
-    expect(dpia.metric).not.toBe("1/1 conformes");
-    expect(gobierno.status).not.toBe("ready");
-    expect(gobierno.metric).not.toBe("3/3 conformes");
+    // ISO-10 (datos) no tiene equivalente vigente: no es de ningún monitor.
+    expect(dpia).toMatchObject({ status: "unmeasured", metric: "Sin comprobaciones del área" });
+    // ISO-06 se lee como ISO_ORG_ROLES y es legado: se cuenta, no acredita.
+    expect(gobierno).toMatchObject({ status: "watch", metric: "0/1 acreditadas · 1 de legado, no acredita" });
   });
 
   it("control positivo: una comprobación con el código del área sí mueve su monitor", () => {
     const monitores = buildAimsComplianceMonitors({
       systems: [{ id: "s1", status: "ACTIVO", risk_level: "Limitado" }],
-      assessments: [],
+      // Sólo acredita con la evaluación vigente del sistema congelada y revisada.
+      assessments: [{ id: "a1", system_id: "s1", framework: "EU_AI_ACT", status: "CON_GAPS", frozen_at: "2026-09-18", reviewed_at: "2026-09-18" }],
       incidents: [],
       complianceChecks: [
         { id: "c1", system_id: "s1", requirement_code: "PROTECCION_DATOS", requirement_title: "Sin palabra clave", status: "CONFORME" },
         { id: "c2", system_id: "s1", requirement_code: "ISO_ORG_ROLES", requirement_title: "x", status: "NO_CONFORME" },
       ],
     });
-    expect(monitores.find((m) => m.id === "fundamental-rights-dpia")).toMatchObject({ status: "ready", metric: "1/1 conformes" });
-    expect(monitores.find((m) => m.id === "governance-accountability")).toMatchObject({ status: "gap", metric: "0/1 conformes" });
+    expect(monitores.find((m) => m.id === "fundamental-rights-dpia")).toMatchObject({ status: "ready", metric: "1/1 acreditadas" });
+    expect(monitores.find((m) => m.id === "governance-accountability")).toMatchObject({ status: "gap", metric: "0/1 acreditadas" });
   });
 
   it("un monitor sin comprobaciones de su código dice «no medido», no «Derivado» ni «Sin cobertura»", () => {
@@ -100,26 +134,6 @@ describe("la asignación es por código, nunca por el texto", () => {
       expect(m.status, id).toBe("unmeasured");
       expect(m.metric, id).not.toMatch(/Derivado|Sin cobertura/);
     }
-  });
-});
-
-describe("monitor por sistema y por tenant", () => {
-  it("el del sistema sólo cuenta lo suyo; el del tenant, todo", async () => {
-    const { buildAimsComplianceMonitorsPorSistema } = await import("../readiness");
-    const input = {
-      systems: [{ id: "s1", status: "ACTIVO" }, { id: "s2", status: "ACTIVO" }],
-      assessments: [],
-      incidents: [],
-      complianceChecks: [
-        { id: "c1", system_id: "s1", requirement_code: "DATA_GOVERNANCE", status: "CONFORME" },
-        { id: "c2", system_id: "s2", requirement_code: "DATA_GOVERNANCE", status: "NO_CONFORME" },
-      ],
-    };
-    const porSistema = buildAimsComplianceMonitorsPorSistema(input);
-    expect(Object.keys(porSistema).sort()).toEqual(["s1", "s2"]);
-    expect(porSistema.s1.find((m) => m.id === "data-governance")).toMatchObject({ status: "ready", metric: "1/1 conformes" });
-    expect(porSistema.s2.find((m) => m.id === "data-governance")).toMatchObject({ status: "gap", metric: "0/1 conformes" });
-    expect(buildAimsComplianceMonitors(input).find((m) => m.id === "data-governance")?.metric).toBe("1/2 conformes");
   });
 });
 

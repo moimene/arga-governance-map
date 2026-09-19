@@ -24,7 +24,7 @@ import { mockearModulos } from "@/test/garrigues/_mock-restaurable";
 // `mock.module` es global a la corrida (ver _mock-restaurable.ts).
 // Tercer modo (F1.T8): `datos`, con filas de forma real, para medir lo que la
 // portada pinta con dato y no sólo con vacío o error.
-let modo: "error" | "vacio" | "datos" = "vacio";
+let modo: "error" | "vacio" | "datos" | "guiados" = "vacio";
 const DATOS: Record<string, unknown[]> = {
   systems: [
     // ARGA medido: nivel «Alto» declarado en ficha, sin cuestionario.
@@ -37,10 +37,15 @@ const DATOS: Record<string, unknown[]> = {
     { id: "a1", system_id: "s1", framework: "EU_AI_ACT", status: "APROBADO", assessment_date: "2026-07-19", findings: [] },
   ],
 };
+// Control positivo del tono: los mismos sistemas, clasificados por cuestionario.
+const GUIADOS: Record<string, unknown[]> = {
+  ...DATOS,
+  systems: (DATOS.systems as Array<Record<string, unknown>>).map((s) => ({ ...s, regulatory_profile: { cuestionario_id: `q-${s.id}` } })),
+};
 const consulta = (clave?: string) => () =>
   modo === "error"
     ? { data: undefined, isLoading: false, isError: true, error: new Error("permiso denegado") }
-    : { data: modo === "datos" && clave ? DATOS[clave] ?? [] : [], isLoading: false, isError: false, error: null };
+    : { data: clave && (modo === "datos" || modo === "guiados") ? (modo === "guiados" ? GUIADOS : DATOS)[clave] ?? [] : [], isLoading: false, isError: false, error: null };
 // El Dashboard lee además secciones e indicadores del tenant (F1.T3). El resto
 // del módulo se conserva real: lo importan otras pantallas.
 const expedienteReal = await import("@/hooks/useAimsTechnicalFile");
@@ -352,6 +357,9 @@ describe("«handoff» no se rinde como rótulo en ninguna superficie del módulo
 
 describe("F1.T8 — rótulos de madurez y portada honesta", () => {
   const PRIORIDAD = `${DIR}/PrioridadAhora.tsx`;
+  // El valor del KPI (no el de la prioridad): el rótulo del KpiCard va detrás de su valor.
+  const valorKpiAltos = () =>
+    screen.getAllByText("Alto riesgo sin autodiagnóstico acreditado").find((e) => e.tagName === "DIV")!.previousElementSibling!;
   const DOMINIOS = `${DIR}/ReadinessDomains.tsx`;
 
   it("sin constantes: ni `QUICK_ACTIONS` en la prioridad ni una lista fija de «Próximos pasos»", () => {
@@ -370,14 +378,19 @@ describe("F1.T8 — rótulos de madurez y portada honesta", () => {
     const vacio = buildAimsReadiness({ systems: [], assessments: [], incidents: [] }).nextSteps;
     expect(vacio.map((p) => p.to)).toEqual(["/ai-governance/sistemas/nuevo"]);
     const conDato = buildAimsReadiness({
-      systems: [{ id: "s1", status: "ACTIVO", risk_level: "Alto" }],
+      systems: [
+        { id: "s1", status: "ACTIVO", risk_level: "Alto", regulatory_profile: { cuestionario_id: "q" } },
+        { id: "s2", status: "ACTIVO", risk_level: "Alto" },
+      ],
       assessments: [{ id: "a", system_id: "s1", status: "CONFORME", findings: [] }],
       incidents: [{ id: "i", system_id: "s1", status: "EN_INVESTIGACION" }],
     }).nextSteps;
     const detalle = conDato.map((p) => p.detalle).join(" | ");
     expect(detalle).toMatch(/1 sistemas sin clasificación guiada/);
     expect(detalle).toMatch(/1 autodiagnósticos vigentes sin congelar y revisar/);
+    // El «Alto» se cuenta sólo con cuestionario; el declarado en ficha, aparte.
     expect(detalle).toMatch(/1 sistemas de alto riesgo sin autodiagnóstico acreditado/);
+    expect(detalle).toMatch(/1 declarados Alto en ficha, sin cuestionario/);
     expect(detalle).toMatch(/1 incidentes abiertos o en investigación/);
     expect(conDato.every((p) => p.to.startsWith("/"))).toBe(true);
   });
@@ -408,6 +421,18 @@ describe("F1.T8 — rótulos de madurez y portada honesta", () => {
     const filas = [...fila.parentElement!.children].map((e) => e.textContent);
     expect(filas).toEqual(["Alto0", "Limitado0", "Mínimo0", "Declarado, sin cuestionario2", "Sin clasificar0"]);
     expect(screen.getByText(/Nivel declarado en ficha, sin cuestionario/)).toBeTruthy();
+    // El KPI de alto riesgo se pinta neutro: su «2» es el nivel declarado, no uno medido.
+    expect(valorKpiAltos().className).toContain("text-[var(--g-text-secondary)]");
+    expect(valorKpiAltos().className).not.toContain("--status-error");
+    modo = "vacio";
+  });
+
+  it("control positivo: con cuestionario, dos de alto riesgo sin acreditar van en rojo", async () => {
+    modo = "guiados";
+    const { default: Pagina } = await import("@/pages/ai-governance/Dashboard");
+    render(createElement(MemoryRouter, null, createElement(Pagina)));
+    expect(valorKpiAltos().textContent).toBe("2");
+    expect(valorKpiAltos().className).toContain("--status-error");
     modo = "vacio";
   });
 });

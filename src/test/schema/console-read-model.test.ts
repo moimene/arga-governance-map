@@ -24,7 +24,6 @@ import {
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-  AI_ASSESSMENT_RESOLVED,
   INCIDENT_CLOSED_STATUSES,
   INCIDENT_OPEN_STATUSES,
   measured,
@@ -226,13 +225,13 @@ describe("console read model — cada número nace de una query que existe", () 
     expect(INCIDENT_CLOSED_STATUSES).toContain("Resuelto");
     expect(INCIDENT_OPEN_STATUSES).not.toContain("Resuelto");
 
-    const ass = await arga.from("ai_risk_assessments").select("status");
+    // «Evaluación resuelta» la decide `sistemasCubiertos` (legado.ts): las
+    // columnas que lee tienen que existir, y tiene que haber filas que leer.
+    const ass = await arga
+      .from("ai_risk_assessments")
+      .select("system_id, framework, status, created_at, frozen_at, reviewed_at");
     expect(ass.error).toBeNull();
-    const estadosEval = new Set((ass.data ?? []).map((r: { status: string }) => r.status));
-    expect(
-      AI_ASSESSMENT_RESOLVED.some((v) => estadosEval.has(v)),
-      `ninguno de ${AI_ASSESSMENT_RESOLVED.join("|")} existe en ai_risk_assessments`,
-    ).toBe(true);
+    expect((ass.data ?? []).length, "ARGA sin evaluaciones: la consola no mediría nada").toBeGreaterThan(0);
   });
 
   it("measured() propaga el error como «no medido» y no como 0", () => {

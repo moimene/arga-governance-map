@@ -14,9 +14,15 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEMO_TENANT, GARRIGUES_TENANT, sesionDe, type CuentaDemo } from "../helpers/supabase-test-client";
 import { buildAimsReadiness, apartarChecksDeOtroCatalogo, type AimsReadinessInput } from "@/lib/aims/readiness";
-import { monitorDeCodigo } from "@/lib/aims/mapa-monitores";
+import { MONITOR_DE_CODIGO, monitorDeCodigo } from "@/lib/aims/mapa-monitores";
 import { checksVigentes } from "@/lib/aims/checks-vigentes";
-import { traducirLegado } from "@/lib/aims/legado";
+import { LEGADO_A_VIGENTE, traducirLegado } from "@/lib/aims/legado";
+
+/** Universo cerrado de códigos: el catálogo vigente más el legado declarado. */
+const conocido = (code: string | null | undefined) =>
+  Boolean(code) &&
+  (Object.prototype.hasOwnProperty.call(MONITOR_DE_CODIGO, code!) ||
+    Object.prototype.hasOwnProperty.call(LEGADO_A_VIGENTE, code!));
 
 /** Monitor de una comprobación: su código, leído como vigente si es de legado (F1.T4). */
 const monitorDe = (c: { requirement_code?: string | null }) => monitorDeCodigo(traducirLegado(c).requirement_code);
@@ -74,7 +80,21 @@ describe("monitores AIMS sobre el dato vivo — asignación por código", () => 
     expect(conCodigo, "ninguna comprobación viva tiene código del catálogo: la invariante sería vacua").toBeGreaterThan(0);
   });
 
+  it("control positivo del universo: reconoce un código vigente y uno de legado, y rechaza uno inventado", () => {
+    expect(conocido("RISK_MGMT")).toBe(true);
+    expect(conocido("AIA-09")).toBe(true);
+    expect(conocido("ISO42001_6.1")).toBe(true);
+    expect(conocido("INVENTADO-99")).toBe(false);
+    expect(conocido(null)).toBe(false);
+  });
+
   for (const [cuenta] of TENANTS) {
+    it(`${cuenta}: todo código vivo es del catálogo o del legado declarado (ninguno cae en silencio fuera de los monitores)`, () => {
+      const codigos = [...new Set(dato.get(cuenta)!.complianceChecks.map((c) => c.requirement_code))];
+      expect(codigos.length, `${cuenta} sin códigos que comprobar`).toBeGreaterThan(0);
+      expect(codigos.filter((c) => !conocido(c)), `${cuenta}: códigos sin monitor ni equivalencia declarada`).toEqual([]);
+    });
+
     it(`${cuenta}: un monitor se apoya en comprobaciones si y sólo si alguna lleva el código de su área`, () => {
       const d = dato.get(cuenta)!;
       const { medibles } = apartarChecksDeOtroCatalogo(d.systems, d.complianceChecks.map(traducirLegado));

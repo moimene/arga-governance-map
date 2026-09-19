@@ -15,8 +15,8 @@ import {
   AVISO_ISO_NO_ES_OBLIGACION,
 } from "@/lib/aims/perfil-aplicabilidad";
 import { ETIQUETA_ROL, type RolRegulatorio } from "@/lib/aims/rol-regulatorio";
-import { chipClaseEstadoEvaluacion, etiqueta, normalizeAimsStatus } from "@/lib/aims/vocabulario";
-import { rotuloEvaluacion } from "@/lib/aims/legado";
+import { etiqueta, normalizeAimsStatus } from "@/lib/aims/vocabulario";
+import { chipClaseEvaluacion, rotuloEvaluacion } from "@/lib/aims/legado";
 import { pendientesDeEvidencia } from "@/lib/aims/conformidad";
 import type { AiRiskAssessment } from "@/hooks/useAiAssessments";
 
@@ -140,7 +140,7 @@ export default function CabeceraInforme({
                   : `${assessment.score}%`}
               </span>
               <span
-                className={`px-2.5 py-1 text-xs font-semibold uppercase tracking-wider ${chipClaseEstadoEvaluacion(assessment.status)}`}
+                className={`px-2.5 py-1 text-xs font-semibold uppercase tracking-wider ${chipClaseEvaluacion(assessment)}`}
                 style={{ borderRadius: "var(--g-radius-full)" }}
               >
                 {etiqueta("estadoEvaluacion", assessment.status)}

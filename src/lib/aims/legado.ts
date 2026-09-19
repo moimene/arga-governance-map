@@ -9,12 +9,12 @@
  * end-to-end.
  *
  * Criterio único: lo importan `readiness`, el Dashboard, la lista de
- * evaluaciones, la pestaña del sistema y el informe. Módulo hoja: sólo importa
+ * evaluaciones, la pestaña del sistema, el informe y la consola TGMS. Módulo hoja: sólo importa
  * hojas.
  */
 import { evaluacionesVigentes } from "./checks-vigentes";
 import { normalizarEstadoSeccion } from "./expediente-tecnico";
-import { ESTADOS_EVALUACION_LEGADO, normalizeAimsStatus } from "./vocabulario";
+import { ESTADOS_EVALUACION_LEGADO, chipClaseEstadoEvaluacion, normalizeAimsStatus } from "./vocabulario";
 
 export const ROTULO_LEGADO = "Legado demo, no acredita";
 
@@ -71,6 +71,33 @@ export function sistemasCubiertos(assessments: EvaluacionLike[]): Set<string> {
       .map((a) => a.system_id)
       .filter((id): id is string => Boolean(id)),
   );
+}
+
+/**
+ * Sistemas cuyas evaluaciones vigentes (la más reciente no borrador de cada
+ * marco) están TODAS congeladas y revisadas. Una comprobación de
+ * `ai_compliance_checks` sólo acredita si su sistema está aquí: la escribe el
+ * mismo autodiagnóstico y, sin firmar, es una declaración.
+ *
+ * ponytail: sin `assessment_id` en la comprobación (M01, F1.T14) no se sabe de
+ * qué evaluación sale, así que se exige que lo estén todas las vigentes del
+ * sistema. Con M01, atarla a la suya.
+ */
+export function sistemasConEvaluacionFirme(assessments: EvaluacionLike[]): Set<string> {
+  const firme = new Map<string, boolean>();
+  for (const a of evaluacionesVigentes(assessments)) {
+    if (a.system_id) firme.set(a.system_id, (firme.get(a.system_id) ?? true) && evaluacionFirme(a));
+  }
+  return new Set([...firme].filter(([, f]) => f).map(([id]) => id));
+}
+
+const CHIP_NO_ACREDITA = "bg-[var(--status-warning)] text-[var(--g-text-inverse)]";
+
+/** Chip del estado: un «Aprobado» o «Conforme» que no acredita no se pinta como éxito. */
+export function chipClaseEvaluacion(a: EvaluacionLike): string {
+  return ESTADOS_CONFORMES.has(normalizeAimsStatus(a.status)) && !evaluacionAcredita(a)
+    ? CHIP_NO_ACREDITA
+    : chipClaseEstadoEvaluacion(a.status);
 }
 
 type SeccionLike = { section_code?: string | null; status?: string | null; reviewed_by_id?: string | null };

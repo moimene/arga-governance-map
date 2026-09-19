@@ -50,6 +50,13 @@ describe("el informe dice lo que no acredita", () => {
     expect(screen.getByText(/40 medidas en L5 pendientes de evidencia/)).toBeTruthy();
   });
 
+  it("ARGA: un «Aprobado» sin congelar no lleva el chip en verde", () => {
+    montar({ status: "APROBADO", score: 100, findings: [{ code: "VAL-01", status: "CONFORME" }] });
+    const chip = screen.getByText("Aprobada (legado)");
+    expect(chip.className).toContain("--status-warning");
+    expect(chip.className).not.toContain("--status-success");
+  });
+
   it("control positivo: congelada, revisada y con evidencia, no hay rótulo ni pendientes", () => {
     montar({
       status: "CONFORME",
@@ -62,5 +69,6 @@ describe("el informe dice lo que no acredita", () => {
     expect(screen.queryByText(/pendientes de evidencia/)).toBeNull();
     // Y el informe sí se ha montado: la aserción de ausencia no es vacía.
     expect(screen.getByText("Informe de autodiagnóstico de madurez")).toBeTruthy();
+    expect(screen.getByText("Conforme").className).toContain("--status-success");
   });
 });

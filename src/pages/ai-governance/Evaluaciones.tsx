@@ -3,8 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, ClipboardCheck, FileWarning, Route, Search, SlidersHorizontal, PlusCircle } from "lucide-react";
 import { useAllAssessments } from "@/hooks/useAiAssessments";
 import { isAimsTechnicalFileGapCandidate } from "@/lib/aims/readiness";
-import { evaluacionAcredita, rotuloEvaluacion } from "@/lib/aims/legado";
-import { chipClaseEstadoEvaluacion, etiqueta, opcionesFiltro } from "@/lib/aims/vocabulario";
+import { chipClaseEvaluacion, evaluacionAcredita, rotuloEvaluacion } from "@/lib/aims/legado";
+import { etiqueta, opcionesFiltro } from "@/lib/aims/vocabulario";
 import FilterGroup from "@/components/ai-governance/FilterGroup";
 
 // El marco no es vocabulario de estado/severidad/nivel: su badge se queda aquí.
@@ -223,7 +223,7 @@ export default function Evaluaciones() {
                 </thead>
                 <tbody className="divide-y divide-[var(--g-border-subtle)]">
                   {filtered.map((ass) => {
-                    const statusCls = chipClaseEstadoEvaluacion(ass.status);
+                    const statusCls = chipClaseEvaluacion(ass);
                     const frameCls = FRAMEWORK_BADGE[ass.framework ?? ""] ?? "bg-[var(--g-surface-subtle)] text-[var(--g-text-secondary)]";
                     const hasGrcHandoff = isAimsTechnicalFileGapCandidate(ass);
                     return (
@@ -304,7 +304,7 @@ export default function Evaluaciones() {
 
             <div className="divide-y divide-[var(--g-border-subtle)] lg:hidden" role="list" aria-label="Lista móvil de evaluaciones IA">
               {filtered.map((ass) => {
-                const statusCls = chipClaseEstadoEvaluacion(ass.status);
+                const statusCls = chipClaseEvaluacion(ass);
                 const frameCls = FRAMEWORK_BADGE[ass.framework ?? ""] ?? "bg-[var(--g-surface-subtle)] text-[var(--g-text-secondary)]";
                 const hasGrcHandoff = isAimsTechnicalFileGapCandidate(ass);
                 return (

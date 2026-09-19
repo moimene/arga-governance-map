@@ -3,7 +3,14 @@ import { checksVigentes, evaluacionesVigentes } from "./checks-vigentes";
 import { acreditaConformidad } from "./conformidad";
 import { tieneClasificacionGuiada } from "./cuestionario-calificacion";
 import { ANEXO_IV_SECCIONES, normalizarEstadoSeccion } from "./expediente-tecnico";
-import { evaluacionAcredita, evaluacionFirme, seccionAcredita, sistemasCubiertos, traducirLegado } from "./legado";
+import {
+  evaluacionAcredita,
+  evaluacionFirme,
+  seccionAcredita,
+  sistemasConEvaluacionFirme,
+  sistemasCubiertos,
+  traducirLegado,
+} from "./legado";
 import { monitorDeCodigo } from "./mapa-monitores";
 import { DESPLIEGUE_REQUIREMENTS, codigosDelPerfil } from "./perfil-aplicabilidad";
 import { etiqueta, isMaterialSeverity, normalizeAimsStatus } from "./vocabulario";
@@ -98,9 +105,10 @@ export interface AimsComplianceMonitorDomain {
   detail: string;
   route: string;
   /**
-   * El objeto del que sale la métrica. Si no hay comprobaciones con el código
-   * del área, es el objeto propio del monitor —nunca `ai_compliance_checks`—,
-   * y `ninguna` cuando no hay nada que leer.
+   * El objeto del que sale la métrica. Con comprobaciones del área,
+   * `ai_compliance_checks` (y, en los monitores con objeto propio, la métrica
+   * añade el objeto y el estado es el peor de los dos). Sin ellas, el objeto
+   * propio del monitor, y `ninguna` cuando no hay nada que leer.
    */
   source:
     | "ai_systems"
@@ -374,18 +382,87 @@ function checksForDefinition(checks: AimsComplianceCheckLike[], definition: Moni
   return checks.filter((check) => monitorDeCodigo(check.requirement_code) === definition.id);
 }
 
-/** Conforme Y no de legado: una comprobación de legado se cuenta, pero no acredita. */
-function checkAcredita(check: AimsComplianceCheckLike): boolean {
-  return !check.codigo_legado && COMPLIANT_STATUSES.has(normalizeAimsStatus(check.status));
+/**
+ * Conforme, no de legado y de un sistema cuya evaluación vigente es firme
+ * (`sistemasConEvaluacionFirme`). Lo demás se cuenta, pero no acredita.
+ */
+function checkAcredita(check: AimsComplianceCheckLike, firmes: Set<string>): boolean {
+  return (
+    !check.codigo_legado &&
+    Boolean(check.system_id && firmes.has(check.system_id)) &&
+    COMPLIANT_STATUSES.has(normalizeAimsStatus(check.status))
+  );
 }
 
-function statusFromChecks(checks: AimsComplianceCheckLike[]): AimsReadinessStatus | null {
+/** Una no conformidad declarada es brecha aunque no esté firmada; una conformidad sin acreditar, sólo vigilancia. */
+function statusFromChecks(checks: AimsComplianceCheckLike[], firmes: Set<string>): AimsReadinessStatus | null {
   if (checks.length === 0) return null;
-  const statuses = checks.map((check) => (check.codigo_legado && !GAP_STATUSES.has(normalizeAimsStatus(check.status)) ? "PENDIENTE" : normalizeAimsStatus(check.status)));
+  const statuses = checks.map((check) => {
+    const st = normalizeAimsStatus(check.status);
+    return !GAP_STATUSES.has(st) && !checkAcredita(check, firmes) && (check.codigo_legado || COMPLIANT_STATUSES.has(st)) ? "PENDIENTE" : st;
+  });
   if (statuses.some((status) => GAP_STATUSES.has(status))) return "gap";
   if (statuses.every((status) => COMPLIANT_STATUSES.has(status))) return "ready";
   if (statuses.some((status) => WATCH_STATUSES.has(status))) return "watch";
   return "watch";
+}
+
+function metricaChecks(checks: AimsComplianceCheckLike[], firmes: Set<string>): string {
+  const legado = checks.filter((c) => c.codigo_legado).length;
+  const sinFirmar = checks.filter(
+    (c) => !c.codigo_legado && COMPLIANT_STATUSES.has(normalizeAimsStatus(c.status)) && !checkAcredita(c, firmes),
+  ).length;
+  return [
+    `${checks.filter((c) => checkAcredita(c, firmes)).length}/${checks.length} acreditadas`,
+    legado > 0 ? `${legado} de legado, no acredita` : null,
+    sinFirmar > 0 ? `${sinFirmar} declaradas conformes sin congelar y revisar` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/**
+ * Monitores con objeto propio (F1.T3): las comprobaciones no mandan sobre él.
+ * El estado es el peor de los dos, y sin el objeto medido nunca es «Listo».
+ */
+const MONITORES_CON_OBJETO = new Set([
+  "technical-documentation",
+  "human-oversight",
+  "accuracy-robustness-cybersecurity",
+  "post-market-monitoring",
+  "evidence-recordkeeping",
+]);
+
+function peor(a: AimsReadinessStatus, b: AimsReadinessStatus): AimsReadinessStatus {
+  const orden: AimsReadinessStatus[] = ["gap", "watch", "ready"];
+  const rango = (s: AimsReadinessStatus) => (s === "unmeasured" || s === "na" ? 1 : orden.indexOf(s));
+  return orden[Math.min(rango(a), rango(b))];
+}
+
+/**
+ * Cobertura de alto riesgo, contada SÓLO entre sistemas clasificados por
+ * cuestionario (`tieneClasificacionGuiada`): el «Alto» declarado en ficha no es
+ * un nivel medido. Con algún sistema sin cuestionario no se afirma «no aplica»
+ * (no medido) ni «Listo» (puede haber más de alto riesgo).
+ */
+function medirAltoRiesgo(systems: AimsSystemLike[], cubiertos: Set<string>) {
+  const guiados = systems.filter(tieneClasificacionGuiada);
+  const sinCuestionario = systems.length - guiados.length;
+  const altos = guiados.filter((system) => system.risk_level === "Alto");
+  const acreditados = altos.filter((system) => cubiertos.has(system.id)).length;
+  const declaradosAlto = systems.filter((s) => !tieneClasificacionGuiada(s) && s.risk_level === "Alto").length;
+  const base = { altos: altos.length, acreditados, declaradosAlto };
+  if (altos.length === 0) {
+    return sinCuestionario > 0
+      ? { ...base, status: "unmeasured" as AimsReadinessStatus, metric: `${sinCuestionario} sistemas sin cuestionario` }
+      : { ...base, status: "na" as AimsReadinessStatus, metric: "Sin sistemas de alto riesgo" };
+  }
+  const medido = domainStatus(pct(acreditados, altos.length), 50, 100);
+  return {
+    ...base,
+    status: medido === "ready" && sinCuestionario > 0 ? ("watch" as AimsReadinessStatus) : medido,
+    metric: `${acreditados}/${altos.length} alto riesgo${sinCuestionario > 0 ? ` · ${sinCuestionario} sistemas sin cuestionario` : ""}`,
+  };
 }
 
 /**
@@ -420,10 +497,8 @@ function fallbackMonitorStatus(
   const indicadores = (input.monitoringIndicators ?? []).filter((i) => i.system_id && ids.has(i.system_id));
   const seccion = (code: string) => secciones.filter((s) => s.section_code === code);
   const totalSystems = systems.length;
-  const highRiskSystems = systems.filter((system) => system.risk_level === "Alto");
   // Cubierto = su evaluación vigente (la más reciente no borrador) acredita.
-  const cubiertos = sistemasCubiertos(assessments);
-  const highRiskAssessed = highRiskSystems.filter((system) => cubiertos.has(system.id)).length;
+  const altoRiesgo = medirAltoRiesgo(systems, sistemasCubiertos(assessments));
   const materialIncidents = incidents.filter(isAimsMaterialIncidentCandidate).length;
   const conClasificacionGuiada = systems.filter(tieneClasificacionGuiada).length;
   const isoAssessments = evaluacionesVigentes(assessments).filter((assessment) => assessment.framework === "ISO_42001");
@@ -441,10 +516,7 @@ function fallbackMonitorStatus(
     case "prohibited-practices":
       return { status: "unmeasured", metric: "Sin análisis del art. 5" };
     case "high-risk-obligations":
-      return {
-        status: highRiskSystems.length === 0 ? "na" : domainStatus(pct(highRiskAssessed, highRiskSystems.length), 50, 100),
-        metric: highRiskSystems.length === 0 ? "Sin sistemas de alto riesgo" : `${highRiskAssessed}/${highRiskSystems.length} alto riesgo`,
-      };
+      return { status: altoRiesgo.status, metric: altoRiesgo.metric };
     // Expediente: sus secciones. Precisión: la del anexo IV.4 (métricas de
     // rendimiento). Supervisión: la del anexo IV.3 (supervisión, funcionamiento
     // y control). Sin la sección, «no medido»: ya no se cae a incidentes.
@@ -517,14 +589,15 @@ export function buildAimsComplianceMonitors(input: AimsReadinessInput): AimsComp
   // traducirlo, manda la comprobación más reciente de cada requisito.
   const traducidas = checksVigentes((input.complianceChecks ?? []).map(traducirLegado));
   const { medibles: checks, otroCatalogo } = apartarChecksDeOtroCatalogo(input.systems, traducidas);
+  const firmes = sistemasConEvaluacionFirme(input.assessments);
   return complianceMonitorDefinitions.map((definition) => {
     const matchingChecks = checksForDefinition(checks, definition);
-    const checkedStatus = statusFromChecks(matchingChecks);
+    const checkedStatus = statusFromChecks(matchingChecks, firmes);
     const fallback = fallbackMonitorStatus(definition, input);
-    const status = checkedStatus ?? fallback.status;
-    const legado = matchingChecks.filter((check) => check.codigo_legado).length;
+    const conObjeto = MONITORES_CON_OBJETO.has(definition.id);
+    const status = checkedStatus === null ? fallback.status : conObjeto ? peor(checkedStatus, fallback.status) : checkedStatus;
     const metric = matchingChecks.length > 0
-      ? `${matchingChecks.filter(checkAcredita).length}/${matchingChecks.length} conformes${legado > 0 ? ` · ${legado} de legado, no acredita` : ""}`
+      ? [metricaChecks(matchingChecks, firmes), conObjeto ? fallback.metric : null].filter(Boolean).join(" · ")
       : fallback.metric;
 
     return {
@@ -542,27 +615,6 @@ export function buildAimsComplianceMonitors(input: AimsReadinessInput): AimsComp
   });
 }
 
-/** El mismo monitor, sistema a sistema: cada uno sólo con sus comprobaciones, evaluaciones e incidentes. */
-export function buildAimsComplianceMonitorsPorSistema(
-  input: AimsReadinessInput,
-): Record<string, AimsComplianceMonitorDomain[]> {
-  const delSistema = <T extends { system_id?: string | null }>(rows: T[] | undefined, id: string) =>
-    (rows ?? []).filter((row) => row.system_id === id);
-  return Object.fromEntries(
-    input.systems.map((system) => [
-      system.id,
-      buildAimsComplianceMonitors({
-        systems: [system],
-        assessments: delSistema(input.assessments, system.id),
-        incidents: delSistema(input.incidents, system.id),
-        complianceChecks: delSistema(input.complianceChecks, system.id),
-        technicalFileSections: delSistema(input.technicalFileSections, system.id),
-        monitoringIndicators: delSistema(input.monitoringIndicators, system.id),
-      }),
-    ]),
-  );
-}
-
 /**
  * Siguientes pasos, derivados del dato disponible (F1.T8). Sustituye a la lista
  * fija que decía lo mismo con cualquier inventario. Sólo aparece lo que el dato
@@ -573,6 +625,7 @@ function pasosDelDato(n: {
   sinClasificar: number;
   sinFirmar: number;
   altoSinAcreditar: number;
+  declaradosAlto: number;
   abiertos: number;
   conBrechas: number;
 }): AimsPaso[] {
@@ -595,6 +648,11 @@ function pasosDelDato(n: {
       detalle: `${n.altoSinAcreditar} sistemas de alto riesgo sin autodiagnóstico acreditado.`,
       to: "/ai-governance/evaluaciones",
     },
+    n.declaradosAlto > 0 && {
+      label: "Clasificar los declarados de alto riesgo",
+      detalle: `${n.declaradosAlto} declarados Alto en ficha, sin cuestionario.`,
+      to: "/ai-governance/sistemas",
+    },
     n.abiertos > 0 && {
       label: "Seguir los incidentes",
       detalle: `${n.abiertos} incidentes abiertos o en investigación.`,
@@ -612,9 +670,7 @@ function pasosDelDato(n: {
 export function buildAimsReadiness(input: AimsReadinessInput): AimsReadinessSummary {
   const { systems, assessments, incidents } = input;
   const totalSystems = systems.length;
-  const cubiertos = sistemasCubiertos(assessments);
-  const highRiskSystems = systems.filter((system) => system.risk_level === "Alto");
-  const highRiskAssessed = highRiskSystems.filter((system) => cubiertos.has(system.id)).length;
+  const altoRiesgo = medirAltoRiesgo(systems, sistemasCubiertos(assessments));
   const openIncidents = incidents.filter((incident) => !incidenteCerrado(incident)).length;
   const incidentesCerrados = incidents.filter(incidenteCerrado).length;
   const conClasificacionGuiada = systems.filter(tieneClasificacionGuiada).length;
@@ -645,7 +701,6 @@ export function buildAimsReadiness(input: AimsReadinessInput): AimsReadinessSumm
   }).length;
 
   const inventoryCoverage = pct(conClasificacionGuiada, totalSystems);
-  const assessmentCoverage = pct(highRiskAssessed, highRiskSystems.length);
   const incidentClosureCoverage = pct(incidentesCerrados, incidents.length);
   const controlCoverage = pct(closedControlFindings, controlFindings.length);
 
@@ -663,9 +718,9 @@ export function buildAimsReadiness(input: AimsReadinessInput): AimsReadinessSumm
       id: "ai-act-assessments",
       hasData: assessments.length > 0,
       label: "Autodiagnóstico de madurez · alto riesgo",
-      status: highRiskSystems.length === 0 ? "na" : domainStatus(assessmentCoverage, 50, 100),
-      metric: highRiskSystems.length === 0 ? "Sin sistemas de alto riesgo" : `${highRiskAssessed}/${highRiskSystems.length} alto riesgo`,
-      detail: "Sistemas de alto riesgo cuyo autodiagnóstico vigente está congelado, revisado y conforme.",
+      status: altoRiesgo.status,
+      metric: altoRiesgo.metric,
+      detail: "Sistemas clasificados de alto riesgo por cuestionario cuyo autodiagnóstico vigente está congelado, revisado y conforme.",
       route: "/ai-governance/evaluaciones",
     },
     {
@@ -734,16 +789,18 @@ export function buildAimsReadiness(input: AimsReadinessInput): AimsReadinessSumm
     // `migration` queda fuera del cómputo: es una nota de postura sobre el
     // backbone, no un dominio de cumplimiento con dato propio, y por eso su
     // `hasData` es false por definición.
+    // «No medido» tampoco sostiene la operabilidad, aunque haya filas.
     standaloneReady: domains
       .filter((domain) => domain.id !== "migration")
-      .every((domain) => domain.status !== "gap" && domain.hasData),
+      .every((domain) => domain.status !== "gap" && domain.status !== "unmeasured" && domain.hasData),
     domains,
     complianceMonitors,
     nextSteps: pasosDelDato({
       totalSystems,
       sinClasificar: totalSystems - conClasificacionGuiada,
       sinFirmar: vigentes.filter((assessment) => !evaluacionFirme(assessment)).length,
-      altoSinAcreditar: highRiskSystems.length - highRiskAssessed,
+      altoSinAcreditar: altoRiesgo.altos - altoRiesgo.acreditados,
+      declaradosAlto: altoRiesgo.declaradosAlto,
       abiertos: openIncidents,
       conBrechas: vigentes.filter(isAimsTechnicalFileGapCandidate).length,
     }),

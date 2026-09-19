@@ -78,8 +78,10 @@ describe("vocabulario de evaluaciones: escritura ↔ lectura", () => {
   it("una evaluación CONFORME, congelada y revisada, cubre a su sistema de alto riesgo", () => {
     const [conforme] = estadosQueElProductoEscribe();
     const firme = { frozen_at: "2026-01-01", reviewed_at: "2026-01-02" };
+    // Clasificado por cuestionario: el «Alto» declarado en ficha no se mide (F1.T8).
+    const sistema = { id: "sys-1", status: "ACTIVO", risk_level: "Alto", regulatory_profile: { cuestionario_id: "q-1" } };
     const resumen = buildAimsReadiness({
-      systems: [{ id: "sys-1", status: "ACTIVO", risk_level: "Alto" }],
+      systems: [sistema],
       assessments: [{ id: "a-1", system_id: "sys-1", status: conforme, score: 100, findings: [], ...firme }],
       incidents: [{ id: "i-1", status: "CERRADO", severity: "BAJO", closed_at: "2026-01-01" }],
     });
@@ -88,7 +90,7 @@ describe("vocabulario de evaluaciones: escritura ↔ lectura", () => {
     expect(dominio?.status, "una evaluación conforme no cubre al sistema que evalúa").toBe("ready");
     // Desde F1.T4 sólo acredita lo congelado y revisado: la misma, sin congelar, no cubre.
     const sinCongelar = buildAimsReadiness({
-      systems: [{ id: "sys-1", status: "ACTIVO", risk_level: "Alto" }],
+      systems: [sistema],
       assessments: [{ id: "a-1", system_id: "sys-1", status: conforme, score: 100, findings: [] }],
       incidents: [],
     });

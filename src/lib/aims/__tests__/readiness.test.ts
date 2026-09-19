@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { sinComentarios } from "@/test/helpers/sin-comentarios";
 import { AIMS_HANDOFFS } from "../handoffs";
 import { AESIA_RIA_REQUIREMENTS } from "../catalog-aesia";
 import {
@@ -80,7 +82,7 @@ describe("buildAimsReadiness", () => {
 
   it("marca gap cuando hay alto riesgo sin evaluación aprobada e incidentes abiertos", () => {
     const summary = buildAimsReadiness({
-      systems: [{ id: "sys-1", status: "ACTIVO", risk_level: "Alto" }],
+      systems: [{ id: "sys-1", status: "ACTIVO", risk_level: "Alto", regulatory_profile: { cuestionario_id: "q-1" } }],
       assessments: [],
       incidents: [
         { id: "incident-1", status: "ABIERTO", severity: "CRITICO" },
@@ -182,7 +184,9 @@ describe("buildAimsReadiness", () => {
     });
 
     expect(monitors.find((monitor) => monitor.id === "data-governance")?.status).toBe("gap");
-    expect(monitors.find((monitor) => monitor.id === "human-oversight")?.status).toBe("ready");
+    // Declarada conforme, pero ninguna evaluación del sistema está congelada y
+    // revisada: no acredita (el caso positivo está en «las comprobaciones no mandan»).
+    expect(monitors.find((monitor) => monitor.id === "human-oversight")?.status).toBe("watch");
     // F1.T3: el nivel «Inaceptable» declarado en la ficha no es un análisis del
     // art. 5. Sin análisis, «no medido» — y el control positivo es que, con la
     // misma entrada, las áreas con comprobaciones sí salen medidas (arriba).
@@ -227,7 +231,7 @@ describe("D1 — las comprobaciones de otro catálogo se apartan, no se suman", 
       incidents: [],
       complianceChecks: checksProveedor,
     });
-    for (const m of monitors) expect(m.metric, m.id).not.toContain("conformes");
+    for (const m of monitors) expect(m.metric, m.id).not.toMatch(/acreditadas|conformes/);
     const data = monitors.find((m) => m.id === "data-governance")!;
     expect(data.otroCatalogo).toBeGreaterThan(0);
     expect(data.status).toBe("unmeasured");
@@ -248,7 +252,8 @@ describe("D1 — las comprobaciones de otro catálogo se apartan, no se suman", 
       incidents: [],
       complianceChecks: [iso],
     }).find((m) => m.id === "iso-42001-management-system")!;
-    expect(gov.metric).toBe("1/1 conformes");
+    // Sin evaluación firme del sistema, declarada y no acreditada.
+    expect(gov.metric).toBe("0/1 acreditadas · 1 declaradas conformes sin congelar y revisar");
     expect(gov.otroCatalogo).toBe(0);
   });
 
@@ -264,7 +269,7 @@ describe("D1 — las comprobaciones de otro catálogo se apartan, no se suman", 
       complianceChecks: checksProveedor,
     }).find((m) => m.id === "data-governance")!;
     expect(data.status).toBe("gap");
-    expect(data.metric).toContain("conformes");
+    expect(data.metric).toContain("acreditadas");
     expect(data.otroCatalogo).toBe(0);
   });
 });
@@ -359,13 +364,46 @@ describe("F1.T2 — cierres, hallazgos y 0/0", () => {
     expect(r.domains.find((d) => d.id === "controls")?.metric).toBe("8/11 cerrados · 11 sin congelar y revisar");
   });
 
-  it("0/0 se pinta gris «no aplica»: sin sistemas de alto riesgo no hay brecha de evaluación", () => {
+  it("0/0 se pinta gris «no aplica» SÓLO con todos los sistemas clasificados por cuestionario", () => {
+    // Harvey no tiene cuestionario: su «Limitado» es el declarado en ficha y no
+    // dice si hay alto riesgo. No se afirma «no aplica»: no medido.
     const r = buildAimsReadiness({ systems: [harvey], assessments: [], incidents: [] });
-    expect(r.domains.find((d) => d.id === "ai-act-assessments")).toMatchObject({ status: "na", metric: "Sin sistemas de alto riesgo" });
-    expect(r.complianceMonitors.find((m) => m.id === "high-risk-obligations")?.status).toBe("na");
-    // Control positivo: con un alto riesgo sin evaluar, sí es brecha.
-    const alto = buildAimsReadiness({ systems: [{ ...harvey, risk_level: "Alto" }], assessments: [], incidents: [] });
+    expect(r.domains.find((d) => d.id === "ai-act-assessments")).toMatchObject({ status: "unmeasured", metric: "1 sistemas sin cuestionario" });
+    expect(r.complianceMonitors.find((m) => m.id === "high-risk-obligations")).toMatchObject({ status: "unmeasured", metric: "1 sistemas sin cuestionario" });
+    // Control positivo: clasificado y no Alto → gris «no aplica».
+    const guiado = { ...harvey, regulatory_profile: { cuestionario_id: "q-h" } };
+    const na = buildAimsReadiness({ systems: [guiado], assessments: [], incidents: [] });
+    expect(na.domains.find((d) => d.id === "ai-act-assessments")).toMatchObject({ status: "na", metric: "Sin sistemas de alto riesgo" });
+    expect(na.complianceMonitors.find((m) => m.id === "high-risk-obligations")?.status).toBe("na");
+    // Y clasificado Alto sin evaluar, sí es brecha.
+    const alto = buildAimsReadiness({ systems: [{ ...guiado, risk_level: "Alto" }], assessments: [], incidents: [] });
     expect(alto.domains.find((d) => d.id === "ai-act-assessments")).toMatchObject({ status: "gap", metric: "0/1 alto riesgo" });
+  });
+
+  it("el «Alto» declarado en ficha sin cuestionario no se cuenta como alto riesgo (ARGA medido: 0/8 con cuestionario, 6 Alto)", () => {
+    const declarados = Array.from({ length: 6 }, (_, i) => ({ id: `a${i}`, status: "ACTIVO", risk_level: "Alto" }));
+    const otros = [{ id: "b1", status: "ACTIVO", risk_level: "Limitado" }, { id: "b2", status: "ACTIVO", risk_level: "Mínimo" }];
+    const r = buildAimsReadiness({ systems: [...declarados, ...otros], assessments: [], incidents: [] });
+    const dominio = r.domains.find((d) => d.id === "ai-act-assessments")!;
+    expect(dominio).toMatchObject({ status: "unmeasured", metric: "8 sistemas sin cuestionario" });
+    expect(dominio.metric).not.toMatch(/alto riesgo/);
+    const detalle = r.nextSteps.map((p) => p.detalle).join(" | ");
+    expect(detalle).toMatch(/6 declarados Alto en ficha, sin cuestionario/);
+    expect(detalle).not.toMatch(/sistemas de alto riesgo sin autodiagnóstico acreditado/);
+    expect(r.standaloneReady).toBe(false);
+  });
+
+  it("mezcla: un Alto clasificado y acreditado no lleva el dominio a Listo si queda algún sistema sin cuestionario", () => {
+    const firme = { frozen_at: "2026-09-18T10:00:00Z", reviewed_at: "2026-09-18T11:00:00Z" };
+    const r = buildAimsReadiness({
+      systems: [
+        { id: "g1", status: "ACTIVO", risk_level: "Alto", regulatory_profile: { cuestionario_id: "q" } },
+        { id: "n1", status: "ACTIVO", risk_level: "Alto" },
+      ],
+      assessments: [{ id: "a", system_id: "g1", framework: "EU_AI_ACT", status: "CONFORME", findings: [], ...firme }],
+      incidents: [],
+    });
+    expect(r.domains.find((d) => d.id === "ai-act-assessments")).toMatchObject({ status: "watch", metric: "1/1 alto riesgo · 1 sistemas sin cuestionario" });
   });
 
   it("el inventario se mide por cuestionarios COMPLETED, no por sistemas activos", () => {
@@ -456,5 +494,112 @@ describe("F1.T2 — cierres, hallazgos y 0/0", () => {
     const terceros = r.complianceMonitors.find((m) => m.id === "provider-vendor-third-party")!;
     expect(terceros.status).toBe("unmeasured");
     expect(terceros.metric).not.toMatch(/con vendor/);
+  });
+});
+
+describe("las comprobaciones no mandan sobre el objeto del monitor ni acreditan sin evaluación firme", () => {
+  const firme = { frozen_at: "2026-09-18T10:00:00Z", reviewed_at: "2026-09-18T11:00:00Z" };
+  const sistema = { id: "s1", status: "ACTIVO", risk_level: "Alto", regulatory_profile: { cuestionario_id: "q" } };
+  const evaluacion = { id: "a1", system_id: "s1", framework: "EU_AI_ACT", status: "CONFORME", created_at: "2026-09-18T09:00:00Z", findings: [] };
+  const checks = [
+    { id: "c1", system_id: "s1", requirement_code: "TECHNICAL_DOC", status: "CONFORME", created_at: "2026-09-18T09:00:00Z" },
+    { id: "c2", system_id: "s1", requirement_code: "HUMAN_OVERSIGHT", status: "CONFORME", created_at: "2026-09-18T09:00:00Z" },
+  ];
+  const seccion = (code: string, status: string, reviewed_by_id: string | null) => ({ system_id: "s1", section_code: code, status, reviewed_by_id });
+  const pendientes = ["AIV-01", "AIV-02", "AIV-03"].map((c) => seccion(c, "Pendiente", null));
+  const nueveConRevisor = Array.from({ length: 9 }, (_, i) => seccion(`AIV-0${i + 1}`, "APPROVED", "p-1"));
+  const monitor = (r: ReturnType<typeof buildAimsComplianceMonitors>, id: string) => r.find((m) => m.id === id)!;
+
+  it("autodiagnóstico sin firmar y secciones pendientes: el expediente no sale Listo", () => {
+    const r = buildAimsComplianceMonitors({
+      systems: [sistema],
+      assessments: [evaluacion],
+      incidents: [],
+      complianceChecks: checks,
+      technicalFileSections: pendientes,
+    });
+    expect(monitor(r, "technical-documentation")).toMatchObject({
+      status: "watch",
+      metric: "0/1 acreditadas · 1 declaradas conformes sin congelar y revisar · 0/3 secciones con revisor",
+      source: "ai_compliance_checks",
+    });
+    expect(monitor(r, "human-oversight")).toMatchObject({
+      status: "watch",
+      metric: "0/1 acreditadas · 1 declaradas conformes sin congelar y revisar · 0/1 secciones con revisor",
+    });
+  });
+
+  it("evaluación firme pero sin el objeto acreditado: tampoco Listo", () => {
+    const r = buildAimsComplianceMonitors({
+      systems: [sistema],
+      assessments: [{ ...evaluacion, ...firme }],
+      incidents: [],
+      complianceChecks: checks,
+      technicalFileSections: pendientes,
+    });
+    expect(monitor(r, "technical-documentation")).toMatchObject({ status: "watch", metric: "1/1 acreditadas · 0/3 secciones con revisor" });
+    const sinSecciones = buildAimsComplianceMonitors({ systems: [sistema], assessments: [{ ...evaluacion, ...firme }], incidents: [], complianceChecks: checks });
+    expect(monitor(sinSecciones, "technical-documentation")).toMatchObject({ status: "watch", metric: "1/1 acreditadas · Sin expediente técnico" });
+    // Una sección no conforme manda aunque las comprobaciones acrediten.
+    const noConforme = buildAimsComplianceMonitors({
+      systems: [sistema], assessments: [{ ...evaluacion, ...firme }], incidents: [], complianceChecks: checks,
+      technicalFileSections: [seccion("AIV-03", "NON_CONFORMING", "p-1")],
+    });
+    expect(monitor(noConforme, "human-oversight").status).toBe("gap");
+  });
+
+  it("control positivo: evaluación firme y las nueve secciones con revisor dan Listo", () => {
+    const r = buildAimsComplianceMonitors({
+      systems: [sistema],
+      assessments: [{ ...evaluacion, ...firme }],
+      incidents: [],
+      complianceChecks: checks,
+      technicalFileSections: nueveConRevisor,
+    });
+    expect(monitor(r, "technical-documentation")).toMatchObject({ status: "ready", metric: "1/1 acreditadas · 9/9 secciones con revisor" });
+    expect(monitor(r, "human-oversight")).toMatchObject({ status: "ready", metric: "1/1 acreditadas · 1/1 secciones con revisor" });
+  });
+
+  it("Harvey (Garrigues, leído en Cloud el 2026-09-19): ROBUSTNESS y CYBERSECURITY CONFORME de un autodiagnóstico sin firmar no acreditan", () => {
+    const harvey = "2f877e8c-875d-4b11-9b39-aed0826cacb5";
+    const creada = "2026-09-07T02:09:31.889226+00:00";
+    // Las diez medidas del art. 15 de la evaluación fdcccf9e: L5 sin recuento de evidencia.
+    const findings = [
+      { code: "MG_ACCU_01", status: "L1" }, { code: "MG_ACCU_02", status: "L4" }, { code: "MG_ACCU_03", status: "L5" },
+      { code: "MG_ROBU_01", status: "L5" }, { code: "MG_ROBU_02", status: "L5" }, { code: "MG_ROBU_03", status: "L5" },
+      { code: "MG_CIBE_01", status: "L5" }, { code: "MG_CIBE_02", status: "L5" }, { code: "MG_CIBE_03", status: "L5" }, { code: "MG_CIBE_04", status: "L5" },
+    ];
+    const r = buildAimsComplianceMonitors({
+      systems: [{ id: harvey, status: "EN_EVALUACION", risk_level: "Limitado", regulatory_role: null, regulatory_profile: null }],
+      assessments: [{ id: "fdcccf9e-fff0-4346-a2f2-17e610981be3", system_id: harvey, framework: "EU_AI_ACT", status: "CON_GAPS", score: 49, created_at: "2026-09-07T02:09:31.47052+00:00", frozen_at: null, reviewed_at: null, findings }],
+      incidents: [],
+      complianceChecks: [
+        { id: "69ffe2c8", system_id: harvey, requirement_code: "ACCURACY", status: "NO_CONFORME", created_at: creada },
+        { id: "3eecef25", system_id: harvey, requirement_code: "ROBUSTNESS", status: "CONFORME", created_at: creada },
+        { id: "a44294b3", system_id: harvey, requirement_code: "CYBERSECURITY", status: "CONFORME", created_at: creada },
+      ],
+    });
+    const precision = monitor(r, "accuracy-robustness-cybersecurity");
+    expect(precision.metric).toBe("0/3 acreditadas · 2 declaradas conformes sin congelar y revisar · Sin sección del anexo IV.4");
+    expect(precision.metric).not.toMatch(/\b[1-9]\d*\/3 (conformes|acreditadas)/);
+    expect(precision.status).toBe("gap");
+  });
+});
+
+describe("G-ARISTA — incidente cerrado, un solo criterio", () => {
+  const SUPERFICIES = ["src/pages/ai-governance/Dashboard.tsx", "src/pages/ai-governance/Incidentes.tsx"];
+  const porEstado = /normalizeAimsStatus\(\s*\w+\.status\s*\)\s*===\s*"CERRADO"/;
+
+  it("control positivo del detector sobre la forma retirada", () => {
+    expect(porEstado.test('incidents.filter((i) => normalizeAimsStatus(i.status) === "CERRADO")')).toBe(true);
+  });
+
+  it("las superficies que cuentan cerrados importan `incidenteCerrado`, lo llaman y no cuentan por estado", () => {
+    for (const f of SUPERFICIES) {
+      const src = sinComentarios(readFileSync(f, "utf8"));
+      expect(src, `${f} no importa incidenteCerrado`).toMatch(/import\s*\{[^}]*\bincidenteCerrado\b[^}]*\}\s*from\s*"@\/lib\/aims\/readiness"/);
+      expect(src, `${f} importa y no llama`).toMatch(/incidenteCerrado\)|incidenteCerrado\(/);
+      expect(porEstado.test(src), `${f} cuenta cerrados por el estado a secas`).toBe(false);
+    }
   });
 });

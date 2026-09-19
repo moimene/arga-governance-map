@@ -4,7 +4,7 @@ import type { AiSystem } from "@/hooks/useAiSystems";
 import { AESIA_RIA_REQUIREMENTS } from "@/lib/aims/catalog-aesia";
 import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 import { evaluadaContraOtroCatalogo } from "@/lib/aims/perfil-aplicabilidad";
-import { evaluacionAcredita, rotuloEvaluacion } from "@/lib/aims/legado";
+import { chipClaseEvaluacion, rotuloEvaluacion } from "@/lib/aims/legado";
 import { claseNivelRiesgo, etiqueta } from "@/lib/aims/vocabulario";
 
 /**
@@ -13,8 +13,8 @@ import { claseNivelRiesgo, etiqueta } from "@/lib/aims/vocabulario";
  * `notes` va rotulado como lo que es —texto libre de quien registró la
  * evaluación— porque hay filas en Cloud cuyo `notes` afirma «cumplimiento
  * estricto de todos los artículos» y lo escribió un e2e, no una auditoría.
- * Si acredita conformidad lo decide `assessmentAcreditaConformidad`, no esta
- * pantalla.
+ * Si acredita conformidad lo decide `legado.ts` (congelada y revisada), no
+ * esta pantalla.
  */
 
 export interface TabEvaluacionesProps {
@@ -87,11 +87,7 @@ export default function TabEvaluaciones({ system, assessments, error, onNueva, o
               <div className="pt-2 border-t border-[var(--g-border-subtle)] flex justify-between items-center text-xs">
                 <span className="flex flex-wrap items-center gap-1.5">
                   <span
-                    className={`px-2 py-0.5 font-semibold text-[11px] ${
-                      evaluacionAcredita(ass)
-                        ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-                        : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
-                    }`}
+                    className={`px-2 py-0.5 font-semibold text-[11px] ${chipClaseEvaluacion(ass)}`}
                     style={{ borderRadius: "var(--g-radius-full)" }}
                   >
                     {etiqueta("estadoEvaluacion", ass.status) || "Sin estado"}

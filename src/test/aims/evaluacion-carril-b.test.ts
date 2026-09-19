@@ -99,9 +99,10 @@ describe("B2 — el paso 2 cuenta las medidas del catálogo aplicado", () => {
 });
 
 describe("B3 — estado de evaluación y de sistema por la hoja de vocabulario", () => {
-  it("la cabecera del informe pinta chip y etiqueta desde vocabulario", () => {
+  it("la cabecera del informe pinta chip y etiqueta desde las hojas", () => {
     const src = read(CABECERA);
-    expect(src).toContain("chipClaseEstadoEvaluacion(assessment.status)");
+    // El chip lo tiñe `legado.ts` (verde sólo si acredita), que delega en el vocabulario.
+    expect(src).toContain("chipClaseEvaluacion(assessment)");
     expect(src).toContain('etiqueta("estadoEvaluacion", assessment.status)');
     expect(src, "vuelve el literal crudo del estado").not.toMatch(/>\s*\{assessment\.status\}\s*</);
     expect(src).not.toContain("assessmentAcreditaConformidad(");

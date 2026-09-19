@@ -3,10 +3,12 @@ import { readFileSync } from "node:fs";
 import {
   LEGADO_A_VIGENTE,
   ROTULO_LEGADO,
+  chipClaseEvaluacion,
   evaluacionAcredita,
   rotuloEvaluacion,
   rotuloSeccion,
   seccionAcredita,
+  sistemasConEvaluacionFirme,
   sistemasCubiertos,
   traducirLegado,
 } from "../legado";
@@ -37,10 +39,12 @@ describe("acredita sólo lo congelado y revisado", () => {
   it("ARGA Score (APROBADO 72, sin congelar) deja de figurar como cubierto", () => {
     // Fila de ARGA leída en Cloud el 2026-09-19.
     const argaScore = { id: "3b160895", system_id: "1148370a", framework: "EU_AI_ACT", status: "APROBADO", score: 72, created_at: "2026-04-18T15:44:31Z", findings: [{ code: "ART_9", status: "CONFORME" }] };
-    const r = buildAimsReadiness({ systems: [{ id: "1148370a", status: "ACTIVO", risk_level: "Alto" }], assessments: [argaScore], incidents: [] });
+    // Con cuestionario: sin él, el «Alto» es el declarado en ficha y el dominio no mide (F1.T8).
+    const arga = { id: "1148370a", status: "ACTIVO", risk_level: "Alto", regulatory_profile: { cuestionario_id: "q" } };
+    const r = buildAimsReadiness({ systems: [arga], assessments: [argaScore], incidents: [] });
     expect(r.domains.find((d) => d.id === "ai-act-assessments")).toMatchObject({ metric: "0/1 alto riesgo", status: "gap" });
     // Control positivo: la misma fila congelada y revisada, sí.
-    const firme = buildAimsReadiness({ systems: [{ id: "1148370a", status: "ACTIVO", risk_level: "Alto" }], assessments: [{ ...argaScore, ...congeladaYRevisada }], incidents: [] });
+    const firme = buildAimsReadiness({ systems: [arga], assessments: [{ ...argaScore, ...congeladaYRevisada }], incidents: [] });
     expect(firme.domains.find((d) => d.id === "ai-act-assessments")?.metric).toBe("1/1 alto riesgo");
   });
 });
@@ -56,6 +60,48 @@ describe("manda la más reciente no borrador", () => {
   it("un borrador posterior NO desplaza a la acreditada anterior", () => {
     const borrador = { id: "b", system_id: "s1", framework: "EU_AI_ACT", status: "BORRADOR", created_at: "2026-09-10T10:00:00Z" };
     expect(sistemasCubiertos([vieja, borrador]).has("s1")).toBe(true);
+  });
+});
+
+describe("una comprobación sólo acredita si la evaluación vigente de su sistema es firme", () => {
+  const eu = { system_id: "s1", framework: "EU_AI_ACT", status: "CONFORME", created_at: "2026-09-01T10:00:00Z" };
+
+  it("sin congelar ni revisar, el sistema no está en firme; congelada y revisada, sí", () => {
+    expect(sistemasConEvaluacionFirme([eu]).has("s1")).toBe(false);
+    expect(sistemasConEvaluacionFirme([{ ...eu, frozen_at: "2026-09-18" }]).has("s1")).toBe(false);
+    expect(sistemasConEvaluacionFirme([{ ...eu, ...congeladaYRevisada }]).has("s1")).toBe(true);
+  });
+
+  it("manda la más reciente: una posterior sin firmar la desplaza; un borrador, no", () => {
+    const firme = { ...eu, ...congeladaYRevisada };
+    expect(sistemasConEvaluacionFirme([firme, { ...eu, status: "CON_GAPS", created_at: "2026-09-10T10:00:00Z" }]).has("s1")).toBe(false);
+    expect(sistemasConEvaluacionFirme([firme, { ...eu, status: "BORRADOR", created_at: "2026-09-10T10:00:00Z" }]).has("s1")).toBe(true);
+  });
+
+  it("sin saber de qué evaluación sale la comprobación, TODAS las vigentes del sistema tienen que ser firmes", () => {
+    const iso = { system_id: "s1", framework: "ISO_42001", status: "CONFORME", created_at: "2026-09-02T10:00:00Z" };
+    expect(sistemasConEvaluacionFirme([{ ...eu, ...congeladaYRevisada }, iso]).has("s1")).toBe(false);
+    expect(sistemasConEvaluacionFirme([{ ...eu, ...congeladaYRevisada }, { ...iso, ...congeladaYRevisada }]).has("s1")).toBe(true);
+    // Firme no es conforme: una CON_GAPS congelada y revisada deja las comprobaciones revisadas.
+    expect(sistemasConEvaluacionFirme([{ ...eu, status: "CON_GAPS", ...congeladaYRevisada }]).has("s1")).toBe(true);
+  });
+
+  it("un sistema sin evaluaciones no está en firme", () => {
+    expect(sistemasConEvaluacionFirme([]).size).toBe(0);
+  });
+});
+
+describe("el chip del estado sólo es verde si la evaluación acredita", () => {
+  it("«Aprobado» o «Conforme» sin congelar y revisar no se pinta como éxito", () => {
+    expect(chipClaseEvaluacion({ status: "APROBADO" })).toContain("--status-warning");
+    expect(chipClaseEvaluacion({ status: "CONFORME", frozen_at: "2026-09-18" })).toContain("--status-warning");
+    expect(chipClaseEvaluacion({ status: "APROBADO" })).not.toContain("--status-success");
+  });
+
+  it("control positivo: conforme, congelada y revisada, sí; el resto sigue el vocabulario", () => {
+    expect(chipClaseEvaluacion({ status: "CONFORME", ...congeladaYRevisada })).toContain("--status-success");
+    expect(chipClaseEvaluacion({ status: "CON_GAPS" })).toContain("--status-warning");
+    expect(chipClaseEvaluacion({ status: "BORRADOR" })).toContain("--g-surface-muted");
   });
 });
 
@@ -150,7 +196,7 @@ describe("LEGADO_A_VIGENTE — códigos de legado leídos como vigentes, sólo l
     expect(alto.source).toBe("ai_compliance_checks");
     expect(alto.status).not.toBe("ready");
     // Las dos filas son el mismo requisito (art. 9): manda la más reciente.
-    expect(alto.metric).toBe("0/1 conformes · 1 de legado, no acredita");
+    expect(alto.metric).toBe("0/1 acreditadas · 1 de legado, no acredita");
   });
 });
 
@@ -161,6 +207,8 @@ describe("G-ARISTA — readiness, informe y Dashboard importan `legado.ts` y no 
     "src/components/ai-governance/evaluacion-detalle/CabeceraInforme.tsx",
     "src/pages/ai-governance/Evaluaciones.tsx",
     "src/components/ai-governance/sistema/TabEvaluaciones.tsx",
+    // La consola TGMS decide «IA alto riesgo sin evaluar» con el mismo criterio.
+    "src/hooks/useModuleStatus.ts",
   ];
 
   it("cada superficie importa la hoja y llama a su criterio", () => {
@@ -177,6 +225,32 @@ describe("G-ARISTA — readiness, informe y Dashboard importan `legado.ts` y no 
     expect(detector.test("assessments.filter((a) => assessmentAcreditaConformidad(a.status))")).toBe(true);
     for (const f of SUPERFICIES) {
       expect(detector.test(sinComentarios(readFileSync(f, "utf8"))), f).toBe(false);
+    }
+  });
+
+  it("la consola no decide «evaluación resuelta» filtrando por estado", () => {
+    const detector = /\.in\(\s*"status",\s*AI_ASSESSMENT_RESOLVED\s*\)|AI_ASSESSMENT_RESOLVED\s*=/;
+    expect(detector.test('.in("status", AI_ASSESSMENT_RESOLVED)')).toBe(true);
+    const src = sinComentarios(readFileSync("src/hooks/useModuleStatus.ts", "utf8"));
+    expect(detector.test(src)).toBe(false);
+    expect(src).toMatch(/sistemasCubiertos\(/);
+    // Lee las columnas que el criterio necesita, no sólo el sistema.
+    expect(src).toMatch(/frozen_at/);
+    expect(src).toMatch(/reviewed_at/);
+  });
+
+  it("las tres superficies con chip de estado lo tiñen con la hoja, no por el estado a secas", () => {
+    const CHIP = [
+      "src/pages/ai-governance/Evaluaciones.tsx",
+      "src/components/ai-governance/evaluacion-detalle/CabeceraInforme.tsx",
+      "src/components/ai-governance/sistema/TabEvaluaciones.tsx",
+    ];
+    const porEstado = /chipClaseEstadoEvaluacion\(|evaluacionAcredita\(\s*\w+\s*\)\s*\?\s*"bg-/;
+    expect(porEstado.test("chipClaseEstadoEvaluacion(ass.status)")).toBe(true);
+    for (const f of CHIP) {
+      const src = sinComentarios(readFileSync(f, "utf8"));
+      expect(src, `${f} no usa el chip de la hoja`).toMatch(/chipClaseEvaluacion\(/);
+      expect(porEstado.test(src), `${f} tiñe el chip por su cuenta`).toBe(false);
     }
   });
 
