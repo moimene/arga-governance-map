@@ -381,6 +381,45 @@ describe("A3 — no se ofrece una capacidad que el sistema deniega", () => {
       }
     }
   });
+
+  it("2026-09-19 (F1.T7) — ninguna superficie asigna a una sección un estado que exige revisor: ni verbo ni estado", () => {
+    // Se retiró el cierre del expediente, pero el selector de cada sección
+    // seguía ofreciendo «Conforme» y «Cerrada» (APPROVED/SEALED) sin revisor.
+    // Dos puertas: el VERBO (un botón que aprueba, cierra o sella) y el ESTADO
+    // (un selector alimentado con la lista completa). El comportamiento se
+    // renderiza en `tab-expediente-tecnico.test.tsx`; esto es el respaldo
+    // textual en toda la superficie, que un refactor puede reintroducir suelto.
+    const VERBOS = [
+      /\b(Aprobar|Cerrar|Sellar|Validar|Certificar)\s+(la\s+|esta\s+)?secci[oó]n/i,
+      /\bMarcar\s+como\s+(conforme|revisad[oa]|cerrad[oa]|aprobad[oa])/i,
+    ];
+    // Control del instrumento: cada patrón casa con el rótulo que prohíbe.
+    expect(VERBOS[0].test("Aprobar sección")).toBe(true);
+    expect(VERBOS[1].test("Marcar como conforme")).toBe(true);
+    const ESTADO = /\bESTADOS_SECCION\s*\.\s*(map|forEach|filter)\s*\(/;
+    expect(ESTADO.test("{ESTADOS_SECCION.map((e) =>")).toBe(true);
+
+    const ficheros = superficieAims();
+    expect(ficheros.length, "el barrido se ha quedado corto: la ausencia sería vacua").toBeGreaterThanOrEqual(30);
+    for (const f of ficheros) {
+      const src = sinComentarios(read(f));
+      for (const re of VERBOS) {
+        expect(re.test(src), `${f}: ofrece un verbo que exige revisor → ${src.match(re)?.[0]}`).toBe(false);
+      }
+      expect(ESTADO.test(src), `${f}: recorre la lista completa de estados de sección, SEALED y APPROVED incluidos`)
+        .toBe(false);
+    }
+
+    // Control positivo del ESTADO: el selector existe y se alimenta de la hoja.
+    const tab = sinComentarios(read("src/components/ai-governance/sistema/TabExpedienteTecnico.tsx"));
+    expect(tab).toContain("ESTADOS_SECCION_EDITABLES.map(");
+    // Y la escritura aplica el mismo criterio: retirar la opción del selector y
+    // dejar que el UPDATE acepte APPROVED sería la retirada a medias otra vez.
+    const hook = sinComentarios(read(HOOK));
+    const update = hook.slice(hook.indexOf("export function useUpdateTechnicalFileSection"));
+    expect(update).toContain('.from("aims_technical_file_sections")');
+    expect(update.slice(0, update.indexOf(".update("))).toContain("esEstadoSeccionEditable(status)");
+  });
 });
 
 describe("A3 — el documento descargable no afirma lo que no consta", () => {

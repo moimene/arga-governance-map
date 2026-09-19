@@ -9,7 +9,8 @@ import {
   type AimsTechnicalFileSection,
 } from "@/hooks/useAimsTechnicalFile";
 import {
-  ESTADOS_SECCION,
+  ESTADOS_SECCION_EDITABLES,
+  esEstadoSeccionEditable,
   etiquetaEstadoSeccion,
   normalizarEstadoSeccion,
   vinculaArt11,
@@ -23,6 +24,11 @@ import VersionesSistema from "./VersionesSistema";
  * `vinculaArt11` a partir del rol y del nivel, y sin uno de los dos no se
  * afirma nada. Registro interno sin hash de integridad: ninguna de las dos
  * tablas del expediente tiene columna donde guardarlo.
+ *
+ * El selector de estado solo ofrece los de trabajo (`ESTADOS_SECCION_EDITABLES`):
+ * «Conforme» y «Cerrada» exigen un revisor que la aplicación no tiene. Una
+ * sección registrada así se edita partiendo de «Pendiente», y guardar la deja en
+ * el estado de trabajo elegido: el contenido nuevo no lo ha revisado nadie.
  */
 
 export interface TabExpedienteTecnicoProps {
@@ -81,8 +87,7 @@ export default function TabExpedienteTecnico({
   const abrirEdicion = (sec: AimsTechnicalFileSection) => {
     setEditando(sec.id);
     setTexto(textoDeSeccion(sec));
-    const n = normalizarEstadoSeccion(sec.status);
-    setEstado((ESTADOS_SECCION as readonly string[]).includes(n) ? n : "PENDING");
+    setEstado(esEstadoSeccionEditable(sec.status) ? normalizarEstadoSeccion(sec.status) : "PENDING");
   };
 
   const guardar = async (sec: AimsTechnicalFileSection) => {
@@ -236,12 +241,15 @@ export default function TabExpedienteTecnico({
                           className="h-9 px-3 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]"
                           style={{ borderRadius: "var(--g-radius-md)" }}
                         >
-                          {ESTADOS_SECCION.map((e) => (
+                          {ESTADOS_SECCION_EDITABLES.map((e) => (
                             <option key={e} value={e}>
                               {etiquetaEstadoSeccion(e)}
                             </option>
                           ))}
                         </select>
+                        <p className="mt-1 max-w-xs text-[var(--g-text-secondary)]">
+                          «Conforme» y «Cerrada» exigen un revisor: no se asignan desde aquí.
+                        </p>
                       </div>
                       <button
                         type="button"

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, skipToken } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
-import { ANEXO_IV_SECCIONES } from "@/lib/aims/expediente-tecnico";
+import { ANEXO_IV_SECCIONES, esEstadoSeccionEditable } from "@/lib/aims/expediente-tecnico";
 
 // Los tipos siguientes reflejan las columnas REALES de Cloud
 // (`information_schema`, verificado 2026-08-29). La versión anterior declaraba
@@ -124,12 +124,19 @@ export function useAimsMonitoringIndicators(systemId: string | undefined) {
  * La escritura va acotada por tenant Y por id, y se comprueba que vuelve fila:
  * la RLS filtra un UPDATE ajeno a CERO FILAS SIN ERROR, así que sin esta
  * comprobación una edición de otro entorno se daría por guardada.
+ *
+ * Solo escribe estados de trabajo (`esEstadoSeccionEditable`): «Conforme» y
+ * «Cerrada» exigen un revisor que la aplicación no tiene, y retirarlos del
+ * selector dejando que el UPDATE los acepte sería una retirada a medias.
  */
 export function useUpdateTechnicalFileSection() {
   const qc = useQueryClient();
   const { tenantId } = useTenantContext();
   return useMutation({
     mutationFn: async ({ id, content, status }: { id: string; content: Record<string, unknown>; status: string }) => {
+      if (!esEstadoSeccionEditable(status)) {
+        throw new Error(`El estado «${status}» exige un revisor y no se asigna desde la aplicación.`);
+      }
       const { data, error } = await supabase
         .from("aims_technical_file_sections")
         .update({ content, status })
