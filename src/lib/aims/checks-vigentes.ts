@@ -12,12 +12,15 @@
  * evaluación real y sirve para ver la evolución. Lo que se corrige es la
  * LECTURA: de cada requisito manda la comprobación más reciente.
  *
- * Módulo hoja: no importa nada, para que lo puedan usar los hooks y el read
- * model sin ciclos.
+ * Módulo hoja: solo importa otra hoja (`vocabulario`), para que lo puedan usar
+ * los hooks y el read model sin ciclos.
  */
+
+import { normalizeAimsStatus } from "./vocabulario";
 
 type ChequeoConHistoria = {
   system_id?: string | null;
+  status?: string | null;
   requirement_code?: string | null;
   created_at?: string | null;
   checked_at?: string | null;
@@ -53,6 +56,16 @@ function peso(c: ChequeoConHistoria): number {
   return c.evaluacion && c.evaluacion.status !== "BORRADOR" ? 1 : 0;
 }
 
+/**
+ * Entre las que no acreditan (legado y borrador), una no conformidad declarada
+ * solo la desplaza otra no conformidad: una conformidad o un pendiente
+ * posteriores no prueban que la brecha se cerrara. Decisión del controlador al
+ * integrar F1 (19-09-2026), sobre el caso FraudGuard de ARGA.
+ */
+function esNoConforme(c: ChequeoConHistoria): boolean {
+  return normalizeAimsStatus(c.status) === "NO_CONFORME";
+}
+
 export function checksVigentes<T extends ChequeoConHistoria>(rows: T[] | null | undefined): T[] {
   const porRequisito = new Map<string, T>();
   (rows ?? []).forEach((c) => {
@@ -69,7 +82,9 @@ export function checksVigentes<T extends ChequeoConHistoria>(rows: T[] | null | 
     const gana =
       !previo ||
       peso(c) > peso(previo) ||
-      (peso(c) === peso(previo) && marca(c) >= marca(previo));
+      (peso(c) === peso(previo) &&
+        marca(c) >= marca(previo) &&
+        !(peso(c) === 0 && esNoConforme(previo) && !esNoConforme(c)));
     if (gana) porRequisito.set(clave, c);
   });
   return [...porRequisito.values()];

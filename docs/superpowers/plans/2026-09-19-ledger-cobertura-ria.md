@@ -94,18 +94,7 @@ sin cambio visible.
 | F1.T10 | HECHA, **no cerrada** | Revisión del texto de las ayudas por Legal (criterio de aceptación) y veredicto de H-02A (F1.T15) |
 | F1.T11 | HECHA, **no cerrada** | Veredicto de H-02A (F1.T15) y confirmación por Legal de la desviación de `ROLES_ART_4` |
 
-**Cotejo literal (19-09-2026, navegador, consolidado CELEX 02024R1689-20260727; ▼M1 = Reglamento
-(UE) 2026/1744).** Para llevar a la tabla de F0.T2 al integrar:
-
-| Punto | Texto oficial (extracto literal) | Uso en el producto |
-|---|---|---|
-| Art. 4.1 (▼M1) | «Los proveedores y responsables del despliegue de sistemas de IA adoptarán medidas para apoyar la promoción de la alfabetización en materia de IA de su personal y demás personas que se encarguen en su nombre del funcionamiento y la utilización de sistemas de IA […]. Esta obligación no exige que los proveedores o los responsables del despliegue garanticen un nivel específico de alfabetización en materia de IA de ninguna persona en particular.» | Nota de RIA_ART_4 y descripción de ALFABETIZACION. Destinatarios «de sistemas de IA»: apoya dejar fuera al proveedor de un modelo |
-| Art. 5.1 b bis) (▼M1) | «[…] un sistema de IA que genere o manipule imágenes, vídeos o audios realistas o material similar de las partes íntimas de una persona física identificable, o de una persona física identificable que participe en actividades sexualmente explícitas, sin el consentimiento libre, específico, informado e inequívoco y explícito de dicha persona […]» | Ayuda de Q2_1 (reescrita: decía «imágenes íntimas… sin su consentimiento») |
-| Art. 5.1 b ter) (▼M1) | «[…] un sistema de IA que genere o manipule material o espectáculos en el sentido del artículo 2, letras c) y e), de la Directiva 2011/93/UE, excepto cuando se aplique una defensa de «forma ilícita» en virtud del Derecho nacional» | Ayuda de Q2_1 (añade la Directiva) |
-| Art. 5.1 bis a) y b) (▼M1) | a) al mercado o en servicio «solo estará prohibida cuando: i) dicha generación o manipulación sea la finalidad prevista […], o ii) […] un resultado razonablemente previsible y reproducible […] y el sistema no disponga de medidas técnicas de seguridad razonables […]»; b) la utilización «solo está prohibida cuando el responsable del despliegue utilice el sistema con el fin de generar o manipular dicho material» | Ayuda de Q2_1, sin cambio |
-| Art. 113, párr. 3, a) (▼M1) | «[…] a excepción del artículo 5, apartado 1, párrafo primero, letras b bis) y b ter), y el artículo 5, apartado 1 bis, y apartado 1 ter, que serán aplicables a partir del 2 de diciembre de 2026» | Fecha de Q2_1, sin cambio |
-| Art. 6.3, último párrafo (▼B) | «[…] los sistemas de IA a que se refiere el anexo III siempre se considerarán de alto riesgo cuando el sistema de IA efectúe la elaboración de perfiles de personas físicas.» | Aviso de perfilado de Q2_3 (C10) |
-| Art. 3.52 (▼B) | «“elaboración de perfiles”: la elaboración de perfiles tal como se define en el artículo 4, punto 4, del Reglamento (UE) 2016/679» | Ejemplo de Q2_3 |
+**Cotejo literal de esta cadena:** trasladado a `docs/legal/2026-09-19-verificacion-omnibus-puntos-abiertos.md`, sección «Cotejo de F1.T10 y F1.T11».
 
 **No cotejado, y por eso retirado del producto:** el número del artículo del Reglamento
 2026/1744 que modifica el art. 4 (la spec cita «art. 1.5»; Harvey citó «4.1 (mod.), cdo. 8»). La
@@ -264,7 +253,7 @@ ARGA Salud y ARGA Vida ponen en servicio y acumulan los dos roles. La misma preg
 
 ## Filas de ARGA tocadas
 
-(ninguna todavía)
+(ninguna todavía: M01 es solo esquema — 0 filas tocadas, medido)
 
 ### Pantallas de ARGA que cambian sin tocar filas (F1.T12/T13 + corrector D-catalogo, 19-09)
 
@@ -289,8 +278,8 @@ cambiaron de texto (marcadas fila a fila) y que entraron 15 nuevas sin evaluar. 
 
 | Fase | Estado | Notas |
 |---|---|---|
-| F0 | EN CURSO | T3 (H-01) hecha · T2 hecha (7 VERIFICADOS, 1 PENDIENTE_LEGAL: fecha de la sección 5) · T1 propuestas presentadas al usuario · T4 y T5 en la cadena F de la fase 1 |
-| F1 | EN CURSO | Seis cadenas en worktrees aislados (A monitores, B sistema, C cuestionario, D catálogo, E migración M01, F documentos de F0) |
+| F0 | EN CURSO | T2 hecha (8 VERIFICADOS —incluido el cdo. 177, que corrige a Harvey—, 1 PENDIENTE_LEGAL) · T3 (H-01) hecha · T4 y T5 hechas (cadena F) · **T1 abierta: D-U1…D-U8 sin respuesta del usuario** |
+| F1 | INTEGRADA, no cerrada | Seis cadenas fusionadas en la rama (19-09): T1-T9, T12-T14 hechas; **T10, T11 y T15 abiertas** hasta el veredicto de H-02A y la revisión de Legal de las ayudas; T1-bis a F8. **M01 aplicada en Cloud** (`20260919100000`, Management API desde el fichero: ensayo revertido, transacción con verificación que aborta y 14 sondas revertidas, registro en `schema_migrations`, `notify pgrst`; sonda P1-P9 revertida OK; sonda viva 5 rojos → 16/16; 0 filas tocadas, 61 comprobaciones y 8 evaluaciones sin enlace). Gates: typecheck, lint y build limpios; `bun test` 4 772 pass / 156 skip / 0 fail (base 4 547) |
 | F2-F11 | PENDIENTE | |
 
 ## F1 — cadena A-monitores: cambios visibles medidos (corrector, 19-09)
@@ -324,7 +313,7 @@ se cuenta **solo entre sistemas con cuestionario**. En las métricas, «conforme
 | M · Prácticas prohibidas | watch «0 inaceptables» | no medido «Sin análisis del art. 5» |
 | M · Obligaciones alto riesgo | watch «4/6 conformes» | watch «0/4 acreditadas · 4 de legado, no acredita» |
 | M · Expediente técnico | gap «1/2 conformes» | gap «0/2 acreditadas · 2 de legado, no acredita · 0/5 secciones con revisor» |
-| M · Gobierno del dato | **gap** «4/6 conformes» | **watch** «0/3 acreditadas · 3 de legado, no acredita» |
+| M · Gobierno del dato | **gap** «4/6 conformes» | **gap** «0/3 acreditadas · 3 de legado, no acredita» (tras la decisión de precedencia al integrar F1; en la cadena A salía watch) |
 | M · Transparencia | gap «2/5 conformes» | gap «0/3 acreditadas · 3 de legado, no acredita» |
 | M · Supervisión humana | watch «3/4 conformes» | watch «0/4 acreditadas · 4 de legado, no acredita · 0/1 secciones con revisor» |
 | M · Precisión, robustez y ciberseguridad | Listo «1/1 conformes» | watch «0/1 acreditadas · 1 de legado, no acredita · 0/1 secciones con revisor» |
@@ -339,7 +328,7 @@ se cuenta **solo entre sistemas con cuestionario**. En las métricas, «conforme
 | Chips «Aprobada (legado)» (5 filas) en lista e informe | verde | aviso (`--status-warning`) |
 | Chip del BORRADOR ISO en la pestaña del sistema | aviso | neutro (el del vocabulario, como en la lista) |
 
-**Los tres cambios de gap a vigilancia, con su causa** (ninguno es una mejora de cumplimiento; los
+**Los cambios de gap a vigilancia, con su causa** (eran tres en la cadena A; tras integrar F1 quedan dos: Gobierno del dato vuelve a gap) (ninguno es una mejora de cumplimiento; los
 tres dejan de afirmar algo que la base no sostenía):
 
 - **Gobierno del dato.** Lo ponía en gap el `EU_AI_ACT_ART_10` NO_CONFORME de FraudGuard (18-04).
@@ -348,6 +337,10 @@ tres dejan de afirmar algo que la base no sostenía):
   queda desplazada por una conformidad de legado que no acredita. El monitor queda en vigilancia,
   nunca en Listo. Efecto de la regla de F1.T4, declarado aquí para que el controlador decida si una
   no conformidad de legado debe prevalecer sobre una conformidad de legado posterior.
+  **Decidido al integrar F1 (19-09):** sí. Entre las comprobaciones que no acreditan (legado y
+  borrador), una no conformidad solo la desplaza otra no conformidad; una evaluación cerrada
+  sigue mandando sobre las dos (`checks-vigentes.ts`, `esNoConforme`). Medido con login real:
+  Gobierno del dato de ARGA vuelve a **gap** «0/3 acreditadas · 3 de legado, no acredita».
 - **Evidencia y recordkeeping.** El gap de la base salía de comprobaciones que la subcadena le
   atribuía y que no son del art. 12 (entre ellas el `AIA-13` «No conforme» de FraudGuard, que ahora
   cuenta en Transparencia). Por código solo le corresponde `VAL-04` → `LOGGING`, de legado.
@@ -384,7 +377,11 @@ tres dejan de afirmar algo que la base no sostenía):
   con test, pero ninguna superficie lo montaba (código sin arista). La parte «por sistema» de F1.T1
   queda **PENDIENTE**: montarlo en la ficha del sistema con su test de render. Tarea a asignar por el
   controlador (propuesta: F1.T1-bis). El monitor por tenant sigue en el Dashboard.
-- **Comprobación ↔ evaluación sin enlace.** Mientras M01 (F1.T14) no dé `assessment_id` a
+  **Decidido al integrar F1:** se monta en **F8**, en la ficha del sistema, junto a la vista
+  `v_aims_indicator_status` (F8.T10), que es la que da estado derivado a los indicadores; montarlo
+  antes pintaría un monitor por sistema sin su objeto de vigilancia.
+- **Comprobación ↔ evaluación sin enlace.** (M01 aplicada el 19-09: el enlace existe; las 61
+  legacy siguen NULL. Atar la acreditación a la evaluación propia queda para F2.) Mientras M01 (F1.T14) no dé `assessment_id` a
   `ai_compliance_checks`, `sistemasConEvaluacionFirme` exige que **todas** las evaluaciones vigentes
   del sistema estén congeladas y revisadas: una ISO sin firmar impide acreditar las comprobaciones
   RIA del mismo sistema. Es conservador (nunca acredita de más); con M01, atar cada comprobación a
@@ -401,13 +398,13 @@ tres dejan de afirmar algo que la base no sostenía):
 
 ## Deudas y hallazgos durante la ejecución
 
-- **`CUESTIONARIO_VERSION` sigue en «1.1»** aunque F1.T10 cambia la ayuda de Q2_1 (y con ella qué
+- **[DECIDIDO al integrar F1: sube a «1.1.1»; 0 cuestionarios en Cloud]** **`CUESTIONARIO_VERSION` seguía en «1.1»** aunque F1.T10 cambia la ayuda de Q2_1 (y con ella qué
   significa responder «No») y F1.T11 los `applicable_frameworks` que se sellan para unas mismas
   respuestas. Hoy no hay ambigüedad (0 filas en `aims_classification_questionnaires`, medido). La
   decisión es del controlador: subir a «1.1.1» (el servidor no valida el valor, solo lo sella y
   pone «1.1» por defecto en `fn_aims_registrar_sistema`) o declarar que la v1.1 abarca las dos
   ayudas con corte en el despliegue, comprobando antes que siguen sin existir cuestionarios.
-- **`EntidadDetalle`, columna «Riesgo EU AI Act»** (preexistente, fuera de F1.T9): pinta
+- **[HECHO al integrar F1: chip neutro sin cuestionario, gate en `no-fabricated-claims` con mutación comprobada; cambio visible en ARGA: 6 chips rojos «Alto» pasan a neutros con el `title` «nivel declarado en ficha, sin cuestionario»]** **`EntidadDetalle`, columna «Riesgo EU AI Act»** (preexistente, fuera de F1.T9): pinta
   `risk_level` en rojo o aviso sin mirar `tieneClasificacionGuiada`. ARGA: 8 sistemas, 6 «Alto», 0
   cuestionarios → 6 chips rojos que afirman una clasificación sin medir. Tarea pendiente: chip
   neutro «nivel declarado en ficha, sin cuestionario», como el resto del módulo, con gate de arista.
@@ -452,7 +449,7 @@ tres dejan de afirmar algo que la base no sostenía):
 - **F1.T7 — sección «Cerrada» (SEALED):** la pestaña ya no ofrece «Editar», pero el guard del hook
   mira el estado de DESTINO, no el de origen; la inmutabilidad en servidor llega con **F9.T2**
   (trigger de guardia de `status`). Latente: 0 filas SEALED en Cloud (medido 2026-09-19).
-- **F1.T7 — `reviewed_at` huérfano (decisión del controlador):** guardar una sección «Conforme» la
+- **[DECIDIDO al integrar F1: lo cierra F9.T2 — `fn_aims_revisar_seccion` limpia `reviewed_at` al devolver una sección a estado de trabajo; F1.T4 no toca dato]** **F1.T7 — `reviewed_at` huérfano (decisión del controlador):** guardar una sección «Conforme» la
   deja en un estado de trabajo y no toca `reviewed_at`, que queda sin revisión a la que corresponder.
   La pestaña avisa antes de guardar y ya no pinta «Revisada» junto a un estado de trabajo (hoy ninguna
   fila de ARGA está en ese caso: la única «Pendiente» tiene `reviewed_at` NULL), pero el dato conserva

@@ -34,7 +34,9 @@ describe("de cada requisito manda la comprobación más reciente", () => {
 
   it("gana la última escrita, no la primera", () => {
     const vigentes = checksVigentes([
-      fila("R1", "2026-05-21T10:00:00Z", "NO_CONFORME"),
+      // PARCIAL y no NO_CONFORME: una no conformidad sin acreditar no la
+      // desplaza una conformidad posterior (ver más abajo).
+      fila("R1", "2026-05-21T10:00:00Z", "PARCIAL"),
       fila("R1", "2026-07-19T10:00:00Z", "CONFORME"),
     ]);
     expect(vigentes).toHaveLength(1);
@@ -43,7 +45,7 @@ describe("de cada requisito manda la comprobación más reciente", () => {
 
   it("con marcas iguales gana la que llega después (orden de escritura)", () => {
     const vigentes = checksVigentes([
-      fila("R1", "2026-07-19T10:00:00Z", "NO_CONFORME"),
+      fila("R1", "2026-07-19T10:00:00Z", "PARCIAL"),
       fila("R1", "2026-07-19T10:00:00Z", "CONFORME"),
     ]);
     expect(vigentes[0].status).toBe("CONFORME");
@@ -136,10 +138,38 @@ describe("un borrador no desplaza a una evaluación cerrada", () => {
     expect(vigentes).toHaveLength(1);
   });
 
-  it("las legacy (sin evaluación) siguen el criterio de siempre: manda la más reciente", () => {
+  // Decisión del controlador al integrar F1 (19-09-2026). Caso de ARGA: el
+  // `EU_AI_ACT_ART_10` NO_CONFORME de FraudGuard (18-04) quedaba desplazado por
+  // el `AIA-10` «Conforme» del día siguiente, los dos de legado. Una
+  // conformidad que no acredita no prueba que la brecha se cerrara.
+  it("entre las que no acreditan, una conformidad posterior no desplaza a una no conformidad", () => {
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-04-18T10:00:00Z", "NO_CONFORME", null),
+      deEvaluacion("2026-04-19T10:00:00Z", "Conforme", null),
+    ]);
+    expect(vigentes[0].status, "una conformidad de legado borró una no conformidad declarada").toBe("NO_CONFORME");
+  });
+
+  it("ni un borrador posterior sin contestar", () => {
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-05-21T10:00:00Z", "No conforme", null),
+      deEvaluacion("2026-10-01T10:00:00Z", "PENDIENTE", { status: "BORRADOR", reviewed_at: null }),
+    ]);
+    expect(vigentes[0].status).toBe("No conforme");
+  });
+
+  it("control: una no conformidad posterior sí desplaza a una conformidad de legado", () => {
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-05-21T10:00:00Z", "CONFORME", null),
+      deEvaluacion("2026-07-19T10:00:00Z", "NO_CONFORME", null),
+    ]);
+    expect(vigentes[0].status).toBe("NO_CONFORME");
+  });
+
+  it("control: una evaluación cerrada posterior sí desplaza a la no conformidad de legado", () => {
     const vigentes = checksVigentes([
       deEvaluacion("2026-05-21T10:00:00Z", "NO_CONFORME", null),
-      deEvaluacion("2026-07-19T10:00:00Z", "CONFORME", null),
+      deEvaluacion("2026-10-01T10:00:00Z", "CONFORME", { status: "CONFORME", reviewed_at: null }),
     ]);
     expect(vigentes[0].status).toBe("CONFORME");
   });

@@ -26,7 +26,13 @@
  * interpretable cuando cambien las preguntas.
  */
 
-export const CUESTIONARIO_VERSION = "1.1";
+/**
+ * 1.1.1 (19-09-2026): F1.T10 cambia la ayuda de Q2_1 (y con ella qué significa
+ * responder «No») y F1.T11 los marcos que se sellan para unas mismas respuestas.
+ * Se sube al integrar F1, con 0 cuestionarios en Cloud (medido): ninguno sellado
+ * con «1.1» se lee con la ayuda nueva. El servidor no valida el valor; solo lo sella.
+ */
+export const CUESTIONARIO_VERSION = "1.1.1";
 
 export type IdPregunta = "Q1_1" | "Q1_2" | "Q1_3" | "Q1_4" | "Q2_1" | "Q2_2" | "Q2_3" | "Q2_4" | "Q2_5";
 export type Respuestas = Partial<Record<IdPregunta, boolean>>;

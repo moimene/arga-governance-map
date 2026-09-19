@@ -20,6 +20,7 @@ import {
 import { usePoliciesList } from "@/hooks/usePoliciesObligations";
 import { Brain, ChevronRight, ClipboardList, Compass, Download, Edit3, ExternalLink, Network } from "lucide-react";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
+import { tieneClasificacionGuiada } from "@/lib/aims/cuestionario-calificacion";
 
 const matTone = (m: string): "critical" | "warning" | "info" | "neutral" => {
   const l = formatMateriality(m);
@@ -334,17 +335,23 @@ export default function EntidadDetalle() {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{sys.system_type ?? "—"}</TableCell>
                       <TableCell>
+                        {/* Sin cuestionario, el nivel es el declarado en ficha y no se
+                            pinta como riesgo medido: neutro, como en el inventario. */}
                         {sys.risk_level && (
-                          <StatusBadge
-                            label={sys.risk_level}
-                            tone={
-                              sys.risk_level === "Alto" || sys.risk_level === "Inaceptable"
-                                ? "critical"
-                                : sys.risk_level === "Limitado"
-                                ? "warning"
-                                : "active"
-                            }
-                          />
+                          <span title={tieneClasificacionGuiada(sys) ? undefined : "nivel declarado en ficha, sin cuestionario"}>
+                            <StatusBadge
+                              label={sys.risk_level}
+                              tone={
+                                !tieneClasificacionGuiada(sys)
+                                  ? "neutral"
+                                  : sys.risk_level === "Alto" || sys.risk_level === "Inaceptable"
+                                  ? "critical"
+                                  : sys.risk_level === "Limitado"
+                                  ? "warning"
+                                  : "active"
+                              }
+                            />
+                          </span>
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{sys.vendor ?? "—"}</TableCell>

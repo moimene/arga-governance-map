@@ -1222,6 +1222,18 @@ describe("F1.T9 — atribuciones falsas fuera", () => {
       "el aviso no llega a la pantalla y al borrador").toBeGreaterThanOrEqual(2);
   });
 
+  // Decisión del controlador al integrar F1 (19-09-2026): ARGA tiene 6 sistemas
+  // «Alto» y 0 cuestionarios, y la ficha de la sociedad los pintaba en rojo.
+  // Capa de TEXTO, débil y declarada: montar la ficha arrastra una docena de
+  // hooks; lo que se vigila es que el tono crítico solo se alcance con cuestionario.
+  it("la ficha de una sociedad no pinta en rojo un nivel sin cuestionario", () => {
+    const src = sinComentarios(read(ENTIDAD));
+    // Control positivo: el tono crítico sigue existiendo para los clasificados.
+    expect(src).toContain('"critical"');
+    expect(src).toMatch(/!tieneClasificacionGuiada\(sys\)\s*\?\s*"neutral"/);
+    expect(src).toContain("nivel declarado en ficha, sin cuestionario");
+  });
+
   it("Q2_2 se rotula por el art. 6.2 y el anexo III, no por el 6.1", async () => {
     const { PREGUNTAS } = await import("@/lib/aims/cuestionario-calificacion");
     const q22 = PREGUNTAS.find((p) => p.id === "Q2_2");
