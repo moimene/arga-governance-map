@@ -7,6 +7,7 @@ import {
   assessmentAcreditaConformidad,
   buildAimsReadiness,
   filterSystemsByScope,
+  incidenteCerrado,
   isAimsMaterialIncidentCandidate,
   normalizeAimsStatus,
   systemStatusChipClass,
@@ -142,9 +143,8 @@ export default function AiDashboard() {
   const sistemasClasificados = systems.filter((s) => (s.risk_level ?? "").trim() !== "").length;
   const conClasificacionGuiada = systems.filter(tieneClasificacionGuiada).length;
 
-  const incidentesAbiertos = incidents.filter(
-    (i) => ["ABIERTO", "EN_INVESTIGACION"].includes(normalizeAimsStatus(i.status))
-  ).length;
+  // Mismo criterio que el dominio «Incidentes»: abierto = no cerrado con fecha.
+  const incidentesAbiertos = incidents.filter((i) => !incidenteCerrado(i)).length;
 
   // `APROBADO` es legado: el producto escribe `CONFORME`. Predicado único en
   // `readiness.ts` para que escritura y lectura no vuelvan a divergir.

@@ -1,4 +1,5 @@
 import { AESIA_RIA_REQUIREMENTS } from "./catalog-aesia";
+import { evaluacionesVigentes } from "./checks-vigentes";
 import { acreditaConformidad } from "./conformidad";
 import { tieneClasificacionGuiada } from "./cuestionario-calificacion";
 import { monitorDeCodigo } from "./mapa-monitores";
@@ -30,6 +31,7 @@ export interface AimsAssessmentLike {
   findings?: { code?: string | null; status?: string | null; justification?: string | null }[] | null;
   assessment_date?: string | null;
   framework?: string | null;
+  created_at?: string | null;
 }
 
 export interface AimsIncidentLike {
@@ -167,6 +169,23 @@ export function isAimsTechnicalFileGapCandidate(assessment: AimsAssessmentLike) 
   return hasUnapprovedStatus || hasWeakScore || hasOpenFinding;
 }
 
+/**
+ * Un incidente está cerrado SÓLO con estado CERRADO y fecha de cierre. Tener
+ * escritas la causa raíz o la acción correctiva no lo cierra: medido en
+ * Garrigues el 2026-09-19, el incidente de Harvey en investigación salía
+ * «1/1 con cierre» por eso.
+ */
+export function incidenteCerrado(incident: AimsIncidentLike): boolean {
+  return normalizeAimsStatus(incident.status) === "CERRADO" && Boolean(incident.closed_at);
+}
+
+/** «0/1 cerrados · 1 en investigación»: lo que no está cerrado se dice qué es. */
+function metricaCierre(incidents: AimsIncidentLike[]): string {
+  const cerrados = incidents.filter(incidenteCerrado).length;
+  const enInvestigacion = incidents.filter((i) => normalizeAimsStatus(i.status) === "EN_INVESTIGACION").length;
+  return `${cerrados}/${incidents.length} cerrados${enInvestigacion > 0 ? ` · ${enInvestigacion} en investigación` : ""}`;
+}
+
 export function isAimsMaterialIncidentCandidate(incident: AimsIncidentLike) {
   const severity = incident.severity ?? "";
   const status = incident.status ?? "";
@@ -263,9 +282,9 @@ const complianceMonitorDefinitions: MonitorDefinition[] = [
     id: "provider-vendor-third-party",
     label: "Proveedor y terceros",
     area: "Operativo AIMS",
-    detail: "Identificación de vendor, dependencia crítica y posible derivación a GRC TPRM.",
+    detail: "Evaluación del proveedor y de la cadena de suministro; el nombre del proveedor en la ficha no la acredita.",
     route: "/ai-governance/sistemas",
-    source: "ai_systems",
+    source: "ninguna",
     handoff: "AIMS_VENDOR_CONTEXT",
   },
   {
@@ -332,7 +351,6 @@ function fallbackMonitorStatus(
 ): { status: AimsReadinessStatus; metric: string } {
   const { systems, assessments, incidents } = input;
   const totalSystems = systems.length;
-  const activeSystems = systems.filter((system) => normalizeAimsStatus(system.status) === "ACTIVO").length;
   const highRiskSystems = systems.filter((system) => system.risk_level === "Alto");
   const inacceptableSystems = systems.filter((system) => system.risk_level === "Inaceptable");
   const assessedSystemIds = new Set(
@@ -343,10 +361,8 @@ function fallbackMonitorStatus(
   const highRiskAssessed = highRiskSystems.filter((system) => assessedSystemIds.has(system.id)).length;
   const technicalGaps = assessments.filter(isAimsTechnicalFileGapCandidate).length;
   const materialIncidents = incidents.filter(isAimsMaterialIncidentCandidate).length;
-  const incidentsWithClosureEvidence = incidents.filter(
-    (incident) => incident.root_cause || incident.corrective_action || incident.closed_at,
-  ).length;
-  const systemsWithVendor = systems.filter((system) => Boolean(system.vendor)).length;
+  const incidentesCerrados = incidents.filter(incidenteCerrado).length;
+  const conClasificacionGuiada = systems.filter(tieneClasificacionGuiada).length;
   const isoAssessments = assessments.filter((assessment) => assessment.framework === "ISO_42001");
   const approvedIsoAssessments = isoAssessments.filter((assessment) =>
     assessmentAcreditaConformidad(assessment.status),
@@ -355,8 +371,8 @@ function fallbackMonitorStatus(
   switch (definition.id) {
     case "inventory-classification":
       return {
-        status: domainStatus(pct(activeSystems, totalSystems), 50, 80),
-        metric: totalSystems === 0 ? "0 sistemas" : `${activeSystems}/${totalSystems} activos`,
+        status: domainStatus(pct(conClasificacionGuiada, totalSystems), 50, 80),
+        metric: totalSystems === 0 ? "0 sistemas" : `${conClasificacionGuiada}/${totalSystems} con clasificación guiada`,
       };
     case "prohibited-practices":
       return {
@@ -365,8 +381,8 @@ function fallbackMonitorStatus(
       };
     case "high-risk-obligations":
       return {
-        status: domainStatus(pct(highRiskAssessed, highRiskSystems.length), 50, 100),
-        metric: highRiskSystems.length === 0 ? "Sin alto riesgo" : `${highRiskAssessed}/${highRiskSystems.length} alto riesgo`,
+        status: highRiskSystems.length === 0 ? "na" : domainStatus(pct(highRiskAssessed, highRiskSystems.length), 50, 100),
+        metric: highRiskSystems.length === 0 ? "Sin sistemas de alto riesgo" : `${highRiskAssessed}/${highRiskSystems.length} alto riesgo`,
       };
     case "technical-documentation":
       return {
@@ -376,27 +392,25 @@ function fallbackMonitorStatus(
     case "accuracy-robustness-cybersecurity":
     case "incident-reporting-escalation":
       return {
-        status: incidents.length === 0 ? "watch" : materialIncidents === 0 ? "ready" : materialIncidents <= 2 ? "watch" : "gap",
+        status: incidents.length === 0 ? "unmeasured" : materialIncidents === 0 ? "ready" : materialIncidents <= 2 ? "watch" : "gap",
         metric: incidents.length === 0 ? "Sin incidentes registrados" : `${materialIncidents} materiales`,
-      };
-    case "provider-vendor-third-party":
-      return {
-        status: domainStatus(pct(systemsWithVendor, totalSystems), 50, 80),
-        metric: totalSystems === 0 ? "0 proveedores" : `${systemsWithVendor}/${totalSystems} con vendor`,
       };
     case "post-market-monitoring":
     case "evidence-recordkeeping":
       return {
-        status: incidents.length === 0 ? "watch" : domainStatus(pct(incidentsWithClosureEvidence, incidents.length), 50, 80),
-        metric: incidents.length === 0 ? "Sin incidentes" : `${incidentsWithClosureEvidence}/${incidents.length} con cierre`,
+        status: incidents.length === 0 ? "unmeasured" : domainStatus(pct(incidentesCerrados, incidents.length), 50, 80),
+        metric: incidents.length === 0 ? "Sin incidentes" : metricaCierre(incidents),
       };
     case "iso-42001-management-system":
       return {
-        status: isoAssessments.length === 0 ? "gap" : domainStatus(pct(approvedIsoAssessments, isoAssessments.length), 50, 80),
-        metric: isoAssessments.length === 0 ? "Sin ISO" : `${approvedIsoAssessments}/${isoAssessments.length} aprobadas`,
+        status: isoAssessments.length === 0 ? "unmeasured" : domainStatus(pct(approvedIsoAssessments, isoAssessments.length), 50, 80),
+        metric: isoAssessments.length === 0 ? "Sin evaluaciones ISO 42001" : `${approvedIsoAssessments}/${isoAssessments.length} aprobadas`,
       };
     // Sin comprobaciones con el código del área no hay nada medido: que exista
-    // alguna evaluación del sistema no dice nada de ESTA área.
+    // alguna evaluación del sistema no dice nada de ESTA área. Terceros entra
+    // aquí: tener el proveedor escrito en la ficha no es haber evaluado al
+    // tercero.
+    case "provider-vendor-third-party":
     default:
       return { status: "unmeasured", metric: "Sin comprobaciones del área" };
   }
@@ -485,7 +499,6 @@ export function buildAimsReadiness({
   complianceChecks = [],
 }: AimsReadinessInput): AimsReadinessSummary {
   const totalSystems = systems.length;
-  const activeSystems = systems.filter((system) => normalizeAimsStatus(system.status) === "ACTIVO").length;
   const assessedSystemIds = new Set(
     assessments
       .filter((assessment) => assessmentAcreditaConformidad(assessment.status) && assessment.system_id)
@@ -493,13 +506,12 @@ export function buildAimsReadiness({
   );
   const highRiskSystems = systems.filter((system) => system.risk_level === "Alto");
   const highRiskAssessed = highRiskSystems.filter((system) => assessedSystemIds.has(system.id)).length;
-  const openIncidents = incidents.filter((incident) =>
-    ["ABIERTO", "EN_INVESTIGACION"].includes(normalizeAimsStatus(incident.status)),
-  ).length;
-  const incidentsWithClosureEvidence = incidents.filter(
-    (incident) => incident.root_cause || incident.corrective_action || incident.closed_at,
-  ).length;
-  const findings = assessments.flatMap((assessment) => assessment.findings ?? []);
+  const openIncidents = incidents.filter((incident) => !incidenteCerrado(incident)).length;
+  const incidentesCerrados = incidents.filter(incidenteCerrado).length;
+  const conClasificacionGuiada = systems.filter(tieneClasificacionGuiada).length;
+  // Sólo la última evaluación no borrador de cada sistema y marco: los
+  // borradores y las repeticiones no son hallazgos vigentes.
+  const findings = evaluacionesVigentes(assessments).flatMap((assessment) => assessment.findings ?? []);
   const controlFindings = findings.filter((finding) => finding.code || finding.status);
   // El vocabulario que el producto ESCRIBE en `findings[].status` es el nivel
   // de madurez (`L1`…`L8`), no una palabra de estado: `buildEvaluationPayload`
@@ -516,9 +528,9 @@ export function buildAimsReadiness({
     return acreditaConformidad({ status: st, justification: finding.justification });
   }).length;
 
-  const inventoryCoverage = pct(activeSystems, totalSystems);
+  const inventoryCoverage = pct(conClasificacionGuiada, totalSystems);
   const assessmentCoverage = pct(highRiskAssessed, highRiskSystems.length);
-  const incidentClosureCoverage = pct(incidentsWithClosureEvidence, incidents.length);
+  const incidentClosureCoverage = pct(incidentesCerrados, incidents.length);
   const controlCoverage = pct(closedControlFindings, controlFindings.length);
 
   const domains: AimsReadinessDomain[] = [
@@ -527,16 +539,16 @@ export function buildAimsReadiness({
       hasData: systems.length > 0,
       label: "Inventario",
       status: domainStatus(inventoryCoverage, 50, 80),
-      metric: totalSystems === 0 ? "0 sistemas" : `${activeSystems}/${totalSystems} activos`,
-      detail: "Registro operativo de sistemas IA, proveedor, tipo, estado y riesgo.",
+      metric: totalSystems === 0 ? "0 sistemas" : `${conClasificacionGuiada}/${totalSystems} con clasificación guiada`,
+      detail: "Registro operativo de sistemas IA, clasificados por cuestionario guiado completado.",
       route: "/ai-governance/sistemas",
     },
     {
       id: "ai-act-assessments",
       hasData: assessments.length > 0,
       label: "Evaluaciones AI Act",
-      status: domainStatus(assessmentCoverage, 50, 100),
-      metric: highRiskSystems.length === 0 ? "Sin alto riesgo" : `${highRiskAssessed}/${highRiskSystems.length} alto riesgo`,
+      status: highRiskSystems.length === 0 ? "na" : domainStatus(assessmentCoverage, 50, 100),
+      metric: highRiskSystems.length === 0 ? "Sin sistemas de alto riesgo" : `${highRiskAssessed}/${highRiskSystems.length} alto riesgo`,
       detail: "Cobertura aprobada para sistemas de riesgo alto y trazabilidad de evaluaciones.",
       route: "/ai-governance/evaluaciones",
     },
@@ -546,7 +558,7 @@ export function buildAimsReadiness({
       label: "Incidentes",
       // Sin un solo incidente registrado no se sabe si hay incidencias: es
       // ausencia de dato, no conformidad.
-      status: incidents.length === 0 ? "watch" : openIncidents === 0 ? "ready" : openIncidents <= 2 ? "watch" : "gap",
+      status: incidents.length === 0 ? "unmeasured" : openIncidents === 0 ? "ready" : openIncidents <= 2 ? "watch" : "gap",
       metric: incidents.length === 0 ? "Sin incidentes registrados" : `${openIncidents} abiertos`,
       detail: "Registro de severidad, investigación, causa raíz y acción correctiva.",
       route: "/ai-governance/incidentes",
@@ -555,17 +567,18 @@ export function buildAimsReadiness({
       id: "controls",
       hasData: controlFindings.length > 0,
       label: "Controles",
-      status: controlFindings.length === 0 ? "watch" : domainStatus(controlCoverage, 40, 75),
-      metric: controlFindings.length === 0 ? "Derivado" : `${closedControlFindings}/${controlFindings.length} cerrados`,
-      detail: "Postura derivada de findings de evaluación; no crea controles paralelos.",
+      status: controlFindings.length === 0 ? "unmeasured" : domainStatus(controlCoverage, 40, 75),
+      metric: controlFindings.length === 0 ? "Sin hallazgos de evaluación" : `${closedControlFindings}/${controlFindings.length} cerrados`,
+      detail: "Hallazgos de la última evaluación no borrador de cada sistema; no crea controles paralelos.",
       route: "/ai-governance/evaluaciones",
     },
     {
       id: "operational-evidence",
       hasData: incidents.length > 0,
       label: "Evidencias operativas",
-      status: incidents.length === 0 ? "watch" : domainStatus(incidentClosureCoverage, 50, 80),
-      metric: incidents.length === 0 ? "Pendiente" : `${incidentsWithClosureEvidence}/${incidents.length} con cierre`,
+      // 0/0: sin incidentes no hay nada que cerrar — gris, no brecha.
+      status: incidents.length === 0 ? "na" : domainStatus(incidentClosureCoverage, 50, 80),
+      metric: incidents.length === 0 ? "Sin incidentes que cerrar" : metricaCierre(incidents),
       detail: "Evidencia funcional para demo; no se presenta como evidencia probatoria final.",
       route: "/ai-governance/incidentes",
     },

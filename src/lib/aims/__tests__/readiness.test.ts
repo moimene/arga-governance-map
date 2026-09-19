@@ -13,9 +13,11 @@ import {
 describe("buildAimsReadiness", () => {
   it("declara los dominios P0 sin depender de schema aims_*", () => {
     const summary = buildAimsReadiness({
+      // Operable exige dato en todos los dominios: clasificación guiada
+      // completada y cierre con fecha (F1.T2).
       systems: [
-        { id: "sys-1", status: "ACTIVO", risk_level: "Alto" },
-        { id: "sys-2", status: "ACTIVO", risk_level: "Limitado" },
+        { id: "sys-1", status: "ACTIVO", risk_level: "Alto", regulatory_profile: { cuestionario_id: "q-1" } },
+        { id: "sys-2", status: "ACTIVO", risk_level: "Limitado", regulatory_profile: { cuestionario_id: "q-2" } },
       ],
       assessments: [
         {
@@ -33,6 +35,7 @@ describe("buildAimsReadiness", () => {
           severity: "MEDIO",
           root_cause: "Sesgo de muestra",
           corrective_action: "Recalibración documentada",
+          closed_at: "2026-01-01",
         },
       ],
     });
@@ -276,7 +279,7 @@ describe("D2 — un borrador es «no medido», no un gap", () => {
 });
 
 describe("D3 — el estado se compara normalizado, como el KPI del Dashboard", () => {
-  it("una fila «Activo» cuenta igual en el KPI y en el dominio de inventario", () => {
+  it("una fila «Activo» cuenta en el KPI; «En investigación» cuenta como abierto", () => {
     const systems = [
       { id: "s1", status: "Activo", risk_level: "Alto" },
       { id: "s2", status: "RETIRADO", risk_level: "Alto" },
@@ -286,8 +289,94 @@ describe("D3 — el estado se compara normalizado, como el KPI del Dashboard", (
     const kpi = systems.filter((s) => normalizeAimsStatus(s.status) === "ACTIVO").length;
     expect(kpi).toBe(1);
     const resumen = buildAimsReadiness({ systems, assessments: [], incidents });
-    expect(resumen.domains.find((d) => d.id === "inventory")?.metric).toBe(`${kpi}/2 activos`);
-    expect(resumen.complianceMonitors.find((m) => m.id === "inventory-classification")?.metric).toBe(`${kpi}/2 activos`);
+    // Desde F1.T2 el inventario se mide por clasificación guiada, no por activos.
+    expect(resumen.domains.find((d) => d.id === "inventory")?.metric).toBe("0/2 con clasificación guiada");
+    expect(resumen.complianceMonitors.find((m) => m.id === "inventory-classification")?.metric).toBe("0/2 con clasificación guiada");
     expect(resumen.domains.find((d) => d.id === "incidents")?.metric).toBe("1 abiertos");
+  });
+});
+
+describe("F1.T2 — cierres, hallazgos y 0/0", () => {
+  // Incidente REAL de Garrigues (Harvey), leído en Cloud el 2026-09-19: en
+  // investigación, con causa raíz y acción correctiva escritas, sin cierre.
+  // Con «basta con tener texto de causa raíz», el monitor lo daba por cerrado.
+  const harveyEnInvestigacion = {
+    id: "447d97c2",
+    system_id: "2f877e8c",
+    status: "EN_INVESTIGACION",
+    severity: "BAJO",
+    root_cause: "Falta de formación y aplicación del procedimiento",
+    corrective_action: "Formación",
+    closed_at: null,
+  };
+  const harvey = { id: "2f877e8c", status: "EN_EVALUACION", risk_level: "Limitado" };
+
+  it("un incidente en investigación no cuenta como cerrado, aunque tenga causa raíz", () => {
+    const r = buildAimsReadiness({ systems: [harvey], assessments: [], incidents: [harveyEnInvestigacion] });
+    const evidencia = r.domains.find((d) => d.id === "operational-evidence")!;
+    expect(evidencia.metric).toBe("0/1 cerrados · 1 en investigación");
+    expect(evidencia.status).not.toBe("ready");
+    const postMarket = r.complianceMonitors.find((m) => m.id === "post-market-monitoring")!;
+    expect(postMarket.status).not.toBe("ready");
+  });
+
+  it("control positivo: CERRADO con fecha de cierre sí cierra; CERRADO sin fecha, no", () => {
+    const cerrado = { ...harveyEnInvestigacion, status: "CERRADO", closed_at: "2026-09-18T10:00:00Z" };
+    const r = buildAimsReadiness({ systems: [harvey], assessments: [], incidents: [cerrado] });
+    expect(r.domains.find((d) => d.id === "operational-evidence")).toMatchObject({ status: "ready", metric: "1/1 cerrados" });
+    expect(r.domains.find((d) => d.id === "incidents")).toMatchObject({ status: "ready", metric: "0 abiertos" });
+
+    const sinFecha = { ...cerrado, closed_at: null };
+    const r2 = buildAimsReadiness({ systems: [harvey], assessments: [], incidents: [sinFecha] });
+    expect(r2.domains.find((d) => d.id === "operational-evidence")?.metric).toBe("0/1 cerrados");
+    expect(r2.domains.find((d) => d.id === "incidents")?.metric).toBe("1 abiertos");
+  });
+
+  it("los hallazgos salen sólo de la última evaluación no borrador (ARGA medido: 8/11, no 35/38)", () => {
+    // Las siete evaluaciones de ARGA leídas en Cloud el 2026-09-19.
+    const val = (s: string) => Array.from({ length: 7 }, (_, i) => ({ code: `VAL-0${i + 1}`, status: s }));
+    const triaje = "90000000-0000-0000-0000-000000000001";
+    const suscripcion = "90000000-0000-0000-0000-000000000002";
+    const assessments = [
+      { id: "132042ee", system_id: suscripcion, framework: "ISO_42001", status: "BORRADOR", created_at: "2026-07-31T04:38:44Z", findings: Array.from({ length: 6 }, (_, i) => ({ code: `ISO-0${i + 5}`, status: "CONFORME" })) },
+      { id: "f26e844b", system_id: triaje, framework: "EU_AI_ACT", status: "APROBADO", created_at: "2026-07-19T10:03:15Z", findings: val("CONFORME") },
+      { id: "68f23d26", system_id: triaje, framework: "EU_AI_ACT", status: "APROBADO", created_at: "2026-07-19T10:05:42Z", findings: val("CONFORME") },
+      { id: "802d9278", system_id: triaje, framework: "EU_AI_ACT", status: "APROBADO", created_at: "2026-07-19T10:04:27Z", findings: val("CONFORME") },
+      { id: "137610a4", system_id: triaje, framework: "EU_AI_ACT", status: "APROBADO", created_at: "2026-05-21T11:41:16Z", findings: val("CONFORME") },
+      { id: "3b160895", system_id: "1148370a", framework: "EU_AI_ACT", status: "APROBADO", created_at: "2026-04-18T15:44:31Z", findings: [{ code: "ART_9", status: "CONFORME" }, { code: "ART_13", status: "PENDIENTE" }] },
+      { id: "d3234e6a", system_id: "900a2ea7", framework: "EU_AI_ACT", status: "EN_REVISION", created_at: "2026-04-18T15:44:31Z", findings: [{ code: "ART_9", status: "EN_CURSO" }, { code: "ART_10", status: "NO_CONFORME" }] },
+    ];
+    const r = buildAimsReadiness({ systems: [], assessments, incidents: [] });
+    expect(r.domains.find((d) => d.id === "controls")?.metric).toBe("8/11 cerrados");
+  });
+
+  it("0/0 se pinta gris «no aplica»: sin sistemas de alto riesgo no hay brecha de evaluación", () => {
+    const r = buildAimsReadiness({ systems: [harvey], assessments: [], incidents: [] });
+    expect(r.domains.find((d) => d.id === "ai-act-assessments")).toMatchObject({ status: "na", metric: "Sin sistemas de alto riesgo" });
+    expect(r.complianceMonitors.find((m) => m.id === "high-risk-obligations")?.status).toBe("na");
+    // Control positivo: con un alto riesgo sin evaluar, sí es brecha.
+    const alto = buildAimsReadiness({ systems: [{ ...harvey, risk_level: "Alto" }], assessments: [], incidents: [] });
+    expect(alto.domains.find((d) => d.id === "ai-act-assessments")).toMatchObject({ status: "gap", metric: "0/1 alto riesgo" });
+  });
+
+  it("el inventario se mide por cuestionarios COMPLETED, no por sistemas activos", () => {
+    const systems = [
+      { id: "s1", status: "ACTIVO", regulatory_profile: { cuestionario_id: "q-1" } },
+      { id: "s2", status: "ACTIVO", regulatory_profile: null },
+    ];
+    const r = buildAimsReadiness({ systems, assessments: [], incidents: [] });
+    expect(r.domains.find((d) => d.id === "inventory")?.metric).toBe("1/2 con clasificación guiada");
+    expect(r.complianceMonitors.find((m) => m.id === "inventory-classification")?.metric).toBe("1/2 con clasificación guiada");
+  });
+
+  it("terceros: tener un proveedor escrito no es haber evaluado al tercero", () => {
+    const r = buildAimsReadiness({
+      systems: [{ id: "s1", status: "ACTIVO", vendor: "Palantir" }],
+      assessments: [],
+      incidents: [],
+    });
+    const terceros = r.complianceMonitors.find((m) => m.id === "provider-vendor-third-party")!;
+    expect(terceros.status).toBe("unmeasured");
+    expect(terceros.metric).not.toMatch(/con vendor/);
   });
 });
