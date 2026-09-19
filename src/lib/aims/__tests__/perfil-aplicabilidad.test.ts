@@ -29,8 +29,8 @@ describe("el catálogo se acota por rol y nivel de riesgo", () => {
     // Control positivo del instrumento: el catálogo de proveedor es el que se
     // dice que es. Sin esto, un perfil que devolviera siempre lo mismo dejaría
     // el resto de aserciones verdes.
-    // 84 → 93 con el recotejo de los arts. 12, 13 y 17 (F1.T12, 2026-09-19).
-    expect(medidasDe(AESIA_RIA_REQUIREMENTS), "el catálogo de proveedor ya no son 93 medidas").toBe(93);
+    // 84 → 93 → 99 con el recotejo contra el consolidado (F1.T12 y F1.T13, 2026-09-19).
+    expect(medidasDe(AESIA_RIA_REQUIREMENTS), "el catálogo de proveedor ya no son 99 medidas").toBe(99);
 
     const perfil = perfilAplicable(
       { regulatory_role: "RESPONSABLE_DESPLIEGUE", risk_level: "Limitado" },

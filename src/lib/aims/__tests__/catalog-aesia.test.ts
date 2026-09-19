@@ -93,26 +93,27 @@ describe("Catálogo interno de requisitos y motor de conversión", () => {
     // verifica la procedencia de la Guía AESIA: eso sigue sin cotejar. Lo que sí
     // se cotejó (2026-09-19) es cada clave y cada título contra el texto
     // consolidado del Reglamento: ver los bloques «Recotejo» de abajo.
-    // 84 → 93: el recotejo de los arts. 12, 13 y 17 añade 9 medidas (17.1 d y e,
-    // 13.3 b i, iv, v y vii, y los tres fines del 12.2).
+    // 84 → 93 → 99: el recotejo de los arts. 12, 13 y 17 añade 9 medidas (17.1 d y e,
+    // 13.3 b i, iv, v y vii, y los tres fines del 12.2) y el de los arts. 9, 10,
+    // 14 y 72 otras 6 (9.2 c, 9.7, 9.8, 10.2 g, 14.5 y 72.4).
     expect(AESIA_RIA_REQUIREMENTS.length).toBe(12);
     expect(
       AESIA_RIA_REQUIREMENTS.reduce((sum, r) => sum + r.measures.length, 0),
-    ).toBe(93);
+    ).toBe(99);
   });
 
   // Absorbido de `src/hooks/__tests__/useAiGovernanceHooks.test.ts`, que se
   // llamaba «Hook Contracts» y no probaba ningún hook: repetía este fichero con
   // cuatro imports sin usar. Esto era lo único suyo que no estaba ya aquí — el
   // selector por marco, que es el que decide qué catálogo ve la pantalla.
-  it("selecciona el catálogo por marco: 12 requisitos RIA y 4 de ISO 42001", () => {
+  it("selecciona el catálogo por marco: 12 requisitos RIA y 10 de ISO 42001", () => {
     const ria = getRequirementsForFramework("EU_AI_ACT");
     expect(ria.length).toBe(12);
     expect(ria[0].code).toBe("QUALITY_MGMT");
     expect(ria[11].code).toBe("INCIDENT_MGMT");
 
     const iso = getRequirementsForFramework("ISO_42001");
-    expect(iso.length).toBe(4);
+    expect(iso.length).toBe(10);
     expect(iso[0].code).toBe("ISO_POLICIES");
 
     // Control discriminante: los dos marcos NO devuelven el mismo catálogo.
@@ -211,8 +212,16 @@ const CODIGOS_ANTERIORES: Record<string, string[]> = {
   INCIDENT_MGMT: ["MG_INCI_01", "MG_INCI_02", "MG_INCI_03", "MG_INCI_04", "MG_INCI_05"],
 };
 
-/** Requisitos cuyo recotejo contra el consolidado está hecho y fechado. */
-const RECOTEJADOS = ["QUALITY_MGMT", "TRANSPARENCY", "LOGGING"];
+/**
+ * Requisitos cuyo recotejo contra el consolidado está hecho y fechado: los doce
+ * (F1.T12 los arts. 12, 13 y 17; F1.T13 los 9, 10, 15, 72 y 73, y con ellos el
+ * 11 y el 14, que completan el catálogo). Lista literal: un requisito nuevo sin
+ * cotejar no entra solo.
+ */
+const RECOTEJADOS = [
+  "QUALITY_MGMT", "RISK_MGMT", "HUMAN_OVERSIGHT", "DATA_GOVERNANCE", "TRANSPARENCY", "ACCURACY",
+  "ROBUSTNESS", "CYBERSECURITY", "LOGGING", "TECHNICAL_DOC", "POST_MARKET", "INCIDENT_MGMT",
+];
 
 function codigosPerdidos(catalogo: RequirementDef[]): string[] {
   const donde = new Map(catalogo.flatMap((r) => r.measures.map((m) => [m.id, r.code] as const)));
@@ -268,6 +277,8 @@ describe("Recotejo contra el texto consolidado — línea base y fecha", () => {
     for (const r of AESIA_RIA_REQUIREMENTS) {
       expect("verificadoEl" in r, `${r.code}: no declara verificadoEl`).toBe(true);
     }
+    // El universo de la lista cubre el catálogo entero: ningún requisito fuera.
+    expect(AESIA_RIA_REQUIREMENTS.map((r) => r.code).filter((c) => !RECOTEJADOS.includes(c))).toEqual([]);
     expect(sinFechaDeCotejo(AESIA_RIA_REQUIREMENTS, RECOTEJADOS)).toEqual([]);
     // Control positivo: quitar la fecha a uno lo detecta.
     const mutado = AESIA_RIA_REQUIREMENTS.map((r) => (r.code === "LOGGING" ? { ...r, verificadoEl: null } : r));
@@ -366,5 +377,135 @@ describe("Recotejo — art. 17 (sistema de gestión de la calidad)", () => {
       expect(suyas.length).toBeGreaterThan(0);
       expect(suyas.every((m) => m.desde === VERSION_CATALOGO_RIA)).toBe(true);
     }
+  });
+});
+
+/** Clave de cada medida del requisito, para asertar la ubicación. */
+const ubicacion = (r: RequirementDef) => Object.fromEntries(r.measures.map((m) => [m.id, m.subpartId]));
+const textoDe = (r: RequirementDef) =>
+  [r.title, r.description, ...r.subparts.map((s) => s.titleShort), ...r.measures.map((m) => m.description)].join(" | ");
+
+describe("Recotejo — art. 9 (sistema de gestión de riesgos)", () => {
+  const rk = req("RISK_MGMT");
+
+  it("9.2 b) y c) realineados: el uso indebido va en la b) y la c) tiene medida propia", () => {
+    expect(ubicacion(rk)).toMatchObject({ MG_RISK_01: "9.2.a", MG_RISK_02: "9.2.b", MG_RISK_03: "9.2.b", MG_RISK_04: "9.2.d" });
+    const c = rk.measures.filter((m) => m.subpartId === "9.2.c");
+    expect(c.length).toBeGreaterThan(0);
+    expect(c.every((m) => m.desde === VERSION_CATALOGO_RIA)).toBe(true);
+    expect(c.map((m) => m.description).join(" ")).toMatch(/vigilancia poscomercialización/);
+  });
+
+  it("9.4 a 9.9 en su apartado: combinación, residual, pruebas, condiciones reales, momento y vulnerables", () => {
+    expect(ubicacion(rk)).toMatchObject({
+      MG_RISK_09: "9.4",
+      MG_RISK_07: "9.5",
+      MG_RISK_08: "9.6",
+      MG_RISK_05: "9.6",
+      MG_RISK_06: "9.9",
+    });
+    expect(subpartTitle(rk, "9.5")).toMatch(/residual/i);
+    expect(subpartTitle(rk, "9.6")).toMatch(/prueba/i);
+    expect(subpartTitle(rk, "9.7")).toMatch(/condiciones reales/i);
+    expect(subpartTitle(rk, "9.8")).toMatch(/umbrales/i);
+    for (const clave of ["9.7", "9.8"]) {
+      expect(rk.measures.some((m) => m.subpartId === clave && m.desde === VERSION_CATALOGO_RIA), `${clave} sin medida`).toBe(true);
+    }
+  });
+});
+
+describe("Recotejo — art. 10 (datos y gobernanza de datos)", () => {
+  const dg = req("DATA_GOVERNANCE");
+
+  it("las ocho letras del 10.2 tienen medida, con la g) nueva y las lagunas en la h)", () => {
+    for (const l of "abcdefgh".split("")) {
+      expect(dg.measures.some((m) => m.subpartId === `10.2.${l}`), `10.2.${l} sin medida`).toBe(true);
+    }
+    expect(ubicacion(dg).MG_DATA_07).toBe("10.2.h");
+    const g = dg.measures.filter((m) => m.subpartId === "10.2.g");
+    expect(g.every((m) => m.desde === VERSION_CATALOGO_RIA)).toBe(true);
+    expect(g.map((m) => m.description).join(" ")).toMatch(/sesgos/);
+  });
+
+  it("el 10.5 está suprimido: las categorías especiales cuelgan del art. 4 bis", () => {
+    expect(JSON.stringify(dg)).not.toMatch(/"10\.5"/);
+    expect(JSON.stringify(dg)).toMatch(/"10\.4"/);
+    const titulo = subpartTitle(dg, ubicacion(dg).MG_DATA_10);
+    expect(titulo).toMatch(/art\. 4 bis/);
+  });
+});
+
+describe("Recotejo — art. 15 (precisión, solidez y ciberseguridad)", () => {
+  it("precisión: el nivel y su uniformidad en el 15.1; las métricas en las instrucciones, 15.3", () => {
+    expect(ubicacion(req("ACCURACY"))).toEqual({ MG_ACCU_01: "15.1", MG_ACCU_02: "15.3", MG_ACCU_03: "15.1" });
+  });
+
+  it("solidez en el 15.4 y ciberseguridad en el 15.5", () => {
+    const sol = req("ROBUSTNESS");
+    expect(Object.values(ubicacion(sol)).every((k) => k.startsWith("15.4"))).toBe(true);
+    expect(Object.values(ubicacion(req("CYBERSECURITY"))).every((k) => k.startsWith("15.5"))).toBe(true);
+    // Los intentos de alteración por terceros son ciberseguridad (15.5), no solidez.
+    expect(medida(sol, "MG_ROBU_01").description).not.toMatch(/alteraci/);
+  });
+
+  it("MG_ROBU_03 corregida: bucles de retroalimentación, no «no degradar»", () => {
+    const m = medida(req("ROBUSTNESS"), "MG_ROBU_03");
+    expect(m.description).toMatch(/bucles de retroalimentación/);
+    expect(m.description).not.toMatch(/degrad/);
+  });
+});
+
+describe("Recotejo — art. 72 (vigilancia poscomercialización)", () => {
+  const pm = req("POST_MARKET");
+
+  it("claves del 72.1 al 72.4, cada una con medida, y ningún 72.5", () => {
+    expect(JSON.stringify(pm)).not.toMatch(/72\.5/);
+    for (const ap of ["72.1", "72.2", "72.3", "72.4"]) {
+      expect(pm.measures.some((m) => m.subpartId === ap), `${ap} sin medida`).toBe(true);
+    }
+  });
+});
+
+describe("Recotejo — art. 73 (incidentes graves)", () => {
+  const inc = req("INCIDENT_MGMT");
+
+  it("MG_INCI_01 con los tres plazos: 15, 10 y 2 días", () => {
+    const d = medida(inc, "MG_INCI_01").description;
+    expect(d).toMatch(/\b15 días/);
+    expect(d).toMatch(/\b10 días/);
+    expect(d).toMatch(/\b2 días/);
+  });
+
+  it("sin «afectados»: el art. 73 notifica a la autoridad de vigilancia del mercado", () => {
+    const texto = textoDe(inc);
+    expect(texto).toMatch(/autoridad(es)? de vigilancia del mercado/);
+    expect(texto).not.toMatch(/afectados/);
+  });
+
+  it("claves del art. 73 que existen: 73.1 a 73.5 en la notificación y 73.6 en la investigación", () => {
+    const u = ubicacion(inc);
+    expect(u).toMatchObject({ MG_INCI_01: "73.1", MG_INCI_02: "73.6.p1", MG_INCI_03: "73.6.p1", MG_INCI_04: "73.6.p2" });
+  });
+});
+
+describe("Recotejo — arts. 11 y 14 (para cerrar el catálogo)", () => {
+  it("documentación técnica: el 11.2 es del anexo I, así que las dos medidas del art. 11 van en el 11.1", () => {
+    const td = req("TECHNICAL_DOC");
+    expect(td.subparts.map((s) => s.subpartId)).not.toContain("11.2");
+    expect(ubicacion(td)).toMatchObject({
+      MG_TDOC_01: "11.1",
+      MG_TDOC_02: "11.1",
+      MG_TDOC_04: "AnexoIV.1.h",
+      MG_TDOC_06: "AnexoIV.2.d",
+      MG_TDOC_07: "AnexoIV.2.g",
+    });
+  });
+
+  it("supervisión humana: el 14.5 tiene medida, rotulada solo para el anexo III, punto 1, letra a)", () => {
+    const ho = req("HUMAN_OVERSIGHT");
+    const m = ho.measures.filter((x) => x.subpartId === "14.5");
+    expect(m.length).toBe(1);
+    expect(m[0].desde).toBe(VERSION_CATALOGO_RIA);
+    expect(subpartTitle(ho, "14.5")).toContain("anexo III, punto 1, letra a)");
   });
 });

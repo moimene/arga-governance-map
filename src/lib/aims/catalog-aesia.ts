@@ -73,6 +73,11 @@ export interface RequirementDef {
    * declarado y todavía sin cotejar. Los catálogos que no son del RIA no lo usan.
    */
   verificadoEl?: string | null;
+  /**
+   * Carácter del requisito cuando no es una obligación del RIA. ISO/IEC 42001
+   * es siempre `MARCO_OPERATIVO`: marco de madurez, no obligación jurídica.
+   */
+  caracter?: "OBLIGACION" | "MARCO_OPERATIVO";
   subparts: SubpartDef[];
   measures: MeasureGuideDef[];
 }
@@ -357,28 +362,38 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     title: "Sistema de gestión de riesgos",
     articleRef: "Art. 9",
     description: "Establecer, aplicar, documentar y mantener un sistema de gestión de riesgos continuo y sistemático que identifique, evalúe y mitigue los riesgos conocidos y previsibles para la salud, la seguridad y los derechos fundamentales.",
-    verificadoEl: null,
+    verificadoEl: "2026-09-19",
+    // Realineado con el art. 9: el uso indebido razonablemente previsible es de
+    // la b), no de la c); la c) —otros riesgos a partir de la vigilancia
+    // poscomercialización— no tenía medida; las pruebas son del 9.6 (se
+    // pintaban en el 9.4 y el 9.7); el residual aceptable es del 9.5; la
+    // aplicación combinada de requisitos, del 9.4; y los menores y colectivos
+    // vulnerables, del 9.9.
     subparts: [
-      { subpartId: "9.2.a", articleNumber: "Art. 9", titleShort: "Identificación y análisis de riesgos previsibles", orderIndex: 1 },
-      { subpartId: "9.2.b", articleNumber: "Art. 9", titleShort: "Estimación y evaluación de riesgos sistemática", orderIndex: 2 },
-      { subpartId: "9.2.c", articleNumber: "Art. 9", titleShort: "Evaluación de riesgos por uso previsto e indebido", orderIndex: 3 },
-      { subpartId: "9.2.d", articleNumber: "Art. 9", titleShort: "Adopción de medidas adecuadas de gestión de riesgos", orderIndex: 4 },
-      { subpartId: "9.4", articleNumber: "Art. 9", titleShort: "Pruebas y validación de medidas de gestión", orderIndex: 5 },
-      { subpartId: "9.5", articleNumber: "Art. 9", titleShort: "Consideración de efectos acumulativos e interacciones", orderIndex: 6 },
-      { subpartId: "9.6", articleNumber: "Art. 9", titleShort: "Diseño del sistema con nivel de riesgo residual aceptable", orderIndex: 7 },
-      { subpartId: "9.7", articleNumber: "Art. 9", titleShort: "Pruebas para encontrar soluciones de mitigación más apropiadas", orderIndex: 8 },
-      { subpartId: "9.8", articleNumber: "Art. 9", titleShort: "Medidas de gestión que no creen riesgos secundarios nuevos", orderIndex: 9 },
+      { subpartId: "9.2.a", articleNumber: "Art. 9", titleShort: "Determinación y análisis de los riesgos conocidos y previsibles", orderIndex: 1 },
+      { subpartId: "9.2.b", articleNumber: "Art. 9", titleShort: "Estimación y evaluación de riesgos en uso conforme e indebido previsible", orderIndex: 2 },
+      { subpartId: "9.2.c", articleNumber: "Art. 9", titleShort: "Otros riesgos a partir de la vigilancia poscomercialización", orderIndex: 3 },
+      { subpartId: "9.2.d", articleNumber: "Art. 9", titleShort: "Medidas adecuadas y específicas de gestión de riesgos", orderIndex: 4 },
+      { subpartId: "9.4", articleNumber: "Art. 9", titleShort: "Efectos de la aplicación combinada de los requisitos", orderIndex: 5 },
+      { subpartId: "9.5", articleNumber: "Art. 9", titleShort: "Riesgo residual aceptable y orden de las medidas", orderIndex: 6 },
+      { subpartId: "9.6", articleNumber: "Art. 9", titleShort: "Pruebas para determinar las medidas más adecuadas", orderIndex: 7 },
+      { subpartId: "9.7", articleNumber: "Art. 9", titleShort: "Pruebas en condiciones reales (art. 60), si se hacen", orderIndex: 8 },
+      { subpartId: "9.8", articleNumber: "Art. 9", titleShort: "Momento de las pruebas, con parámetros y umbrales definidos", orderIndex: 9 },
+      { subpartId: "9.9", articleNumber: "Art. 9", titleShort: "Menores de edad y otros colectivos vulnerables", orderIndex: 10 },
     ],
     measures: [
       { id: "MG_RISK_01", code: "MG_RISK_01", description: "Identificar y analizar los riesgos conocidos y previsibles para personas afectadas", subpartId: "9.2.a" },
       { id: "MG_RISK_02", code: "MG_RISK_02", description: "Estimar y evaluar los riesgos que puedan surgir durante el funcionamiento", subpartId: "9.2.b" },
-      { id: "MG_RISK_03", code: "MG_RISK_03", description: "Evaluar los riesgos derivados del uso previsto y del uso indebido razonablemente previsible", subpartId: "9.2.c" },
+      { id: "MG_RISK_03", code: "MG_RISK_03", description: "Evaluar los riesgos derivados del uso previsto y del uso indebido razonablemente previsible", subpartId: "9.2.b" },
+      { id: "MG_RISK_10", code: "MG_RISK_10", description: "Evaluar otros riesgos a partir del análisis de los datos de la vigilancia poscomercialización (art. 72)", subpartId: "9.2.c", desde: VERSION_CATALOGO_RIA },
       { id: "MG_RISK_04", code: "MG_RISK_04", description: "Adoptar medidas de gestión de riesgos eficaces y proporcionadas", subpartId: "9.2.d" },
-      { id: "MG_RISK_05", code: "MG_RISK_05", description: "Realizar pruebas para verificar que las medidas de gestión cumplen sus objetivos", subpartId: "9.4" },
-      { id: "MG_RISK_06", code: "MG_RISK_06", description: "Considerar los efectos sobre grupos vulnerables e interacciones entre sistemas", subpartId: "9.5" },
-      { id: "MG_RISK_07", code: "MG_RISK_07", description: "Diseñar el sistema para asegurar que el riesgo residual resulte aceptable", subpartId: "9.6" },
-      { id: "MG_RISK_08", code: "MG_RISK_08", description: "Ejecutar pruebas iterativas para seleccionar las mejores soluciones técnicas de mitigación", subpartId: "9.7" },
-      { id: "MG_RISK_09", code: "MG_RISK_09", description: "Asegurar que las medidas de mitigación no introducen riesgos nuevos o desproporcionados", subpartId: "9.8" },
+      { id: "MG_RISK_09", code: "MG_RISK_09", description: "Asegurar que las medidas de mitigación no introducen riesgos nuevos o desproporcionados, teniendo en cuenta la aplicación combinada de los requisitos", subpartId: "9.4" },
+      { id: "MG_RISK_07", code: "MG_RISK_07", description: "Diseñar el sistema para asegurar que el riesgo residual resulte aceptable", subpartId: "9.5" },
+      { id: "MG_RISK_08", code: "MG_RISK_08", description: "Ejecutar pruebas iterativas para seleccionar las medidas de gestión de riesgos más adecuadas", subpartId: "9.6" },
+      { id: "MG_RISK_05", code: "MG_RISK_05", description: "Realizar pruebas para verificar que las medidas de gestión cumplen sus objetivos", subpartId: "9.6" },
+      { id: "MG_RISK_11", code: "MG_RISK_11", description: "Si el sistema se prueba en condiciones reales, hacerlo conforme al art. 60", subpartId: "9.7", desde: VERSION_CATALOGO_RIA },
+      { id: "MG_RISK_12", code: "MG_RISK_12", description: "Probar el sistema durante el desarrollo y, en todo caso, antes de introducirlo en el mercado o ponerlo en servicio, con parámetros y umbrales de probabilidad definidos previamente", subpartId: "9.8", desde: VERSION_CATALOGO_RIA },
+      { id: "MG_RISK_06", code: "MG_RISK_06", description: "Valorar si el sistema puede afectar negativamente a menores de dieciocho años y a otros colectivos vulnerables", subpartId: "9.9" },
     ],
   },
   {
@@ -386,7 +401,7 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     title: "Supervisión humana",
     articleRef: "Art. 14",
     description: "Diseñar y desarrollar los sistemas de IA de alto riesgo de modo que puedan ser supervisados eficazmente por personas físicas durante su uso para prevenir o minimizar riesgos.",
-    verificadoEl: null,
+    verificadoEl: "2026-09-19",
     subparts: [
       { subpartId: "14.1", articleNumber: "Art. 14", titleShort: "Diseño para supervisión humana efectiva", orderIndex: 1 },
       { subpartId: "14.2", articleNumber: "Art. 14", titleShort: "Prevención o minimización de riesgos para la salud y derechos", orderIndex: 2 },
@@ -397,6 +412,7 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
       { subpartId: "14.4.c", articleNumber: "Art. 14", titleShort: "Interpretación correcta de resultados y explicabilidad", orderIndex: 7 },
       { subpartId: "14.4.d", articleNumber: "Art. 14", titleShort: "Capacidad de decidir no utilizar el sistema o anular la salida", orderIndex: 8 },
       { subpartId: "14.4.e", articleNumber: "Art. 14", titleShort: "Capacidad de intervenir en el funcionamiento o pararlo (Kill switch)", orderIndex: 9 },
+      { subpartId: "14.5", articleNumber: "Art. 14", titleShort: "Verificación por dos personas: solo anexo III, punto 1, letra a)", orderIndex: 10 },
     ],
     measures: [
       { id: "MG_HUMN_01", code: "MG_HUMN_01", description: "Diseñar la interfaz y flujo del sistema para habilitar supervisión humana efectiva", subpartId: "14.1" },
@@ -408,6 +424,7 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
       { id: "MG_HUMN_07", code: "MG_HUMN_07", description: "Proporcionar explicaciones claras de las razones que motivan los resultados del sistema", subpartId: "14.4.c" },
       { id: "MG_HUMN_08", code: "MG_HUMN_08", description: "Habilitar la opción de ignorar, modificar o anular la recomendación de la IA (Override)", subpartId: "14.4.d" },
       { id: "MG_HUMN_09", code: "MG_HUMN_09", description: "Implementar un mecanismo de parada segura e inmediata del sistema (Kill Switch)", subpartId: "14.4.e" },
+      { id: "MG_HUMN_10", code: "MG_HUMN_10", description: "No actuar ni decidir sobre una identificación del sistema sin que al menos dos personas competentes la verifiquen y confirmen por separado, salvo las excepciones del art. 14.5", subpartId: "14.5", desde: VERSION_CATALOGO_RIA },
     ],
   },
   {
@@ -415,7 +432,13 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     title: "Datos y gobernanza de datos",
     articleRef: "Art. 10",
     description: "Aplicar prácticas adecuadas de gobernanza y gestión de datos a los conjuntos de entrenamiento, validación y prueba para asegurar calidad, representatividad y mitigación de sesgos.",
-    verificadoEl: null,
+    verificadoEl: "2026-09-19",
+    // El 10.2 tiene ocho letras: la g) (medidas contra los sesgos) no tenía
+    // medida y las lagunas son de la h). El 10.5 está SUPRIMIDO por el
+    // Reglamento (UE) 2026/1744: el tratamiento de categorías especiales para
+    // detectar y corregir sesgos pasa al art. 4 bis. El contenido de MG_DATA_10
+    // (disparador y seis condiciones del 4 bis.1) es de F7.T4; aquí solo deja
+    // de colgar de un apartado que ya no existe.
     subparts: [
       { subpartId: "10.2.a", articleNumber: "Art. 10", titleShort: "Decisiones de diseño de datos pertinentes", orderIndex: 1 },
       { subpartId: "10.2.b", articleNumber: "Art. 10", titleShort: "Procesos de recogida de datos y origen", orderIndex: 2 },
@@ -423,22 +446,24 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
       { subpartId: "10.2.d", articleNumber: "Art. 10", titleShort: "Formulación de supuestos sobre la información", orderIndex: 4 },
       { subpartId: "10.2.e", articleNumber: "Art. 10", titleShort: "Evaluación de disponibilidad, cantidad y adecuación", orderIndex: 5 },
       { subpartId: "10.2.f", articleNumber: "Art. 10", titleShort: "Examen de posibles sesgos en los datos", orderIndex: 6 },
-      { subpartId: "10.2.g", articleNumber: "Art. 10", titleShort: "Identificación de lagunas o deficiencias de datos", orderIndex: 7 },
-      { subpartId: "10.3", articleNumber: "Art. 10", titleShort: "Conjuntos pertinentes, representativos y libres de errores", orderIndex: 8 },
-      { subpartId: "10.4", articleNumber: "Art. 10", titleShort: "Consideración de características contextuales geográficas y de población", orderIndex: 9 },
-      { subpartId: "10.5", articleNumber: "Art. 10", titleShort: "Tratamiento de categorías especiales de datos personales", orderIndex: 10 },
+      { subpartId: "10.2.g", articleNumber: "Art. 10", titleShort: "Medidas para detectar, prevenir y mitigar sesgos", orderIndex: 7 },
+      { subpartId: "10.2.h", articleNumber: "Art. 10", titleShort: "Lagunas o deficiencias de los datos y cómo subsanarlas", orderIndex: 8 },
+      { subpartId: "10.3", articleNumber: "Art. 10", titleShort: "Conjuntos pertinentes, representativos y libres de errores", orderIndex: 9 },
+      { subpartId: "10.4", articleNumber: "Art. 10", titleShort: "Consideración de características contextuales geográficas y de población", orderIndex: 10 },
+      { subpartId: "4bis.1", articleNumber: "Art. 4 bis", titleShort: "Categorías especiales de datos para detectar y corregir sesgos (art. 4 bis)", orderIndex: 11 },
     ],
     measures: [
       { id: "MG_DATA_01", code: "MG_DATA_01", description: "Documentar las decisiones de diseño y arquitectura de los conjuntos de datos", subpartId: "10.2.a" },
-      { id: "MG_DATA_02", code: "MG_DATA_02", description: "Establecer procesos formales de recolección y trazabilidad del origen de los datos", subpartId: "10.2.b" },
+      { id: "MG_DATA_02", code: "MG_DATA_02", description: "Establecer procesos formales de recolección y trazabilidad del origen de los datos y, en los personales, de la finalidad original de su recogida", subpartId: "10.2.b" },
       { id: "MG_DATA_03", code: "MG_DATA_03", description: "Definir operaciones estandarizadas de limpieza, transformación y etiquetado", subpartId: "10.2.c" },
       { id: "MG_DATA_04", code: "MG_DATA_04", description: "Formular y validar supuestos de representatividad sobre los datos usados", subpartId: "10.2.d" },
       { id: "MG_DATA_05", code: "MG_DATA_05", description: "Evaluar la disponibilidad, volumen y suficiencia estadística de las muestras", subpartId: "10.2.e" },
       { id: "MG_DATA_06", code: "MG_DATA_06", description: "Examinar la presencia de sesgos históricos o de muestreo que afecten a derechos", subpartId: "10.2.f" },
-      { id: "MG_DATA_07", code: "MG_DATA_07", description: "Identificar lagunas informativas y aplicar medidas correctivas de enriquecimiento", subpartId: "10.2.g" },
-      { id: "MG_DATA_08", code: "MG_DATA_08", description: "Asegurar que los datasets de validación y test sean estadísticamente representativos", subpartId: "10.3" },
+      { id: "MG_DATA_11", code: "MG_DATA_11", description: "Adoptar medidas adecuadas para detectar, prevenir y mitigar los posibles sesgos detectados", subpartId: "10.2.g", desde: VERSION_CATALOGO_RIA },
+      { id: "MG_DATA_07", code: "MG_DATA_07", description: "Identificar lagunas informativas y aplicar medidas correctivas de enriquecimiento", subpartId: "10.2.h" },
+      { id: "MG_DATA_08", code: "MG_DATA_08", description: "Asegurar que los conjuntos de entrenamiento, validación y prueba sean pertinentes, suficientemente representativos y, en la mayor medida posible, sin errores y completos", subpartId: "10.3" },
       { id: "MG_DATA_09", code: "MG_DATA_09", description: "Considerar las características contextuales y demográficas del entorno de despliegue", subpartId: "10.4" },
-      { id: "MG_DATA_10", code: "MG_DATA_10", description: "Garantizar las salvaguardas estrictas si se tratan categorías especiales bajo RGPD", subpartId: "10.5" },
+      { id: "MG_DATA_10", code: "MG_DATA_10", description: "Garantizar las salvaguardas estrictas si se tratan categorías especiales bajo RGPD", subpartId: "4bis.1" },
     ],
   },
   {
@@ -488,33 +513,40 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     title: "Precisión",
     articleRef: "Art. 15",
     description: "Alcanzar un nivel adecuado de precisión y declarar las métricas de rendimiento alcanzadas a lo largo de todo el ciclo de vida del sistema de IA.",
-    verificadoEl: null,
+    verificadoEl: "2026-09-19",
+    // Art. 15: el nivel y su uniformidad a lo largo del ciclo de vida son del
+    // 15.1; las métricas que se declaran, del 15.3 (van en las instrucciones de
+    // uso). El 15.2 son parámetros de referencia que fomenta la Comisión: no
+    // es un deber del proveedor y no lleva medida.
     subparts: [
-      { subpartId: "15.1.prec", articleNumber: "Art. 15", titleShort: "Nivel adecuado de precisión según finalidad prevista", orderIndex: 1 },
-      { subpartId: "15.2.prec", articleNumber: "Art. 15", titleShort: "Declaración y comunicación de métricas de precisión", orderIndex: 2 },
-      { subpartId: "15.3.prec", articleNumber: "Art. 15", titleShort: "Resiliencia de la precisión frente a variaciones de datos", orderIndex: 3 },
+      { subpartId: "15.1", articleNumber: "Art. 15", titleShort: "Nivel adecuado de precisión y funcionamiento uniforme durante el ciclo de vida", orderIndex: 1 },
+      { subpartId: "15.3", articleNumber: "Art. 15", titleShort: "Niveles de precisión y parámetros en las instrucciones de uso", orderIndex: 2 },
     ],
     measures: [
-      { id: "MG_ACCU_01", code: "MG_ACCU_01", description: "Alcanzar un nivel de precisión adecuado validado en entornos reales de uso", subpartId: "15.1.prec" },
-      { id: "MG_ACCU_02", code: "MG_ACCU_02", description: "Declarar formalmente las métricas de precisión alcanzadas (F1, AUC, precisión, recall)", subpartId: "15.2.prec" },
-      { id: "MG_ACCU_03", code: "MG_ACCU_03", description: "Implementar mecanismos para asegurar la estabilidad de la precisión ante drift", subpartId: "15.3.prec" },
+      { id: "MG_ACCU_01", code: "MG_ACCU_01", description: "Alcanzar un nivel de precisión adecuado validado en entornos reales de uso", subpartId: "15.1" },
+      { id: "MG_ACCU_02", code: "MG_ACCU_02", description: "Declarar en las instrucciones de uso las métricas de precisión alcanzadas (F1, AUC, precisión, recall)", subpartId: "15.3" },
+      { id: "MG_ACCU_03", code: "MG_ACCU_03", description: "Implementar mecanismos para asegurar la estabilidad de la precisión ante drift", subpartId: "15.1" },
     ],
   },
   {
     code: "ROBUSTNESS",
     title: "Solidez y robustez",
     articleRef: "Art. 15",
-    description: "Asegurar que el sistema de IA sea resistente frente a errores, fallos técnicos, anomalías en los datos de entrada o intentos maliciosos de alteración.",
-    verificadoEl: null,
+    description: "Asegurar que el sistema de IA sea lo más resistente posible frente a errores, fallos o incoherencias del propio sistema o de su entorno.",
+    verificadoEl: "2026-09-19",
+    // La solidez es el 15.4, en sus tres párrafos. Los intentos de alteración
+    // por terceros no son solidez sino ciberseguridad (15.5), y el aprendizaje
+    // tras la puesta en servicio es el párrafo tercero del 15.4: lo que exige
+    // es cortar los bucles de retroalimentación sesgados, no «no degradar».
     subparts: [
-      { subpartId: "15.4.a", articleNumber: "Art. 15", titleShort: "Resistencia técnica frente a errores e imprevistos", orderIndex: 1 },
-      { subpartId: "15.4.b", articleNumber: "Art. 15", titleShort: "Soluciones de redundancia y tolerancia a fallos", orderIndex: 2 },
-      { subpartId: "15.5", articleNumber: "Art. 15", titleShort: "Robustez en modelos con aprendizaje continuo autónomo", orderIndex: 3 },
+      { subpartId: "15.4.p1", articleNumber: "Art. 15", titleShort: "Resistencia a errores, fallos e incoherencias", orderIndex: 1 },
+      { subpartId: "15.4.p2", articleNumber: "Art. 15", titleShort: "Redundancia técnica y planes de prevención de fallos", orderIndex: 2 },
+      { subpartId: "15.4.p3", articleNumber: "Art. 15", titleShort: "Bucles de retroalimentación en sistemas que siguen aprendiendo", orderIndex: 3 },
     ],
     measures: [
-      { id: "MG_ROBU_01", code: "MG_ROBU_01", description: "Resistir intentos de alteración y variaciones imprevistas en los datos de entrada", subpartId: "15.4.a" },
-      { id: "MG_ROBU_02", code: "MG_ROBU_02", description: "Aplicar soluciones técnicas de redundancia y mitigación ante fallos del modelo", subpartId: "15.4.b" },
-      { id: "MG_ROBU_03", code: "MG_ROBU_03", description: "Asegurar que los modelos que aprenden tras el despliegue no degradan su comportamiento", subpartId: "15.5" },
+      { id: "MG_ROBU_01", code: "MG_ROBU_01", description: "Hacer el sistema lo más resistente posible a errores, fallos o incoherencias —incluidas las variaciones imprevistas en los datos de entrada— del propio sistema o de su entorno", subpartId: "15.4.p1" },
+      { id: "MG_ROBU_02", code: "MG_ROBU_02", description: "Aplicar soluciones técnicas de redundancia y mitigación ante fallos del modelo", subpartId: "15.4.p2" },
+      { id: "MG_ROBU_03", code: "MG_ROBU_03", description: "En sistemas que siguen aprendiendo tras su introducción en el mercado o puesta en servicio, eliminar o reducir el riesgo de que resultados sesgados influyan en entradas futuras (bucles de retroalimentación) y subsanarlos con medidas adecuadas", subpartId: "15.4.p3" },
     ],
   },
   {
@@ -522,18 +554,19 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     title: "Ciberseguridad",
     articleRef: "Art. 15",
     description: "Proteger el sistema de IA contra accesos no autorizados, ataques adversarios, envenenamiento de datos y manipulación maliciosa.",
-    verificadoEl: null,
+    verificadoEl: "2026-09-19",
+    // La ciberseguridad es el 15.5 (se pintaba como 15.4, que es la solidez).
     subparts: [
-      { subpartId: "15.4.ciber.a", articleNumber: "Art. 15", titleShort: "Protección contra accesos no autorizados e intrusiones", orderIndex: 1 },
-      { subpartId: "15.4.ciber.b", articleNumber: "Art. 15", titleShort: "Prevención de envenenamiento de datos de entrenamiento", orderIndex: 2 },
-      { subpartId: "15.4.ciber.c", articleNumber: "Art. 15", titleShort: "Prevención de manipulación de pesos y arquitectura", orderIndex: 3 },
-      { subpartId: "15.4.ciber.d", articleNumber: "Art. 15", titleShort: "Mitigación de ataques de inyección y entradas adversarias", orderIndex: 4 },
+      { subpartId: "15.5.terceros", articleNumber: "Art. 15", titleShort: "Resistencia a terceros no autorizados que aprovechen vulnerabilidades", orderIndex: 1 },
+      { subpartId: "15.5.datos", articleNumber: "Art. 15", titleShort: "Envenenamiento de datos de entrenamiento", orderIndex: 2 },
+      { subpartId: "15.5.modelos", articleNumber: "Art. 15", titleShort: "Envenenamiento de modelos y componentes preentrenados", orderIndex: 3 },
+      { subpartId: "15.5.adversarios", articleNumber: "Art. 15", titleShort: "Ejemplos adversarios, ataques a la confidencialidad y defectos del modelo", orderIndex: 4 },
     ],
     measures: [
-      { id: "MG_CIBE_01", code: "MG_CIBE_01", description: "Proteger la infraestructura contra accesos no autorizados y fugas de datos", subpartId: "15.4.ciber.a" },
-      { id: "MG_CIBE_02", code: "MG_CIBE_02", description: "Implementar controles para prevenir el envenenamiento de datos (Data Poisoning)", subpartId: "15.4.ciber.b" },
-      { id: "MG_CIBE_03", code: "MG_CIBE_03", description: "Prevenir la manipulación no autorizada de modelos (Model Poisoning / Backdoors)", subpartId: "15.4.ciber.c" },
-      { id: "MG_CIBE_04", code: "MG_CIBE_04", description: "Mitigar ataques de inyección de prompts, entradas adversarias y extracción de datos", subpartId: "15.4.ciber.d" },
+      { id: "MG_CIBE_01", code: "MG_CIBE_01", description: "Proteger la infraestructura contra accesos no autorizados y fugas de datos", subpartId: "15.5.terceros" },
+      { id: "MG_CIBE_02", code: "MG_CIBE_02", description: "Implementar controles para prevenir el envenenamiento de datos (Data Poisoning)", subpartId: "15.5.datos" },
+      { id: "MG_CIBE_03", code: "MG_CIBE_03", description: "Prevenir la manipulación no autorizada de modelos (Model Poisoning / Backdoors)", subpartId: "15.5.modelos" },
+      { id: "MG_CIBE_04", code: "MG_CIBE_04", description: "Mitigar ataques de inyección de prompts, entradas adversarias y extracción de datos", subpartId: "15.5.adversarios" },
     ],
   },
   {
@@ -578,24 +611,28 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     title: "Documentación técnica",
     articleRef: "Art. 11",
     description: "Elaborar y mantener la documentación técnica completa del sistema antes de su introducción en el mercado o puesta en servicio con arreglo al Anexo IV.",
-    verificadoEl: null,
+    verificadoEl: "2026-09-19",
+    // Art. 11 y anexo IV: el 11.1 ya exige elaborarla antes y mantenerla
+    // actualizada; el 11.2 es el conjunto único de documentos de los productos
+    // del anexo I, sección A, así que ninguna de estas medidas es suya. Las
+    // instrucciones de uso son el punto 1 h) del anexo IV; los datos, el 2 d);
+    // y la validación y las pruebas, el 2 g).
     subparts: [
-      { subpartId: "11.1", articleNumber: "Art. 11", titleShort: "Elaboración de documentación técnica previa", orderIndex: 1 },
-      { subpartId: "11.2", articleNumber: "Art. 11", titleShort: "Mantenimiento y actualización continua del expediente", orderIndex: 2 },
-      { subpartId: "AnexoIV.1.a", articleNumber: "Anexo IV", titleShort: "Descripción general del sistema y uso previsto", orderIndex: 3 },
-      { subpartId: "AnexoIV.1.b", articleNumber: "Anexo IV", titleShort: "Descripción de elementos e instrucciones de uso", orderIndex: 4 },
-      { subpartId: "AnexoIV.2.a", articleNumber: "Anexo IV", titleShort: "Métodos de desarrollo y lógica del modelo", orderIndex: 5 },
-      { subpartId: "AnexoIV.2.b", articleNumber: "Anexo IV", titleShort: "Procedimientos de diseño y especificaciones de datos", orderIndex: 6 },
-      { subpartId: "AnexoIV.2.c", articleNumber: "Anexo IV", titleShort: "Resultados del sistema de pruebas y validación", orderIndex: 7 },
+      { subpartId: "11.1", articleNumber: "Art. 11", titleShort: "Elaborada antes de la puesta en servicio y mantenida actualizada", orderIndex: 1 },
+      { subpartId: "AnexoIV.1.a", articleNumber: "Anexo IV", titleShort: "Finalidad prevista, proveedor y versión del sistema", orderIndex: 2 },
+      { subpartId: "AnexoIV.1.h", articleNumber: "Anexo IV", titleShort: "Instrucciones de uso para el responsable del despliegue", orderIndex: 3 },
+      { subpartId: "AnexoIV.2.b", articleNumber: "Anexo IV", titleShort: "Especificaciones de diseño, algoritmos y arquitectura", orderIndex: 4 },
+      { subpartId: "AnexoIV.2.d", articleNumber: "Anexo IV", titleShort: "Requisitos en materia de datos y conjuntos de entrenamiento", orderIndex: 5 },
+      { subpartId: "AnexoIV.2.g", articleNumber: "Anexo IV", titleShort: "Procedimientos de validación y prueba, y sus parámetros", orderIndex: 6 },
     ],
     measures: [
       { id: "MG_TDOC_01", code: "MG_TDOC_01", description: "Elaborar el expediente técnico antes de la puesta en servicio del sistema", subpartId: "11.1" },
-      { id: "MG_TDOC_02", code: "MG_TDOC_02", description: "Actualizar la documentación técnica ante cualquier cambio sustancial del modelo", subpartId: "11.2" },
+      { id: "MG_TDOC_02", code: "MG_TDOC_02", description: "Actualizar la documentación técnica ante cualquier cambio sustancial del modelo", subpartId: "11.1" },
       { id: "MG_TDOC_03", code: "MG_TDOC_03", description: "Documentar la descripción general, versiones y casos de uso previstos y no previstos", subpartId: "AnexoIV.1.a" },
-      { id: "MG_TDOC_04", code: "MG_TDOC_04", description: "Redactar manuales claros de instrucciones de uso dirigidos a los desplegadores", subpartId: "AnexoIV.1.b" },
-      { id: "MG_TDOC_05", code: "MG_TDOC_05", description: "Documentar la arquitectura técnica, algoritmos y decisiones de diseño del modelo", subpartId: "AnexoIV.2.a" },
-      { id: "MG_TDOC_06", code: "MG_TDOC_06", description: "Documentar el origen, preprocesamiento y linaje de los conjuntos de datos", subpartId: "AnexoIV.2.b" },
-      { id: "MG_TDOC_07", code: "MG_TDOC_07", description: "Adjuntar los informes detallados de pruebas, validaciones y métricas de error", subpartId: "AnexoIV.2.c" },
+      { id: "MG_TDOC_04", code: "MG_TDOC_04", description: "Redactar manuales claros de instrucciones de uso dirigidos a los responsables del despliegue", subpartId: "AnexoIV.1.h" },
+      { id: "MG_TDOC_05", code: "MG_TDOC_05", description: "Documentar la arquitectura técnica, algoritmos y decisiones de diseño del modelo", subpartId: "AnexoIV.2.b" },
+      { id: "MG_TDOC_06", code: "MG_TDOC_06", description: "Documentar el origen, preprocesamiento y linaje de los conjuntos de datos", subpartId: "AnexoIV.2.d" },
+      { id: "MG_TDOC_07", code: "MG_TDOC_07", description: "Adjuntar los informes detallados de pruebas, validaciones y métricas de error", subpartId: "AnexoIV.2.g" },
     ],
   },
   {
@@ -603,103 +640,210 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     title: "Vigilancia poscomercialización",
     articleRef: "Art. 72",
     description: "Establecer y documentar un sistema de vigilancia poscomercialización continuo para recopilar, analizar y evaluar datos sobre el rendimiento del sistema en producción.",
-    verificadoEl: null,
+    verificadoEl: "2026-09-19",
+    // El art. 72 tiene cuatro apartados: no hay 72.5. La evaluación del
+    // cumplimiento permanente y los datos que facilitan los responsables del
+    // despliegue son del 72.2; el 72.4 es la integración en los sistemas y
+    // planes que ya exigen el anexo I, sección A, o el Derecho de servicios
+    // financieros (anexo III, punto 5), y no tenía medida.
     subparts: [
-      { subpartId: "72.1", articleNumber: "Art. 72", titleShort: "Establecimiento del sistema de vigilancia poscomercialización", orderIndex: 1 },
-      { subpartId: "72.2", articleNumber: "Art. 72", titleShort: "Recogida, documentación y análisis activo de datos de uso", orderIndex: 2 },
-      { subpartId: "72.3", articleNumber: "Art. 72", titleShort: "Plan de vigilancia poscomercialización proporcionado", orderIndex: 3 },
-      { subpartId: "72.4", articleNumber: "Art. 72", titleShort: "Evaluación continua de la conformidad del sistema", orderIndex: 4 },
-      { subpartId: "72.5", articleNumber: "Art. 72", titleShort: "Cooperación y retroalimentación con los responsables de despliegue", orderIndex: 5 },
+      { subpartId: "72.1", articleNumber: "Art. 72", titleShort: "Sistema de vigilancia poscomercialización proporcionado", orderIndex: 1 },
+      { subpartId: "72.2", articleNumber: "Art. 72", titleShort: "Recogida y análisis activos de datos durante toda la vida útil", orderIndex: 2 },
+      { subpartId: "72.3", articleNumber: "Art. 72", titleShort: "Plan de vigilancia poscomercialización, parte de la documentación técnica", orderIndex: 3 },
+      { subpartId: "72.4", articleNumber: "Art. 72", titleShort: "Integración en sistemas ya existentes (anexo I, sección A, o entidades financieras)", orderIndex: 4 },
     ],
     measures: [
       { id: "MG_POST_01", code: "MG_POST_01", description: "Establecer un sistema estructurado de vigilancia operativa poscomercialización", subpartId: "72.1" },
-      { id: "MG_POST_02", code: "MG_POST_02", description: "Recoger, documentar y analizar activamente los datos de funcionamiento real", subpartId: "72.2" },
+      { id: "MG_POST_02", code: "MG_POST_02", description: "Recoger, documentar y analizar activamente los datos de funcionamiento real, incluida cuando proceda la interacción con otros sistemas de IA", subpartId: "72.2" },
+      { id: "MG_POST_04", code: "MG_POST_04", description: "Evaluar el cumplimiento permanente de los requisitos y adoptar las medidas que procedan, incluido el reentrenamiento", subpartId: "72.2" },
+      { id: "MG_POST_05", code: "MG_POST_05", description: "Establecer canales de cooperación y reporte con los responsables del despliegue", subpartId: "72.2" },
       { id: "MG_POST_03", code: "MG_POST_03", description: "Elaborar un plan formal de vigilancia con métricas, umbrales y revisiones periódicas", subpartId: "72.3" },
-      { id: "MG_POST_04", code: "MG_POST_04", description: "Evaluar periódicamente la conformidad y adoptar medidas de reentrenamiento", subpartId: "72.4" },
-      { id: "MG_POST_05", code: "MG_POST_05", description: "Establecer canales de cooperación y reporte con los usuarios del sistema", subpartId: "72.5" },
+      { id: "MG_POST_06", code: "MG_POST_06", description: "Si el sistema está regulado por el anexo I, sección A, o lo introduce una entidad financiera (anexo III, punto 5), decidir y documentar si la vigilancia se integra en los sistemas y planes ya existentes con un nivel de protección equivalente", subpartId: "72.4", desde: VERSION_CATALOGO_RIA },
     ],
   },
   {
     code: "INCIDENT_MGMT",
     title: "Gestión de incidentes graves",
     articleRef: "Art. 73",
-    description: "Notificar a las autoridades competentes y a los afectados cualquier incidente grave o mal funcionamiento del sistema en los plazos reglamentarios y adoptar medidas correctoras.",
-    verificadoEl: null,
+    description: "Notificar los incidentes graves a las autoridades de vigilancia del mercado de los Estados miembros donde se produzcan, en los plazos del art. 73, investigarlos y adoptar medidas correctoras.",
+    verificadoEl: "2026-09-19",
+    // El art. 73 no notifica a los «afectados», sino a la autoridad de
+    // vigilancia del mercado del Estado miembro donde ocurrió (que para una
+    // entidad financiera no es necesariamente la AESIA: art. 74.6). Los plazos
+    // son tres: 15 días (73.2), 2 días si hay infracción generalizada o
+    // incidente del art. 3, punto 49, letra b) (73.3) y 10 días si hay un
+    // fallecimiento (73.4). La investigación y la cooperación son del 73.6. El
+    // registro de incidentes no es del art. 73: es del 17.1 k).
     subparts: [
-      { subpartId: "73.1", articleNumber: "Art. 73", titleShort: "Notificación de incidentes graves en un plazo máximo de 15 días", orderIndex: 1 },
-      { subpartId: "73.2", articleNumber: "Art. 73", titleShort: "Adopción de medidas correctoras inmediatas", orderIndex: 2 },
-      { subpartId: "73.3", articleNumber: "Art. 73", titleShort: "Investigación rigurosa de causas y evaluación de riesgos", orderIndex: 3 },
-      { subpartId: "73.4", articleNumber: "Art. 73", titleShort: "Cooperación plena con la AESIA y autoridades supervisoras", orderIndex: 4 },
-      { subpartId: "73.5", articleNumber: "Art. 73", titleShort: "Registro y custodia de expedientes de incidentes e investigaciones", orderIndex: 5 },
+      { subpartId: "73.1", articleNumber: "Art. 73", titleShort: "Notificación de incidentes graves y sus plazos (15, 10 y 2 días)", orderIndex: 1 },
+      { subpartId: "73.6.p1", articleNumber: "Art. 73", titleShort: "Investigación, evaluación de riesgos y medidas correctoras", orderIndex: 2 },
+      { subpartId: "73.6.p2", articleNumber: "Art. 73", titleShort: "Cooperación con las autoridades durante la investigación", orderIndex: 3 },
+      { subpartId: "17.1.k", articleNumber: "Art. 17", titleShort: "Registro de incidentes y lecciones aprendidas", orderIndex: 4 },
     ],
     measures: [
-      { id: "MG_INCI_01", code: "MG_INCI_01", description: "Protocolo para notificar a la AESIA incidentes graves en un plazo máximo de 15 días", subpartId: "73.1" },
-      { id: "MG_INCI_02", code: "MG_INCI_02", description: "Adoptar medidas de contención y remediación inmediata ante fallos críticos", subpartId: "73.2" },
-      { id: "MG_INCI_03", code: "MG_INCI_03", description: "Investigar la causa raíz técnica y documentar las medidas correctoras", subpartId: "73.3" },
-      { id: "MG_INCI_04", code: "MG_INCI_04", description: "Proporcionar a las autoridades toda la información técnica requerida sobre el incidente", subpartId: "73.4" },
-      { id: "MG_INCI_05", code: "MG_INCI_05", description: "Custodiar el registro histórico de incidentes y lecciones aprendidas", subpartId: "73.5" },
+      { id: "MG_INCI_01", code: "MG_INCI_01", description: "Protocolo para notificar los incidentes graves a la autoridad de vigilancia del mercado del Estado miembro donde ocurran: de inmediato y, como máximo, a los 15 días de conocerlos; a los 10 días si hay un fallecimiento; y a los 2 días si hay una infracción generalizada o una alteración grave de infraestructuras críticas. Admite una notificación inicial incompleta", subpartId: "73.1" },
+      { id: "MG_INCI_02", code: "MG_INCI_02", description: "Adoptar medidas de contención y remediación inmediata ante fallos críticos", subpartId: "73.6.p1" },
+      { id: "MG_INCI_03", code: "MG_INCI_03", description: "Investigar la causa raíz técnica y documentar las medidas correctoras", subpartId: "73.6.p1" },
+      { id: "MG_INCI_04", code: "MG_INCI_04", description: "Proporcionar a las autoridades toda la información técnica requerida sobre el incidente", subpartId: "73.6.p2" },
+      { id: "MG_INCI_05", code: "MG_INCI_05", description: "Custodiar el registro histórico de incidentes y lecciones aprendidas", subpartId: "17.1.k" },
     ],
   },
 ];
 
 /**
- * Catálogo complementario ISO/IEC 42001 (Sistema de Gestión de Inteligencia Artificial)
+ * Catálogo complementario ISO/IEC 42001 (sistema de gestión de la IA).
+ *
+ * SIEMPRE MARCO OPERATIVO: la norma es un marco de madurez y documentación, no
+ * una obligación jurídica autónoma. `procedenciaDe` lo pinta así en cada medida.
+ *
+ * Renumerado (2026-09-19): el anexo A se pintaba desplazado («Políticas (A.5)»,
+ * «Organización interna (A.6)», «Evaluación de impacto (A.8)», «Ciclo de vida
+ * (A.9)»), cuando son A.2, A.3, A.5 y A.6; y cubría 4 de los 9 objetivos de
+ * control. Ahora están los 9 (A.2 a A.10) y la planificación de la cláusula 6.1
+ * (evaluación y tratamiento de riesgos e impacto: 6.1.2 a 6.1.4). Se cotejó la
+ * NUMERACIÓN, no el texto de la norma, que no se ha tenido delante: por eso
+ * estos requisitos no llevan `verificadoEl`. Los títulos son descripciones
+ * propias, no transcripción de la norma.
  */
 export const ISO_42001_REQUIREMENTS: RequirementDef[] = [
   {
     code: "ISO_POLICIES",
-    title: "Políticas relativas a la IA (A.5)",
-    articleRef: "ISO 42001 A.5",
+    title: "Políticas relativas a la IA (A.2)",
+    articleRef: "ISO 42001 A.2",
     description: "Establecer, aprobar y comunicar directrices de gobernanza y políticas éticas para el uso de la IA en la organización.",
+    caracter: "MARCO_OPERATIVO",
     subparts: [
-      { subpartId: "A.5.1", articleNumber: "A.5", titleShort: "Política de IA alineada con la estrategia corporativa", orderIndex: 1 },
-      { subpartId: "A.5.2", articleNumber: "A.5", titleShort: "Revisión periódica y actualización de directrices de IA", orderIndex: 2 },
+      { subpartId: "A.2.2", articleNumber: "anexo A, A.2", titleShort: "Política de IA alineada con la estrategia corporativa", orderIndex: 1 },
+      { subpartId: "A.2.4", articleNumber: "anexo A, A.2", titleShort: "Revisión periódica de la política de IA", orderIndex: 2 },
     ],
     measures: [
-      { id: "MG_ISO_POL_01", code: "MG_ISO_POL_01", description: "Aprobar la política corporativa de IA por el Consejo o Comité de Dirección", subpartId: "A.5.1" },
-      { id: "MG_ISO_POL_02", code: "MG_ISO_POL_02", description: "Establecer calendario de revisión anual de la política de IA", subpartId: "A.5.2" },
+      { id: "MG_ISO_POL_01", code: "MG_ISO_POL_01", description: "Aprobar la política corporativa de IA por el Consejo o Comité de Dirección", subpartId: "A.2.2" },
+      { id: "MG_ISO_POL_02", code: "MG_ISO_POL_02", description: "Establecer calendario de revisión anual de la política de IA", subpartId: "A.2.4" },
     ],
   },
   {
     code: "ISO_ORG_ROLES",
-    title: "Organización interna y roles (A.6)",
-    articleRef: "ISO 42001 A.6",
-    description: "Asignación clara de responsabilidades, roles de supervisión técnica y segregación de funciones.",
+    title: "Organización interna y roles (A.3)",
+    articleRef: "ISO 42001 A.3",
+    description: "Asignación clara de roles y responsabilidades sobre los sistemas de IA en la organización.",
+    caracter: "MARCO_OPERATIVO",
     subparts: [
-      { subpartId: "A.6.1", articleNumber: "A.6", titleShort: "Definición y asignación de roles y responsabilidades de IA", orderIndex: 1 },
-      { subpartId: "A.6.2", articleNumber: "A.6", titleShort: "Segregación de funciones y comités de supervisión", orderIndex: 2 },
+      { subpartId: "A.3.2", articleNumber: "anexo A, A.3", titleShort: "Roles y responsabilidades sobre la IA", orderIndex: 1 },
     ],
     measures: [
-      { id: "MG_ISO_ORG_01", code: "MG_ISO_ORG_01", description: "Designar al responsable de gobernanza de IA (AI Officer) y equipos técnicos", subpartId: "A.6.1" },
-      { id: "MG_ISO_ORG_02", code: "MG_ISO_ORG_02", description: "Constituir un Comité de Ética y Gobernanza de IA con reuniones periódicas", subpartId: "A.6.2" },
+      { id: "MG_ISO_ORG_01", code: "MG_ISO_ORG_01", description: "Designar al responsable de gobernanza de IA (AI Officer) y equipos técnicos", subpartId: "A.3.2" },
+      { id: "MG_ISO_ORG_02", code: "MG_ISO_ORG_02", description: "Constituir un Comité de Ética y Gobernanza de IA con reuniones periódicas", subpartId: "A.3.2" },
+    ],
+  },
+  {
+    code: "ISO_RESOURCES",
+    title: "Recursos para los sistemas de IA (A.4)",
+    articleRef: "ISO 42001 A.4",
+    description: "Identificar y documentar los recursos que necesita cada sistema de IA a lo largo de su ciclo de vida.",
+    caracter: "MARCO_OPERATIVO",
+    subparts: [
+      { subpartId: "A.4", articleNumber: "anexo A, A.4", titleShort: "Datos, herramientas, recursos informáticos y personas", orderIndex: 1 },
+    ],
+    measures: [
+      { id: "MG_ISO_REC_01", code: "MG_ISO_REC_01", description: "Documentar los recursos del sistema: datos, herramientas, recursos informáticos y personas con las competencias necesarias", subpartId: "A.4", desde: VERSION_CATALOGO_RIA },
     ],
   },
   {
     code: "ISO_IMPACT_ASSESS",
-    title: "Evaluación del impacto de sistemas de IA (A.8)",
-    articleRef: "ISO 42001 A.8",
-    description: "Evaluar el impacto ético, social y sobre derechos fundamentales de cada sistema antes de su despliegue.",
+    title: "Evaluación del impacto de sistemas de IA (A.5)",
+    articleRef: "ISO 42001 A.5",
+    description: "Evaluar las posibles consecuencias de cada sistema para las personas, los grupos y la sociedad antes de su despliegue.",
+    caracter: "MARCO_OPERATIVO",
     subparts: [
-      { subpartId: "A.8.1", articleNumber: "A.8", titleShort: "Metodología formal de evaluación de impacto de IA", orderIndex: 1 },
-      { subpartId: "A.8.2", articleNumber: "A.8", titleShort: "Documentación y mitigación de impactos negativos", orderIndex: 2 },
+      { subpartId: "A.5.2", articleNumber: "anexo A, A.5", titleShort: "Proceso de evaluación de impacto del sistema", orderIndex: 1 },
+      { subpartId: "A.5.3", articleNumber: "anexo A, A.5", titleShort: "Documentación de las evaluaciones de impacto", orderIndex: 2 },
     ],
     measures: [
-      { id: "MG_ISO_IMP_01", code: "MG_ISO_IMP_01", description: "Ejecutar evaluación de impacto ético y de derechos fundamentales previa", subpartId: "A.8.1" },
-      { id: "MG_ISO_IMP_02", code: "MG_ISO_IMP_02", description: "Establecer planes de mitigación para los riesgos éticos identificados", subpartId: "A.8.2" },
+      { id: "MG_ISO_IMP_01", code: "MG_ISO_IMP_01", description: "Ejecutar evaluación de impacto ético y de derechos fundamentales previa", subpartId: "A.5.2" },
+      { id: "MG_ISO_IMP_02", code: "MG_ISO_IMP_02", description: "Establecer planes de mitigación para los riesgos éticos identificados", subpartId: "A.5.3" },
     ],
   },
   {
     code: "ISO_LIFECYCLE",
-    title: "Ciclo de vida del sistema de IA (A.9)",
-    articleRef: "ISO 42001 A.9",
+    title: "Ciclo de vida del sistema de IA (A.6)",
+    articleRef: "ISO 42001 A.6",
     description: "Aplicar salvaguardas operativas y controles de calidad en cada fase del ciclo de vida del sistema.",
+    caracter: "MARCO_OPERATIVO",
     subparts: [
-      { subpartId: "A.9.1", articleNumber: "A.9", titleShort: "Gestión de cambios y control de versiones del modelo", orderIndex: 1 },
-      { subpartId: "A.9.2", articleNumber: "A.9", titleShort: "Criterios formales de retirada segura y obsolescencia", orderIndex: 2 },
+      { subpartId: "A.6.2", articleNumber: "anexo A, A.6", titleShort: "Cambios, versiones y retirada del sistema", orderIndex: 1 },
     ],
     measures: [
-      { id: "MG_ISO_LIF_01", code: "MG_ISO_LIF_01", description: "Documentar el control de versiones y auditoría de cambios en producción", subpartId: "A.9.1" },
-      { id: "MG_ISO_LIF_02", code: "MG_ISO_LIF_02", description: "Definir protocolo de apagado y retirada segura de sistemas obsoletos", subpartId: "A.9.2" },
+      { id: "MG_ISO_LIF_01", code: "MG_ISO_LIF_01", description: "Documentar el control de versiones y auditoría de cambios en producción", subpartId: "A.6.2" },
+      { id: "MG_ISO_LIF_02", code: "MG_ISO_LIF_02", description: "Definir protocolo de apagado y retirada segura de sistemas obsoletos", subpartId: "A.6.2" },
+    ],
+  },
+  {
+    code: "ISO_DATA",
+    title: "Datos para los sistemas de IA (A.7)",
+    articleRef: "ISO 42001 A.7",
+    description: "Gestionar los datos que usa cada sistema de IA: adquisición, calidad, procedencia y preparación.",
+    caracter: "MARCO_OPERATIVO",
+    subparts: [
+      { subpartId: "A.7", articleNumber: "anexo A, A.7", titleShort: "Calidad, procedencia y preparación de los datos", orderIndex: 1 },
+    ],
+    measures: [
+      { id: "MG_ISO_DAT_01", code: "MG_ISO_DAT_01", description: "Definir y documentar la adquisición, la calidad, la procedencia y la preparación de los datos del sistema", subpartId: "A.7", desde: VERSION_CATALOGO_RIA },
+    ],
+  },
+  {
+    code: "ISO_INFO_PARTIES",
+    title: "Información para las partes interesadas (A.8)",
+    articleRef: "ISO 42001 A.8",
+    description: "Dar a quienes usan el sistema, y a las demás partes interesadas, la información que necesitan sobre él.",
+    caracter: "MARCO_OPERATIVO",
+    subparts: [
+      { subpartId: "A.8", articleNumber: "anexo A, A.8", titleShort: "Documentación, comunicación de incidentes e información externa", orderIndex: 1 },
+    ],
+    measures: [
+      { id: "MG_ISO_INF_01", code: "MG_ISO_INF_01", description: "Informar a las partes interesadas: documentación para quien usa el sistema, comunicación de incidentes e información externa", subpartId: "A.8", desde: VERSION_CATALOGO_RIA },
+    ],
+  },
+  {
+    code: "ISO_RESPONSIBLE_USE",
+    title: "Uso de los sistemas de IA (A.9)",
+    articleRef: "ISO 42001 A.9",
+    description: "Usar los sistemas de IA de forma responsable y conforme a su uso previsto.",
+    caracter: "MARCO_OPERATIVO",
+    subparts: [
+      { subpartId: "A.9", articleNumber: "anexo A, A.9", titleShort: "Procesos, objetivos y uso previsto", orderIndex: 1 },
+    ],
+    measures: [
+      { id: "MG_ISO_USO_01", code: "MG_ISO_USO_01", description: "Definir los procesos y objetivos de uso responsable y el uso previsto del sistema", subpartId: "A.9", desde: VERSION_CATALOGO_RIA },
+    ],
+  },
+  {
+    code: "ISO_THIRD_PARTIES",
+    title: "Relaciones con terceros y clientes (A.10)",
+    articleRef: "ISO 42001 A.10",
+    description: "Repartir y gestionar las responsabilidades con proveedores, socios y clientes a lo largo del ciclo de vida.",
+    caracter: "MARCO_OPERATIVO",
+    subparts: [
+      { subpartId: "A.10", articleNumber: "anexo A, A.10", titleShort: "Reparto de responsabilidades, proveedores y clientes", orderIndex: 1 },
+    ],
+    measures: [
+      { id: "MG_ISO_TER_01", code: "MG_ISO_TER_01", description: "Repartir las responsabilidades con proveedores, socios y clientes a lo largo del ciclo de vida del sistema", subpartId: "A.10", desde: VERSION_CATALOGO_RIA },
+    ],
+  },
+  {
+    code: "ISO_RISK_PLANNING",
+    title: "Riesgos e impacto de la IA en la planificación (6.1)",
+    articleRef: "ISO 42001 6.1",
+    description: "Planificar el sistema de gestión de la IA evaluando y tratando sus riesgos y el impacto de los sistemas.",
+    caracter: "MARCO_OPERATIVO",
+    subparts: [
+      { subpartId: "6.1.2", articleNumber: "cláusula 6.1", titleShort: "Evaluación de los riesgos de la IA", orderIndex: 1 },
+      { subpartId: "6.1.3", articleNumber: "cláusula 6.1", titleShort: "Tratamiento de los riesgos de la IA", orderIndex: 2 },
+      { subpartId: "6.1.4", articleNumber: "cláusula 6.1", titleShort: "Evaluación del impacto de los sistemas de IA", orderIndex: 3 },
+    ],
+    measures: [
+      { id: "MG_ISO_RIE_01", code: "MG_ISO_RIE_01", description: "Definir y aplicar un proceso de evaluación de los riesgos de la IA", subpartId: "6.1.2", desde: VERSION_CATALOGO_RIA },
+      { id: "MG_ISO_RIE_02", code: "MG_ISO_RIE_02", description: "Definir y aplicar un proceso de tratamiento de esos riesgos, con los controles que se eligen y por qué", subpartId: "6.1.3", desde: VERSION_CATALOGO_RIA },
+      { id: "MG_ISO_RIE_03", code: "MG_ISO_RIE_03", description: "Definir y aplicar un proceso de evaluación del impacto de los sistemas de IA", subpartId: "6.1.4", desde: VERSION_CATALOGO_RIA },
     ],
   },
 ];

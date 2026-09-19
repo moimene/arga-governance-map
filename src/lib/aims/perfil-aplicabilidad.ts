@@ -363,9 +363,22 @@ export function perfilAplicable(
   };
 }
 
-/** Procedencia de una medida, si el perfil la declara. */
+/**
+ * Procedencia de las medidas de ISO/IEC 42001, derivada del carácter que declara
+ * cada requisito del catálogo (siempre MARCO_OPERATIVO) y de su número.
+ */
+const PROCEDENCIA_ISO: Record<string, ProcedenciaMedida> = Object.fromEntries(
+  ISO_42001_REQUIREMENTS.filter((r) => r.caracter).flatMap((r) =>
+    r.measures.map((m) => {
+      const bloque = r.subparts.find((s) => s.subpartId === m.subpartId);
+      return [m.id, p("ISO_42001", r.caracter, `ISO/IEC 42001, ${bloque?.articleNumber ?? r.articleRef}`)] as const;
+    }),
+  ),
+);
+
+/** Procedencia de una medida, si el perfil o el catálogo ISO la declaran. */
 export function procedenciaDe(measureId: string): ProcedenciaMedida | null {
-  return PROCEDENCIA_DESPLIEGUE[measureId] ?? null;
+  return PROCEDENCIA_DESPLIEGUE[measureId] ?? PROCEDENCIA_ISO[measureId] ?? null;
 }
 
 /**
