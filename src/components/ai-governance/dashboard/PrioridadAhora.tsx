@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, ClipboardCheck, Cpu, PlusCircle, Route } from "lucide-react";
+import { AlertTriangle, ArrowRight, ClipboardCheck, Cpu, Route } from "lucide-react";
+import type { AimsPaso } from "@/lib/aims/readiness";
 
 export interface PrioridadAhoraProps {
   altosNoEvaluados: number;
@@ -11,15 +12,12 @@ export interface PrioridadAhoraProps {
   detalleInventario: string;
   /** Con cuestionario de clasificación completado (`tieneClasificacionGuiada`). */
   conClasificacionGuiada: number;
+  /** Ningún «Alto» contado viene de un cuestionario: el nivel es el declarado en ficha y se pinta neutro. */
+  nivelDeclarado: boolean;
+  /** Siguientes pasos derivados del dato (`readiness.nextSteps`), no una lista fija. */
+  pasos: AimsPaso[];
   loading: boolean;
 }
-
-const QUICK_ACTIONS = [
-  { label: "Nuevo sistema IA", body: "Alta gestionada en AIMS.", to: "/ai-governance/sistemas/nuevo", icon: PlusCircle },
-  { label: "Revisar evaluaciones", body: "Cobertura AI Act, findings y expediente técnico.", to: "/ai-governance/evaluaciones", icon: ClipboardCheck },
-  { label: "Registrar incidente IA", body: "Incidente gestionado con severidad y sistema asociado.", to: "/ai-governance/incidentes/nuevo", icon: AlertTriangle },
-  { label: "Proponer riesgo GRC", body: "Derivación de solo lectura para que GRC decida el riesgo.", to: "/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP", icon: Route },
-];
 
 export function PrioridadAhora({
   altosNoEvaluados,
@@ -29,20 +27,25 @@ export function PrioridadAhora({
   totalIncidentes,
   detalleInventario,
   conClasificacionGuiada,
+  nivelDeclarado,
+  pasos,
   loading,
 }: PrioridadAhoraProps) {
   const priorityItems = [
     {
-      label: "Alto riesgo sin evaluación aprobada",
+      label: "Alto riesgo sin autodiagnóstico acreditado",
       value: altosNoEvaluados,
-      body: "Cerrar evaluación AI Act antes de presentar el sistema como controlado.",
+      body: nivelDeclarado
+        ? "El «Alto» es el declarado en ficha: clasificar con el cuestionario antes de concluir."
+        : "Congelar y revisar el autodiagnóstico antes de presentar el sistema como controlado.",
       to: "/ai-governance/evaluaciones",
       icon: ClipboardCheck,
+      // Neutro sin cuestionario: un nivel declarado en ficha no es un riesgo medido.
       tone:
-        altosNoEvaluados > 0
-          ? "text-[var(--status-error)]"
-          : totalSistemas === 0
-            ? "text-[var(--g-text-secondary)]"
+        totalSistemas === 0 || nivelDeclarado
+          ? "text-[var(--g-text-secondary)]"
+          : altosNoEvaluados > 0
+            ? "text-[var(--status-error)]"
             : "text-[var(--status-success)]",
     },
     {
@@ -123,31 +126,32 @@ export function PrioridadAhora({
       >
         <div className="border-b border-[var(--g-border-subtle)] px-5 py-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
-            Empezar un flujo
+            Siguientes pasos, derivados del dato
           </p>
           <h2 className="text-base font-semibold text-[var(--g-text-primary)]">
             Acciones del responsable AIMS
           </h2>
         </div>
-        <div className="divide-y divide-[var(--g-border-subtle)]">
-          {QUICK_ACTIONS.map((item) => {
-            const Icon = item.icon;
-            return (
+        {pasos.length === 0 ? (
+          <p className="px-5 py-4 text-sm text-[var(--g-text-secondary)]">Sin pasos derivados del dato disponible.</p>
+        ) : (
+          <div className="divide-y divide-[var(--g-border-subtle)]">
+            {pasos.map((paso) => (
               <Link
-                key={item.to}
-                to={item.to}
+                key={paso.label}
+                to={paso.to}
                 className="flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-[var(--g-surface-subtle)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
               >
-                <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--g-brand-3308)]" />
+                <Route className="mt-0.5 h-4 w-4 shrink-0 text-[var(--g-brand-3308)]" />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold text-[var(--g-text-primary)]">{item.label}</span>
-                  <span className="mt-0.5 block text-xs leading-5 text-[var(--g-text-secondary)]">{item.body}</span>
+                  <span className="block text-sm font-semibold text-[var(--g-text-primary)]">{paso.label}</span>
+                  <span className="mt-0.5 block text-xs leading-5 text-[var(--g-text-secondary)]">{paso.detalle}</span>
                 </span>
                 <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[var(--g-text-secondary)]" />
               </Link>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

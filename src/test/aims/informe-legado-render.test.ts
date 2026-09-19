@@ -61,6 +61,6 @@ describe("el informe dice lo que no acredita", () => {
     expect(screen.queryByText(/no acredita/)).toBeNull();
     expect(screen.queryByText(/pendientes de evidencia/)).toBeNull();
     // Y el informe sí se ha montado: la aserción de ausencia no es vacía.
-    expect(screen.getByText("Informe de Autodiagnóstico de Conformidad")).toBeTruthy();
+    expect(screen.getByText("Informe de autodiagnóstico de madurez")).toBeTruthy();
   });
 });

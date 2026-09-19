@@ -65,7 +65,7 @@ export default function TabEvaluaciones({ system, assessments, error, onNueva, o
                 <div>
                   <span className="font-mono text-xs font-bold text-[var(--g-brand-3308)]">{etiqueta("marco", ass.framework) || "Sin marco"}</span>
                   <h3 className="text-sm font-bold text-[var(--g-text-primary)] mt-0.5">
-                    Evaluación del{" "}
+                    Autodiagnóstico del{" "}
                     {ass.assessment_date ? new Date(ass.assessment_date).toLocaleDateString("es-ES") : "N/D"}
                   </h3>
                 </div>

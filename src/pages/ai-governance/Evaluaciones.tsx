@@ -81,10 +81,10 @@ export default function Evaluaciones() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <ClipboardCheck className="h-5 w-5 shrink-0 text-[var(--g-brand-3308)]" />
-            <h1 className="text-xl font-bold text-[var(--g-text-primary)]">Evaluaciones de riesgo IA</h1>
+            <h1 className="text-xl font-bold text-[var(--g-text-primary)]">Autodiagnóstico de madurez</h1>
           </div>
           <p className="max-w-[72ch] text-sm text-[var(--g-text-secondary)]">
-            Cobertura AI Act e ISO 42001 por sistema, con señal explícita cuando el expediente técnico debe derivarse a GRC.
+            Madurez de las medidas de cada sistema frente al RIA e ISO 42001; no es una evaluación del riesgo. Señala cuándo el expediente técnico debe derivarse a GRC.
           </p>
         </div>
         <button

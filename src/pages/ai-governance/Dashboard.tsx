@@ -84,12 +84,18 @@ export default function AiDashboard() {
   ]
     .filter(Boolean)
     .join(" · ");
-  const alto    = systems.filter((s) => s.risk_level === "Alto").length;
-  const limitado = systems.filter((s) => s.risk_level === "Limitado").length;
-  const minimo  = systems.filter((s) => s.risk_level === "Mínimo").length;
+  // El gráfico sólo colorea el nivel que sale de un cuestionario; el declarado
+  // en ficha va aparte y neutro, como el chip del inventario (F1.T8).
+  const guiados = systems.filter(tieneClasificacionGuiada);
+  const alto    = guiados.filter((s) => s.risk_level === "Alto").length;
+  const limitado = guiados.filter((s) => s.risk_level === "Limitado").length;
+  const minimo  = guiados.filter((s) => s.risk_level === "Mínimo").length;
 
   const sistemasClasificados = systems.filter((s) => (s.risk_level ?? "").trim() !== "").length;
-  const conClasificacionGuiada = systems.filter(tieneClasificacionGuiada).length;
+  const declaradoSinCuestionario = sistemasClasificados - guiados.filter((s) => (s.risk_level ?? "").trim() !== "").length;
+  const conClasificacionGuiada = guiados.length;
+  // Con algún sistema sin cuestionario, el «Alto» contado no es un nivel medido.
+  const nivelDeclarado = systems.some((s) => !tieneClasificacionGuiada(s));
 
   // Mismo criterio que el dominio «Incidentes»: abierto = no cerrado con fecha.
   const incidentesAbiertos = incidents.filter((i) => !incidenteCerrado(i)).length;
@@ -99,8 +105,8 @@ export default function AiDashboard() {
   const cubiertos = sistemasCubiertos(assessments);
   const altosNoEvaluados = systems.filter((s) => s.risk_level === "Alto" && !cubiertos.has(s.id)).length;
 
-  // Días desde última evaluación
-  const lastAssessment = assessments.find((a) => a.assessment_date);
+  // Días desde el último autodiagnóstico que no es borrador.
+  const lastAssessment = assessments.find((a) => a.assessment_date && normalizeAimsStatus(a.status) !== "BORRADOR");
   const diasDesdeEval = lastAssessment?.assessment_date
     ? Math.floor((Date.now() - new Date(lastAssessment.assessment_date).getTime()) / 86400000)
     : null;
@@ -142,6 +148,8 @@ export default function AiDashboard() {
           totalIncidentes={incidents.length}
           detalleInventario={detalleInventario}
           conClasificacionGuiada={conClasificacionGuiada}
+          nivelDeclarado={nivelDeclarado}
+          pasos={readiness.nextSteps}
           loading={loading}
         />
       )}
@@ -175,11 +183,11 @@ export default function AiDashboard() {
               to="/ai-governance/sistemas"
             />
             <KpiCard
-              label="Riesgo Alto sin eval. aprobada"
+              label="Alto riesgo sin autodiagnóstico acreditado"
               value={systems.length === 0 ? "—" : altosNoEvaluados}
-              sub={systems.length === 0 ? "Sin inventario registrado" : "Requieren evaluación EU AI Act"}
+              sub={systems.length === 0 ? "Sin inventario registrado" : nivelDeclarado ? "Nivel declarado en ficha, sin cuestionario" : "Congelado, revisado y conforme"}
               icon={AlertTriangle}
-              tone={systems.length === 0 ? "neutral" : altosNoEvaluados > 0 ? "error" : "success"}
+              tone={systems.length === 0 ? "neutral" : nivelDeclarado ? "neutral" : altosNoEvaluados > 0 ? "error" : "success"}
               to="/ai-governance/evaluaciones"
             />
             <KpiCard
@@ -191,7 +199,7 @@ export default function AiDashboard() {
               to="/ai-governance/incidentes"
             />
             <KpiCard
-              label="Última evaluación"
+              label="Último autodiagnóstico"
               value={diasDesdeEval !== null ? `${diasDesdeEval}d` : "—"}
               sub={lastAssessment?.assessment_date ?? "Sin evaluaciones"}
               icon={Clock}
@@ -224,6 +232,7 @@ export default function AiDashboard() {
                   { label: "Alto", count: alto, total: systems.length, color: "bg-[var(--status-error)]" },
                   { label: "Limitado", count: limitado, total: systems.length, color: "bg-[var(--status-warning)]" },
                   { label: "Mínimo", count: minimo, total: systems.length, color: "bg-[var(--status-success)]" },
+                  { label: "Declarado, sin cuestionario", count: declaradoSinCuestionario, total: systems.length, color: "bg-[var(--g-border-default)]" },
                   // Cuarta fila obligatoria: las tres anteriores sólo cuentan
                   // los tres literales de clasificación, así que un sistema sin
                   // `risk_level` desaparecía de una «distribución» que dejaba
@@ -239,7 +248,7 @@ export default function AiDashboard() {
                   },
                 ].map((row) => (
                   <div key={row.label} className="flex items-center gap-3">
-                    <div className="w-20 text-xs font-medium text-[var(--g-text-secondary)]">{row.label}</div>
+                    <div className="w-36 text-xs font-medium text-[var(--g-text-secondary)]">{row.label}</div>
                     <div className="flex-1 h-2 bg-[var(--g-surface-muted)]" style={{ borderRadius: "var(--g-radius-full)" }}>
                       <div
                         className={`h-2 ${row.color} transition-all`}

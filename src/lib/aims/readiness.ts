@@ -133,7 +133,14 @@ export interface AimsReadinessSummary {
   standaloneReady: boolean;
   domains: AimsReadinessDomain[];
   complianceMonitors: AimsComplianceMonitorDomain[];
-  nextSteps: string[];
+  /** Pasos derivados del dato: qué falta, cuánto y dónde se hace. Nunca una lista fija. */
+  nextSteps: AimsPaso[];
+}
+
+export interface AimsPaso {
+  label: string;
+  detalle: string;
+  to: string;
 }
 
 // Aquí vivían `aimsScreenPostures` y `aimsReadOnlyHandoffs`. El primero era una
@@ -556,6 +563,52 @@ export function buildAimsComplianceMonitorsPorSistema(
   );
 }
 
+/**
+ * Siguientes pasos, derivados del dato disponible (F1.T8). Sustituye a la lista
+ * fija que decía lo mismo con cualquier inventario. Sólo aparece lo que el dato
+ * señala, con su cuenta y su pantalla.
+ */
+function pasosDelDato(n: {
+  totalSystems: number;
+  sinClasificar: number;
+  sinFirmar: number;
+  altoSinAcreditar: number;
+  abiertos: number;
+  conBrechas: number;
+}): AimsPaso[] {
+  if (n.totalSystems === 0) {
+    return [{ label: "Dar de alta un sistema IA", detalle: "Sin sistemas en el inventario.", to: "/ai-governance/sistemas/nuevo" }];
+  }
+  const pasos: Array<AimsPaso | false> = [
+    n.sinClasificar > 0 && {
+      label: "Clasificar con el cuestionario guiado",
+      detalle: `${n.sinClasificar} sistemas sin clasificación guiada completada.`,
+      to: "/ai-governance/sistemas",
+    },
+    n.sinFirmar > 0 && {
+      label: "Congelar y revisar autodiagnósticos",
+      detalle: `${n.sinFirmar} autodiagnósticos vigentes sin congelar y revisar: no acreditan.`,
+      to: "/ai-governance/evaluaciones",
+    },
+    n.altoSinAcreditar > 0 && {
+      label: "Acreditar los sistemas de alto riesgo",
+      detalle: `${n.altoSinAcreditar} sistemas de alto riesgo sin autodiagnóstico acreditado.`,
+      to: "/ai-governance/evaluaciones",
+    },
+    n.abiertos > 0 && {
+      label: "Seguir los incidentes",
+      detalle: `${n.abiertos} incidentes abiertos o en investigación.`,
+      to: "/ai-governance/incidentes",
+    },
+    n.conBrechas > 0 && {
+      label: "Proponer riesgo a GRC",
+      detalle: `${n.conBrechas} autodiagnósticos con brechas que pueden derivarse a GRC (solo lectura).`,
+      to: "/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP",
+    },
+  ];
+  return pasos.filter((paso): paso is AimsPaso => Boolean(paso));
+}
+
 export function buildAimsReadiness(input: AimsReadinessInput): AimsReadinessSummary {
   const { systems, assessments, incidents } = input;
   const totalSystems = systems.length;
@@ -609,10 +662,10 @@ export function buildAimsReadiness(input: AimsReadinessInput): AimsReadinessSumm
     {
       id: "ai-act-assessments",
       hasData: assessments.length > 0,
-      label: "Evaluaciones AI Act",
+      label: "Autodiagnóstico de madurez · alto riesgo",
       status: highRiskSystems.length === 0 ? "na" : domainStatus(assessmentCoverage, 50, 100),
       metric: highRiskSystems.length === 0 ? "Sin sistemas de alto riesgo" : `${highRiskAssessed}/${highRiskSystems.length} alto riesgo`,
-      detail: "Cobertura aprobada para sistemas de riesgo alto y trazabilidad de evaluaciones.",
+      detail: "Sistemas de alto riesgo cuyo autodiagnóstico vigente está congelado, revisado y conforme.",
       route: "/ai-governance/evaluaciones",
     },
     {
@@ -686,13 +739,14 @@ export function buildAimsReadiness(input: AimsReadinessInput): AimsReadinessSumm
       .every((domain) => domain.status !== "gap" && domain.hasData),
     domains,
     complianceMonitors,
-    nextSteps: [
-      "Cerrar evaluación aprobada de cada sistema de riesgo Alto.",
-      "Completar monitorización por dominios AI Act, ISO 42001, proveedores, post-market y derechos fundamentales.",
-      "Convertir findings abiertos en controles GRC solo mediante contrato cross-module aprobado.",
-      "Preparar la correspondencia entre el inventario legado y el backbone técnico antes de cualquier migración.",
-      "Enlazar evidencia final únicamente cuando la custodia de evidencias y el registro de auditoría estén declarados aptos.",
-    ],
+    nextSteps: pasosDelDato({
+      totalSystems,
+      sinClasificar: totalSystems - conClasificacionGuiada,
+      sinFirmar: vigentes.filter((assessment) => !evaluacionFirme(assessment)).length,
+      altoSinAcreditar: highRiskSystems.length - highRiskAssessed,
+      abiertos: openIncidents,
+      conBrechas: vigentes.filter(isAimsTechnicalFileGapCandidate).length,
+    }),
   };
 }
 

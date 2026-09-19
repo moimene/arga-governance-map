@@ -112,7 +112,7 @@ export default function CabeceraInforme({
               </span>
             </div>
             <h1 className="text-2xl font-bold text-[var(--g-text-primary)]">
-              Informe de Autodiagnóstico de Conformidad
+              Informe de autodiagnóstico de madurez
             </h1>
             <p className="text-sm text-[var(--g-text-secondary)]">
               Sistema Evaluado:{" "}

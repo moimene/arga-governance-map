@@ -267,7 +267,7 @@ describe("A3 — un cero sin dato no se pinta como un cero bueno", () => {
       }
     }
     for (const [etiqueta, coleccion] of [
-      ["Riesgo Alto sin eval. aprobada", "systems"],
+      ["Alto riesgo sin autodiagnóstico acreditado", "systems"],
       ["Incidentes abiertos", "incidents"],
     ] as const) {
       const i = src.indexOf(etiqueta);

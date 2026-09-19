@@ -208,7 +208,7 @@ export default function EvaluacionNueva() {
         findings: payloadActual.findings,
         action_plan: generarPlanDeAdaptacion(payloadActual.findings, planEditado, new Date()),
         status: estadoFinal ? payloadActual.status : "BORRADOR",
-        notes: notes || `Autodiagnóstico de conformidad. Medidas evaluadas: ${payloadActual.evaluadas}/${payloadActual.totales}.`,
+        notes: notes || `Autodiagnóstico de madurez. Medidas evaluadas: ${payloadActual.evaluadas}/${payloadActual.totales}.`,
       },
     }),
     [payloadActual, planEditado, systemId, framework, stats.maturityScore, notes],
@@ -317,7 +317,7 @@ export default function EvaluacionNueva() {
             <ChevronLeft className="w-4 h-4" />
             <span>Volver a Evaluaciones</span>
           </button>
-          <h1 className="text-2xl font-bold text-[var(--g-text-primary)]">Nuevo Autodiagnóstico de Conformidad</h1>
+          <h1 className="text-2xl font-bold text-[var(--g-text-primary)]">Nuevo autodiagnóstico de madurez</h1>
         </div>
 
         <div className="flex items-center gap-2 text-xs">
