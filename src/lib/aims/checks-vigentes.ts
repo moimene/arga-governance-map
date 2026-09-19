@@ -39,14 +39,18 @@ function marca(c: ChequeoConHistoria): number {
 }
 
 /**
- * Una comprobación de un autodiagnóstico en `BORRADOR` no desplaza a la de una
- * evaluación cerrada, por reciente que sea: cerrar un autodiagnóstico sin
- * contestar nada lo deja en `BORRADOR` e inserta igualmente un `PENDIENTE` por
- * requisito, que tapaba lo ya revisado. Si el borrador es lo único que hay, se
- * conserva: no se pierde dato.
+ * Solo pesa una comprobación enlazada a una evaluación CERRADA (`status`
+ * distinto de `BORRADOR`). Un borrador y una legacy (sin evaluación) no
+ * acreditan: empatan entre ellos y decide la fecha, como antes de M01. Así, un
+ * `PENDIENTE` de un autodiagnóstico cerrado sin contestar no tapa lo ya
+ * cerrado, y una fila de seed tampoco tapa a un borrador posterior. Si lo único
+ * que hay es un borrador o una legacy, se conserva: no se pierde dato.
+ *
+ * `reviewed_at` no se lee aquí: el criterio es «cerrada», no «revisada». Viaja
+ * en el embebido para F1.T4 (`legado.ts`).
  */
 function peso(c: ChequeoConHistoria): number {
-  return c.evaluacion?.status === "BORRADOR" ? 0 : 1;
+  return c.evaluacion && c.evaluacion.status !== "BORRADOR" ? 1 : 0;
 }
 
 export function checksVigentes<T extends ChequeoConHistoria>(rows: T[] | null | undefined): T[] {

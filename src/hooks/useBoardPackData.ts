@@ -346,12 +346,15 @@ export function useBoardPackData(meetingId: string, entityId?: string | null): {
             created_at: string | null;
             evaluacion: { status: string | null; reviewed_at: string | null } | null;
           };
-          const { data: checks } = systemIds.length
+          const { data: checks, error: errChecks } = systemIds.length
             ? await supabase
                 .from("ai_compliance_checks")
                 .select("system_id, requirement_code, requirement_title, status, created_at, evaluacion:ai_risk_assessments!assessment_id(status, reviewed_at)")
                 .in("system_id", systemIds)
-            : { data: [] as FilaCheck[] };
+            : { data: [] as FilaCheck[], error: null };
+          // Sin la relación (M01 sin aplicar, caché de PostgREST sin recargar)
+          // la lectura falla: «no medido», nunca 0 no conformidades.
+          if (errChecks) throw errChecks;
           // Reevaluar no borra el histórico de comprobaciones: «Motor de triaje»
           // tiene 28 filas para 7 códigos. Sin el filtro, un sistema reevaluado
           // cuatro veces multiplicaba por cuatro sus no conformidades en el

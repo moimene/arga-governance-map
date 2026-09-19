@@ -59,6 +59,19 @@
 -- exige que ese sistema sea del tenant de la sesión. Igual para el cuestionario
 -- de una evaluación, que además no cambia una vez congelada.
 --
+-- UNA EVALUACIÓN CONGELADA NO SE TOCA POR SUS COMPROBACIONES
+-- ----------------------------------------------------------
+-- Congelar fija la fila de la evaluación, pero sus comprobaciones viven en otra
+-- tabla con grant de INSERT y UPDATE. Sin esto, una sesión anexaría por
+-- PostgREST un CONFORME a una evaluación ya congelada, o corregiría el estado de
+-- una suya, y el resultado vigente de lo «que no se toca» cambiaría sin que
+-- cambiara la fila congelada: el enlace dejaría de acreditar que la comprobación
+-- salió con esa evaluación. Por eso ni se enlaza una comprobación a una
+-- congelada (alta o cambio de enlace, para todos), ni cambia una comprobación
+-- de una congelada. La única excepción es reapuntar la autoría SIN sesión, que
+-- es la consolidación de personas duplicadas. El wizard no lo nota: inserta las
+-- comprobaciones al cerrar, y la congelación llega después, por RPC.
+--
 -- SECUENCIA (patrón E-05)
 -- -----------------------
 -- Producción y desarrollo comparten `governance_OS`. Esta migración es
@@ -105,6 +118,15 @@ begin
       raise exception 'COMPROBACION_INMUTABLE: la autoría, la evaluación y el sistema de la comprobación % no se cambian', old.id
         using errcode = '42501';
     end if;
+    -- Por fila entera (jsonb) y no por columnas enumeradas: una columna futura
+    -- queda cubierta sin tocar esto. Solo la autoría puede cambiar, y sin
+    -- sesión (la de arriba ya la cierra para una sesión).
+    if exists (select 1 from public.ai_risk_assessments a
+                where a.id = old.assessment_id and a.frozen_at is not null)
+       and (to_jsonb(new) - 'checked_by_id') is distinct from (to_jsonb(old) - 'checked_by_id') then
+      raise exception 'EVALUACION_CONGELADA: la comprobación % es de una evaluación congelada; no cambia', old.id
+        using errcode = '42501';
+    end if;
   elsif auth.uid() is not null then
     select up.person_id into v_persona
       from public.user_profiles up
@@ -123,6 +145,15 @@ begin
      where a.id = new.assessment_id and a.system_id = new.system_id
   ) then
     raise exception 'EVALUACION_DE_OTRO_SISTEMA: la evaluación % no es del sistema de la comprobación', new.assessment_id
+      using errcode = '42501';
+  end if;
+
+  -- En INSERT, OLD es NULL (PostgreSQL ≥ 11): cuenta como enlace nuevo.
+  if new.assessment_id is not null
+     and (tg_op = 'INSERT' or new.assessment_id is distinct from old.assessment_id)
+     and exists (select 1 from public.ai_risk_assessments a
+                  where a.id = new.assessment_id and a.frozen_at is not null) then
+    raise exception 'EVALUACION_CONGELADA: la evaluación % está congelada; no admite comprobaciones nuevas', new.assessment_id
       using errcode = '42501';
   end if;
 
@@ -202,6 +233,12 @@ declare
   v_tenant_q uuid;
   v_q uuid;
   v_a uuid;
+  v_c uuid;
+  v_err4 text;
+  v_err5 text;
+  v_err6 text;
+  v_n_corr int;
+  v_n_mant int;
 begin
   -- 3.1 Estructura: las dos FK nuevas, con RESTRICT (E-02).
   select count(*) into v_n from pg_constraint
@@ -277,17 +314,19 @@ begin
     raise exception 'VERIFICACION: authenticated debe conservar INSERT en las dos tablas; el instrumento ve %', v_n;
   end if;
 
-  -- 3.5 Sujeto de las sondas: una evaluación real, su sistema, y una cuenta de
-  --     su tenant enlazada a persona. Sin sujeto, las sondas no probarían nada.
+  -- 3.5 Sujeto de las sondas: una evaluación real SIN CONGELAR (a una congelada
+  --     no se le anexan comprobaciones, 3.13), su sistema, y una cuenta de su
+  --     tenant enlazada a persona. Sin sujeto, las sondas no probarían nada.
   select a.id, a.system_id, s.tenant_id into v_eval, v_sys, v_tenant
     from public.ai_risk_assessments a
     join public.ai_systems s on s.id = a.system_id
-   where exists (select 1 from public.user_profiles up
+   where a.frozen_at is null
+     and exists (select 1 from public.user_profiles up
                   where up.tenant_id = s.tenant_id and up.person_id is not null)
    order by a.created_at
    limit 1;
   if v_eval is null then
-    raise exception 'VERIFICACION: ninguna evaluación tiene una cuenta enlazada en su tenant; las sondas no tendrían sujeto';
+    raise exception 'VERIFICACION: ninguna evaluación sin congelar tiene una cuenta enlazada en su tenant; las sondas no tendrían sujeto';
   end if;
 
   select up.user_id, up.person_id into v_user, v_persona
@@ -396,6 +435,11 @@ begin
   --  3.11 El cuestionario de un sistema en la evaluación de OTRO: rechazado.
   --  3.12 Positivo: del mismo sistema, la evaluación entra enlazada; y
   --       congelada, su cuestionario ya no cambia.
+  --  3.13 Sin congelar, una comprobación enlazada entra y se corrige (positivo,
+  --       con sesión); congelada, ni entra otra ni se corrige esa.
+  --  3.14 Congelada, reapuntar la autoría sin sesión sigue entrando
+  --       (consolidación de personas duplicadas); pero ni sin sesión se
+  --       enlaza a ella una comprobación que no lo estaba.
   select s.id, s.tenant_id into v_sys_q, v_tenant_q
     from public.ai_systems s
    where not exists (select 1 from public.aims_classification_questionnaires q
@@ -412,6 +456,9 @@ begin
   v_enlazada := null;
   v_err2 := null;
   v_err3 := null;
+  v_c := null;
+  v_n_corr := 0;
+  v_n_mant := 0;
   begin
     insert into public.aims_classification_questionnaires (tenant_id, system_id, questionnaire_version)
     values (v_tenant_q, v_sys_q, 'VERIFICACION_M01')
@@ -426,6 +473,13 @@ begin
     insert into public.ai_risk_assessments (system_id, framework, status, questionnaire_id)
     values (v_sys_q, 'EU_AI_ACT', 'BORRADOR', v_q)
     returning id, questionnaire_id into v_a, v_enlazada;
+    perform set_config('request.jwt.claims', json_build_object('sub', v_user, 'role', 'authenticated')::text, true);
+    insert into public.ai_compliance_checks (system_id, requirement_code, status, assessment_id)
+    values (v_sys_q, 'VERIFICACION_M01', 'PENDIENTE', v_a)
+    returning id into v_c;
+    update public.ai_compliance_checks set status = 'NO_CONFORME' where id = v_c;
+    get diagnostics v_n_corr = row_count;
+    perform set_config('request.jwt.claims', '', true);
     update public.ai_risk_assessments set frozen_at = now() where id = v_a;
     begin
       update public.ai_risk_assessments set questionnaire_id = null where id = v_a;
@@ -433,12 +487,38 @@ begin
     exception when others then
       v_err2 := sqlerrm;
     end;
+    perform set_config('request.jwt.claims', json_build_object('sub', v_user, 'role', 'authenticated')::text, true);
+    begin
+      insert into public.ai_compliance_checks (system_id, requirement_code, status, assessment_id)
+      values (v_sys_q, 'VERIFICACION_M01', 'CONFORME', v_a);
+      v_err4 := 'ACEPTADA';
+    exception when others then
+      v_err4 := sqlerrm;
+    end;
+    begin
+      update public.ai_compliance_checks set status = 'CONFORME' where id = v_c;
+      v_err5 := 'ACEPTADA';
+    exception when others then
+      v_err5 := sqlerrm;
+    end;
+    perform set_config('request.jwt.claims', '', true);
+    update public.ai_compliance_checks set checked_by_id = v_otra where id = v_c;
+    get diagnostics v_n_mant = row_count;
+    insert into public.ai_compliance_checks (system_id, requirement_code, status)
+    values (v_sys_q, 'VERIFICACION_M01', 'CONFORME')
+    returning id into v_c;
+    begin
+      update public.ai_compliance_checks set assessment_id = v_a where id = v_c;
+      v_err6 := 'ACEPTADA';
+    exception when others then
+      v_err6 := sqlerrm;
+    end;
     raise exception 'SONDA_REVERTIDA';
   exception when others then
     v_err := sqlerrm;
   end;
   if v_err <> 'SONDA_REVERTIDA' then
-    raise exception 'VERIFICACION: el enlace legítimo al cuestionario se rechazó (%)', v_err;
+    raise exception 'VERIFICACION: una escritura legítima de las sondas del cuestionario y la congelada se rechazó (%)', v_err;
   end if;
   if v_err3 not like 'CUESTIONARIO_DE_OTRO_SISTEMA%' then
     raise exception 'VERIFICACION: el cuestionario de otro sistema no se rechaza (%)', v_err3;
@@ -449,8 +529,23 @@ begin
   if v_err2 not like 'EVALUACION_CONGELADA%' then
     raise exception 'VERIFICACION: el cuestionario de una evaluación congelada cambia (%)', v_err2;
   end if;
+  if v_c is null or v_n_corr <> 1 then
+    raise exception 'VERIFICACION: la comprobación de una evaluación sin congelar no entra o no se corrige (% / % filas)', v_c, v_n_corr;
+  end if;
+  if coalesce(v_err4, '') not like 'EVALUACION_CONGELADA%' then
+    raise exception 'VERIFICACION: se anexa una comprobación a una evaluación congelada (%)', v_err4;
+  end if;
+  if coalesce(v_err5, '') not like 'EVALUACION_CONGELADA%' then
+    raise exception 'VERIFICACION: se corrige una comprobación de una evaluación congelada (%)', v_err5;
+  end if;
+  if v_n_mant <> 1 then
+    raise exception 'VERIFICACION: la congelación bloquea el mantenimiento de la autoría (% filas)', v_n_mant;
+  end if;
+  if coalesce(v_err6, '') not like 'EVALUACION_CONGELADA%' then
+    raise exception 'VERIFICACION: sin sesión se enlaza una comprobación a una evaluación congelada (%)', v_err6;
+  end if;
 
   perform set_config('request.jwt.claims', '', true);
-  raise notice 'VERIFICACION OK: 2 FK RESTRICT, 0 DEFAULT en columnas de persona, 2 triggers sin anon, grants intactos, 8 sondas de comportamiento revertidas';
+  raise notice 'VERIFICACION OK: 2 FK RESTRICT, 0 DEFAULT en columnas de persona, 2 triggers sin anon, grants intactos, 14 sondas de comportamiento revertidas';
 end;
 $verificacion$;

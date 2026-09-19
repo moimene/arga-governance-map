@@ -43,9 +43,11 @@ begin
 
   select s.id into v_garr_sys from public.ai_systems s
    where s.tenant_id = '00000000-0000-0000-0000-000000000002' order by s.created_at limit 1;
+  -- Sin congelar: P7 le anexa una comprobación, y a una congelada no se puede (P9).
   select a.id, a.system_id into v_arga_eval, v_arga_sys
     from public.ai_risk_assessments a join public.ai_systems s on s.id = a.system_id
-   where s.tenant_id = '00000000-0000-0000-0000-000000000001' order by a.created_at limit 1;
+   where s.tenant_id = '00000000-0000-0000-0000-000000000001' and a.frozen_at is null
+   order by a.created_at limit 1;
   if v_garr_sys is null or v_arga_eval is null then
     raise exception 'PROBE: sin sistema de Garrigues o sin evaluación de ARGA: las sondas no tendrían sujeto';
   end if;
@@ -129,6 +131,30 @@ begin
   if v_err not like 'CUESTIONARIO_DE_OTRO_SISTEMA%' then
     raise exception 'PROBE P5: un cuestionario ajeno no se rechaza (%)', v_err;
   end if;
+
+  -- P9 — congelada por la RPC real: ni se le anexa una comprobación ni se
+  --      corrige la que tiene. Los positivos son P1 (alta enlazada) y P4c
+  --      (UPDATE de la misma fila), los dos antes de congelar.
+  perform public.fn_aims_freeze_assessment(v_nueva);
+  begin
+    insert into public.ai_compliance_checks (system_id, assessment_id, requirement_code, status)
+    values (v_garr_sys, v_nueva, 'PROBE_M01', 'CONFORME');
+    v_err := 'ACEPTADA'; v_code := null;
+  exception when others then
+    v_err := sqlerrm; v_code := sqlstate;
+  end;
+  if v_err not like 'EVALUACION_CONGELADA%' or v_code is distinct from '42501' then
+    raise exception 'PROBE P9a: se anexa una comprobación a una evaluación congelada (% / %)', v_code, v_err;
+  end if;
+  begin
+    update public.ai_compliance_checks set status = 'CONFORME' where id = v_check;
+    v_err := 'ACEPTADA'; v_code := null;
+  exception when others then
+    v_err := sqlerrm; v_code := sqlstate;
+  end;
+  if v_err not like 'EVALUACION_CONGELADA%' or v_code is distinct from '42501' then
+    raise exception 'PROBE P9b: se corrige una comprobación de una evaluación congelada (% / %)', v_code, v_err;
+  end if;
   reset role;
 
   -- P6 — sesión sin persona (usuario sin perfil): rechazada.
@@ -157,7 +183,13 @@ begin
     raise exception 'PROBE P7: autoría ARGA % y debía ser %', v_quien, v_arga_persona;
   end if;
 
-  -- P8 — las legacy siguen sin enlace (no hubo backfill).
+  -- P8 — las legacy siguen sin enlace (no hubo backfill). Control positivo:
+  --      que haya legacy que medir; si no, el recuento de abajo daría 0 sobre nada.
+  select count(*) into v_filas from public.ai_compliance_checks
+   where created_at < '2026-09-19';
+  if v_filas = 0 then
+    raise exception 'PROBE P8: no hay comprobaciones legacy que medir';
+  end if;
   select count(*) into v_filas from public.ai_compliance_checks
    where created_at < '2026-09-19' and assessment_id is not null;
   if v_filas <> 0 then
@@ -169,6 +201,6 @@ begin
 end;
 $probe$;
 
-SELECT 'M01 PROBE OK: P1-P8 (autoría de servidor, enlace coherente, cross-tenant, inmutabilidad, sin persona, legacy intactas)' AS resultado;
+SELECT 'M01 PROBE OK: P1-P9 (autoría de servidor, enlace coherente, cross-tenant, inmutabilidad, sin persona, legacy intactas, congelada intocable)' AS resultado;
 
 ROLLBACK;
