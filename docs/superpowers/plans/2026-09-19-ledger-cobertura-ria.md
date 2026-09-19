@@ -42,6 +42,8 @@ ejecuta lo que depende de ella («falla cerrado»).
 |---|---|---|---|
 | H-01 | 17 criterios de aplicabilidad, correcciones a la matriz, calendario del Ómnibus | RESPONDIDO 19-09 | 16 correctos + C2 con matiz útil. El matiz de Harvey en C15 (art. 73.4) **no está en el texto consolidado**: C15 queda correcto. 8 consideraciones → requisitos RH-1…RH-8. Archivo: `docs/legal/harvey/2026-09-19-H-01-*` |
 
+Citas de Harvey que NO resisten el literal (lote H-01): el art. 73.4 en C15 y el considerando 25 en C8 (el apoyo correcto del doble rol es el considerando 83). Los criterios siguen siendo correctos; las citas no. Ver `docs/legal/2026-09-19-verificacion-omnibus-puntos-abiertos.md`.
+
 Regla: la respuesta de Harvey es dato; toda afirmación suya que cambie un criterio se contrasta
 con el literal (EUR-Lex consolidado 27-07-2026) antes de usarla.
 
@@ -66,8 +68,8 @@ con el literal (EUR-Lex consolidado 27-07-2026) antes de usarla.
 
 | Fase | Estado | Notas |
 |---|---|---|
-| F0 | EN CURSO | T3 (H-01) hecha; T1 propuestas presentadas al usuario |
-| F1 | PENDIENTE | Siguiente |
+| F0 | EN CURSO | T3 (H-01) hecha · T2 hecha (7 VERIFICADOS, 1 PENDIENTE_LEGAL: fecha de la sección 5) · T1 propuestas presentadas al usuario · T4 y T5 en la cadena F de la fase 1 |
+| F1 | EN CURSO | Seis cadenas en worktrees aislados (A monitores, B sistema, C cuestionario, D catálogo, E migración M01, F documentos de F0) |
 | F2-F11 | PENDIENTE | |
 
 ## Deudas y hallazgos durante la ejecución
