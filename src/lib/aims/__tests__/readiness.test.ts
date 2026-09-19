@@ -24,6 +24,9 @@ describe("buildAimsReadiness", () => {
           id: "assess-1",
           system_id: "sys-1",
           status: "APROBADO",
+          // Acredita sólo lo congelado y revisado (F1.T4).
+          frozen_at: "2026-01-01",
+          reviewed_at: "2026-01-02",
           findings: [{ code: "AIA-09", status: "CERRADO" }],
         },
       ],
@@ -352,7 +355,8 @@ describe("F1.T2 — cierres, hallazgos y 0/0", () => {
       { id: "d3234e6a", system_id: "900a2ea7", framework: "EU_AI_ACT", status: "EN_REVISION", created_at: "2026-04-18T15:44:31Z", findings: [{ code: "ART_9", status: "EN_CURSO" }, { code: "ART_10", status: "NO_CONFORME" }] },
     ];
     const r = buildAimsReadiness({ systems: [], assessments, incidents: [] });
-    expect(r.domains.find((d) => d.id === "controls")?.metric).toBe("8/11 cerrados");
+    // Desde F1.T4 se dice además que ninguna de las 11 está congelada y revisada.
+    expect(r.domains.find((d) => d.id === "controls")?.metric).toBe("8/11 cerrados · 11 sin congelar y revisar");
   });
 
   it("0/0 se pinta gris «no aplica»: sin sistemas de alto riesgo no hay brecha de evaluación", () => {

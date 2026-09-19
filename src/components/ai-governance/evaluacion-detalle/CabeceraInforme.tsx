@@ -16,6 +16,7 @@ import {
 } from "@/lib/aims/perfil-aplicabilidad";
 import { ETIQUETA_ROL, type RolRegulatorio } from "@/lib/aims/rol-regulatorio";
 import { chipClaseEstadoEvaluacion, etiqueta, normalizeAimsStatus } from "@/lib/aims/vocabulario";
+import { rotuloEvaluacion } from "@/lib/aims/legado";
 import type { AiRiskAssessment } from "@/hooks/useAiAssessments";
 
 export interface CabeceraInformeProps {
@@ -145,6 +146,9 @@ export default function CabeceraInforme({
               </span>
             </div>
             <span className="text-xs text-[var(--g-text-secondary)]">Madurez Global del Sistema</span>
+            {rotuloEvaluacion(assessment) && (
+              <span className="text-xs font-semibold text-[var(--g-text-primary)]">{rotuloEvaluacion(assessment)}</span>
+            )}
           </div>
         </div>
 

@@ -5,7 +5,6 @@ import { useAiIncidentsList } from "@/hooks/useAiIncidents";
 import { useAllAssessments, useAllComplianceChecks } from "@/hooks/useAiAssessments";
 import { useAimsMonitoringIndicatorsDelTenant, useAimsTechnicalFileSectionsDelTenant } from "@/hooks/useAimsTechnicalFile";
 import {
-  assessmentAcreditaConformidad,
   buildAimsReadiness,
   filterSystemsByScope,
   incidenteCerrado,
@@ -19,6 +18,7 @@ import { useTenantContext } from "@/context/TenantContext";
 import { useBodyBySlug } from "@/hooks/useBodies";
 import { aiGovernanceBodySlug } from "@/lib/aims/governing-body";
 import { claseNivelRiesgo } from "@/lib/aims/vocabulario";
+import { sistemasCubiertos } from "@/lib/aims/legado";
 import { tieneClasificacionGuiada } from "@/lib/aims/cuestionario-calificacion";
 import { ClasificacionGuiadaCard } from "@/components/ai-governance/dashboard/ClasificacionGuiadaCard";
 import { ComplianceMonitorPanel } from "@/components/ai-governance/dashboard/ComplianceMonitorPanel";
@@ -94,14 +94,10 @@ export default function AiDashboard() {
   // Mismo criterio que el dominio «Incidentes»: abierto = no cerrado con fecha.
   const incidentesAbiertos = incidents.filter((i) => !incidenteCerrado(i)).length;
 
-  // `APROBADO` es legado: el producto escribe `CONFORME`. Predicado único en
-  // `readiness.ts` para que escritura y lectura no vuelvan a divergir.
-  const approvedSysIds = new Set(
-    assessments.filter((a) => assessmentAcreditaConformidad(a.status)).map((a) => a.system_id)
-  );
-  const altosNoEvaluados = systems.filter(
-    (s) => s.risk_level === "Alto" && !approvedSysIds.has(s.id)
-  ).length;
+  // Cubierto = su evaluación vigente acredita (conforme, congelada y
+  // revisada). Criterio único en `legado.ts`, el mismo que usa `readiness`.
+  const cubiertos = sistemasCubiertos(assessments);
+  const altosNoEvaluados = systems.filter((s) => s.risk_level === "Alto" && !cubiertos.has(s.id)).length;
 
   // Días desde última evaluación
   const lastAssessment = assessments.find((a) => a.assessment_date);

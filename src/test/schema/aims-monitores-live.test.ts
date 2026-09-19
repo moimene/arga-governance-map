@@ -16,6 +16,10 @@ import { DEMO_TENANT, GARRIGUES_TENANT, sesionDe, type CuentaDemo } from "../hel
 import { buildAimsReadiness, apartarChecksDeOtroCatalogo, type AimsReadinessInput } from "@/lib/aims/readiness";
 import { monitorDeCodigo } from "@/lib/aims/mapa-monitores";
 import { checksVigentes } from "@/lib/aims/checks-vigentes";
+import { traducirLegado } from "@/lib/aims/legado";
+
+/** Monitor de una comprobación: su código, leído como vigente si es de legado (F1.T4). */
+const monitorDe = (c: { requirement_code?: string | null }) => monitorDeCodigo(traducirLegado(c).requirement_code);
 
 type Dato = Required<AimsReadinessInput>;
 
@@ -65,7 +69,7 @@ describe("monitores AIMS sobre el dato vivo — asignación por código", () => 
       const d = dato.get(cuenta)!;
       expect(d.systems.length, `${cuenta} sin sistemas: la sonda no mediría nada`).toBeGreaterThan(0);
       expect(d.complianceChecks.length, `${cuenta} sin comprobaciones`).toBeGreaterThan(0);
-      conCodigo += d.complianceChecks.filter((c) => monitorDeCodigo(c.requirement_code)).length;
+      conCodigo += d.complianceChecks.filter((c) => monitorDe(c)).length;
     }
     expect(conCodigo, "ninguna comprobación viva tiene código del catálogo: la invariante sería vacua").toBeGreaterThan(0);
   });
@@ -73,8 +77,8 @@ describe("monitores AIMS sobre el dato vivo — asignación por código", () => 
   for (const [cuenta] of TENANTS) {
     it(`${cuenta}: un monitor se apoya en comprobaciones si y sólo si alguna lleva el código de su área`, () => {
       const d = dato.get(cuenta)!;
-      const { medibles } = apartarChecksDeOtroCatalogo(d.systems, d.complianceChecks);
-      const conCodigo = new Set(medibles.map((c) => monitorDeCodigo(c.requirement_code)).filter(Boolean));
+      const { medibles } = apartarChecksDeOtroCatalogo(d.systems, d.complianceChecks.map(traducirLegado));
+      const conCodigo = new Set(medibles.map(monitorDe).filter(Boolean));
       const monitores = buildAimsReadiness(d).complianceMonitors;
       expect(monitores.length).toBeGreaterThan(10);
       for (const m of monitores) {

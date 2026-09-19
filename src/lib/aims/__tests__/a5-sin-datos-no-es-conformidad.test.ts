@@ -85,12 +85,13 @@ describe("A5 — cero datos no es conformidad", () => {
     const conDato = buildAimsReadiness({
       systems: [{ id: "s1", status: "ACTIVO", risk_level: "Alto" }],
       assessments: [
-        { id: "a1", system_id: "s1", status: "APROBADO", findings: [{ code: "F1", status: "CERRADO" }] },
+        // Congelada y revisada (F1.T4) e incidente cerrado con fecha (F1.T2).
+        { id: "a1", system_id: "s1", status: "APROBADO", frozen_at: "2026-01-01", reviewed_at: "2026-01-02", findings: [{ code: "F1", status: "CERRADO" }] },
       ],
       incidents: [
         {
           id: "i1", system_id: "s1", status: "CERRADO", severity: "MEDIO",
-          root_cause: "causa", corrective_action: "acción",
+          root_cause: "causa", corrective_action: "acción", closed_at: "2026-01-03",
         },
       ],
     });

@@ -4,7 +4,7 @@ import type { AiSystem } from "@/hooks/useAiSystems";
 import { AESIA_RIA_REQUIREMENTS } from "@/lib/aims/catalog-aesia";
 import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 import { evaluadaContraOtroCatalogo } from "@/lib/aims/perfil-aplicabilidad";
-import { assessmentAcreditaConformidad } from "@/lib/aims/readiness";
+import { evaluacionAcredita, rotuloEvaluacion } from "@/lib/aims/legado";
 import { claseNivelRiesgo, etiqueta } from "@/lib/aims/vocabulario";
 
 /**
@@ -88,7 +88,7 @@ export default function TabEvaluaciones({ system, assessments, error, onNueva, o
                 <span className="flex flex-wrap items-center gap-1.5">
                   <span
                     className={`px-2 py-0.5 font-semibold text-[11px] ${
-                      assessmentAcreditaConformidad(ass.status)
+                      evaluacionAcredita(ass)
                         ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
                         : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
                     }`}
@@ -96,6 +96,11 @@ export default function TabEvaluaciones({ system, assessments, error, onNueva, o
                   >
                     {etiqueta("estadoEvaluacion", ass.status) || "Sin estado"}
                   </span>
+                  {rotuloEvaluacion(ass) && (
+                    <span className={`px-2 py-0.5 font-semibold text-[11px] ${claseNivelRiesgo(null)}`} style={{ borderRadius: "var(--g-radius-full)" }}>
+                      {rotuloEvaluacion(ass)}
+                    </span>
+                  )}
                   {/* Chip neutro de la hoja (el mismo que un nivel sin clasificar). */}
                   {evaluadaContraOtroCatalogo(ass.findings, system, AESIA_RIA_REQUIREMENTS) && (
                     <span className={`px-2 py-0.5 font-semibold text-[11px] ${claseNivelRiesgo(null)}`} style={{ borderRadius: "var(--g-radius-full)" }}>

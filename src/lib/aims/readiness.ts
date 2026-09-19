@@ -1,8 +1,9 @@
 import { AESIA_RIA_REQUIREMENTS } from "./catalog-aesia";
-import { evaluacionesVigentes } from "./checks-vigentes";
+import { checksVigentes, evaluacionesVigentes } from "./checks-vigentes";
 import { acreditaConformidad } from "./conformidad";
 import { tieneClasificacionGuiada } from "./cuestionario-calificacion";
 import { ANEXO_IV_SECCIONES, normalizarEstadoSeccion } from "./expediente-tecnico";
+import { evaluacionAcredita, evaluacionFirme, seccionAcredita, sistemasCubiertos, traducirLegado } from "./legado";
 import { monitorDeCodigo } from "./mapa-monitores";
 import { DESPLIEGUE_REQUIREMENTS, codigosDelPerfil } from "./perfil-aplicabilidad";
 import { etiqueta, isMaterialSeverity, normalizeAimsStatus } from "./vocabulario";
@@ -33,6 +34,8 @@ export interface AimsAssessmentLike {
   assessment_date?: string | null;
   framework?: string | null;
   created_at?: string | null;
+  frozen_at?: string | null;
+  reviewed_at?: string | null;
 }
 
 export interface AimsIncidentLike {
@@ -53,6 +56,9 @@ export interface AimsComplianceCheckLike {
   description?: string | null;
   status?: string | null;
   evidence_url?: string | null;
+  created_at?: string | null;
+  /** Código original si se leyó como legado (`traducirLegado`): no acredita. */
+  codigo_legado?: string;
 }
 
 /** Sección del expediente técnico (`aims_technical_file_sections`). */
@@ -361,18 +367,18 @@ function checksForDefinition(checks: AimsComplianceCheckLike[], definition: Moni
   return checks.filter((check) => monitorDeCodigo(check.requirement_code) === definition.id);
 }
 
+/** Conforme Y no de legado: una comprobación de legado se cuenta, pero no acredita. */
+function checkAcredita(check: AimsComplianceCheckLike): boolean {
+  return !check.codigo_legado && COMPLIANT_STATUSES.has(normalizeAimsStatus(check.status));
+}
+
 function statusFromChecks(checks: AimsComplianceCheckLike[]): AimsReadinessStatus | null {
   if (checks.length === 0) return null;
-  const statuses = checks.map((check) => normalizeAimsStatus(check.status));
+  const statuses = checks.map((check) => (check.codigo_legado && !GAP_STATUSES.has(normalizeAimsStatus(check.status)) ? "PENDIENTE" : normalizeAimsStatus(check.status)));
   if (statuses.some((status) => GAP_STATUSES.has(status))) return "gap";
   if (statuses.every((status) => COMPLIANT_STATUSES.has(status))) return "ready";
   if (statuses.some((status) => WATCH_STATUSES.has(status))) return "watch";
   return "watch";
-}
-
-/** Una sección acredita si está conforme (o cerrada) y tiene revisor: la fecha de revisión sola no. */
-function seccionAcredita(seccion: AimsSectionLike): boolean {
-  return ["APPROVED", "SEALED"].includes(normalizarEstadoSeccion(seccion.status)) && Boolean(seccion.reviewed_by_id);
 }
 
 /**
@@ -408,18 +414,13 @@ function fallbackMonitorStatus(
   const seccion = (code: string) => secciones.filter((s) => s.section_code === code);
   const totalSystems = systems.length;
   const highRiskSystems = systems.filter((system) => system.risk_level === "Alto");
-  const assessedSystemIds = new Set(
-    assessments
-      .filter((assessment) => assessmentAcreditaConformidad(assessment.status) && assessment.system_id)
-      .map((assessment) => assessment.system_id as string),
-  );
-  const highRiskAssessed = highRiskSystems.filter((system) => assessedSystemIds.has(system.id)).length;
+  // Cubierto = su evaluación vigente (la más reciente no borrador) acredita.
+  const cubiertos = sistemasCubiertos(assessments);
+  const highRiskAssessed = highRiskSystems.filter((system) => cubiertos.has(system.id)).length;
   const materialIncidents = incidents.filter(isAimsMaterialIncidentCandidate).length;
   const conClasificacionGuiada = systems.filter(tieneClasificacionGuiada).length;
-  const isoAssessments = assessments.filter((assessment) => assessment.framework === "ISO_42001");
-  const approvedIsoAssessments = isoAssessments.filter((assessment) =>
-    assessmentAcreditaConformidad(assessment.status),
-  ).length;
+  const isoAssessments = evaluacionesVigentes(assessments).filter((assessment) => assessment.framework === "ISO_42001");
+  const approvedIsoAssessments = isoAssessments.filter(evaluacionAcredita).length;
 
   switch (definition.id) {
     case "inventory-classification":
@@ -467,7 +468,7 @@ function fallbackMonitorStatus(
     case "iso-42001-management-system":
       return {
         status: isoAssessments.length === 0 ? "unmeasured" : domainStatus(pct(approvedIsoAssessments, isoAssessments.length), 50, 80),
-        metric: isoAssessments.length === 0 ? "Sin evaluaciones ISO 42001" : `${approvedIsoAssessments}/${isoAssessments.length} aprobadas`,
+        metric: isoAssessments.length === 0 ? "Sin evaluaciones ISO 42001" : `${approvedIsoAssessments}/${isoAssessments.length} acreditadas`,
       };
     // Sin comprobaciones con el código del área no hay nada medido: que exista
     // alguna evaluación del sistema no dice nada de ESTA área. Terceros entra
@@ -505,14 +506,18 @@ export function apartarChecksDeOtroCatalogo(systems: AimsSystemLike[], checks: A
 }
 
 export function buildAimsComplianceMonitors(input: AimsReadinessInput): AimsComplianceMonitorDomain[] {
-  const { medibles: checks, otroCatalogo } = apartarChecksDeOtroCatalogo(input.systems, input.complianceChecks ?? []);
+  // El legado se LEE con su código vigente (sin tocar la fila) y, tras
+  // traducirlo, manda la comprobación más reciente de cada requisito.
+  const traducidas = checksVigentes((input.complianceChecks ?? []).map(traducirLegado));
+  const { medibles: checks, otroCatalogo } = apartarChecksDeOtroCatalogo(input.systems, traducidas);
   return complianceMonitorDefinitions.map((definition) => {
     const matchingChecks = checksForDefinition(checks, definition);
     const checkedStatus = statusFromChecks(matchingChecks);
     const fallback = fallbackMonitorStatus(definition, input);
     const status = checkedStatus ?? fallback.status;
+    const legado = matchingChecks.filter((check) => check.codigo_legado).length;
     const metric = matchingChecks.length > 0
-      ? `${matchingChecks.filter((check) => COMPLIANT_STATUSES.has(normalizeAimsStatus(check.status))).length}/${matchingChecks.length} conformes`
+      ? `${matchingChecks.filter(checkAcredita).length}/${matchingChecks.length} conformes${legado > 0 ? ` · ${legado} de legado, no acredita` : ""}`
       : fallback.metric;
 
     return {
@@ -554,19 +559,22 @@ export function buildAimsComplianceMonitorsPorSistema(
 export function buildAimsReadiness(input: AimsReadinessInput): AimsReadinessSummary {
   const { systems, assessments, incidents } = input;
   const totalSystems = systems.length;
-  const assessedSystemIds = new Set(
-    assessments
-      .filter((assessment) => assessmentAcreditaConformidad(assessment.status) && assessment.system_id)
-      .map((assessment) => assessment.system_id as string),
-  );
+  const cubiertos = sistemasCubiertos(assessments);
   const highRiskSystems = systems.filter((system) => system.risk_level === "Alto");
-  const highRiskAssessed = highRiskSystems.filter((system) => assessedSystemIds.has(system.id)).length;
+  const highRiskAssessed = highRiskSystems.filter((system) => cubiertos.has(system.id)).length;
   const openIncidents = incidents.filter((incident) => !incidenteCerrado(incident)).length;
   const incidentesCerrados = incidents.filter(incidenteCerrado).length;
   const conClasificacionGuiada = systems.filter(tieneClasificacionGuiada).length;
   // Sólo la última evaluación no borrador de cada sistema y marco: los
   // borradores y las repeticiones no son hallazgos vigentes.
-  const findings = evaluacionesVigentes(assessments).flatMap((assessment) => assessment.findings ?? []);
+  const vigentes = evaluacionesVigentes(assessments);
+  const findings = vigentes.flatMap((assessment) => assessment.findings ?? []);
+  // Hallazgos de evaluaciones sin congelar y revisar: se cuentan, pero no
+  // pueden llevar «Controles» a Listo (acredita sólo lo congelado y revisado).
+  const sinFirmar = vigentes
+    .filter((assessment) => !evaluacionFirme(assessment))
+    .flatMap((assessment) => assessment.findings ?? [])
+    .filter((finding) => finding.code || finding.status).length;
   const controlFindings = findings.filter((finding) => finding.code || finding.status);
   // El vocabulario que el producto ESCRIBE en `findings[].status` es el nivel
   // de madurez (`L1`…`L8`), no una palabra de estado: `buildEvaluationPayload`
@@ -622,8 +630,16 @@ export function buildAimsReadiness(input: AimsReadinessInput): AimsReadinessSumm
       id: "controls",
       hasData: controlFindings.length > 0,
       label: "Controles",
-      status: controlFindings.length === 0 ? "unmeasured" : domainStatus(controlCoverage, 40, 75),
-      metric: controlFindings.length === 0 ? "Sin hallazgos de evaluación" : `${closedControlFindings}/${controlFindings.length} cerrados`,
+      status:
+        controlFindings.length === 0
+          ? "unmeasured"
+          : domainStatus(controlCoverage, 40, 75) === "ready" && sinFirmar > 0
+            ? "watch"
+            : domainStatus(controlCoverage, 40, 75),
+      metric:
+        controlFindings.length === 0
+          ? "Sin hallazgos de evaluación"
+          : `${closedControlFindings}/${controlFindings.length} cerrados${sinFirmar > 0 ? ` · ${sinFirmar} sin congelar y revisar` : ""}`,
       detail: "Hallazgos de la última evaluación no borrador de cada sistema; no crea controles paralelos.",
       route: "/ai-governance/evaluaciones",
     },
