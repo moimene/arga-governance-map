@@ -124,7 +124,9 @@ describe("F1.T10 — ayudas del cuestionario v1.1", () => {
   type Peticion = { id: string; estado?: string };
   const registro = JSON.parse(readFileSync("docs/legal/harvey/registro.json", "utf8")) as { peticiones: Peticion[] };
   const h02aConVeredicto = registro.peticiones.some((p) => p.id === "H-02A" && p.estado === "RESPONDIDA");
-  const PROHIBIDAS = [/SOLO si/, /casi seguro/i, /ante la duda/i];
+  // Sin distinguir mayúsculas ni tilde: «solo si» excluye igual que «SOLO si».
+  // `\b` al final para no morder «sólo sistemas».
+  const PROHIBIDAS = [/\bs[óo]lo si\b/i, /casi seguro/i, /ante la duda/i];
 
   const textoDe = (p: { titulo: string; ayuda: { queSignifica: string; ejemplos: string[]; comoSaberlo: string } }) =>
     [p.titulo, p.ayuda.queSignifica, ...p.ayuda.ejemplos, p.ayuda.comoSaberlo].join("\n");
@@ -136,6 +138,10 @@ describe("F1.T10 — ayudas del cuestionario v1.1", () => {
     for (const re of PROHIBIDAS.slice(0, 2)) {
       expect(re.test("Marque «Sí» SOLO si el sistema… la respuesta casi seguro es «No»")).toBe(true);
     }
+    for (const frase of ["Marque «Sí» solo si", "sólo si el sistema", "Sólo si, además,"]) {
+      expect({ frase, casa: PROHIBIDAS[0].test(frase) }).toEqual({ frase, casa: true });
+    }
+    expect(PROHIBIDAS[0].test("se aplica a sólo sistemas de IA")).toBe(false);
   });
 
   it("ninguna ayuda instruye a excluir letras ni a responder «No» por defecto", async () => {
@@ -161,6 +167,9 @@ describe("F1.T10 — ayudas del cuestionario v1.1", () => {
     expect(q).toMatch(/no exige intenci[óo]n/i);
     expect(q).toMatch(/fines de garant[íi]a del cumplimiento del Derecho/);
     expect(q).toMatch(/anexo III, punto 1 a\)/);
+    // b bis) y b ter) cotejadas con el consolidado 02024R1689-20260727 (ledger).
+    expect(q).toMatch(/partes íntimas de una persona física identificable/);
+    expect(q).toContain("Directiva 2011/93/UE");
   });
 
   it("Q2_3 no pone de ejemplo un scoring y avisa de que el perfilado excluye la excepción", async () => {
@@ -168,23 +177,46 @@ describe("F1.T10 — ayudas del cuestionario v1.1", () => {
     const q23 = PREGUNTAS.find((p) => p.id === "Q2_3")!;
     expect(textoDe(q23).match(/scoring/i)?.[0] ?? null).toBeNull();
     expect(q23.ayuda.queSignifica).toMatch(/perfiles de personas f[íi]sicas/);
-    // El aviso de perfilado está validado por Harvey (C10): no es provisional.
+    // Q2_3 no lleva rótulo porque solo cambia lo validado (C10, y el último
+    // párrafo del 6.3 cotejado literal): el resto es el texto de la spec del
+    // equipo legal. Quién documenta la excepción (art. 6.4) es de H-02, que no
+    // tiene veredicto: no entra en la ayuda hasta entonces.
+    const ART_6_4 = /art(?:ículo|\.)\s*6(?:\.|, apartado )4/i;
+    expect(ART_6_4.test("la documenta el proveedor (art. 6.4)"), "control positivo del patrón").toBe(true);
+    expect(textoDe(q23).match(ART_6_4)?.[0] ?? null).toBeNull();
     expect(q23.provisional).toBeUndefined();
   });
 
   it("mientras H-02A no tenga veredicto, la ayuda del art. 5 va rotulada provisional", async () => {
     const { PREGUNTAS, ROTULO_PROVISIONAL } = await import("@/lib/aims/cuestionario-calificacion");
     expect(ROTULO_PROVISIONAL).toMatch(/provisional, pendiente de validaci[óo]n/i);
-    if (!h02aConVeredicto) {
-      expect(PREGUNTAS.find((p) => p.id === "Q2_1")!.provisional).toBe(ROTULO_PROVISIONAL);
-    }
+    const q21 = PREGUNTAS.find((p) => p.id === "Q2_1")!;
+    // Con veredicto (CORRECTO o INCORRECTO) el rótulo se va: o se valida o se
+    // revierte. Un «pendiente de validación» que sobrevive al veredicto miente.
+    if (!h02aConVeredicto) expect(q21.provisional).toBe(ROTULO_PROVISIONAL);
+    else expect(q21.provisional).toBeUndefined();
   });
 
-  it("PreguntaGuiada pinta el rótulo provisional desde la pregunta", () => {
-    const src = fuente("PreguntaGuiada.tsx");
-    expect(src).toContain("pregunta.provisional");
-    expect(/\{pregunta\.provisional\}/.test(src), "el rótulo se lee pero no se pinta").toBe(true);
+  it("PreguntaGuiada PINTA el rótulo: con Q2_1 sí, con Q2_3 no", async () => {
+    // Render, no grep del fuente: un `{false && pregunta.provisional && …}`
+    // deja el literal en el fichero y el rótulo fuera de la pantalla.
+    const { createElement } = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { default: Pregunta } = await import("@/components/ai-governance/clasificacion/PreguntaGuiada");
+    const { PREGUNTAS, ROTULO_PROVISIONAL } = await import("@/lib/aims/cuestionario-calificacion");
+    const pinta = (id: string) =>
+      renderToStaticMarkup(
+        createElement(Pregunta, { pregunta: PREGUNTAS.find((p) => p.id === id)!, valor: undefined, onChange: () => {} }),
+      );
+    const q21 = pinta("Q2_1");
+    const q23 = pinta("Q2_3");
+    // Control positivo: la ayuda llega al marcado (va en un panel `hidden`).
+    expect(q23).toContain("¿Qué significa esto?");
+    expect(q23).not.toContain(ROTULO_PROVISIONAL);
+    if (!h02aConVeredicto) expect(q21).toContain(ROTULO_PROVISIONAL);
+    else expect(q21).not.toContain(ROTULO_PROVISIONAL);
   });
+
 });
 
 describe("cuestionario guiado — reglas UX Garrigues y tamaño", () => {

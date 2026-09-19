@@ -146,6 +146,12 @@ describe("fase 3 — marcos y perfil", () => {
     expect(art4?.titulo).toMatch(/medidas para apoyar/i);
     expect(art4?.nota).toMatch(/2026\/1744/);
     expect(art4?.nota).toMatch(/no exige/i);
+    // Literal del art. 4.1 cotejado en el consolidado 02024R1689-20260727
+    // (ledger). La cita al artículo del 2026/1744 que lo modifica no se cotejó:
+    // no se afirma.
+    expect(art4?.nota).toContain("adoptarán medidas para apoyar la promoción de la alfabetización en materia de IA");
+    expect(art4?.nota).toMatch(/art\. 4\.1/i);
+    expect(art4?.nota).not.toMatch(/art\. 1\.5/i);
   });
 
   it("proveedor de alto riesgo: arts. 9–15, 17 y 47, 72 y 73", () => {
@@ -191,6 +197,10 @@ describe("fase 3 — marcos y perfil", () => {
     const prov = derivarMarcos("PROVEEDOR", "Limitado", true).find((x) => x.code === "RIA_CAP_V_GPAI");
     expect(prov?.nota).toMatch(/PROVEEDOR del modelo/);
     expect(prov?.nota).toMatch(/55/);
+    // Y es la nota del PROVEEDOR, no la del desplegador: las dos cumplen los
+    // dos patrones de arriba, así que sin esto la rama podría cruzarse.
+    expect(prov?.nota).toMatch(/no convierte en proveedor del modelo/);
+    expect(prov?.nota).not.toMatch(/responsable del despliegue/);
     // Quien sí es proveedor del modelo no recibe la cautela, solo la numeración.
     const gpai = derivarMarcos("PROVEEDOR_GPAI", "Limitado", true).find((x) => x.code === "RIA_CAP_V_GPAI");
     expect(gpai?.nota).not.toMatch(/PROVEEDOR del modelo/);

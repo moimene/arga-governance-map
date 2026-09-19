@@ -153,7 +153,7 @@ export const DESPLIEGUE_REQUIREMENTS: RequirementDef[] = [
     title: "Alfabetización en materia de IA",
     articleRef: "Art. 4",
     description:
-      "Adoptar medidas para apoyar la alfabetización en IA del personal que usa el sistema, teniendo en cuenta sus conocimientos técnicos, su experiencia, su formación, el contexto de uso y las personas sobre las que se usa (art. 4 en la redacción del Reglamento (UE) 2026/1744). Es una obligación de medios: no exige garantizar un nivel específico y se acredita con las medidas adoptadas (formación, instrucciones, política de uso). Vincula a proveedores y a responsables del despliegue de CUALQUIER nivel de riesgo.",
+      "Adoptar medidas para apoyar la promoción de la alfabetización en materia de IA del personal y demás personas que se encargan del funcionamiento y la utilización del sistema, teniendo en cuenta sus conocimientos técnicos, su experiencia, su formación, el contexto de uso y las personas sobre las que se usa (art. 4 en la redacción del Reglamento (UE) 2026/1744). Es una obligación de medios: no exige garantizar un nivel específico y se acredita con las medidas adoptadas (formación, instrucciones, política de uso). Vincula a proveedores y a responsables del despliegue de CUALQUIER nivel de riesgo.",
     subparts: [
       { subpartId: "ALF.PROGRAMA", articleNumber: "Art. 4", titleShort: "Programa de formación", orderIndex: 1 },
       { subpartId: "ALF.CONTEXTO", articleNumber: "Art. 4", titleShort: "Adecuación al perfil y al contexto", orderIndex: 2 },
@@ -355,7 +355,22 @@ export function perfilAplicable(
     };
   }
 
-  if (ROLES_DE_DESPLIEGUE.has(rol)) {
+  // Importador y distribuidor (arts. 23 y 24) no tienen catálogo propio (DA-1)
+  // y el art. 4 no les vincula: el del responsable del despliegue les mediría
+  // la alfabetización como obligación suya. Falla abierto al completo.
+  if (rol !== "RESPONSABLE_DESPLIEGUE" && ROLES_DE_DESPLIEGUE.has(rol)) {
+    return {
+      requirements: catalogoProveedor,
+      etiqueta: "Proveedor de sistema de alto riesgo",
+      motivo:
+        "Importador o distribuidor: no hay catálogo validado para este rol (arts. 23 y 24), así que se mide contra el catálogo completo del proveedor y se dice.",
+      provisional: false,
+      sinRolDeclarado: false,
+      catalogProfile: perfilCatalogo(rol, nivel),
+    };
+  }
+
+  if (rol === "RESPONSABLE_DESPLIEGUE") {
     return {
       requirements: DESPLIEGUE_REQUIREMENTS,
       etiqueta: `Responsable del despliegue · riesgo ${nivel.toLowerCase()}`,

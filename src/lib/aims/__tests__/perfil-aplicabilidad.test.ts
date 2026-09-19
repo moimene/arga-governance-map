@@ -11,6 +11,7 @@ import {
   procedenciaDe,
 } from "../perfil-aplicabilidad";
 import { AESIA_RIA_REQUIREMENTS, ISO_42001_REQUIREMENTS } from "../catalog-aesia";
+import { ROLES_DE_DESPLIEGUE, ROLES_DE_PROVEEDOR, derivarMarcos } from "../cuestionario-calificacion";
 
 /**
  * Las 84 medidas guía desarrollan los arts. 9 a 15, 17, 72 y 73: son las
@@ -136,6 +137,39 @@ describe("cada medida del perfil dice de dónde sale y con qué carácter", () =
     // El registro de aprovechamiento mide un resultado que el art. 4 ya no
     // exige: es marco operativo, no obligación.
     expect(procedenciaDe("MD_ALF_05")?.caracter).toBe("MARCO_OPERATIVO");
+  });
+
+  it("F1.T11 — el catálogo no mide el art. 4 como obligación de un rol al que los marcos no se lo asignan", () => {
+    // Retirada a medias: `derivarMarcos` dejó de asignar el art. 4 a importador
+    // y distribuidor, pero el perfil les servía el catálogo del desplegador,
+    // que mide MD_ALF_01 a 04 como OBLIGACION «Art. 4».
+    const mideArt4 = (reqs: typeof AESIA_RIA_REQUIREMENTS) =>
+      reqs.some((r) =>
+        r.measures.some((m) => {
+          const proc = procedenciaDe(m.id);
+          return proc?.caracter === "OBLIGACION" && proc.norma === "Art. 4";
+        }),
+      );
+    // Control positivo del instrumento: distingue un catálogo del otro.
+    expect(mideArt4(DESPLIEGUE_REQUIREMENTS)).toBe(true);
+    expect(mideArt4(AESIA_RIA_REQUIREMENTS)).toBe(false);
+    const roles = [...ROLES_DE_DESPLIEGUE, ...ROLES_DE_PROVEEDOR];
+    expect(roles).toEqual(expect.arrayContaining(["RESPONSABLE_DESPLIEGUE", "IMPORTADOR", "DISTRIBUIDOR", "PROVEEDOR"]));
+
+    const discrepan: string[] = [];
+    let midenArt4 = 0;
+    for (const rol of roles) {
+      for (const nivel of ["Alto", "Limitado", "Mínimo"]) {
+        const mide = mideArt4(perfilAplicable({ regulatory_role: rol, risk_level: nivel }, AESIA_RIA_REQUIREMENTS).requirements);
+        const asignado = derivarMarcos(rol, nivel, false).some((m) => m.code === "RIA_ART_4");
+        if (mide) midenArt4++;
+        if (mide && !asignado) discrepan.push(`${rol} · ${nivel}`);
+      }
+    }
+    expect(discrepan).toEqual([]);
+    // Sin esto, un perfil que nunca sirviera el catálogo del desplegador
+    // dejaría la lista vacía por construcción.
+    expect(midenArt4).toBeGreaterThan(0);
   });
 
   it("F1.T11 — el art. 50.4 obliga al responsable del despliegue a divulgar, no a marcar", () => {

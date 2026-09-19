@@ -125,13 +125,70 @@ describe("F1.T11 — carácter de las medidas del desplegador, provisional hasta
     expect(conRotulo).toEqual(h02aConVeredicto ? [] : [...CUATRO].sort());
   });
 
-  it("las dos superficies que pintan la procedencia pintan también el rótulo", () => {
+  it("las dos superficies que pintan la procedencia la leen de la hoja", () => {
     for (const f of [`${DIR_PASOS}/PasoMedidas.tsx`, "src/components/ai-governance/evaluacion-detalle/ChecklistMedidas.tsx"]) {
-      const src = sinComentarios(read(f));
-      // Control positivo: la superficie sigue pintando la procedencia.
-      expect(src, `${f} ya no pinta la procedencia`).toContain("procedenciaDe(");
-      expect(/\{proc\.provisional\}/.test(src), `${f} no pinta el rótulo provisional`).toBe(true);
+      expect(sinComentarios(read(f)), `${f} ya no pinta la procedencia`).toContain("procedenciaDe(");
     }
+  });
+
+  // Render, no grep del fuente: un `{false && proc.provisional && …}` deja el
+  // literal en el fichero y el rótulo fuera de la pantalla. Se cuenta cuántas
+  // veces aparece: una por medida rotulada del catálogo, ni más ni menos.
+  it("PasoMedidas y ChecklistMedidas PINTAN el rótulo en cada medida provisional", async () => {
+    const { createElement } = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { DESPLIEGUE_REQUIREMENTS } = await import("@/lib/aims/perfil-aplicabilidad");
+    const { ROTULO_PROVISIONAL } = await import("@/lib/aims/cuestionario-calificacion");
+    const { default: PasoMedidas } = await import("@/components/ai-governance/evaluacion/PasoMedidas");
+    const { default: ChecklistMedidas } = await import("@/components/ai-governance/evaluacion-detalle/ChecklistMedidas");
+    const veces = (html: string, t: string) => html.split(t).length - 1;
+    const noop = () => {};
+    const esperadas = h02aConVeredicto ? 0 : CUATRO.length;
+
+    const checklist = renderToStaticMarkup(
+      createElement(ChecklistMedidas, {
+        catalog: DESPLIEGUE_REQUIREMENTS,
+        findingsMap: {},
+        planCounts: {},
+        evaluatedCount: 0,
+        findingsPersistidos: 0,
+        findingsSinReconciliar: false,
+        expandedRequirements: {},
+        onToggleRequirement: noop,
+      }),
+    );
+    // Control positivo: la procedencia de MD_TRA_01 llega al marcado.
+    expect(checklist).toContain("MD_TRA_01");
+    expect(checklist).toContain("Art. 50.1");
+    expect(veces(checklist, ROTULO_PROVISIONAL)).toBe(esperadas);
+
+    // El paso solo pinta el requisito activo: se recorren todos.
+    let enPaso = 0;
+    for (const req of DESPLIEGUE_REQUIREMENTS) {
+      const html = renderToStaticMarkup(
+        createElement(PasoMedidas, {
+          requirements: DESPLIEGUE_REQUIREMENTS,
+          activeRequirement: req,
+          activeReqCode: req.code,
+          onActiveReqCode: noop,
+          additionalMeasures: [],
+          evaluations: {},
+          onEvaluationChange: noop,
+          onAddMa: noop,
+          onRemoveMa: noop,
+          systemId: "",
+          evidencias: [],
+          evidenciasDe: {},
+          autoguardado: "limpio",
+          bannerPerfil: null,
+          onPrev: noop,
+          onNext: noop,
+        }),
+      );
+      if (req.code === "TRANSPARENCIA") expect(html).toContain("Art. 50.1");
+      enPaso += veces(html, ROTULO_PROVISIONAL);
+    }
+    expect(enPaso).toBe(esperadas);
   });
 });
 
