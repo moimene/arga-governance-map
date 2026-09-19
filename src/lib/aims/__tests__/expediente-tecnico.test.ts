@@ -1,6 +1,12 @@
 import { describe, it, expect } from "bun:test";
 import {
   ANEXO_IV_SECCIONES,
+  ESTADOS_SECCION,
+  ESTADOS_SECCION_CON_REVISOR,
+  ESTADOS_SECCION_EDITABLES,
+  esEstadoSeccionConRevisor,
+  esEstadoSeccionEditable,
+  esSeccionCerrada,
   etiquetaEstadoSeccion,
   normalizarEstadoSeccion,
   vinculaArt11,
@@ -42,5 +48,52 @@ describe("expediente técnico — anexo IV", () => {
     expect(etiquetaEstadoSeccion("Conforme")).toBe("Conforme");
     expect(etiquetaEstadoSeccion("Lo que sea")).toBe("Lo que sea");
     expect(etiquetaEstadoSeccion(null)).toBe("Sin estado");
+  });
+});
+
+describe("F1.T7 (GC-51) — el cliente no asigna estados que exigen un revisor", () => {
+  it("el selector no ofrece SEALED ni APPROVED", () => {
+    expect(ESTADOS_SECCION_EDITABLES).not.toContain("SEALED");
+    expect(ESTADOS_SECCION_EDITABLES).not.toContain("APPROVED");
+    expect([...ESTADOS_SECCION_CON_REVISOR].sort()).toEqual(["APPROVED", "SEALED"]);
+  });
+
+  it("control positivo: los estados de trabajo siguen ofreciéndose, y el universo queda cerrado", () => {
+    // Una lista vacía satisfaría las dos ausencias de arriba sin ofrecer nada.
+    expect(ESTADOS_SECCION_EDITABLES).toEqual(["PENDING", "IN_REVIEW", "NON_CONFORMING"]);
+    // Todo estado conocido es editable o exige revisor: ninguno queda fuera.
+    for (const e of ESTADOS_SECCION) {
+      const editable = (ESTADOS_SECCION_EDITABLES as readonly string[]).includes(e);
+      const conRevisor = (ESTADOS_SECCION_CON_REVISOR as readonly string[]).includes(e);
+      expect(editable !== conRevisor, e).toBe(true);
+    }
+  });
+
+  it("la escritura aplica el mismo criterio, también a las grafías del seed", () => {
+    for (const s of ["APPROVED", "Conforme", "conforme", "SEALED", "sealed"]) {
+      expect(esEstadoSeccionEditable(s), s).toBe(false);
+    }
+    for (const s of ["PENDING", "Pendiente", "IN_REVIEW", "En revisión", "NON_CONFORMING", "No conforme"]) {
+      expect(esEstadoSeccionEditable(s), s).toBe(true);
+    }
+    // Lo desconocido no se escribe: no es un estado de trabajo declarado.
+    expect(esEstadoSeccionEditable("Lo que sea")).toBe(false);
+    expect(esEstadoSeccionEditable(null)).toBe(false);
+  });
+});
+
+describe("F1.T7 — qué acompaña a un estado con revisor, y qué no se reabre", () => {
+  it("«Revisada» solo es legible junto a un estado de revisor, en cualquier grafía", () => {
+    for (const s of ["APPROVED", "Conforme", "SEALED", "sealed"]) expect(esEstadoSeccionConRevisor(s), s).toBe(true);
+    // Control: los de trabajo y lo desconocido no afirman revisión.
+    for (const s of ["PENDING", "Pendiente", "En revisión", "No conforme", "Lo que sea", null]) {
+      expect(esEstadoSeccionConRevisor(s), String(s)).toBe(false);
+    }
+  });
+
+  it("solo una sección cerrada queda fuera de la edición", () => {
+    expect(esSeccionCerrada("SEALED")).toBe(true);
+    expect(esSeccionCerrada("sealed")).toBe(true);
+    for (const s of ["APPROVED", "Conforme", "PENDING", "En revisión", null]) expect(esSeccionCerrada(s), String(s)).toBe(false);
   });
 });

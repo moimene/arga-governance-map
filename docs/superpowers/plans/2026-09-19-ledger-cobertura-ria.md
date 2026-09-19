@@ -184,3 +184,19 @@ tres dejan de afirmar algo que la base no sostenía):
   24 obligaciones: las 21 de PBC/FT de Garrigues (el patrón espera `OBL-GARR-PBC-%` y están
   sembradas como `OBL-PBC-%`), que hoy se sincronizan al módulo de riesgos penales en vez de al de
   PBC/FT, y 3 de ARGA. Tarea en F5 (sin convertir el ELSE en RAISE).
+- **F1.T6 cierra GC-50 solo para «sin medición»** (revisión adversarial de la cadena B-sistema).
+  Con valor medido, el chip pinta `status` tal cual (DEFAULT 'OK') sin compararlo con
+  `threshold_config`: un indicador por encima del umbral crítico se pintaría «OK». Hoy es cierto de
+  hecho para el único indicador de Cloud (ARGA, 6,4 frente a aviso 8), pero es un rótulo sin arista.
+  **F8.T10** (`v_aims_indicator_status`) debe derivar DENTRO_UMBRAL / UMBRAL_SUPERADO y reproducir el
+  criterio de `tieneMedicion` (falla cerrado: solo un número finito o una cadena no vacía, suelto o
+  en `value`). No se compara en cliente: el dato no declara si el umbral se supera por arriba o por
+  abajo.
+- **F1.T7 — sección «Cerrada» (SEALED):** la pestaña ya no ofrece «Editar», pero el guard del hook
+  mira el estado de DESTINO, no el de origen; la inmutabilidad en servidor llega con **F9.T2**
+  (trigger de guardia de `status`). Latente: 0 filas SEALED en Cloud (medido 2026-09-19).
+- **F1.T7 — `reviewed_at` huérfano (decisión del controlador):** guardar una sección «Conforme» la
+  deja en un estado de trabajo y no toca `reviewed_at`, que queda sin revisión a la que corresponder.
+  La pestaña avisa antes de guardar y ya no pinta «Revisada» junto a un estado de trabajo (hoy ninguna
+  fila de ARGA está en ese caso: la única «Pendiente» tiene `reviewed_at` NULL), pero el dato conserva
+  la fecha. Qué cadena lo cierra —F1.T4 (legado) o F9.T2 (`fn_aims_revisar_seccion`)— está sin decidir.

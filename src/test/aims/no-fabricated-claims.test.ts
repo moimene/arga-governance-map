@@ -386,6 +386,48 @@ describe("A3 — no se ofrece una capacidad que el sistema deniega", () => {
       }
     }
   });
+
+  it("2026-09-19 (F1.T7) — ninguna superficie asigna a una sección un estado que exige revisor: ni verbo ni estado", () => {
+    // Se retiró el cierre del expediente, pero el selector de cada sección
+    // seguía ofreciendo «Conforme» y «Cerrada» (APPROVED/SEALED) sin revisor.
+    // Dos puertas: el VERBO (un botón que aprueba, cierra o sella) y el ESTADO
+    // (un selector alimentado con la lista completa). El comportamiento se
+    // renderiza en `tab-expediente-tecnico.test.tsx`; esto es el respaldo
+    // textual en toda la superficie, que un refactor puede reintroducir suelto.
+    const VERBOS = [
+      /\b(Aprobar|Cerrar|Sellar|Validar|Certificar)\s+(la\s+|esta\s+)?secci[oó]n/i,
+      /\bMarcar\s+como\s+(conforme|revisad[oa]|cerrad[oa]|aprobad[oa])/i,
+    ];
+    // Control del instrumento: cada patrón casa con el rótulo que prohíbe.
+    expect(VERBOS[0].test("Aprobar sección")).toBe(true);
+    expect(VERBOS[1].test("Marcar como conforme")).toBe(true);
+    const ESTADO = /\bESTADOS_SECCION\s*\.\s*(map|forEach|filter)\s*\(/;
+    expect(ESTADO.test("{ESTADOS_SECCION.map((e) =>")).toBe(true);
+
+    const ficheros = superficieAims();
+    expect(ficheros.length, "el barrido se ha quedado corto: la ausencia sería vacua").toBeGreaterThanOrEqual(30);
+    for (const f of ficheros) {
+      const src = sinComentarios(read(f));
+      for (const re of VERBOS) {
+        expect(re.test(src), `${f}: ofrece un verbo que exige revisor → ${src.match(re)?.[0]}`).toBe(false);
+      }
+      expect(ESTADO.test(src), `${f}: recorre la lista completa de estados de sección, SEALED y APPROVED incluidos`)
+        .toBe(false);
+    }
+
+    // Control positivo del ESTADO: el selector existe y se alimenta de la hoja.
+    const tab = sinComentarios(read("src/components/ai-governance/sistema/TabExpedienteTecnico.tsx"));
+    expect(tab).toContain("ESTADOS_SECCION_EDITABLES.map(");
+    // Y la escritura aplica el mismo criterio: retirar la opción del selector y
+    // dejar que el UPDATE acepte APPROVED sería la retirada a medias otra vez.
+    // CAPA DÉBIL, declarada: un señuelo que llame a la función sin lanzar
+    // satisface este grep. El rechazo se EJECUTA en `tab-expediente-tecnico.test.tsx`
+    // (el hook real contra un doble de `supabase.from`); esto queda de respaldo.
+    const hook = sinComentarios(read(HOOK));
+    const update = hook.slice(hook.indexOf("export function useUpdateTechnicalFileSection"));
+    expect(update).toContain('.from("aims_technical_file_sections")');
+    expect(update.slice(0, update.indexOf(".update("))).toContain("esEstadoSeccionEditable(status)");
+  });
 });
 
 describe("A3 — el documento descargable no afirma lo que no consta", () => {
@@ -910,6 +952,10 @@ describe("2026-09-06 — la ausencia de dato se dice, no se rellena", () => {
     // La pestaña de vigilancia se extrajo el 2026-09-08 y el mapa se renombró
     // (`INDICATOR_STATUS_CHIP` → `CHIP_INDICADOR`, `SECTION_STATUS_CHIP_NEUTRO`
     // → `CHIP_NEUTRO`): el invariante no cambia, sólo dónde se mide.
+    // Desde el 2026-09-19 (F1.T6) la clave del chip la da la hoja
+    // `estadoIndicador`, que devuelve SIN_MEDICION sin valor medido: el mapa
+    // no la conoce y cae al neutro. Su comportamiento se renderiza en
+    // `tab-vigilancia.test.tsx`; aquí sigue vigilado el fallback.
     const src = sinComentarios(read(TAB_VIGILANCIA));
     expect(
       /ind\.status\s*===\s*"OPTIMAL"/.test(src),
@@ -921,7 +967,7 @@ describe("2026-09-06 — la ausencia de dato se dice, no se rellena", () => {
     const cuerpo = mapa.slice(0, mapa.indexOf("};"));
     expect(/\bOK:/.test(cuerpo), "el estado 'OK', que es el DEFAULT de la columna, no se reconoce").toBe(true);
     // El fallback es el chip neutro, no el de aviso ni el de éxito.
-    const uso = src.slice(src.indexOf("CHIP_INDICADOR[normalizeAimsStatus(ind.status)]"));
+    const uso = src.slice(src.indexOf("CHIP_INDICADOR[estado.clave]"));
     expect(/\?\?\s*CHIP_NEUTRO/.test(uso.slice(0, 160)),
       "el estado desconocido de un indicador ya no cae al chip neutro").toBe(true);
     // Control positivo del propio chip neutro: mapearlo a un color de éxito o
@@ -1118,5 +1164,22 @@ describe("2026-09-07 — el escalado no redacta la justificación por el oficial
       "el escalado ya no manda el órgano destino").toBe(true);
     expect(/buildMeetingHandoffPath/.test(src),
       "el escalado ya no construye el handoff de Secretaría").toBe(true);
+  });
+});
+
+describe("2026-09-19 — F1.T6: la vigilancia no promete lo que no mide", () => {
+  it("ninguna superficie promete monitorización continua", () => {
+    // La pestaña de vigilancia se presentaba como «monitorización continua de
+    // deriva» sobre indicadores que nacen sin medición, sin umbral y sin forma
+    // de actualizarlos. Se juzga lo renderizable, no la prosa que lo explica.
+    const re = /monitorizaci[oó]n\s+continua|monitoreo\s+continuo|continuous\s+monitoring/i;
+    // Control del instrumento: el patrón casa con la frase que se retiró.
+    expect(re.test("Monitorización continua de deriva (drift)")).toBe(true);
+    const ficheros = superficieAims();
+    expect(ficheros).toContain(TAB_VIGILANCIA);
+    for (const f of ficheros) {
+      const hit = sinComentarios(read(f)).match(re);
+      expect(hit, `${f}: promete una monitorización que no existe → ${hit?.[0]}`).toBeNull();
+    }
   });
 });
