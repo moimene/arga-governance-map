@@ -89,6 +89,109 @@ describe("EvaluacionNueva — el catálogo lo decide el perfil", () => {
   });
 });
 
+// F1.T11 (programa de cobertura RIA, 2026-09-19; cierra GC-31, GC-36, GC-39 y
+// GC-117 en su parte F1). Cuatro medidas del responsable del despliegue se
+// presentaban como obligación jurídica suya y no lo son: el art. 50.1 obliga al
+// proveedor (MD_TRA_01), el cap. V al proveedor del modelo (MD_CS_01/02) y el
+// art. 25.1 califica al sujeto sin imponerle un deber de vigilancia (MD_CS_05).
+// Pasan a marco operativo PROVISIONAL hasta el veredicto de Harvey H-02A, cuyo
+// estado se lee del registro: sin veredicto, ni vuelven a obligación ni pierden
+// el rótulo.
+describe("F1.T11 — carácter de las medidas del desplegador, provisional hasta H-02A", () => {
+  type Peticion = { id: string; estado?: string };
+  const registro = JSON.parse(read("docs/legal/harvey/registro.json")) as { peticiones: Peticion[] };
+  const h02aConVeredicto = registro.peticiones.some((p) => p.id === "H-02A" && p.estado === "RESPONDIDA");
+  const CUATRO = ["MD_TRA_01", "MD_CS_01", "MD_CS_02", "MD_CS_05"];
+
+  it("el registro de Harvey se lee (control positivo del instrumento)", () => {
+    expect(registro.peticiones.some((p) => p.id === "H-01" && p.estado === "RESPONDIDA")).toBe(true);
+  });
+
+  it("sin veredicto de H-02A, las cuatro son marco operativo y llevan el rótulo provisional", async () => {
+    const { procedenciaDe } = await import("@/lib/aims/perfil-aplicabilidad");
+    const { ROTULO_PROVISIONAL } = await import("@/lib/aims/cuestionario-calificacion");
+    for (const id of CUATRO) {
+      const proc = procedenciaDe(id);
+      expect(proc, `${id} ha perdido su procedencia`).not.toBeNull();
+      if (h02aConVeredicto) continue;
+      expect({ id, caracter: proc!.caracter }).toEqual({ id, caracter: "MARCO_OPERATIVO" });
+      expect({ id, provisional: proc!.provisional }).toEqual({ id, provisional: ROTULO_PROVISIONAL });
+    }
+  });
+
+  it("el rótulo provisional no se reparte más allá de las cuatro", async () => {
+    const { PROCEDENCIA_DESPLIEGUE } = await import("@/lib/aims/perfil-aplicabilidad");
+    const conRotulo = Object.entries(PROCEDENCIA_DESPLIEGUE).filter(([, p]) => p.provisional).map(([id]) => id).sort();
+    expect(conRotulo).toEqual(h02aConVeredicto ? [] : [...CUATRO].sort());
+  });
+
+  it("las dos superficies que pintan la procedencia la leen de la hoja", () => {
+    for (const f of [`${DIR_PASOS}/PasoMedidas.tsx`, "src/components/ai-governance/evaluacion-detalle/ChecklistMedidas.tsx"]) {
+      expect(sinComentarios(read(f)), `${f} ya no pinta la procedencia`).toContain("procedenciaDe(");
+    }
+  });
+
+  // Render, no grep del fuente: un `{false && proc.provisional && …}` deja el
+  // literal en el fichero y el rótulo fuera de la pantalla. Se cuenta cuántas
+  // veces aparece: una por medida rotulada del catálogo, ni más ni menos.
+  it("PasoMedidas y ChecklistMedidas PINTAN el rótulo en cada medida provisional", async () => {
+    const { createElement } = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { DESPLIEGUE_REQUIREMENTS } = await import("@/lib/aims/perfil-aplicabilidad");
+    const { ROTULO_PROVISIONAL } = await import("@/lib/aims/cuestionario-calificacion");
+    const { default: PasoMedidas } = await import("@/components/ai-governance/evaluacion/PasoMedidas");
+    const { default: ChecklistMedidas } = await import("@/components/ai-governance/evaluacion-detalle/ChecklistMedidas");
+    const veces = (html: string, t: string) => html.split(t).length - 1;
+    const noop = () => {};
+    const esperadas = h02aConVeredicto ? 0 : CUATRO.length;
+
+    const checklist = renderToStaticMarkup(
+      createElement(ChecklistMedidas, {
+        catalog: DESPLIEGUE_REQUIREMENTS,
+        findingsMap: {},
+        planCounts: {},
+        evaluatedCount: 0,
+        findingsPersistidos: 0,
+        findingsSinReconciliar: false,
+        expandedRequirements: {},
+        onToggleRequirement: noop,
+      }),
+    );
+    // Control positivo: la procedencia de MD_TRA_01 llega al marcado.
+    expect(checklist).toContain("MD_TRA_01");
+    expect(checklist).toContain("Art. 50.1");
+    expect(veces(checklist, ROTULO_PROVISIONAL)).toBe(esperadas);
+
+    // El paso solo pinta el requisito activo: se recorren todos.
+    let enPaso = 0;
+    for (const req of DESPLIEGUE_REQUIREMENTS) {
+      const html = renderToStaticMarkup(
+        createElement(PasoMedidas, {
+          requirements: DESPLIEGUE_REQUIREMENTS,
+          activeRequirement: req,
+          activeReqCode: req.code,
+          onActiveReqCode: noop,
+          additionalMeasures: [],
+          evaluations: {},
+          onEvaluationChange: noop,
+          onAddMa: noop,
+          onRemoveMa: noop,
+          systemId: "",
+          evidencias: [],
+          evidenciasDe: {},
+          autoguardado: "limpio",
+          bannerPerfil: null,
+          onPrev: noop,
+          onNext: noop,
+        }),
+      );
+      if (req.code === "TRANSPARENCIA") expect(html).toContain("Art. 50.1");
+      enPaso += veces(html, ROTULO_PROVISIONAL);
+    }
+    expect(enPaso).toBe(esperadas);
+  });
+});
+
 describe("PerfilAplicabilidadBanner — dice qué perfil y qué le falta", () => {
   it("pinta el perfil de catálogo leyendo el dato, no un rótulo fijo", () => {
     const src = sinComentarios(read(BANNER));

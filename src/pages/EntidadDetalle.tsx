@@ -296,13 +296,18 @@ export default function EntidadDetalle() {
 
         <TabsContent value="ai" className="mt-4">
           <Card className="p-6">
-            <div className="mb-4 flex items-center gap-2">
+            <div className="mb-2 flex items-center gap-2">
               <Brain className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold text-foreground">Sistemas IA de esta entidad</h3>
+              {/* `ai_systems` no tiene `entity_id`: la lista es el inventario
+                  entero del tenant y no se atribuye a esta sociedad (F1.T9). */}
+              <h3 className="text-sm font-semibold text-foreground">Sistemas de IA del grupo (sin atribución a esta sociedad)</h3>
               <Link to="/ai-governance/sistemas" className="ml-auto text-xs text-primary hover:underline flex items-center gap-1">
                 <ExternalLink className="h-3 w-3" />Ver inventario completo
               </Link>
             </div>
+            <p className="mb-4 text-xs text-muted-foreground">
+              El inventario todavía no registra qué sociedad es proveedora o responsable del despliegue de cada sistema.
+            </p>
             {allAiSystems.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <Brain className="h-8 w-8 text-muted-foreground mb-2" />

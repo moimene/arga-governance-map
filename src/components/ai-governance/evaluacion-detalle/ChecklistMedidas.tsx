@@ -172,6 +172,7 @@ export default function ChecklistMedidas({
                                     {proc.caracter === "OBLIGACION" ? "Obligación" : "Marco operativo"}
                                   </span>{" "}
                                   · {proc.norma}
+                                  {proc.provisional && <span className="italic"> · {proc.provisional}</span>}
                                 </div>
                               );
                             })()}
