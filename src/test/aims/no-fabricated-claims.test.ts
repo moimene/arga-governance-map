@@ -415,6 +415,9 @@ describe("A3 — no se ofrece una capacidad que el sistema deniega", () => {
     expect(tab).toContain("ESTADOS_SECCION_EDITABLES.map(");
     // Y la escritura aplica el mismo criterio: retirar la opción del selector y
     // dejar que el UPDATE acepte APPROVED sería la retirada a medias otra vez.
+    // CAPA DÉBIL, declarada: un señuelo que llame a la función sin lanzar
+    // satisface este grep. El rechazo se EJECUTA en `tab-expediente-tecnico.test.tsx`
+    // (el hook real contra un doble de `supabase.from`); esto queda de respaldo.
     const hook = sinComentarios(read(HOOK));
     const update = hook.slice(hook.indexOf("export function useUpdateTechnicalFileSection"));
     expect(update).toContain('.from("aims_technical_file_sections")');

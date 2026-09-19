@@ -10,7 +10,9 @@ import {
 } from "@/hooks/useAimsTechnicalFile";
 import {
   ESTADOS_SECCION_EDITABLES,
+  esEstadoSeccionConRevisor,
   esEstadoSeccionEditable,
+  esSeccionCerrada,
   etiquetaEstadoSeccion,
   normalizarEstadoSeccion,
   vinculaArt11,
@@ -28,7 +30,10 @@ import VersionesSistema from "./VersionesSistema";
  * El selector de estado solo ofrece los de trabajo (`ESTADOS_SECCION_EDITABLES`):
  * «Conforme» y «Cerrada» exigen un revisor que la aplicación no tiene. Una
  * sección registrada así se edita partiendo de «Pendiente», y guardar la deja en
- * el estado de trabajo elegido: el contenido nuevo no lo ha revisado nadie.
+ * el estado de trabajo elegido: el contenido nuevo no lo ha revisado nadie. La
+ * pestaña lo avisa ANTES de guardar, porque la aplicación no puede deshacerlo.
+ * Una sección «Cerrada» no se reabre desde aquí, y «Revisada» solo acompaña a un
+ * estado de revisor: junto a uno de trabajo, esa fecha no corresponde a nada.
  */
 
 export interface TabExpedienteTecnicoProps {
@@ -188,7 +193,7 @@ export default function TabExpedienteTecnico({
                   </div>
 
                   <div className="flex items-center gap-3">
-                    {sec.reviewed_at && (
+                    {sec.reviewed_at && esEstadoSeccionConRevisor(sec.status) && (
                       <div className="text-right">
                         <span className="text-xs font-bold text-[var(--g-brand-3308)]">
                           {new Date(sec.reviewed_at).toLocaleDateString("es-ES")}
@@ -202,6 +207,7 @@ export default function TabExpedienteTecnico({
                     >
                       {etiquetaEstadoSeccion(sec.status)}
                     </span>
+                    {!esSeccionCerrada(sec.status) && (
                     <button
                       type="button"
                       onClick={() => (editando === sec.id ? setEditando(null) : abrirEdicion(sec))}
@@ -210,6 +216,7 @@ export default function TabExpedienteTecnico({
                     >
                       {editando === sec.id ? "Cerrar" : "Editar"}
                     </button>
+                    )}
                   </div>
                 </div>
 
@@ -250,6 +257,17 @@ export default function TabExpedienteTecnico({
                         <p className="mt-1 max-w-xs text-[var(--g-text-secondary)]">
                           «Conforme» y «Cerrada» exigen un revisor: no se asignan desde aquí.
                         </p>
+                        {!esEstadoSeccionEditable(sec.status) && (
+                          <p
+                            data-aviso-estado-revisor
+                            role="note"
+                            className="mt-1 max-w-xs font-semibold text-[var(--g-text-primary)]"
+                          >
+                            Guardar deja esta sección en «{etiquetaEstadoSeccion(estado)}»: «
+                            {etiquetaEstadoSeccion(sec.status)}» no se conserva, porque el contenido nuevo no lo
+                            ha revisado nadie.
+                          </p>
+                        )}
                       </div>
                       <button
                         type="button"

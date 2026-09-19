@@ -13,16 +13,23 @@ import { normalizeAimsStatus } from "./vocabulario";
 
 export const SIN_MEDICION = "SIN_MEDICION";
 
-/** ¿Hay un valor medido? Un cero es una medición; `{}` o `{ value: null }`, no. */
+/** Un valor leíble: número finito o cadena no vacía. */
+function esValor(v: unknown): boolean {
+  if (typeof v === "number") return Number.isFinite(v);
+  return typeof v === "string" && v.trim() !== "";
+}
+
+/**
+ * ¿Hay un valor medido? Falla CERRADO: cuenta el valor suelto o el `value` de
+ * un objeto, y solo si es un número finito (el cero incluido) o una cadena no
+ * vacía. Cualquier otra forma —`{}`, `{ unit: "%" }`, `{ value: {} }`, un
+ * array, un booleano— es «sin medición»: un valor que no se sabe leer no es una
+ * medición, y el DEFAULT 'OK' de `status` no puede pintarse sobre él.
+ */
 export function tieneMedicion(valor: unknown): boolean {
-  if (valor == null) return false;
-  if (typeof valor === "string") return valor.trim() !== "";
-  if (typeof valor === "object") {
-    const o = valor as Record<string, unknown>;
-    if ("value" in o) return o.value != null;
-    return Object.keys(o).length > 0;
-  }
-  return true;
+  if (esValor(valor)) return true;
+  if (valor == null || typeof valor !== "object" || Array.isArray(valor)) return false;
+  return esValor((valor as Record<string, unknown>).value);
 }
 
 export function estadoIndicador(ind: { status?: string | null; current_value?: unknown }): {

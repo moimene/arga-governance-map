@@ -8,14 +8,14 @@
 // se mide lo que la pestaña PINTA, con control positivo: el único indicador de
 // Cloud (ARGA, medido el 2026-09-19) sí tiene valor (6,4 % con umbrales 8/12),
 // y tiene que seguir en «OK».
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { mockRestaurable } from "@/test/garrigues/_mock-restaurable";
 import { sinComentarios } from "@/test/helpers/sin-comentarios";
 import { estadoIndicador, SIN_MEDICION } from "@/lib/aims/vigilancia";
-import type TipoVigilancia from "@/components/ai-governance/sistema/TabVigilancia";
+import Vigilancia from "@/components/ai-governance/sistema/TabVigilancia";
+import { conProveedoresReales } from "./_proveedores-reales";
 
 const TAB = "src/components/ai-governance/sistema/TabVigilancia.tsx";
 const HOOK = "src/hooks/useAimsTechnicalFile.ts";
@@ -26,8 +26,11 @@ const base = {
   system_id: "11111111-1111-1111-1111-111111111111",
   created_at: "2026-04-24T00:00:00Z",
 };
-/** Como nace desde la pestaña: DEFAULT 'OK', sin valor ni umbral. */
-const SIN_VALOR = { ...base, id: "ind-sin-valor", indicator_name: "Deriva del modelo", status: "OK", current_value: null };
+/**
+ * Como nace desde la pestaña: `status` DEFAULT 'OK' y `current_value` DEFAULT
+ * '{}'::jsonb (la columna es NOT NULL, medido el 2026-09-19), sin umbral.
+ */
+const SIN_VALOR = { ...base, id: "ind-sin-valor", indicator_name: "Deriva del modelo", status: "OK", current_value: {} };
 /** El indicador real de ARGA (Motor de triaje de siniestros auto). */
 const ARGA_REAL = {
   ...base,
@@ -56,32 +59,38 @@ describe("F1.T6 — la hoja: sin valor medido no hay estado que leer", () => {
     }
   });
 
+  it("falla cerrado: un valor que no se sabe leer no es una medición", () => {
+    // `{ unit: "%" }` es una unidad declarada sin valor: la misma forma que el
+    // `threshold_config` del indicador de ARGA. Ninguna de estas formas puede
+    // pintarse «OK» en verde por el DEFAULT de `status`.
+    const ilegibles = [
+      { unit: "%" }, { value: "" }, { value: "  " }, { pending: true }, { valor: 3 }, [null], [6.4],
+      { value: {} }, { value: [] }, { value: true }, { value: Number.NaN }, { value: Infinity },
+      Number.NaN, true,
+    ];
+    for (const v of ilegibles) {
+      expect(estadoIndicador({ status: "OK", current_value: v }).clave, String(JSON.stringify(v) ?? v))
+        .toBe(SIN_MEDICION);
+    }
+  });
+
   it("control positivo: con valor medido se lee el estado (también un cero)", () => {
     expect(estadoIndicador({ status: "OK", current_value: { unit: "%", value: 6.4 } }))
       .toEqual({ clave: "OK", etiqueta: "OK" });
     expect(estadoIndicador({ status: "optimal", current_value: 0 }).clave).toBe("OPTIMAL");
     expect(estadoIndicador({ status: "OK", current_value: { unit: "%", value: 0 } }).clave).toBe("OK");
+    expect(estadoIndicador({ status: "OK", current_value: { value: "6,4 %" } }).clave).toBe("OK");
+    expect(estadoIndicador({ status: "OK", current_value: "6,4 %" }).clave).toBe("OK");
   });
 });
 
 describe("F1.T6 — la pestaña pinta «sin medición» y no promete monitorización", () => {
-  let restaurar = () => undefined;
-  let Vigilancia: typeof TipoVigilancia;
-  beforeAll(async () => {
-    const inerte = () => ({ mutate: () => undefined, mutateAsync: async () => undefined, isPending: false });
-    const real = await import("@/hooks/useAimsTechnicalFile");
-    restaurar = await mockRestaurable("@/hooks/useAimsTechnicalFile", () => ({
-      ...real,
-      useRegistrarIndicador: inerte,
-    }));
-    Vigilancia = (await import("@/components/ai-governance/sistema/TabVigilancia")).default;
-  });
-  afterAll(() => restaurar());
-
+  // Sin `mock.module`: la pestaña se renderiza con sus hooks y proveedores
+  // reales, así que el resultado no depende de qué fichero la cargó antes.
   function chips(indicators: unknown[]) {
     const div = document.createElement("div");
     div.innerHTML = renderToStaticMarkup(
-      createElement(Vigilancia, { systemId: base.system_id, indicators: indicators as never }),
+      conProveedoresReales(createElement(Vigilancia, { systemId: base.system_id, indicators: indicators as never })),
     );
     return {
       html: div.innerHTML,
@@ -102,7 +111,10 @@ describe("F1.T6 — la pestaña pinta «sin medición» y no promete monitorizac
     const [sinValor, arga] = vistos;
     expect(sinValor.clave).toBe(SIN_MEDICION);
     expect(sinValor.texto).toBe("Sin medición");
-    expect(/status-(success|warning|error)/.test(sinValor.clase),
+    // Neutro en positivo, no por ausencia de tres colores: un `--status-info`
+    // también es un color de estado.
+    expect(sinValor.clase).toContain("--g-surface-muted");
+    expect(/--status-/.test(sinValor.clase),
       `el indicador sin medición se pinta con un color que afirma algo: ${sinValor.clase}`).toBe(false);
 
     // Control positivo: el indicador real de ARGA, con valor, sigue igual.

@@ -100,6 +100,20 @@ export function esEstadoSeccionEditable(status: string | null | undefined): bool
   return (ESTADOS_SECCION_EDITABLES as readonly string[]).includes(normalizarEstadoSeccion(status));
 }
 
+/** ¿Afirma este estado una revisión? Solo entonces se lee `reviewed_at` como «Revisada». */
+export function esEstadoSeccionConRevisor(status: string | null | undefined): boolean {
+  return (ESTADOS_SECCION_CON_REVISOR as readonly string[]).includes(normalizarEstadoSeccion(status));
+}
+
+/**
+ * Una sección cerrada no se reabre desde la aplicación: el guard de escritura
+ * mira el estado de DESTINO, así que editarla la devolvería a un estado de
+ * trabajo. La inmutabilidad en servidor llega con F9.T2 (M19).
+ */
+export function esSeccionCerrada(status: string | null | undefined): boolean {
+  return normalizarEstadoSeccion(status) === "SEALED";
+}
+
 export function etiquetaEstadoSeccion(status: string | null | undefined): string {
   const n = normalizarEstadoSeccion(status);
   return (ETIQUETA_ESTADO_SECCION as Record<string, string>)[n] ?? (status ?? "Sin estado");

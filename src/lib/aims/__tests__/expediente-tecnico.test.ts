@@ -4,7 +4,9 @@ import {
   ESTADOS_SECCION,
   ESTADOS_SECCION_CON_REVISOR,
   ESTADOS_SECCION_EDITABLES,
+  esEstadoSeccionConRevisor,
   esEstadoSeccionEditable,
+  esSeccionCerrada,
   etiquetaEstadoSeccion,
   normalizarEstadoSeccion,
   vinculaArt11,
@@ -77,5 +79,21 @@ describe("F1.T7 (GC-51) — el cliente no asigna estados que exigen un revisor",
     // Lo desconocido no se escribe: no es un estado de trabajo declarado.
     expect(esEstadoSeccionEditable("Lo que sea")).toBe(false);
     expect(esEstadoSeccionEditable(null)).toBe(false);
+  });
+});
+
+describe("F1.T7 — qué acompaña a un estado con revisor, y qué no se reabre", () => {
+  it("«Revisada» solo es legible junto a un estado de revisor, en cualquier grafía", () => {
+    for (const s of ["APPROVED", "Conforme", "SEALED", "sealed"]) expect(esEstadoSeccionConRevisor(s), s).toBe(true);
+    // Control: los de trabajo y lo desconocido no afirman revisión.
+    for (const s of ["PENDING", "Pendiente", "En revisión", "No conforme", "Lo que sea", null]) {
+      expect(esEstadoSeccionConRevisor(s), String(s)).toBe(false);
+    }
+  });
+
+  it("solo una sección cerrada queda fuera de la edición", () => {
+    expect(esSeccionCerrada("SEALED")).toBe(true);
+    expect(esSeccionCerrada("sealed")).toBe(true);
+    for (const s of ["APPROVED", "Conforme", "PENDING", "En revisión", null]) expect(esSeccionCerrada(s), String(s)).toBe(false);
   });
 });

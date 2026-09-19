@@ -6,7 +6,7 @@
 // Se vigila la ARISTA (que el componente importe y llame la hoja) y, donde el
 // componente es puro, el COMPORTAMIENTO renderizado con control positivo. Todo
 // lo que es grep se mide sobre el fuente SIN COMENTARIOS.
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -16,10 +16,10 @@ import { AESIA_RIA_REQUIREMENTS } from "@/lib/aims/catalog-aesia";
 import TabEvaluaciones from "@/components/ai-governance/sistema/TabEvaluaciones";
 import TabIncidentes from "@/components/ai-governance/sistema/TabIncidentes";
 import DeclaracionConformidadModal from "@/components/ai-governance/DeclaracionConformidadModal";
-import { mockRestaurable } from "@/test/garrigues/_mock-restaurable";
-import type TipoExpediente from "@/components/ai-governance/sistema/TabExpedienteTecnico";
-import type TipoVigilancia from "@/components/ai-governance/sistema/TabVigilancia";
-import type TipoVersiones from "@/components/ai-governance/sistema/VersionesSistema";
+import Expediente from "@/components/ai-governance/sistema/TabExpedienteTecnico";
+import Vigilancia from "@/components/ai-governance/sistema/TabVigilancia";
+import Versiones from "@/components/ai-governance/sistema/VersionesSistema";
+import { conProveedoresReales } from "./_proveedores-reales";
 
 const SISTEMA = "src/components/ai-governance/sistema";
 const EDITAR = `${SISTEMA}/EditarSistemaModal.tsx`;
@@ -208,55 +208,40 @@ describe("A8 — «no se pudo leer» no es «no hay»", () => {
     expect(src).toContain('"Sistema no encontrado"');
   });
 
-  // Review 2026-09-14 (h.3): las tres pestañas con mutaciones se RENDERIZAN
-  // con los hooks de escritura sustituidos; el grep del literal no cazaba
-  // `{errorSecciones ? (` → `{false ? (`.
+  // Review 2026-09-14 (h.3): las tres pestañas con mutaciones se RENDERIZAN;
+  // el grep del literal no cazaba `{errorSecciones ? (` → `{false ? (`.
+  // 2026-09-19: con sus hooks y proveedores REALES, no con `mock.module` del
+  // hook: un componente cargado durante ese mock se quedaba ligado a los dobles
+  // después de restaurarlo, y rompía los tests de otros ficheros que lo usaban
+  // de verdad. En render estático no corre ningún efecto ni ninguna mutación.
   describe("expediente, vigilancia y versiones: con error no aparece el vacío; sin error, sí", () => {
-    const inerte = () => ({ mutate: noop, mutateAsync: async () => undefined, isPending: false });
-    let restaurar = noop;
-    let Expediente: typeof TipoExpediente;
-    let Vigilancia: typeof TipoVigilancia;
-    let Versiones: typeof TipoVersiones;
-    beforeAll(async () => {
-      const real = await import("@/hooks/useAimsTechnicalFile");
-      restaurar = await mockRestaurable("@/hooks/useAimsTechnicalFile", () => ({
-        ...real,
-        useIniciarExpedienteTecnico: inerte,
-        useUpdateTechnicalFileSection: inerte,
-        useRegistrarVersion: inerte,
-        useRegistrarIndicador: inerte,
-      }));
-      Expediente = (await import("@/components/ai-governance/sistema/TabExpedienteTecnico")).default;
-      Vigilancia = (await import("@/components/ai-governance/sistema/TabVigilancia")).default;
-      Versiones = (await import("@/components/ai-governance/sistema/VersionesSistema")).default;
-    });
-    afterAll(() => restaurar());
+    const pintar = (tipo, props) => renderToStaticMarkup(conProveedoresReales(createElement(tipo, props)));
 
     it("expediente (secciones)", () => {
       const props = { systemId: base.id, rol: null, nivel: null, secciones: [], versiones: [], onClasificar: noop };
-      const conError = renderToStaticMarkup(createElement(Expediente, { ...props, errorSecciones: error }));
+      const conError = pintar(Expediente, { ...props, errorSecciones: error });
       expect(conError).not.toContain("No se han generado secciones técnicas");
       expect(conError).not.toContain("Iniciar expediente técnico");
       expect(conError).toContain("No se pudo leer las secciones del expediente (permiso denegado)");
-      const sinError = renderToStaticMarkup(createElement(Expediente, props));
+      const sinError = pintar(Expediente, props);
       expect(sinError).toContain("No se han generado secciones técnicas");
       expect(sinError).toContain("Iniciar expediente técnico");
     });
 
     it("vigilancia (indicadores)", () => {
       const props = { systemId: base.id, indicators: [] };
-      const conError = renderToStaticMarkup(createElement(Vigilancia, { ...props, error }));
+      const conError = pintar(Vigilancia, { ...props, error });
       expect(conError).not.toContain("No hay indicadores de monitorización");
       expect(conError).toContain("No se pudo leer los indicadores (permiso denegado)");
-      expect(renderToStaticMarkup(createElement(Vigilancia, props))).toContain("No hay indicadores de monitorización");
+      expect(pintar(Vigilancia, props)).toContain("No hay indicadores de monitorización");
     });
 
     it("versiones", () => {
       const props = { systemId: base.id, versiones: [] };
-      const conError = renderToStaticMarkup(createElement(Versiones, { ...props, error }));
+      const conError = pintar(Versiones, { ...props, error });
       expect(conError).not.toContain("No hay versiones registradas");
       expect(conError).toContain("No se pudo leer las versiones (permiso denegado)");
-      expect(renderToStaticMarkup(createElement(Versiones, props))).toContain("No hay versiones registradas");
+      expect(pintar(Versiones, props)).toContain("No hay versiones registradas");
     });
   });
 });
