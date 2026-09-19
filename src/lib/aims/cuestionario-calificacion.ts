@@ -33,6 +33,15 @@ export type Respuestas = Partial<Record<IdPregunta, boolean>>;
 
 export type Ayuda = { queSignifica: string; ejemplos: string[]; comoSaberlo: string };
 
+/**
+ * Rótulo de lo que se cambió antes de tener veredicto (programa de cobertura
+ * RIA, F1.T10 y F1.T11): el lote H-02A de Harvey valida las ayudas del art. 5 y
+ * el carácter de cuatro medidas del responsable del despliegue. Con CORRECTO se
+ * retira el rótulo; con INCORRECTO se revierte el cambio (ledger del programa).
+ * La ayuda no se sella: cambiarla no altera el hash de ningún cuestionario.
+ */
+export const ROTULO_PROVISIONAL = "Provisional, pendiente de validación";
+
 export type PreguntaGuiada = {
   id: IdPregunta;
   fase: 1 | 2;
@@ -40,6 +49,8 @@ export type PreguntaGuiada = {
   articulo: string;
   /** Qué citaba la spec cuando el artículo se corrigió, para que Legal vea el cambio. */
   notaSpec?: string;
+  /** Presente mientras la ayuda espera veredicto (hoy, H-02A). */
+  provisional?: string;
   ayuda: Ayuda;
   siImplica: string;
   noImplica: string;
@@ -129,15 +140,19 @@ export const PREGUNTAS: PreguntaGuiada[] = [
     fase: 2,
     titulo: "¿El sistema realiza alguna actividad que la ley considera inaceptable?",
     articulo: "Art. 5 (prácticas prohibidas)",
+    // Diez letras tras el Reglamento (UE) 2026/1744, y el 5.1 bis. Las ayudas de
+    // las letras c), d), f) y h) esperan el veredicto de H-02A.
+    provisional: ROTULO_PROVISIONAL,
     ayuda: {
       queSignifica:
-        "Se refiere a usos de IA que la Unión Europea ha prohibido completamente. Marque «Sí» SOLO si el sistema hace alguna de estas cosas: puntúa o clasifica a personas por su comportamiento social para perjudicarlas; las manipula de forma inconsciente; explota vulnerabilidades (edad, discapacidad, situación económica); o identifica personas por biometría en espacios públicos en tiempo real, salvo excepciones policiales.",
+        "Son los usos de la IA que el art. 5 prohíbe. Marque «Sí» si el sistema hace, o se usa para, cualquiera de estas prácticas: a) técnicas subliminales, manipuladoras o engañosas que alteran de forma sustancial el comportamiento de una persona y le causan, o pueden causarle, un perjuicio considerable; b) aprovechar vulnerabilidades por edad, discapacidad o situación social o económica con ese mismo efecto; b bis) generar imágenes íntimas de una persona sin su consentimiento; b ter) generar material de abuso sexual infantil; c) evaluar o clasificar a personas por su comportamiento social o sus rasgos personales cuando la puntuación lleva a un trato perjudicial en contextos ajenos a aquel en que se obtuvieron los datos, o injustificado o desproporcionado (no exige intención: basta con que ese trato se produzca); d) evaluar el riesgo de que una persona cometa un delito basándose únicamente en su perfil o en sus rasgos de personalidad; e) crear o ampliar bases de datos de reconocimiento facial con imágenes extraídas de forma no selectiva de internet o de circuitos cerrados de televisión; f) inferir las emociones de una persona en el lugar de trabajo o en centros educativos, salvo por motivos médicos o de seguridad (alcanza a cualquier empleador que lo use con ese fin); g) categorizar a personas por sus datos biométricos para deducir su raza, opiniones políticas, afiliación sindical, convicciones religiosas o filosóficas, vida sexual u orientación sexual; h) identificación biométrica remota «en tiempo real» en espacios de acceso público con fines de garantía del cumplimiento del Derecho, salvo las excepciones tasadas del propio artículo. La identificación biométrica remota con otros fines no es la h): se analiza como posible alto riesgo (anexo III, punto 1 a)). Las letras b bis) y b ter) se aplican desde el 2-12-2026 con el alcance del art. 5.1 bis: al proveedor le alcanzan si esa generación es la finalidad prevista o un resultado razonablemente previsible y reproducible sin salvaguardias razonables; al responsable del despliegue, si usa el sistema con ese fin.",
       ejemplos: [
-        "Puntuación social que perjudica a las personas.",
-        "Identificación biométrica remota en tiempo real en espacios de acceso público.",
+        "Un sistema que puntúa a clientes por su comportamiento en redes sociales y les niega o encarece un servicio por ello (letra c), aunque no se diseñara para perjudicarles.",
+        "Una herramienta que infiere el estado de ánimo de los empleados en sus videollamadas (letra f).",
+        "No entra en la letra d) un sistema que puntúa expedientes de siniestro por indicios objetivos de fraude, sin evaluar el riesgo de que una persona cometa un delito por su perfil.",
       ],
       comoSaberlo:
-        "Si tiene dudas, la respuesta casi seguro es «No». Estas prácticas son excepcionales y evidentes.",
+        "Repase las letras una a una con quien conoce el uso real del sistema. Si alguna describe lo que hace o para qué se usa, marque «Sí». Si no puede descartarla, no confirme la clasificación: consúltelo antes con el equipo legal.",
     },
     siImplica: "Inaceptable — flujo bloqueado",
     noImplica: "Continuar",
@@ -168,13 +183,16 @@ export const PREGUNTAS: PreguntaGuiada[] = [
       "¿Considera que, a pesar de estar en la lista anterior, este sistema concreto no genera un riesgo real para las personas?",
     articulo: "Art. 6.3 (excepción motivada)",
     ayuda: {
+      // Sin el ejemplo del scoring y con el aviso de perfilado (validado por
+      // Harvey, C10): el último párrafo del art. 6.3 lo excluye siempre.
       queSignifica:
-        "Es una excepción legal: si puede demostrar que el sistema, aunque pertenece a una categoría de alto riesgo, no supone en la práctica un peligro significativo para la salud, la seguridad o los derechos de las personas, puede documentar una clasificación inferior. Si marca «Sí» deberá escribir una justificación detallada, que queda registrada y puede ser revisada por la autoridad competente.",
+        "Es una excepción legal: un sistema del anexo III no se considera de alto riesgo si no supone un riesgo importante de daño para la salud, la seguridad o los derechos fundamentales de las personas, incluido por no influir sustancialmente en el resultado de la toma de decisiones. Esa evaluación la documenta el proveedor antes de introducir el sistema en el mercado o ponerlo en servicio (art. 6.4). La excepción no se aplica nunca si el sistema elabora perfiles de personas físicas (art. 6.3, último párrafo): en ese caso es siempre de alto riesgo. Si marca «Sí» deberá escribir una justificación detallada, que queda registrada y puede ser revisada por la autoridad competente.",
       ejemplos: [
-        "Un sistema de scoring crediticio usado sólo para operaciones internas de bajo importe y sin decisiones automatizadas sobre personas.",
+        "Una tarea procedimental limitada, como convertir documentos no estructurados en datos estructurados, sin valorar a las personas (art. 6.3, letra a)).",
+        "«No»: el sistema elabora perfiles de personas físicas, por ejemplo para valorar su solvencia o tarificar su seguro de vida o de salud.",
       ],
       comoSaberlo:
-        "Pregúntese si el sistema influye de forma material en una decisión sobre una persona. Si no lo hace, la excepción puede aplicar; motívelo por escrito.",
+        "Compruebe primero si el sistema elabora perfiles de personas físicas: si lo hace, la respuesta es «No». Si no los elabora, pregúntese si sólo realiza una tarea procedimental limitada, mejora el resultado de una actividad humana ya realizada, detecta patrones de decisión sin sustituir ni influir en la valoración humana o hace una tarea preparatoria (art. 6.3, letras a) a d)). Si es así, la excepción puede aplicar; motívelo por escrito.",
     },
     siImplica: "Motivación obligatoria (art. 6.3) — puede reducir la clasificación",
     noImplica: "Alto riesgo confirmado",

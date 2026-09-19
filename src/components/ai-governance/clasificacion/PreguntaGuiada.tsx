@@ -95,6 +95,14 @@ export default function PreguntaGuiada({
         className="space-y-2 bg-[var(--g-surface-subtle)] p-3 text-xs text-[var(--g-text-secondary)]"
         style={{ borderRadius: "var(--g-radius-md)" }}
       >
+        {pregunta.provisional && (
+          <span
+            className="inline-block border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--g-text-secondary)]"
+            style={{ borderRadius: "var(--g-radius-sm)" }}
+          >
+            {pregunta.provisional}
+          </span>
+        )}
         <div>
           <p className="font-semibold text-[var(--g-text-primary)]">¿Qué significa esto?</p>
           <p>{pregunta.ayuda.queSignifica}</p>

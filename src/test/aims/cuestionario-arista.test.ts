@@ -113,6 +113,80 @@ describe("cuestionario guiado — la arista con la hoja del criterio", () => {
   });
 });
 
+// F1.T10 (programa de cobertura RIA, 2026-09-19; cierra GC-18 y GC-26 en su
+// parte v1.1). Las ayudas del art. 5 y del art. 6.3 enseñaban lo contrario de
+// la norma: «Marque Sí SOLO si…» excluía por instrucción las letras d) a g),
+// «casi seguro es No» empujaba a negar, y el ejemplo de la excepción del 6.3
+// era un scoring crediticio, que el último párrafo del 6.3 declara siempre de
+// alto riesgo si elabora perfiles. Las ayudas del art. 5 quedan PROVISIONALES
+// hasta el veredicto de Harvey H-02A: el estado del lote se lee del registro.
+describe("F1.T10 — ayudas del cuestionario v1.1", () => {
+  type Peticion = { id: string; estado?: string };
+  const registro = JSON.parse(readFileSync("docs/legal/harvey/registro.json", "utf8")) as { peticiones: Peticion[] };
+  const h02aConVeredicto = registro.peticiones.some((p) => p.id === "H-02A" && p.estado === "RESPONDIDA");
+  const PROHIBIDAS = [/SOLO si/, /casi seguro/i, /ante la duda/i];
+
+  const textoDe = (p: { titulo: string; ayuda: { queSignifica: string; ejemplos: string[]; comoSaberlo: string } }) =>
+    [p.titulo, p.ayuda.queSignifica, ...p.ayuda.ejemplos, p.ayuda.comoSaberlo].join("\n");
+
+  it("el registro de Harvey se lee (control positivo del instrumento)", () => {
+    // Si el lector no viera nada, `h02aConVeredicto` sería false por ceguera y
+    // el rótulo se exigiría por el motivo equivocado.
+    expect(registro.peticiones.some((p) => p.id === "H-01" && p.estado === "RESPONDIDA")).toBe(true);
+    for (const re of PROHIBIDAS.slice(0, 2)) {
+      expect(re.test("Marque «Sí» SOLO si el sistema… la respuesta casi seguro es «No»")).toBe(true);
+    }
+  });
+
+  it("ninguna ayuda instruye a excluir letras ni a responder «No» por defecto", async () => {
+    const { PREGUNTAS } = await import("@/lib/aims/cuestionario-calificacion");
+    expect(PREGUNTAS.length).toBe(9);
+    for (const p of PREGUNTAS) {
+      const t = textoDe(p);
+      for (const re of PROHIBIDAS) expect({ id: p.id, hit: t.match(re)?.[0] ?? null }).toEqual({ id: p.id, hit: null });
+    }
+  });
+
+  it("Q2_1 nombra las diez letras del art. 5.1 y el 5.1 bis, acota la h) y no exige intención en la c)", async () => {
+    const { PREGUNTAS } = await import("@/lib/aims/cuestionario-calificacion");
+    const q = PREGUNTAS.find((p) => p.id === "Q2_1")!.ayuda.queSignifica;
+    // Como elemento de la enumeración («: a) …; b) …»), no como subcadena: «punto
+    // 1 a)» del anexo III no puede pasar por la letra a) del art. 5.
+    const enumera = (letra: string) => new RegExp(`(?:^|[:;]\\s)${letra.replace(/[()]/g, "\\$&")}\\s`).test(q);
+    expect(enumera("a)") && !new RegExp("(?:^|[:;]\\s)a\\)\\s").test("punto 1 a) del anexo")).toBe(true);
+    for (const letra of ["a)", "b)", "b bis)", "b ter)", "c)", "d)", "e)", "f)", "g)", "h)"]) {
+      expect({ letra, nombrada: enumera(letra) }).toEqual({ letra, nombrada: true });
+    }
+    expect(q).toContain("5.1 bis");
+    expect(q).toMatch(/no exige intenci[óo]n/i);
+    expect(q).toMatch(/fines de garant[íi]a del cumplimiento del Derecho/);
+    expect(q).toMatch(/anexo III, punto 1 a\)/);
+  });
+
+  it("Q2_3 no pone de ejemplo un scoring y avisa de que el perfilado excluye la excepción", async () => {
+    const { PREGUNTAS } = await import("@/lib/aims/cuestionario-calificacion");
+    const q23 = PREGUNTAS.find((p) => p.id === "Q2_3")!;
+    expect(textoDe(q23).match(/scoring/i)?.[0] ?? null).toBeNull();
+    expect(q23.ayuda.queSignifica).toMatch(/perfiles de personas f[íi]sicas/);
+    // El aviso de perfilado está validado por Harvey (C10): no es provisional.
+    expect(q23.provisional).toBeUndefined();
+  });
+
+  it("mientras H-02A no tenga veredicto, la ayuda del art. 5 va rotulada provisional", async () => {
+    const { PREGUNTAS, ROTULO_PROVISIONAL } = await import("@/lib/aims/cuestionario-calificacion");
+    expect(ROTULO_PROVISIONAL).toMatch(/provisional, pendiente de validaci[óo]n/i);
+    if (!h02aConVeredicto) {
+      expect(PREGUNTAS.find((p) => p.id === "Q2_1")!.provisional).toBe(ROTULO_PROVISIONAL);
+    }
+  });
+
+  it("PreguntaGuiada pinta el rótulo provisional desde la pregunta", () => {
+    const src = fuente("PreguntaGuiada.tsx");
+    expect(src).toContain("pregunta.provisional");
+    expect(/\{pregunta\.provisional\}/.test(src), "el rótulo se lee pero no se pinta").toBe(true);
+  });
+});
+
 describe("cuestionario guiado — reglas UX Garrigues y tamaño", () => {
   it("no usa colores Tailwind nativos ni hexadecimales", () => {
     const NATIVOS = /\b(text|bg|border)-(red|green|amber|yellow|gray|slate|blue|white|black)-?\d*\b/g;

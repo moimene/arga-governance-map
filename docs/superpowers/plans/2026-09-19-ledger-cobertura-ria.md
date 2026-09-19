@@ -45,6 +45,23 @@ ejecuta lo que depende de ella («falla cerrado»).
 Regla: la respuesta de Harvey es dato; toda afirmación suya que cambie un criterio se contrasta
 con el literal (EUR-Lex consolidado 27-07-2026) antes de usarla.
 
+### Cambios provisionales a la espera de H-02A (F1.T10 y F1.T11)
+
+Rotulados «Provisional, pendiente de validación» (`ROTULO_PROVISIONAL`,
+`src/lib/aims/cuestionario-calificacion.ts`). Los tests leen el estado del lote en
+`docs/legal/harvey/registro.json`: mientras H-02A no esté RESPONDIDA, el rótulo es
+obligatorio. Con CORRECTO, F1.T15 retira el rótulo; con INCORRECTO, se revierte a lo
+que dice la columna «Antes» y se anota aquí.
+
+| Tarea | Qué | Antes | Ahora (provisional) |
+|---|---|---|---|
+| F1.T10 | Ayuda de Q2_1 (art. 5) | «Marque Sí SOLO si…» con cuatro prácticas; «si tiene dudas, la respuesta casi seguro es No» | Diez letras enumeradas (a-h, b bis, b ter) y el 5.1 bis; c) sin intención; ejemplo de que la d) no alcanza a la puntuación de siniestros por indicios objetivos de fraude; f) a cualquier empleador; h) solo con fines de garantía del cumplimiento del Derecho y la biometría con otros fines al anexo III 1 a) |
+
+No provisionales, por estar ya validados: la retirada del ejemplo del scoring y el aviso de
+perfilado de Q2_3 (C10), el rótulo «Art. 6.2 y anexo III» de Q2_2 (F1.T9) y la redacción
+del art. 4 (C14). **Texto de las ayudas pendiente de revisión por Legal** (F1.T10 lo exige y
+no lo puede cerrar un implementador).
+
 ## Reglas de ejecución
 
 - Una fase por vez en la rama; dentro de la fase, cadenas de tareas sobre ficheros disjuntos en
