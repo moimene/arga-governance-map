@@ -111,6 +111,144 @@ sin cambio visible.
 2026/1744 que modifica el art. 4 (la spec cita «art. 1.5»; Harvey citó «4.1 (mod.), cdo. 8»). La
 nota dice ahora «Art. 4.1 en la redacción del Reglamento (UE) 2026/1744», que sí está cotejado.
 
+## Puntos del Comité (F0.T5)
+
+Orden del día para el **Comité de Gobernanza de la IA** de Garrigues. Legal aporta el contraste
+jurídico. En ARGA, los puntos que le afectan van a su órgano de IA cuando se confirme D-U2
+(propuesta: CATIT).
+
+Cómo se resuelve cada punto: el Comité emite un dictamen, que se registra en Secretaría con el
+asunto indicado (F5.T13) y queda enlazado al sistema, sin posibilidad de edición una vez
+aprobado.
+
+Las fechas límite son **propuesta del implementador de F0.T5, a confirmar por el Comité**,
+calculadas desde la tarea que consume cada punto.
+
+Mientras no haya dictamen, el punto sigue PENDIENTE. **Requisito** para las pantallas afectadas,
+que hoy no existen: fallar cerrado y decirlo, sin deducir nunca la respuesta. Lo implementan
+F6.T13 (requerimientos, CP-1), F4 (pregunta S10 F_2 del cuestionario v2) y F9.T1 (versiones con
+`change_class`, CP-2), y F9.T8 (ficha del sujeto, CP-3), todas sobre el dictamen de F5.T13.
+
+| # | Punto | Tenant | Responsable del dictamen | Aporta Legal | Fecha límite propuesta | Lo consume | Requisito mientras no haya dictamen (tarea) | Estado |
+|---|---|---|---|---|---|---|---|---|
+| CP-1 | Secreto profesional frente a la cooperación (arts. 21 y 26.12) y al acceso a documentación y código (art. 74) | Garrigues | Comité de Gobernanza de la IA (ver la pregunta previa de CP-1) | Contraste H-16 (§9 de la especificación); base del art. 78, del Derecho nacional sobre secreto profesional y de la Carta | H-16 enviado antes del 30-11-2026. Posición aprobada antes del 18-12-2026 | F6.T13 (registro de requerimientos); dictamen SECRETO_PROFESIONAL (F5.T13) | Requerimientos (F6.T13): «posición del despacho sobre secreto profesional pendiente del Comité de IA». La herramienta no decide si se entrega | PENDIENTE |
+| CP-2 | Procedimiento de consulta interna para decidir un «cambio significativo» del art. 111.2 | Garrigues y ARGA | Garrigues: Comité de Gobernanza de la IA. ARGA: órgano de D-U2 | Criterios de apoyo de H-02 P9 (§9); redacción de la ayuda (cdo. 177: «equivalente en sustancia» a la modificación sustancial del 3.23) | 13-11-2026 (tope del cuestionario v2) | Pregunta S10 F_2 del cuestionario v2 (F4); F9.T1 (versiones); dictamen CAMBIO_SIGNIFICATIVO_111_2 (F5.T13) | Cuestionario (F4): F_2 = SÍ no se admite sin la referencia del dictamen. Versiones (F9.T1): SIGNIFICATIVO_111_2 se rechaza sin dictamen | PENDIENTE |
+| CP-3 | Acuerdos intragrupo entre proveedor y responsable del despliegue: GA_IA entre la matriz y NewLaw, y contenido mínimo del acuerdo | Garrigues (y su correlato en ARGA, D-U1) | Garrigues: Comité de Gobernanza de la IA. ARGA: órgano de D-U2 | Cotejo con los arts. 3.3, 3.4, 3.11 y 25; guion del contenido mínimo | 13-11-2026 (antes de M10 y de clasificar GA_IA antes del 2-12-2026) | D-U3; F4.T15 (ACUERDO_INTRAGRUPO); F9.T8; F11.T1 (clasificación de GA_IA); F11.T3 (correlato en ARGA); dictamen ACUERDO_INTRAGRUPO (F5.T13) | Ficha del sujeto (F9.T8): «reparto intragrupo no documentado». El sujeto de GA_IA sigue como hipótesis | PENDIENTE |
+
+### CP-1 Secreto profesional frente a los arts. 21 y 74 (RH-8, DS-40, GC-111)
+
+**Qué se decide.** La posición documentada del despacho ante un requerimiento de una autoridad
+que alcance información amparada por el secreto profesional. Tres preguntas:
+- si puede limitar o condicionar el acceso, y con qué base;
+- quién evalúa cada requerimiento y en qué plazo interno;
+- qué se documenta en cada caso.
+
+**Pregunta previa: quién fija la posición.** Hay tres referencias en el dato sembrado, y ninguna
+resuelve la pregunta:
+- la PI-30 §3.2 d) exige, para el uso extraordinario, un informe al Departamento de Intangibles,
+  la autorización del Comité de IA y, después, la del Senior Partner (informe del 19-09, §4.2);
+- el Código Ético hace responsable al Senior Partner y prevé un informe previo del Comité de
+  Práctica Profesional (art. 43.1, catálogo normativo de G4);
+- el patrón previsto en F5.T13 es un dictamen del Comité más la decisión del Senior Partner.
+
+Si el Comité de IA entiende que la materia es deontológica y corresponde a otro órgano, que lo
+diga, y el punto se reencamina. La herramienta no presupone el órgano.
+
+**Prueba.**
+- **Literal.** Ninguno de estos preceptos excepciona el secreto profesional:
+  - art. 21.1-21.2: información y documentación previa solicitud motivada, y acceso a los
+    archivos de registro bajo control del proveedor;
+  - art. 21.3 y art. 78: confidencialidad de lo que obtengan las autoridades;
+  - art. 26.12: cooperación del responsable del despliegue;
+  - art. 74.12: acceso completo a la documentación y a los conjuntos de datos, también por API;
+  - art. 74.13: acceso al código fuente previa solicitud motivada;
+  - art. 74.14.
+- **Harvey, H-01, consideración 8.** El RIA no tiene una excepción expresa y hay una posible
+  colisión con la cooperación y el acceso a registros. Recomienda someterlo al Comité y
+  documentar la posición del despacho (`docs/legal/harvey/2026-09-19-H-01-respuesta.md`).
+- **Hecho del tenant.** El despacho es responsable del despliegue de Harvey y de Copilot. Según
+  D-U3 (propuesta), es además proveedor de GA_IA. Sus entradas y registros pueden contener
+  información de clientes. CTR-GARR-33 (prohibición de volcar información confidencial en IA
+  generativa de terceros) protege la entrada, pero no resuelve el requerimiento.
+- **El experto ya lo anticipa.** Su entregable de OB-64 (d75) dice: «sin perjuicio de que cada
+  requerimiento deberá ser analizado en detalle y por separado».
+
+**No aplica a ARGA.** La colisión nace del secreto del abogado frente a sus clientes.
+
+### CP-2 Consulta interna del «cambio significativo» (RH-2, DS-38, GC-72)
+
+**Qué se decide.** El procedimiento: quién propone, quién decide, qué se documenta y cuándo.
+Propuesta para el debate, no criterio:
+- **Propone** el responsable interno del sujeto al registrar una versión.
+- **Decide** el órgano de IA, mediante dictamen.
+- **Se documenta:**
+  - la versión de referencia y la nueva;
+  - qué cambia en el diseño (arquitectura, modelo, datos, finalidad);
+  - por qué el cambio es o no «significativo»;
+  - por qué es o no, además, una modificación sustancial del art. 3.23;
+  - los criterios de apoyo utilizados.
+- **Cuándo:** antes de poner en servicio la versión.
+
+**Prueba.**
+- **Literal.** El art. 111.2, en la redacción del 2026/1744, solo sujeta a los sistemas puestos
+  en servicio antes de la fecha de aplicación del capítulo III si sufren «cambios significativos
+  en sus diseños», y no define la expresión. El art. 3.23 define «modificación sustancial». Harvey
+  (H-01, consideración 2) sostiene que son conceptos distintos, pero **el considerando 177 del
+  Reglamento 2024/1689 dice lo contrario**, cotejado literal el 19-09-2026 (CELEX 32024R1689): «el
+  concepto de "cambio significativo" debe entenderse como equivalente en sustancia al de
+  "modificación sustancial", que se utiliza únicamente con respecto a los sistemas de IA de alto
+  riesgo». El 2026/1744 modifica el art. 111.2 y no revisa ese considerando (buscado en su texto
+  oficial: ninguna mención). El considerando no vincula, pero es el criterio interpretativo que
+  da el propio legislador: el dictamen debe partir de él y, si se aparta, justificarlo. Tercera cita
+  de Harvey que no resiste el literal (`docs/legal/2026-09-19-verificacion-omnibus-puntos-abiertos.md`,
+  clave `cdo-177`). El considerando 39 del 2026/1744 computa por tipo y modelo (Harvey, C7).
+- **Consecuencia medida.** Todo el régimen de alto riesgo de ARGA Score (anexo III 5 c), en
+  servicio desde el 1-3-2024 según el dato demo) está latente, y ese estado depende de esta
+  decisión (informe del 19-09, §1). Lo mismo vale para cualquier sistema «Alto» puesto en servicio
+  antes del 2-12-2027 (GC-72).
+- **Diseño.** La herramienta no lo deriva (DS-38), así que sin este procedimiento la pregunta
+  S10 F_2 del cuestionario no puede contestarse con un SÍ.
+
+**ARGA.** Mismo punto para su órgano de IA (D-U2). Hasta que se confirme, falla cerrado.
+
+### CP-3 Acuerdos intragrupo entre proveedor y responsable del despliegue (RH-1, DS-39, GC-115)
+
+**Qué se decide.**
+- (a) Si existe, o existirá, un acuerdo intragrupo que documente el reparto de GA_IA entre la
+  matriz, que es la proveedora propuesta en D-U3, y NewLaw, desarrolladora por encargo.
+- (b) Su contenido mínimo.
+- (c) Confirmar que ninguna sociedad del grupo comercializa GA_IA como producto propio. Si lo
+  hiciera, esa sociedad sería la proveedora y la matriz solo responsable del despliegue.
+
+Guion del contenido mínimo, como propuesta para el debate y no como criterio:
+- partes y sistema;
+- quién lo pone en servicio con su nombre o marca (arts. 3.3 y 3.11);
+- deberes de proveedor que asume la matriz (arts. 4, 5 por usos posibles, 50.1 y 50.2 si
+  concurren);
+- información técnica que NewLaw entrega a la matriz;
+- comunicación de versiones y de cambios de modelo, que alimenta CP-2 y la reapertura del ciclo;
+- incidentes: a quién se informa y en qué plazo;
+- cooperación con autoridades y acceso a registros, que enlaza con CP-1;
+- vigencia y terminación.
+
+**Prueba.**
+- **Literal.** El art. 3.3 hace proveedora a la persona que desarrolla un sistema **o para la que
+  se desarrolla**, y lo pone en servicio con su nombre o marca, incluido el uso propio (art.
+  3.11). Si además lo usa bajo su autoridad, es también responsable del despliegue (art. 3.4).
+- **Harvey, H-01.** C11 (validado): una división sin personalidad no puede ser proveedora, así
+  que g-digital queda fuera. C8: el uso propio acumula los dos roles. Consideración 1:
+  formalizar el reparto en acuerdos intragrupo.
+- **Dato.** El tenant tiene 33 entidades, dos tecnológicas con personalidad (EAD Trust y NewLaw)
+  y la división g-digital. GA_IA figura con proveedor «Garrigues» en texto libre y sin sociedad
+  (informe del 19-09, §4.2).
+- **Precisión.** El art. 25.4 solo rige para sistemas de alto riesgo y para el suministro de
+  componentes (GC-115). GA_IA no consta hoy como alto riesgo. Para GA_IA, el acuerdo es la
+  formalización que recomienda RH-1, no el deber del 25.4.
+
+**ARGA.** Correlato de D-U1 (propuesta): ARGA Digital desarrolla por encargo, y ARGA Seguros,
+ARGA Salud y ARGA Vida ponen en servicio y acumulan los dos roles. La misma pregunta va a su
+órgano de IA (D-U2).
+
 ## Reglas de ejecución
 
 - Una fase por vez en la rama; dentro de la fase, cadenas de tareas sobre ficheros disjuntos en
@@ -319,3 +457,10 @@ tres dejan de afirmar algo que la base no sostenía):
   La pestaña avisa antes de guardar y ya no pinta «Revisada» junto a un estado de trabajo (hoy ninguna
   fila de ARGA está en ese caso: la única «Pendiente» tiene `reviewed_at` NULL), pero el dato conserva
   la fecha. Qué cadena lo cierra —F1.T4 (legado) o F9.T2 (`fn_aims_revisar_seccion`)— está sin decidir.
+- **Siete celdas del Excel del experto vienen cortadas en el propio libro (I-11 del documento de
+  incidencias, P-08).** Medido en el original `Dashboard_control_RIA.xlsx`, uniendo todos los
+  `<t>` de cada `<si>`: `Obligaciones!I11`, `I16`, `I43`, `I49`, `I54`, `I56` e `I65` miden
+  exactamente 180 caracteres, el máximo de la columna. **F3 no puede recuperarlas reextrayendo el
+  Excel**: el texto no está en el fichero. OB-48 toma el de d62 del HTML; las otras seis esperan a
+  P-08, y el HTML no es un sustituto general (d15 acaba donde `I11`; d53 es más corto que
+  `I43`).
