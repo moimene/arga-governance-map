@@ -1010,7 +1010,7 @@ Dependencia entre fases declarada: el registro del positivo del art. 5 (F4.T14) 
 **F1.T5 Un L5 legacy sin evidencia no acredita**
 - Ficheros: `src/lib/aims/conformidad.ts:52-58` y su test; el indicador asociado.
 - Migración: no.
-- Aceptación: `evidenceCount = null` da «pendiente de evidencia» y no acredita. Los trece L5 de Harvey dejan de sostener el 49 %, y el indicador los cuenta aparte.
+- Aceptación: `evidenceCount = null` da «pendiente de evidencia» y no acredita. Los 40 L5 de Harvey (la v2 decía «trece»; corregido el 19-09 contra el dato, ver ledger) dejan de sostener el 49 %, y el indicador los cuenta aparte.
 - Test: `conformidad.test.ts`: un L5 con `evidenceCount = null` no acredita.
 - Gates: G-STD.
 - Cierra: GC-54.
