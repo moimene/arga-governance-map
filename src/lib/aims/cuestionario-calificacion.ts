@@ -328,15 +328,33 @@ export type MarcoNormativo = {
 export const ROLES_DE_DESPLIEGUE = new Set(["RESPONSABLE_DESPLIEGUE", "IMPORTADOR", "DISTRIBUIDOR"]);
 export const ROLES_DE_PROVEEDOR = new Set(["PROVEEDOR", "PROVEEDOR_GPAI", "PROVEEDOR_POSTERIOR"]);
 
+/**
+ * A quién vincula el art. 4: a los proveedores y responsables del despliegue
+ * de SISTEMAS de IA. El proveedor posterior (art. 3.68) es proveedor de un
+ * sistema; el proveedor de un modelo de uso general, el importador y el
+ * distribuidor no están entre sus destinatarios.
+ */
+const ROLES_ART_4 = new Set(["PROVEEDOR", "PROVEEDOR_POSTERIOR", "RESPONSABLE_DESPLIEGUE"]);
+
+const NUMERACION_CAP_V =
+  "La spec cita «Capítulo V-A (arts. 51–55)», numeración de borrador; en el texto final es el capítulo V, arts. 51–56.";
+
 export function derivarMarcos(
   rol: string | null | undefined,
   nivel: string | null | undefined,
   gpai: boolean,
 ): MarcoNormativo[] {
   if (!rol || !nivel) return [];
-  const out: MarcoNormativo[] = [
-    { code: "RIA_ART_4", norma: "RIA", articulos: "Art. 4", titulo: "Alfabetización en materia de IA (todos los sistemas)" },
-  ];
+  const out: MarcoNormativo[] = [];
+  if (ROLES_ART_4.has(rol)) {
+    out.push({
+      code: "RIA_ART_4",
+      norma: "RIA",
+      articulos: "Art. 4",
+      titulo: "Alfabetización en materia de IA: medidas para apoyarla (proveedores y responsables del despliegue)",
+      nota: "Redacción del Reglamento (UE) 2026/1744 (art. 1.5): «adoptarán medidas para apoyar» la alfabetización del personal; no exige garantizar un nivel específico. Se acredita con las medidas adoptadas.",
+    });
+  }
   if (rol === "IMPORTADOR" || rol === "DISTRIBUIDOR") {
     out.push({
       code: "RIA_ARTS_23_24",
@@ -384,10 +402,14 @@ export function derivarMarcos(
       norma: "RIA",
       articulos: "Cap. V, arts. 51–56",
       titulo: "Modelos de IA de uso general",
+      // Cautela en las dos ramas (F1.T11): ser proveedor del SISTEMA que
+      // integra un modelo de uso general no hace proveedor del MODELO.
       nota:
-        ROLES_DE_PROVEEDOR.has(rol)
-          ? "La spec cita «Capítulo V-A (arts. 51–55)», numeración de borrador; en el texto final es el capítulo V, arts. 51–56."
-          : "Las obligaciones del cap. V vinculan al PROVEEDOR del modelo de uso general; para el responsable del despliegue este marco es la trazabilidad del modelo y del proveedor en la cadena de suministro. La spec lo lista para todo sistema con dependencia GPAI; el alcance lo decide el equipo legal. (Numeración: la spec cita «cap. V-A, arts. 51–55»; en el texto final es el cap. V, arts. 51–56.)",
+        rol === "PROVEEDOR_GPAI"
+          ? NUMERACION_CAP_V
+          : ROLES_DE_PROVEEDOR.has(rol)
+            ? `Las obligaciones del cap. V vinculan al PROVEEDOR del modelo de uso general: ser proveedor del sistema que lo integra no convierte en proveedor del modelo. Para este sistema el marco es la trazabilidad del modelo y de su proveedor en la cadena de suministro; el alcance lo decide el equipo legal. ${NUMERACION_CAP_V}`
+            : `Las obligaciones del cap. V vinculan al PROVEEDOR del modelo de uso general; para el responsable del despliegue este marco es la trazabilidad del modelo y del proveedor en la cadena de suministro. La spec lo lista para todo sistema con dependencia GPAI; el alcance lo decide el equipo legal. ${NUMERACION_CAP_V}`,
     });
   }
   out.push(

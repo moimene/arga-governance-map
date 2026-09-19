@@ -56,10 +56,22 @@ que dice la columna «Antes» y se anota aquí.
 | Tarea | Qué | Antes | Ahora (provisional) |
 |---|---|---|---|
 | F1.T10 | Ayuda de Q2_1 (art. 5) | «Marque Sí SOLO si…» con cuatro prácticas; «si tiene dudas, la respuesta casi seguro es No» | Diez letras enumeradas (a-h, b bis, b ter) y el 5.1 bis; c) sin intención; ejemplo de que la d) no alcanza a la puntuación de siniestros por indicios objetivos de fraude; f) a cualquier empleador; h) solo con fines de garantía del cumplimiento del Derecho y la biometría con otros fines al anexo III 1 a) |
+| F1.T11 | MD_TRA_01 (catálogo del desplegador) | `OBLIGACION`, norma «Art. 50.1» | `MARCO_OPERATIVO`, «Art. 50.1 (obliga al proveedor)» |
+| F1.T11 | MD_CS_01 | `OBLIGACION`, «Cap. V» | `MARCO_OPERATIVO`, «Cap. V (obliga al proveedor del modelo)» |
+| F1.T11 | MD_CS_02 | `OBLIGACION`, «Cap. V y anexo XII» | `MARCO_OPERATIVO`, «Cap. V y anexo XII (obligan al proveedor del modelo)» |
+| F1.T11 | MD_CS_05 | `OBLIGACION`, «Art. 25.1» | `MARCO_OPERATIVO`, «Art. 25.1 (califica al sujeto)» |
 
 No provisionales, por estar ya validados: la retirada del ejemplo del scoring y el aviso de
 perfilado de Q2_3 (C10), el rótulo «Art. 6.2 y anexo III» de Q2_2 (F1.T9) y la redacción
-del art. 4 (C14). **Texto de las ayudas pendiente de revisión por Legal** (F1.T10 lo exige y
+del art. 4 (C14) con MD_ALF_05 como marco operativo (ya lo era). Tampoco la cautela del
+cap. V en la rama del proveedor, ni «divulgar» en MD_TRA_02 (literal del 50.4).
+
+**Desviación declarada (F1.T11):** la tarea dice «el art. 4 solo se asigna a PROVEEDOR y
+RESPONSABLE_DESPLIEGUE». `derivarMarcos` lo asigna también a `PROVEEDOR_POSTERIOR`, porque el
+art. 3.68 lo define como proveedor de un **sistema** de IA y el art. 4 vincula a los proveedores
+de sistemas; quitárselo escondería una obligación (el módulo falla abierto). Quedan fuera
+`PROVEEDOR_GPAI` (proveedor de un modelo, no de un sistema), `IMPORTADOR` y `DISTRIBUIDOR`. A
+confirmar por Legal; revertir es quitar un elemento de `ROLES_ART_4`. **Texto de las ayudas pendiente de revisión por Legal** (F1.T10 lo exige y
 no lo puede cerrar un implementador).
 
 ## Reglas de ejecución

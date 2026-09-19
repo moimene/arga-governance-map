@@ -234,6 +234,14 @@ export default function PasoMedidas({
                             {proc.norma}
                           </span>
                         )}
+                        {proc?.provisional && (
+                          <span
+                            className="px-1.5 py-0.5 text-[10px] font-semibold border border-[var(--g-border-subtle)] text-[var(--g-text-secondary)]"
+                            style={{ borderRadius: "var(--g-radius-sm)" }}
+                          >
+                            {proc.provisional}
+                          </span>
+                        )}
                       </div>
                       <h3 className="text-sm font-bold text-[var(--g-text-primary)]">{m.description}</h3>
                     </div>

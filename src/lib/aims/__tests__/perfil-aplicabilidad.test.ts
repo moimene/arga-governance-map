@@ -127,6 +127,25 @@ describe("cada medida del perfil dice de dónde sale y con qué carácter", () =
     expect(art4.every(([, p]) => p.caracter === "OBLIGACION")).toBe(true);
   });
 
+  it("F1.T11 — el art. 4 con la redacción del Ómnibus: adoptar medidas para apoyar, sin nivel exigido", () => {
+    const alf = DESPLIEGUE_REQUIREMENTS.find((r) => r.code === "ALFABETIZACION");
+    expect(alf, "ha desaparecido el requisito del art. 4").toBeDefined();
+    expect(alf!.description).toMatch(/adoptar medidas para apoyar/i);
+    expect(alf!.description).toMatch(/no exige garantizar un nivel/i);
+    expect(alf!.description).not.toMatch(/Garantizar un nivel suficiente/i);
+    // El registro de aprovechamiento mide un resultado que el art. 4 ya no
+    // exige: es marco operativo, no obligación.
+    expect(procedenciaDe("MD_ALF_05")?.caracter).toBe("MARCO_OPERATIVO");
+  });
+
+  it("F1.T11 — el art. 50.4 obliga al responsable del despliegue a divulgar, no a marcar", () => {
+    const tra = DESPLIEGUE_REQUIREMENTS.find((r) => r.code === "TRANSPARENCIA")!;
+    const m = tra.measures.find((x) => x.id === "MD_TRA_02");
+    expect(m?.description).toMatch(/^Divulgaci[óo]n/);
+    expect(tra.subparts.find((s) => s.subpartId === "TRA.CONTENIDO")?.titleShort).toMatch(/Divulgaci[óo]n/);
+    expect(procedenciaDe("MD_TRA_02")?.norma).toBe("Art. 50.4");
+  });
+
   it("los códigos no colisionan con los del catálogo del proveedor", () => {
     // Si colisionaran, `catalogoDeLosFindings` no podría distinguir con cuál se
     // evaluó una fila ya guardada.

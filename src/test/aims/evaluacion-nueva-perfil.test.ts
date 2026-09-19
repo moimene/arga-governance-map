@@ -89,6 +89,52 @@ describe("EvaluacionNueva — el catálogo lo decide el perfil", () => {
   });
 });
 
+// F1.T11 (programa de cobertura RIA, 2026-09-19; cierra GC-31, GC-36, GC-39 y
+// GC-117 en su parte F1). Cuatro medidas del responsable del despliegue se
+// presentaban como obligación jurídica suya y no lo son: el art. 50.1 obliga al
+// proveedor (MD_TRA_01), el cap. V al proveedor del modelo (MD_CS_01/02) y el
+// art. 25.1 califica al sujeto sin imponerle un deber de vigilancia (MD_CS_05).
+// Pasan a marco operativo PROVISIONAL hasta el veredicto de Harvey H-02A, cuyo
+// estado se lee del registro: sin veredicto, ni vuelven a obligación ni pierden
+// el rótulo.
+describe("F1.T11 — carácter de las medidas del desplegador, provisional hasta H-02A", () => {
+  type Peticion = { id: string; estado?: string };
+  const registro = JSON.parse(read("docs/legal/harvey/registro.json")) as { peticiones: Peticion[] };
+  const h02aConVeredicto = registro.peticiones.some((p) => p.id === "H-02A" && p.estado === "RESPONDIDA");
+  const CUATRO = ["MD_TRA_01", "MD_CS_01", "MD_CS_02", "MD_CS_05"];
+
+  it("el registro de Harvey se lee (control positivo del instrumento)", () => {
+    expect(registro.peticiones.some((p) => p.id === "H-01" && p.estado === "RESPONDIDA")).toBe(true);
+  });
+
+  it("sin veredicto de H-02A, las cuatro son marco operativo y llevan el rótulo provisional", async () => {
+    const { procedenciaDe } = await import("@/lib/aims/perfil-aplicabilidad");
+    const { ROTULO_PROVISIONAL } = await import("@/lib/aims/cuestionario-calificacion");
+    for (const id of CUATRO) {
+      const proc = procedenciaDe(id);
+      expect(proc, `${id} ha perdido su procedencia`).not.toBeNull();
+      if (h02aConVeredicto) continue;
+      expect({ id, caracter: proc!.caracter }).toEqual({ id, caracter: "MARCO_OPERATIVO" });
+      expect({ id, provisional: proc!.provisional }).toEqual({ id, provisional: ROTULO_PROVISIONAL });
+    }
+  });
+
+  it("el rótulo provisional no se reparte más allá de las cuatro", async () => {
+    const { PROCEDENCIA_DESPLIEGUE } = await import("@/lib/aims/perfil-aplicabilidad");
+    const conRotulo = Object.entries(PROCEDENCIA_DESPLIEGUE).filter(([, p]) => p.provisional).map(([id]) => id).sort();
+    expect(conRotulo).toEqual(h02aConVeredicto ? [] : [...CUATRO].sort());
+  });
+
+  it("las dos superficies que pintan la procedencia pintan también el rótulo", () => {
+    for (const f of [`${DIR_PASOS}/PasoMedidas.tsx`, "src/components/ai-governance/evaluacion-detalle/ChecklistMedidas.tsx"]) {
+      const src = sinComentarios(read(f));
+      // Control positivo: la superficie sigue pintando la procedencia.
+      expect(src, `${f} ya no pinta la procedencia`).toContain("procedenciaDe(");
+      expect(/\{proc\.provisional\}/.test(src), `${f} no pinta el rótulo provisional`).toBe(true);
+    }
+  });
+});
+
 describe("PerfilAplicabilidadBanner — dice qué perfil y qué le falta", () => {
   it("pinta el perfil de catálogo leyendo el dato, no un rótulo fijo", () => {
     const src = sinComentarios(read(BANNER));

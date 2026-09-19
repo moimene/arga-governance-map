@@ -33,7 +33,13 @@
  */
 
 import type { RequirementDef } from "./catalog-aesia";
-import { ROLES_DE_DESPLIEGUE, perfilCatalogo, tieneClasificacionGuiada, type PerfilCatalogo } from "./cuestionario-calificacion";
+import {
+  ROLES_DE_DESPLIEGUE,
+  ROTULO_PROVISIONAL,
+  perfilCatalogo,
+  tieneClasificacionGuiada,
+  type PerfilCatalogo,
+} from "./cuestionario-calificacion";
 
 export type FuenteMedida = "RIA" | "RGPD" | "ISO_42001" | "DEONTOLOGIA";
 export type CaracterMedida = "OBLIGACION" | "MARCO_OPERATIVO";
@@ -43,6 +49,8 @@ export type ProcedenciaMedida = {
   fuente: FuenteMedida;
   caracter: CaracterMedida;
   norma: string;
+  /** Presente mientras el carácter espera veredicto (hoy, H-02A). */
+  provisional?: string;
 };
 
 export const AVISO_COBERTURA_PROVISIONAL =
@@ -54,10 +62,11 @@ export const AVISO_SIN_ROL =
 export const AVISO_ISO_NO_ES_OBLIGACION =
   "Los controles de ISO/IEC 42001 se presentan como marco operativo de madurez y documentación, no como obligaciones jurídicas autónomas.";
 
-const p = (fuente: FuenteMedida, caracter: CaracterMedida, norma: string): ProcedenciaMedida => ({
+const p = (fuente: FuenteMedida, caracter: CaracterMedida, norma: string, provisional?: string): ProcedenciaMedida => ({
   fuente,
   caracter,
   norma,
+  provisional,
 });
 
 /**
@@ -75,7 +84,10 @@ export const PROCEDENCIA_DESPLIEGUE: Record<string, ProcedenciaMedida> = {
   MD_ALF_04: p("RIA", "OBLIGACION", "Art. 4"),
   MD_ALF_05: p("ISO_42001", "MARCO_OPERATIVO", "ISO/IEC 42001, anexo A"),
 
-  MD_TRA_01: p("RIA", "OBLIGACION", "Art. 50.1"),
+  // F1.T11: el art. 50.1 obliga al PROVEEDOR; para el responsable del
+  // despliegue el aviso es marco operativo. Provisional hasta H-02A: si el
+  // veredicto es INCORRECTO vuelve a p("RIA", "OBLIGACION", "Art. 50.1").
+  MD_TRA_01: p("RIA", "MARCO_OPERATIVO", "Art. 50.1 (obliga al proveedor)", ROTULO_PROVISIONAL),
   MD_TRA_02: p("RIA", "OBLIGACION", "Art. 50.4"),
   MD_TRA_03: p("DEONTOLOGIA", "MARCO_OPERATIVO", "Deontología profesional"),
   MD_TRA_04: p("DEONTOLOGIA", "MARCO_OPERATIVO", "Deontología profesional"),
@@ -88,12 +100,17 @@ export const PROCEDENCIA_DESPLIEGUE: Record<string, ProcedenciaMedida> = {
   MD_PD_05: p("RGPD", "OBLIGACION", "Art. 30 RGPD"),
   MD_PD_06: p("RGPD", "OBLIGACION", "Arts. 13 y 14 RGPD"),
 
-  MD_CS_01: p("RIA", "OBLIGACION", "Cap. V"),
-  MD_CS_02: p("RIA", "OBLIGACION", "Cap. V y anexo XII"),
+  // F1.T11: el cap. V y el anexo XII obligan al proveedor del MODELO, y el
+  // art. 25.1 califica al sujeto sin imponerle un deber de vigilancia. Marco
+  // operativo provisional hasta H-02A; con INCORRECTO vuelven a OBLIGACION con
+  // su norma de antes («Cap. V», «Cap. V y anexo XII», «Art. 25.1»).
+  MD_CS_01: p("RIA", "MARCO_OPERATIVO", "Cap. V (obliga al proveedor del modelo)", ROTULO_PROVISIONAL),
+  MD_CS_02: p("RIA", "MARCO_OPERATIVO", "Cap. V y anexo XII (obligan al proveedor del modelo)", ROTULO_PROVISIONAL),
   MD_CS_03: p("DEONTOLOGIA", "MARCO_OPERATIVO", "Gestión de proveedor"),
   MD_CS_04: p("DEONTOLOGIA", "MARCO_OPERATIVO", "Gestión de proveedor"),
-  // Art. 25.1: es la vigilancia que impide convertirse en proveedor sin saberlo.
-  MD_CS_05: p("RIA", "OBLIGACION", "Art. 25.1"),
+  // Vigilar las tres circunstancias del art. 25.1 evita convertirse en
+  // proveedor sin saberlo: buena práctica, no deber del artículo.
+  MD_CS_05: p("RIA", "MARCO_OPERATIVO", "Art. 25.1 (califica al sujeto)", ROTULO_PROVISIONAL),
   MD_CS_06: p("DEONTOLOGIA", "MARCO_OPERATIVO", "Gestión de proveedor"),
   MD_CS_07: p("DEONTOLOGIA", "MARCO_OPERATIVO", "Gestión de proveedor"),
 
@@ -136,7 +153,7 @@ export const DESPLIEGUE_REQUIREMENTS: RequirementDef[] = [
     title: "Alfabetización en materia de IA",
     articleRef: "Art. 4",
     description:
-      "Garantizar un nivel suficiente de alfabetización en IA del personal que usa el sistema, teniendo en cuenta sus conocimientos técnicos, su experiencia, su formación, el contexto de uso y las personas sobre las que se usa. Vincula a proveedores y a responsables del despliegue de CUALQUIER nivel de riesgo.",
+      "Adoptar medidas para apoyar la alfabetización en IA del personal que usa el sistema, teniendo en cuenta sus conocimientos técnicos, su experiencia, su formación, el contexto de uso y las personas sobre las que se usa (art. 4 en la redacción del Reglamento (UE) 2026/1744). Es una obligación de medios: no exige garantizar un nivel específico y se acredita con las medidas adoptadas (formación, instrucciones, política de uso). Vincula a proveedores y a responsables del despliegue de CUALQUIER nivel de riesgo.",
     subparts: [
       { subpartId: "ALF.PROGRAMA", articleNumber: "Art. 4", titleShort: "Programa de formación", orderIndex: 1 },
       { subpartId: "ALF.CONTEXTO", articleNumber: "Art. 4", titleShort: "Adecuación al perfil y al contexto", orderIndex: 2 },
@@ -154,15 +171,15 @@ export const DESPLIEGUE_REQUIREMENTS: RequirementDef[] = [
     title: "Transparencia frente a las personas",
     articleRef: "Art. 50",
     description:
-      "Obligaciones de transparencia de determinados sistemas de IA: informar de que se interactúa con una IA y marcar el contenido generado o manipulado artificialmente.",
+      "Obligaciones de transparencia del art. 50. El proveedor diseña el sistema para que se informe de que se interactúa con una IA (50.1) y marca el contenido sintético (50.2); el responsable del despliegue divulga que el contenido que publica se ha generado o manipulado de manera artificial (50.4).",
     subparts: [
       { subpartId: "TRA.INTERACCION", articleNumber: "Art. 50.1", titleShort: "Interacción con personas físicas", orderIndex: 1 },
-      { subpartId: "TRA.CONTENIDO", articleNumber: "Art. 50.4", titleShort: "Marcado del contenido generado", orderIndex: 2 },
+      { subpartId: "TRA.CONTENIDO", articleNumber: "Art. 50.4", titleShort: "Divulgación del contenido generado", orderIndex: 2 },
       { subpartId: "TRA.CLIENTE", articleNumber: "Deontología", titleShort: "Información al cliente y revisión humana", orderIndex: 3 },
     ],
     measures: [
       { id: "MD_TRA_01", code: "MD_TRA_01", description: "Aviso de interacción con un sistema de IA en las superficies en que atiende a personas físicas", subpartId: "TRA.INTERACCION" },
-      { id: "MD_TRA_02", code: "MD_TRA_02", description: "Marcado del contenido generado o manipulado que se publique para informar al público sobre asuntos de interés público", subpartId: "TRA.CONTENIDO" },
+      { id: "MD_TRA_02", code: "MD_TRA_02", description: "Divulgación de que el contenido que se publique para informar al público sobre asuntos de interés público se ha generado o manipulado de manera artificial", subpartId: "TRA.CONTENIDO" },
       { id: "MD_TRA_03", code: "MD_TRA_03", description: "Información al cliente sobre el uso de IA generativa en el servicio prestado", subpartId: "TRA.CLIENTE" },
       { id: "MD_TRA_04", code: "MD_TRA_04", description: "Revisión humana acreditada antes de cualquier entrega, con constancia de quién revisa", subpartId: "TRA.CLIENTE" },
       { id: "MD_TRA_05", code: "MD_TRA_05", description: "Criterio interno de cuándo la asistencia por IA debe declararse en el propio entregable", subpartId: "TRA.CLIENTE" },

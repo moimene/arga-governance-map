@@ -121,10 +121,31 @@ describe("fase 2 — nivel", () => {
 });
 
 describe("fase 3 — marcos y perfil", () => {
-  it("el art. 4 aplica siempre", () => {
-    for (const [rol, nivel] of [["PROVEEDOR", "Alto"], ["RESPONSABLE_DESPLIEGUE", "Mínimo"]] as const) {
+  it("el art. 4 vincula a proveedores y responsables del despliegue de sistemas de IA, en cualquier nivel", () => {
+    for (const [rol, nivel] of [
+      ["PROVEEDOR", "Alto"],
+      ["RESPONSABLE_DESPLIEGUE", "Mínimo"],
+      // Art. 3.68: el proveedor posterior es proveedor de un SISTEMA de IA.
+      ["PROVEEDOR_POSTERIOR", "Limitado"],
+    ] as const) {
       expect(derivarMarcos(rol, nivel, false).map((m) => m.code)).toContain("RIA_ART_4");
     }
+  });
+
+  it("F1.T11 — el art. 4 no se asigna a importador, distribuidor ni proveedor de un modelo de uso general", () => {
+    // Control positivo: esos roles sí reciben otros marcos (no es una lista vacía).
+    for (const rol of ["IMPORTADOR", "DISTRIBUIDOR", "PROVEEDOR_GPAI"]) {
+      const codes = derivarMarcos(rol, "Alto", false).map((m) => m.code);
+      expect(codes.length, `${rol} sin marcos`).toBeGreaterThan(0);
+      expect({ rol, art4: codes.includes("RIA_ART_4") }).toEqual({ rol, art4: false });
+    }
+  });
+
+  it("F1.T11 — el art. 4 va con la redacción del Ómnibus: medidas de apoyo, sin nivel exigido", () => {
+    const art4 = derivarMarcos("RESPONSABLE_DESPLIEGUE", "Limitado", false).find((m) => m.code === "RIA_ART_4");
+    expect(art4?.titulo).toMatch(/medidas para apoyar/i);
+    expect(art4?.nota).toMatch(/2026\/1744/);
+    expect(art4?.nota).toMatch(/no exige/i);
   });
 
   it("proveedor de alto riesgo: arts. 9–15, 17 y 47, 72 y 73", () => {
@@ -165,8 +186,15 @@ describe("fase 3 — marcos y perfil", () => {
     const desp = derivarMarcos("RESPONSABLE_DESPLIEGUE", "Limitado", true).find((x) => x.code === "RIA_CAP_V_GPAI");
     expect(desp?.nota).toMatch(/PROVEEDOR del modelo/);
     expect(desp?.nota).toMatch(/equipo legal/);
+    // F1.T11: la cautela va también en la rama del proveedor. Ser proveedor del
+    // SISTEMA que integra un modelo de uso general no hace proveedor del MODELO.
     const prov = derivarMarcos("PROVEEDOR", "Limitado", true).find((x) => x.code === "RIA_CAP_V_GPAI");
-    expect(prov?.nota).not.toMatch(/PROVEEDOR del modelo/);
+    expect(prov?.nota).toMatch(/PROVEEDOR del modelo/);
+    expect(prov?.nota).toMatch(/55/);
+    // Quien sí es proveedor del modelo no recibe la cautela, solo la numeración.
+    const gpai = derivarMarcos("PROVEEDOR_GPAI", "Limitado", true).find((x) => x.code === "RIA_CAP_V_GPAI");
+    expect(gpai?.nota).not.toMatch(/PROVEEDOR del modelo/);
+    expect(gpai?.nota).toMatch(/55/);
   });
 
   it("importador y distribuidor (roles persistidos que el árbol no deriva) citan sus artículos sin desarrollarlos", () => {
