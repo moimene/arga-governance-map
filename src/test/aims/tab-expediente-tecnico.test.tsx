@@ -74,7 +74,16 @@ describe("F1.T7 — el selector de la sección no ofrece estados que exigen revi
     expect(select.value).toBe("PENDING");
   });
 
-  it("guardar no reescribe «Conforme»: la sección queda en el estado de trabajo elegido", () => {
+  it("guardar sin tocar el selector no reescribe «Conforme»: la sección queda en Pendiente", () => {
+    // `select.value` no basta: React muestra la primera opción cuando el estado
+    // interno no casa con ninguna, así que un «Conforme» retenido en el estado
+    // se vería «Pendiente» y se guardaría como APPROVED. Se mira lo que se ENVÍA.
+    abrirEdicion(CONFORME);
+    fireEvent.click(screen.getByRole("button", { name: "Guardar sección" }));
+    expect(guardados).toEqual([expect.objectContaining({ id: "sec-conforme", status: "PENDING" })]);
+  });
+
+  it("y con otro estado de trabajo elegido, se guarda ese", () => {
     const select = abrirEdicion(CONFORME);
     fireEvent.change(select, { target: { value: "IN_REVIEW" } });
     fireEvent.click(screen.getByRole("button", { name: "Guardar sección" }));
