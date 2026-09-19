@@ -1,7 +1,6 @@
 import { useRef } from "react";
 import { AiSystem } from "@/hooks/useAiSystems";
-import { useTenantBranding, useTenantBrandingLoading } from "@/context/TenantBrandContext";
-import { groupFullLabel } from "@/lib/tenant-brand-labels";
+import { useTenantBranding } from "@/context/TenantBrandContext";
 import { isModuleEnabled } from "@/lib/tenant-modules";
 import { derivarMarcos, tieneClasificacionGuiada } from "@/lib/aims/cuestionario-calificacion";
 import { vinculaArt47 } from "@/lib/aims/expediente-tecnico";
@@ -16,6 +15,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+// El art. 47 lo asume el proveedor, que es una persona jurídica. El grupo no lo
+// es, y `ai_systems` no dice qué sociedad del grupo es la proveedora: la
+// entidad queda como hueco a completar y el documento lo dice (F1.T9).
+const AVISO_ENTIDAD_ART47 =
+  "El grupo no es una persona jurídica: la declaración la asume la sociedad proveedora del sistema, que esta ficha todavía no identifica. Complétela antes de la emisión.";
+
 interface DeclaracionConformidadModalProps {
   system: AiSystem;
   isOpen: boolean;
@@ -29,13 +34,6 @@ export default function DeclaracionConformidadModal({
 }: DeclaracionConformidadModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const branding = useTenantBranding();
-  const brandingLoading = useTenantBrandingLoading();
-  // La entidad sale del tenant. Antes se declaraba una aseguradora concreta con
-  // dirección real en un documento que el usuario descarga.
-  // `groupFullLabel(null)` devuelve el grupo de ARGA, y `useTenantBranding()`
-  // también devuelve null MIENTRAS CARGA: sin este guard, un sistema de otro
-  // tenant descargado antes de resolver el branding se declararía de ARGA.
-  const entidad = brandingLoading ? "[entidad por resolver]" : groupFullLabel(branding);
   // Sin clasificación no se declara ninguna: un falso positivo regulatorio en un
   // papel con membrete del art. 47 es tan indefendible como un falso verde.
   const clasificacion = system.risk_level || "No clasificado";
@@ -118,7 +116,8 @@ DECLARACIÓN DE CONFORMIDAD UE (REGLAMENTO UE 2024/1689 - ARTÍCULO 47)
 
 2. RESPONSABLE DE LA DECLARACIÓN:
    - Rol regulatorio: ${rolLabel}
-   - Entidad: ${entidad}
+   - Sociedad proveedora: [por identificar antes de la emisión]
+     ${AVISO_ENTIDAD_ART47}
    - Persona / Cargo Responsable: [por completar antes de la emisión]
 
 3. DECLARACIÓN DE RESPONSABILIDAD:
@@ -215,6 +214,11 @@ validación funcional y no constituye una declaración de conformidad emitida.
               <div>
                 <span className="font-semibold text-[var(--g-text-secondary)] block">Rol regulatorio:</span>
                 <span>{rolLabel}</span>
+              </div>
+              <div className="col-span-2">
+                <span className="font-semibold text-[var(--g-text-secondary)] block">Sociedad proveedora:</span>
+                <span className="italic">[por identificar antes de la emisión]</span>
+                <p className="mt-1 text-[var(--g-text-secondary)]">{AVISO_ENTIDAD_ART47}</p>
               </div>
             </div>
 

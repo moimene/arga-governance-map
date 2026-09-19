@@ -1115,3 +1115,49 @@ describe("2026-09-07 — el escalado no redacta la justificación por el oficial
       "el escalado ya no construye el handoff de Secretaría").toBe(true);
   });
 });
+
+// F1.T9 (programa de cobertura RIA, 2026-09-19; cierra GC-10, GC-17, GC-53).
+// Tres atribuciones que el dato no sostiene: `ai_systems` no tiene
+// `entity_id`, así que la ficha de una sociedad no puede decir qué sistemas son
+// SUYOS; el grupo no es una persona jurídica, así que no puede figurar como la
+// entidad que asume la declaración del art. 47; y Q2_2 no pregunta por el
+// art. 6.1 (anexo I), sino por el 6.2 y el anexo III.
+describe("F1.T9 — atribuciones falsas fuera", () => {
+  const ENTIDAD = "src/pages/EntidadDetalle.tsx";
+  const ATRIBUCION = /Sistemas\s+(?:de\s+)?IA\s+de\s+esta\s+(?:entidad|sociedad)/i;
+
+  it("el patrón de atribución casaría con el rótulo retirado (control positivo del instrumento)", () => {
+    expect(ATRIBUCION.test("Sistemas IA de esta entidad")).toBe(true);
+    expect(ATRIBUCION.test("Sistemas de IA de esta sociedad")).toBe(true);
+    expect(ATRIBUCION.test("Sistemas de IA del grupo (sin atribución a esta sociedad)")).toBe(false);
+  });
+
+  it("la ficha de una sociedad no se atribuye los sistemas de IA del grupo", () => {
+    const src = sinComentarios(read(ENTIDAD));
+    // Control positivo: la sección sigue pintando el inventario; sin esto, una
+    // sección vaciada dejaría la ausencia de abajo verde sin mirar nada.
+    expect(src).toContain("useAiSystemsList(");
+    expect(src).toContain("allAiSystems.map(");
+    expect(src).toContain("Sistemas de IA del grupo (sin atribución a esta sociedad)");
+    expect(src.match(ATRIBUCION)?.[0] ?? null, `${ENTIDAD} vuelve a atribuir los sistemas a la sociedad`).toBeNull();
+  });
+
+  it("la declaración del art. 47 no pone al grupo como entidad y lo avisa", () => {
+    const src = sinComentarios(read(DECLARACION));
+    // Control positivo: es el modal del art. 47 que decide por la hoja.
+    expect(src).toContain("vinculaArt47(");
+    expect(src.match(/groupFullLabel|groupPortfolioLabel|tenant-brand-labels/)?.[0] ?? null,
+      "la declaración rellena la entidad con el rótulo del grupo").toBeNull();
+    // Y lo dice, en pantalla y en el borrador descargable: dos usos del aviso.
+    expect(src).toMatch(/El grupo no es una persona jur[íi]dica/);
+    expect((src.match(/\{AVISO_ENTIDAD_ART47\}|\$\{AVISO_ENTIDAD_ART47\}/g) ?? []).length,
+      "el aviso no llega a la pantalla y al borrador").toBeGreaterThanOrEqual(2);
+  });
+
+  it("Q2_2 se rotula por el art. 6.2 y el anexo III, no por el 6.1", async () => {
+    const { PREGUNTAS } = await import("@/lib/aims/cuestionario-calificacion");
+    const q22 = PREGUNTAS.find((p) => p.id === "Q2_2");
+    expect(q22, "Q2_2 ha desaparecido del catálogo").toBeDefined();
+    expect(q22!.articulo).toBe("Art. 6.2 y anexo III");
+  });
+});

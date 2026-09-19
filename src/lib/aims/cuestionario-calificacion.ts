@@ -146,7 +146,8 @@ export const PREGUNTAS: PreguntaGuiada[] = [
     id: "Q2_2",
     fase: 2,
     titulo: "¿El sistema se usa para alguna de estas finalidades consideradas de alto riesgo?",
-    articulo: "Arts. 6.1 y 6.2, anexo III",
+    // El 6.1 remite al anexo I (productos): esta pregunta es la del 6.2.
+    articulo: "Art. 6.2 y anexo III",
     ayuda: {
       queSignifica:
         "Marque «Sí» si el sistema se usa para: (1) identificación biométrica o categorización de personas; (2) gestión de infraestructuras críticas; (3) educación (admisión, evaluación); (4) empleo (selección, evaluación de trabajadores); (5) acceso a servicios esenciales (crédito, seguros de vida y salud, prestaciones sociales); (6) aplicación de la ley; (7) migración y control de fronteras; (8) administración de justicia y procesos democráticos.",
