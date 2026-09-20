@@ -256,7 +256,7 @@ describe("el perfil expone el perfil de catálogo A/B/C del cuestionario guiado 
     expect(b.motivo).toMatch(/no hay catálogo validado/i);
   });
 
-  it("despliegue de riesgo limitado es C con las 43; sin rol no hay perfil", () => {
+  it("despliegue de riesgo limitado es C con las 44; sin rol no hay perfil", () => {
     const c = perfilAplicable({ regulatory_role: "RESPONSABLE_DESPLIEGUE", risk_level: "Limitado" }, AESIA_RIA_REQUIREMENTS);
     expect(c.catalogProfile).toBe("PROFILE_C");
     expect(c.requirements).toBe(DESPLIEGUE_REQUIREMENTS);

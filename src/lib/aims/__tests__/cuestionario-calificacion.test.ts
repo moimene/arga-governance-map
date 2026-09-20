@@ -26,7 +26,7 @@ const NADA_DE_RIESGO: Respuestas = { Q2_1: false, Q2_2: false, Q2_4: false, Q2_5
 
 describe("catálogo de preguntas", () => {
   it("son las nueve de la spec, cada una con las tres secciones de ayuda", () => {
-    expect(CUESTIONARIO_VERSION).toBe("1.1.1");
+    expect(CUESTIONARIO_VERSION).toBe("1.1.2");
     expect(PREGUNTAS.map((p) => p.id)).toEqual([
       "Q1_1", "Q1_2", "Q1_3", "Q1_4", "Q2_1", "Q2_2", "Q2_3", "Q2_4", "Q2_5",
     ]);

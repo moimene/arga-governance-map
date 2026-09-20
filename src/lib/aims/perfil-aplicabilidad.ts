@@ -89,6 +89,10 @@ export const PROCEDENCIA_DESPLIEGUE: Record<string, ProcedenciaMedida> = {
   // veredicto es INCORRECTO vuelve a p("RIA", "OBLIGACION", "Art. 50.1").
   MD_TRA_01: p("RIA", "MARCO_OPERATIVO", "Art. 50.1 (obliga al proveedor)", ROTULO_PROVISIONAL),
   MD_TRA_02: p("RIA", "OBLIGACION", "Art. 50.4"),
+  // H-02A (P5): el 50.3 es la única obligación del art. 50 que el RIA pone
+  // directamente sobre el responsable del despliegue además del 50.4, y faltaba.
+  // Es condicional al tipo de sistema; el carácter no lo es: cuando aplica, obliga.
+  MD_TRA_06: p("RIA", "OBLIGACION", "Art. 50.3"),
   MD_TRA_03: p("DEONTOLOGIA", "MARCO_OPERATIVO", "Deontología profesional"),
   MD_TRA_04: p("DEONTOLOGIA", "MARCO_OPERATIVO", "Deontología profesional"),
   MD_TRA_05: p("DEONTOLOGIA", "MARCO_OPERATIVO", "Deontología profesional"),
@@ -171,15 +175,17 @@ export const DESPLIEGUE_REQUIREMENTS: RequirementDef[] = [
     title: "Transparencia frente a las personas",
     articleRef: "Art. 50",
     description:
-      "Obligaciones de transparencia del art. 50. El proveedor diseña el sistema para que se informe de que se interactúa con una IA (50.1) y marca el contenido sintético (50.2); el responsable del despliegue divulga que el contenido que publica se ha generado o manipulado de manera artificial (50.4).",
+      "Obligaciones de transparencia del art. 50. El proveedor diseña el sistema para que se informe de que se interactúa con una IA (50.1) y marca el contenido sintético (50.2); al responsable del despliegue le obligan dos apartados: informar a las personas expuestas a un sistema de reconocimiento de emociones o de categorización biométrica (50.3, condicional al tipo de sistema) y divulgar que el contenido que publica se ha generado o manipulado de manera artificial (50.4).",
     subparts: [
       { subpartId: "TRA.INTERACCION", articleNumber: "Art. 50.1", titleShort: "Interacción con personas físicas", orderIndex: 1 },
       { subpartId: "TRA.CONTENIDO", articleNumber: "Art. 50.4", titleShort: "Divulgación del contenido generado", orderIndex: 2 },
-      { subpartId: "TRA.CLIENTE", articleNumber: "Deontología", titleShort: "Información al cliente y revisión humana", orderIndex: 3 },
+      { subpartId: "TRA.EMOCIONES", articleNumber: "Art. 50.3", titleShort: "Reconocimiento de emociones y categorización biométrica", orderIndex: 3 },
+      { subpartId: "TRA.CLIENTE", articleNumber: "Deontología", titleShort: "Información al cliente y revisión humana", orderIndex: 4 },
     ],
     measures: [
       { id: "MD_TRA_01", code: "MD_TRA_01", description: "Aviso de interacción con un sistema de IA en las superficies en que atiende a personas físicas", subpartId: "TRA.INTERACCION" },
       { id: "MD_TRA_02", code: "MD_TRA_02", description: "Divulgación de que el contenido que se publique para informar al público sobre asuntos de interés público se ha generado o manipulado de manera artificial", subpartId: "TRA.CONTENIDO" },
+      { id: "MD_TRA_06", code: "MD_TRA_06", description: "Condicional: SOLO si el sistema es de reconocimiento de emociones o de categorización biométrica. Informar del funcionamiento del sistema a las personas expuestas a él, y tratar sus datos conforme al RGPD. Si el sistema no lo es, la medida no aplica: márquela como no aplicable y diga por qué", subpartId: "TRA.EMOCIONES" },
       { id: "MD_TRA_03", code: "MD_TRA_03", description: "Información al cliente sobre el uso de IA generativa en el servicio prestado", subpartId: "TRA.CLIENTE" },
       { id: "MD_TRA_04", code: "MD_TRA_04", description: "Revisión humana acreditada antes de cualquier entrega, con constancia de quién revisa", subpartId: "TRA.CLIENTE" },
       { id: "MD_TRA_05", code: "MD_TRA_05", description: "Criterio interno de cuándo la asistencia por IA debe declararse en el propio entregable", subpartId: "TRA.CLIENTE" },
@@ -420,7 +426,7 @@ export function procedenciaDe(measureId: string): ProcedenciaMedida | null {
  * Desde que hay perfil por rol, dos evaluaciones con `framework = EU_AI_ACT`
  * pueden venir de catálogos distintos, y pintar la de un responsable del
  * despliegue contra las 84 medidas del proveedor mostraría 84 «Pendiente» y
- * ninguna de las 43 respondidas.
+ * ninguna de las 44 respondidas.
  *
  * Se resuelve por el DATO —qué códigos reconcilia cada candidato— y no por una
  * columna que no lo dice. Empate o cero coincidencias: el primero, que es el

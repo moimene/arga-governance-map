@@ -1,7 +1,7 @@
 /**
  * Qué catálogo se está midiendo, y por qué ése.
  *
- * El perfil se declara donde se evalúa: es lo que explica por qué hay 43
+ * El perfil se declara donde se evalúa: es lo que explica por qué hay 44
  * medidas y no 84, y de qué norma sale cada una. El criterio NO vive aquí —lo
  * calcula `perfilAplicable` en `@/lib/aims/perfil-aplicabilidad` y llega por
  * props—; este componente sólo lo pinta.

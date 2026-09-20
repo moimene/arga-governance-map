@@ -23,18 +23,51 @@
 
 Estado: **PROPUESTA** = valor propuesto por el controlador a partir del dato, adoptado como
 «Simulado — pendiente de confirmar» mientras el usuario no lo corrija. **PENDIENTE** = no se
-ejecuta lo que depende de ella («falla cerrado»).
+ejecuta lo que depende de ella («falla cerrado»). **ACEPTADA** = el usuario ha respondido y la
+propuesta pasa a ser la decisión.
 
-| # | Decisión | Propuesta | Estado |
+**Respuesta del usuario (20-09-2026), literal: «sí a todo».** Se le habían enumerado antes las
+tres consecuencias fuertes —D-U5 exige un acto material suyo, D-U7 deroga una decisión expresa
+suya del 08-09 y D-U8 es una excepción a un invariante WORM—, así que el sí se toma como
+informado y las ocho pasan a ACEPTADA. Lo que cada sí NO cambia:
+
+- **D-U1…D-U4 y D-U6** siguen siendo **dato simulado**, ahora confirmado como criterio: el
+  etiquetado de procedencia (`DEMO_PILOTO`, «Simulado») se mantiene. Lo que decae es el rótulo
+  «pendiente de confirmar», no la marca de simulación.
+- **D-U5** no queda hecha con el sí: **la cuenta no existe todavía**. Todo lo que depende de los
+  cuatro ojos en ARGA sigue fallando cerrado hasta que el usuario la cree (receta en §D-U5 abajo).
+- **D-U7 y D-U8** se ejecutan **con sus condiciones**, no en bloque: cada tabla se reabre después
+  de su corrección del §2.2, y la redacción RGPD solo por el camino gobernado de la enmienda E-12.
+  Reabrir sin la corrección previa, o redactar sin capacidad y sin anotación nueva, sigue
+  prohibido: eso no lo autoriza el sí.
+
+| # | Decisión | Valor adoptado | Estado |
 |---|---|---|---|
-| D-U1 | Proveedora de AIS-ARGA-001/002/003 («ARGA Analytics» no existe) | ARGA Digital, S.L. desarrolla por encargo; proveedoras las sociedades que ponen en servicio con su nombre: ARGA Seguros (triaje auto, suscripción empresas), ARGA Salud (fraude reembolsos salud), ARGA Vida (ARGA Score). Acumulan proveedor + responsable del despliegue (Harvey C8, C11) | PROPUESTA |
-| D-U2 | Órgano de IA de ARGA y decisor del residual | Órgano de IA: Comité Asesor de Tecnología e Innovación (CATIT), dueño también de la PR-024. Residual: Comité de Riesgos; escalado a la Comisión de Riesgos Regulada en alto riesgo | PROPUESTA |
-| D-U3 | Proveedora de GA_IA | Garrigues (matriz), SLP: lo pone en servicio con su marca; NewLaw, desarrolladora por encargo; g-digital no puede (división) (Harvey C11) | PROPUESTA |
-| D-U4 | Fundaciones, institutos e integraciones como sujeto | Fundación Garrigues sí (persona jurídica). Centro de Estudios y BSVV no, hasta acreditar personalidad | PROPUESTA |
-| D-U5 | Segunda cuenta ARGA con rol COMPLIANCE (cuatro ojos) | La crea el usuario en Supabase Auth (el controlador no da de alta cuentas). Después, migración de perfil y persona con el patrón de `20260914121000` (enmienda E-06) | PENDIENTE (acción del usuario) |
-| D-U6 | Especialidad → órgano en ARGA | Jurídico → Comité de Cumplimiento · Técnico y Ciberseguridad → CATIT · Riesgos → Comité de Riesgos · Datos → Comisión de Auditoría y Cumplimiento Normativo | PROPUESTA |
-| D-U7 | Reabrir la escritura de las 8 tablas muertas (EIDF, modelos, componentes, datasets, vigilancia poscomercialización, relojes, informes de incidente, remisiones EIDF-EIPD), derogando en ese punto DA-9 y la frontera D-1 del 08-09 | Sí, con RESTRICT en las FK, el dato de ARGA (`aims_post_market_plans`, 1 fila) solo de lectura, y la corrección previa de cada tabla del §2.2 | PENDIENTE (revierte una decisión expresa del usuario) |
-| D-U8 | Excepción de redacción RGPD sobre el diario de solo anexión `aims_ria_records` | Sí, gobernada: capacidad AIMS_GOBIERNO, motivo, fuera de legal hold, y anotación nueva que referencia el registro redactado (enmienda E-12) | PENDIENTE (excepción a un invariante WORM) |
+| D-U1 | Proveedora de AIS-ARGA-001/002/003 («ARGA Analytics» no existe) | ARGA Digital, S.L. desarrolla por encargo; proveedoras las sociedades que ponen en servicio con su nombre: ARGA Seguros (triaje auto, suscripción empresas), ARGA Salud (fraude reembolsos salud), ARGA Vida (ARGA Score). Acumulan proveedor + responsable del despliegue (Harvey C8, C11) | **ACEPTADA** 20-09 |
+| D-U2 | Órgano de IA de ARGA y decisor del residual | Órgano de IA: Comité Asesor de Tecnología e Innovación (CATIT), dueño también de la PR-024. Residual: Comité de Riesgos; escalado a la Comisión de Riesgos Regulada en alto riesgo | **ACEPTADA** 20-09 |
+| D-U3 | Proveedora de GA_IA | Garrigues (matriz), SLP: lo pone en servicio con su marca; NewLaw, desarrolladora por encargo; g-digital no puede (división) (Harvey C11) | **ACEPTADA** 20-09 |
+| D-U4 | Fundaciones, institutos e integraciones como sujeto | Fundación Garrigues sí (persona jurídica). Centro de Estudios y BSVV no, hasta acreditar personalidad | **ACEPTADA** 20-09 |
+| D-U5 | Segunda cuenta ARGA con rol COMPLIANCE (cuatro ojos) | La crea el usuario en Supabase Auth (el controlador no da de alta cuentas). Después, migración de perfil y persona con el patrón de `20260914121000` (enmienda E-06) | **ACEPTADA** 20-09 — **falta el acto material del usuario** |
+| D-U6 | Especialidad → órgano en ARGA | Jurídico → Comité de Cumplimiento · Técnico y Ciberseguridad → CATIT · Riesgos → Comité de Riesgos · Datos → Comisión de Auditoría y Cumplimiento Normativo | **ACEPTADA** 20-09 |
+| D-U7 | Reabrir la escritura de las 8 tablas muertas (EIDF, modelos, componentes, datasets, vigilancia poscomercialización, relojes, informes de incidente, remisiones EIDF-EIPD), derogando en ese punto DA-9 y la frontera D-1 del 08-09 | Sí, con RESTRICT en las FK, el dato de ARGA (`aims_post_market_plans`, 1 fila) solo de lectura, y la corrección previa de cada tabla del §2.2 | **ACEPTADA** 20-09, con condiciones |
+| D-U8 | Excepción de redacción RGPD sobre el diario de solo anexión `aims_ria_records` | Sí, gobernada: capacidad AIMS_GOBIERNO, motivo, fuera de legal hold, y anotación nueva que referencia el registro redactado (enmienda E-12) | **ACEPTADA** 20-09, con condiciones |
+
+### D-U5 — lo que falta y quién lo hace
+
+El controlador no da de alta cuentas ni maneja contraseñas: la crea el usuario. Receta mínima,
+en el panel de Supabase Auth del proyecto `hzqwefkwsxopwrmtksbg` (Authentication → Users → Add
+user), coherente con las cuentas que ya existen:
+
+- Correo: `compliance@arga-seguros.com` (dominio de la cuenta demo de ARGA ya sembrada).
+- Contraseña: la que el usuario decida; **no se comparte por aquí**. Va a `.env` como
+  `DEMO_PASSWORD_ARGA_COMPLIANCE`, igual que las otras dos, y los tests la leen por
+  `demoPassword()`.
+- Marcar el correo como confirmado (si no, el login demo no entra).
+
+Con la cuenta creada, el controlador hace el resto sin tocar Auth: migración con el patrón de
+`20260914121000` que enlaza el `user_profiles` al tenant de ARGA, le pone `role_code` COMPLIANCE
+y lo ata a una persona del censo de ARGA. Hasta entonces, la revisión a cuatro ojos de ARGA
+sigue midiéndose solo por el camino negativo (`MISMO_EVALUADOR`), como hoy.
 
 ## Validación con Harvey
 
@@ -62,6 +95,27 @@ que dice la columna «Antes» y se anota aquí.
 | F1.T11 | MD_CS_01 | `OBLIGACION`, «Cap. V» | `MARCO_OPERATIVO`, «Cap. V (obliga al proveedor del modelo)» |
 | F1.T11 | MD_CS_02 | `OBLIGACION`, «Cap. V y anexo XII» | `MARCO_OPERATIVO`, «Cap. V y anexo XII (obligan al proveedor del modelo)» |
 | F1.T11 | MD_CS_05 | `OBLIGACION`, «Art. 25.1» | `MARCO_OPERATIVO`, «Art. 25.1 (califica al sujeto)» |
+
+**Veredicto de H-02A (respondida 19-09, contrastada con el literal el mismo día).** Las cinco
+afirmaciones salen CORRECTO o CORRECTO CON MATIZ: los cinco cambios de arriba se **mantienen**,
+ninguno se revierte. Los matices sí obligaban a tocar tres sitios, hecho el 20-09 (versión del
+cuestionario **1.1.2**):
+
+| Qué | Cambio aplicado |
+|---|---|
+| Ayuda de Q2_1, letra d) | El literal del art. 5.1 d) exceptúa expresamente los sistemas que apoyan la valoración humana sobre hechos objetivos y verificables ligados a una actividad delictiva: está ahora en la letra. Y el ejemplo del fraude de siniestros añade sus dos límites — sí entra si las variables combinadas equivalen de hecho a un perfil, y quedar fuera del art. 5 no saca del anexo III ni de los arts. 22 y 9 del RGPD |
+| Ayuda de Q2_1, letra h) | Separada en los tres escenarios: tiempo real + fines policiales = prohibida; **diferido** + fines policiales = alto riesgo con las condiciones del **art. 26.10**; cualquier otra finalidad = anexo III 1 a) y art. 9 RGPD. Se excluye la verificación de identidad uno contra uno, que no es identificación remota |
+| Catálogo del responsable del despliegue | Faltaba el **art. 50.3**, la otra obligación que el art. 50 pone directamente sobre este rol: nueva medida `MD_TRA_06` (subparte `TRA.EMOCIONES`), con carácter `OBLIGACION` y **condicional en su texto** al tipo de sistema (reconocimiento de emociones o categorización biométrica). El catálogo pasa de 43 a **44** medidas |
+
+**Cuarta cita de Harvey que no resiste el literal:** en el matiz de P4 cita el «art. 29» para las
+condiciones de la biometría en diferido. El art. 29 es la notificación de los organismos de
+evaluación de la conformidad; las condiciones están en el **art. 26.10**. El criterio de Harvey
+era correcto; la cita, no. Detalle en `docs/legal/2026-09-19-verificacion-omnibus-puntos-abiertos.md`.
+
+**El rótulo provisional NO se retira todavía.** El gate solo exige el rótulo mientras H-02A no
+esté respondida, así que mantenerlo no rompe nada; retirarlo es F1.T15 y depende de la revisión
+de Legal de los textos de ayuda (F1.T10) y de que Legal confirme la desviación de `ROLES_ART_4`
+(F1.T11). Harvey valida criterio, no sustituye esa revisión.
 
 No provisionales, por estar ya validados: la retirada del ejemplo del scoring y el aviso de
 perfilado de Q2_3 (C10 y último párrafo del 6.3 cotejado; el resto de Q2_3 vuelve al texto de la
@@ -278,7 +332,7 @@ cambiaron de texto (marcadas fila a fila) y que entraron 15 nuevas sin evaluar. 
 
 | Fase | Estado | Notas |
 |---|---|---|
-| F0 | EN CURSO | T2 hecha (8 VERIFICADOS —incluido el cdo. 177, que corrige a Harvey—, 1 PENDIENTE_LEGAL) · T3 (H-01) hecha · T4 y T5 hechas (cadena F) · **T1 abierta: D-U1…D-U8 sin respuesta del usuario** |
+| F0 | HECHA | T2 hecha (8 VERIFICADOS —incluido el cdo. 177, que corrige a Harvey—, 1 PENDIENTE_LEGAL) · T3 (H-01) hecha · T4 y T5 hechas (cadena F) · **T1 cerrada el 20-09: D-U1…D-U8 ACEPTADAS («sí a todo»)**; queda el acto material de D-U5 (cuenta en Auth), que no bloquea F2-F11 salvo lo que exige cuatro ojos en ARGA |
 | F1 | INTEGRADA, no cerrada | Seis cadenas fusionadas en la rama (19-09): T1-T9, T12-T14 hechas; **T10, T11 y T15 abiertas** hasta el veredicto de H-02A y la revisión de Legal de las ayudas; T1-bis a F8. **M01 aplicada en Cloud** (`20260919100000`, Management API desde el fichero: ensayo revertido, transacción con verificación que aborta y 14 sondas revertidas, registro en `schema_migrations`, `notify pgrst`; sonda P1-P9 revertida OK; sonda viva 5 rojos → 16/16; 0 filas tocadas, 61 comprobaciones y 8 evaluaciones sin enlace). Gates: typecheck, lint y build limpios; `bun test` 4 772 pass / 156 skip / 0 fail (base 4 547) |
 | F2-F11 | PENDIENTE | |
 
