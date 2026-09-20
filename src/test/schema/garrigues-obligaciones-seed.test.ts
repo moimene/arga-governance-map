@@ -183,11 +183,34 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
     }
   });
 
-  it("ARGA sigue con 5 obligaciones y 8 controles", async () => {
+  // Este gate medía «ARGA sigue con 5 obligaciones y 8 controles». Esa forma
+  // castigaba cualquier alta legítima y empujaba a revertirla, que es el patrón
+  // que el proyecto ya identificó el 2026-09-07. Se le da la vuelta: vigila que
+  // no se PIERDA lo que había y que toda alta esté DECLARADA con su código.
+  it("ARGA conserva sus 5 obligaciones históricas y sus 8 controles", async () => {
     expect(argaAuthed && arga, "sin sesión de ARGA no se puede asertar nada").toBeTruthy();
-    const { count: o } = await arga.from("obligations").select("id", { count: "exact", head: true });
+    const { data } = await arga.from("obligations").select("code");
+    const codigos = new Set(((data ?? []) as Array<{ code: string }>).map((r) => r.code));
+    for (const c of ["OBL-DORA-003", "OBL-GDPR-001", "OBL-LGPD-001", "OBL-ORSA-001", "OBL-SII-001"]) {
+      expect(codigos.has(c), `ARGA ha perdido ${c}`).toBe(true);
+    }
     const { count: c } = await arga.from("controls").select("id", { count: "exact", head: true });
-    expect(o).toBe(5);
-    expect(c).toBe(8);
+    expect(c, "ARGA ha ganado o perdido controles").toBe(8);
+  });
+
+  it("ARGA no tiene más altas que las declaradas en el ledger", async () => {
+    expect(argaAuthed && arga, "sin sesión de ARGA no se puede asertar nada").toBeTruthy();
+    // Altas declaradas sobre las 5 históricas, con la tarea que las creó.
+    const DECLARADAS: Record<string, string> = {
+      // F5.T5, 2026-09-20: art. 4 del RIA como obligación de ORGANIZACIÓN, que es
+      // donde el experto la coloca. Órgano: CATIT (decisión D-U2 del usuario).
+      "OBL-RIA-ORG-04": "F5.T5 — art. 4 RIA",
+    };
+    const { data } = await arga.from("obligations").select("code");
+    const extra = ((data ?? []) as Array<{ code: string }>)
+      .map((r) => r.code)
+      .filter((c) => !["OBL-DORA-003", "OBL-GDPR-001", "OBL-LGPD-001", "OBL-ORSA-001", "OBL-SII-001"].includes(c))
+      .filter((c) => !Object.prototype.hasOwnProperty.call(DECLARADAS, c));
+    expect(extra, "altas en ARGA sin declarar: decláralas aquí con su tarea").toEqual([]);
   });
 });
