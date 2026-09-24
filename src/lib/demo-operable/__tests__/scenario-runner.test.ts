@@ -87,6 +87,31 @@ describe("demo-operable scenario runner", () => {
     expect(runDemoScenario("JUNTA_UNIVERSAL_OK")).toEqual(runDemoScenario("JUNTA_UNIVERSAL_OK"));
   });
 
+  it("does not default tenantId to ARGA fixed UUID when no options are passed (fails if fixed ARGA tenant is reintroduced)", () => {
+    const run = runDemoScenario("JUNTA_UNIVERSAL_OK");
+    expect(run.ids.tenantId).not.toBe("00000000-0000-0000-0000-000000000001");
+    expect(run.ids.entityId).not.toBe("00000000-0000-0000-0000-000000000010");
+  });
+
+  it("stamps ids with the tenant context provided via options", () => {
+    const run = runDemoScenario("JUNTA_UNIVERSAL_OK", {
+      tenantId: "00000000-0000-0000-0000-000000000002",
+      entityId: "11111111-1111-1111-1111-111111111111",
+    });
+
+    expect(run.ids.tenantId).toBe("00000000-0000-0000-0000-000000000002");
+    expect(run.ids.entityId).toBe("11111111-1111-1111-1111-111111111111");
+  });
+
+  it("threads tenant context to every scenario in runAllDemoScenarios", () => {
+    const runs = runAllDemoScenarios({ tenantId: "00000000-0000-0000-0000-000000000002" });
+
+    expect(runs).toHaveLength(5);
+    for (const run of runs) {
+      expect(run.ids.tenantId).toBe("00000000-0000-0000-0000-000000000002");
+    }
+  });
+
   it("changes deterministic hashes when scenario_run_id changes", () => {
     const first = runDemoScenario("JUNTA_UNIVERSAL_OK", { scenarioRunId: "run-a" });
     const second = runDemoScenario("JUNTA_UNIVERSAL_OK", { scenarioRunId: "run-b" });

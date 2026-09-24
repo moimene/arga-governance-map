@@ -39,7 +39,10 @@ import {
   runDemoScenario,
 } from "@/lib/demo-operable";
 import type { DemoPresenterStatus, DemoScenarioId } from "@/lib/demo-operable";
+import { useTenantContext } from "@/context/TenantContext";
 import { cn } from "@/lib/utils";
+
+const ARGA_DEMO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
 function isDemoScenarioId(value: string | undefined): value is DemoScenarioId {
   return Boolean(value && demoScenarioDefinitions.some((scenario) => scenario.id === value));
@@ -59,6 +62,41 @@ export default function DemoScenarioResult() {
   const { scenarioId } = useParams();
   const [searchParams] = useSearchParams();
   const presenterMode = searchParams.get("presenter") === "1";
+  const { tenantId, isLoading } = useTenantContext();
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-[1040px] p-6">
+        <Card className="flex items-center justify-center p-12">
+          <p className="text-sm text-muted-foreground">Cargando contexto de sesión...</p>
+        </Card>
+      </div>
+    );
+  }
+
+  if (tenantId !== ARGA_DEMO_TENANT_ID) {
+    return (
+      <div className="mx-auto max-w-[1040px] p-6">
+        <Card className="p-6">
+          <StatusBadge label="ACCESO RESTRINGIDO" tone="critical" />
+          <h1 className="mt-4 text-xl font-semibold text-foreground">
+            Escenario no disponible en este entorno
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Los escenarios de demostración guiada pertenecen en exclusiva al entorno de demostración
+            de Grupo ARGA Seguros y no están disponibles para otros espacios de trabajo.
+          </p>
+          <Link
+            to="/"
+            className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Volver a la consola
+          </Link>
+        </Card>
+      </div>
+    );
+  }
 
   if (!isDemoScenarioId(scenarioId)) {
     return (
@@ -100,8 +138,15 @@ function DemoScenarioResultContent({
   presenterMode: boolean;
 }) {
   const navigate = useNavigate();
-  const run = useMemo(() => runDemoScenario(scenarioId), [scenarioId]);
-  const response = useMemo(() => buildDemoRunScenarioResponse({ scenario: scenarioId }), [scenarioId]);
+  const { tenantId, entityId } = useTenantContext();
+  const run = useMemo(
+    () => runDemoScenario(scenarioId, { tenantId: tenantId ?? undefined, entityId: entityId ?? undefined }),
+    [scenarioId, tenantId, entityId],
+  );
+  const response = useMemo(
+    () => buildDemoRunScenarioResponse({ scenario: scenarioId, tenantId: tenantId ?? undefined, entityId: entityId ?? undefined }),
+    [scenarioId, tenantId, entityId],
+  );
   const decisionCopy = getBoardDecisionCopy(run);
   const evidenceCopy = getEvidenceTrustCopy();
   const rolePerspectives = getRolePerspectives(run);
