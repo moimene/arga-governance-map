@@ -1654,7 +1654,7 @@ PLAYWRIGHT_PORT=5191 bunx playwright test e2e/05-secretaria-reuniones.spec.ts e2
 - **Entidad legacy en planes/seeds antiguos:** `00000000-0000-0000-0000-000000000010` (no usar como fuente canónica sin probe)
 - **Cabecera Cloud vigente tras M0:** `20260924180000_public_tables_revoke_truncate_trigger_references.sql`, verificada en repo y Cloud. (Histórico: migración focal del cierre UAT 2026-07-21: `20260720149000_secretaria_supporting_attachment_intent_binding.sql`).
 - **Edge Functions focales:** `convocation-artifact-register` v5 y `convocation-supporting-artifact-register` v1.
-- **Historial de migraciones:** existe drift histórico previo; no afirmar paridad global ni usar `repair` como atajo. Aplicar cambios forward-only, mantener espejo en repo y verificar cada versión concreta en Cloud.
+- **Historial de migraciones:** paridad estricta local/Cloud alcanzada en M0 tras reconciliar el drift histórico de junio mediante el renombrado 1:1 de los 26 ficheros locales a la numeración canónica de Cloud (MOI-128); `supabase migration list --linked` y `supabase db push --linked --dry-run` confirman paridad exacta (0 discrepancias, 0 pendientes). Aplicar siempre cambios forward-only con espejo versionado en repo.
 - **RLS/RPC/storage/policies:** pueden evolucionarse en `governance_OS` durante desarrollo-test-demo, siempre con `db:check-target`, migración versionada, pruebas y verificación Cloud proporcionada al riesgo.
 - **Tablas rules engine:** `rule_packs`, `rule_pack_versions`, `rule_param_overrides`, `rbac_roles`, `rbac_user_roles`, `sod_toxic_pairs`, `evidence_bundles`, `audit_worm_trail`
 
