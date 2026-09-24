@@ -10,6 +10,7 @@ import {
   requiresLegalReference,
   templateMetadataPolicy,
 } from "./template-admin/labels";
+import { hasDemoApprovalMarker } from "./template-admin/patterns";
 
 export type LegalTemplateReviewStatus =
   | "legally_approved"
@@ -25,6 +26,7 @@ export type LegalTemplateReviewFilter =
   | "LEGAL_REPORT_APPROVED"
   | "LEGAL_REPORT_APPROVED_VARIANTS"
   | "MISSING_APPROVAL"
+  | "DEMO_APPROVAL_MARKER"
   | "DRAFT_VERSION"
   | "MISSING_REFERENCE"
   | "MISSING_OWNER"
@@ -33,6 +35,7 @@ export type LegalTemplateReviewFilter =
 
 export interface LegalTemplateReviewFlags {
   missingApproval: boolean;
+  demoApprovalMarker: boolean;
   draftVersion: boolean;
   notesRequireReview: boolean;
   missingReference: boolean;
@@ -65,6 +68,7 @@ export interface LegalTemplateReviewSummary {
   needsReview: number;
   fixtureBridge: number;
   missingApproval: number;
+  demoApprovalMarker: number;
   draftVersion: number;
   missingReference: number;
   missingOwner: number;
@@ -144,6 +148,7 @@ export function buildLegalTemplateReviewRows(templates: PlantillaProtegidaRow[])
     const legalReportApproved = approvalPlan?.decision === "APROBADA";
     const legalReportApprovedWithVariants = approvalPlan?.decision === "APROBADA_CON_VARIANTES";
     const committeeApproved = legalReportApproved || legalReportApprovedWithVariants;
+    const hasDemoMarker = !localFixture && hasDemoApprovalMarker(template.aprobada_por);
     const missingApproval =
       !localFixture &&
       !committeeApproved &&
@@ -151,6 +156,7 @@ export function buildLegalTemplateReviewRows(templates: PlantillaProtegidaRow[])
 
     const flags: LegalTemplateReviewFlags = {
       missingApproval,
+      demoApprovalMarker: hasDemoMarker,
       draftVersion,
       notesRequireReview,
       missingReference,
@@ -163,8 +169,11 @@ export function buildLegalTemplateReviewRows(templates: PlantillaProtegidaRow[])
 
     const reasons: string[] = [];
     if (localFixture) reasons.push("Cobertura provisional no persistida; no sustituye una aprobación legal.");
-    if (missingApproval) reasons.push("Falta aprobación formal.");
-    if (committeeApproved && (!hasValue(template.aprobada_por) || !hasValue(template.fecha_aprobacion))) {
+    if (hasDemoMarker) {
+      reasons.push("Aprobación registrada con marcador de demostración; no constituye aprobación legal nominativa.");
+    }
+    if (missingApproval && !hasDemoMarker) reasons.push("Falta aprobación formal.");
+    if (committeeApproved && !hasDemoMarker && (!hasValue(template.aprobada_por) || !hasValue(template.fecha_aprobacion))) {
       reasons.push("Aprobada por informe del Comité Legal; falta reflejar la aprobación en los metadatos.");
     }
     if (draftVersion) reasons.push("Versión provisional.");
@@ -184,8 +193,10 @@ export function buildLegalTemplateReviewRows(templates: PlantillaProtegidaRow[])
     }
 
     const canClaimLegalApproval =
+      !localFixture &&
       !duplicateMatter &&
-      (committeeApproved || (!localFixture && isOperationalActive && reasons.length === 0));
+      !hasDemoMarker &&
+      (committeeApproved || (isOperationalActive && reasons.length === 0));
     const requiresLegalReview = !canClaimLegalApproval;
 
     let status: LegalTemplateReviewStatus;
@@ -199,9 +210,9 @@ export function buildLegalTemplateReviewRows(templates: PlantillaProtegidaRow[])
     } else if (notesRequireReview || draftVersion || missingReference || missingOwner || duplicateMatter) {
       status = "needs_review";
       label = "Revisión legal";
-    } else if (isOperationalActive && missingApproval) {
+    } else if (isOperationalActive && (missingApproval || hasDemoMarker)) {
       status = "operational_unapproved";
-      label = "Vigente sin aprobación";
+      label = "Vigente sin aprobación nominativa";
     } else {
       status = "in_workflow";
       label = "En preparación";
@@ -233,6 +244,7 @@ export function summarizeLegalTemplateReview(rows: LegalTemplateReviewRow[]): Le
       if (row.requiresLegalReview) acc.needsReview += 1;
       if (row.status === "fixture_bridge") acc.fixtureBridge += 1;
       if (row.flags.missingApproval) acc.missingApproval += 1;
+      if (row.flags.demoApprovalMarker) acc.demoApprovalMarker += 1;
       if (row.flags.draftVersion) acc.draftVersion += 1;
       if (row.flags.missingReference) acc.missingReference += 1;
       if (row.flags.missingOwner) acc.missingOwner += 1;
@@ -248,6 +260,7 @@ export function summarizeLegalTemplateReview(rows: LegalTemplateReviewRow[]): Le
       needsReview: 0,
       fixtureBridge: 0,
       missingApproval: 0,
+      demoApprovalMarker: 0,
       draftVersion: 0,
       missingReference: 0,
       missingOwner: 0,
@@ -268,7 +281,8 @@ export function matchesLegalTemplateReviewFilter(
   if (filter === "REVISION_LEGAL") return row.requiresLegalReview;
   if (filter === "LEGAL_REPORT_APPROVED") return row.flags.legalReportApproved;
   if (filter === "LEGAL_REPORT_APPROVED_VARIANTS") return row.flags.legalReportApprovedWithVariants;
-  if (filter === "MISSING_APPROVAL") return row.flags.missingApproval;
+  if (filter === "MISSING_APPROVAL") return row.flags.missingApproval || row.flags.demoApprovalMarker;
+  if (filter === "DEMO_APPROVAL_MARKER") return row.flags.demoApprovalMarker;
   if (filter === "DRAFT_VERSION") return row.flags.draftVersion;
   if (filter === "MISSING_REFERENCE") return row.flags.missingReference;
   if (filter === "MISSING_OWNER") return row.flags.missingOwner;

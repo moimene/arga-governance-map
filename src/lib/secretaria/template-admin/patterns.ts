@@ -57,3 +57,18 @@ export const REF_LEGAL_PATTERN_STRUCTURED = new RegExp(
     `(?:\\b(?:${LAW_ALT})\\b.*?(?:Art\\.|Arts\\.|art\\.|arts\\.))|` +
     `(?:\\b(?:${LAW_ALT})\\b)`,
 );
+
+/**
+ * Marcadores de demostración o entorno de prueba en el campo `aprobada_por`.
+ * MOI-137: Cualquier mención de 'demo', 'demo-operativo', 'seed', 'prototipo',
+ * 'remediación', 'simulada', 'prueba', 'ficticio', 'ejemplo', 'test', 'placeholder', etc.
+ * desmiente la aprobación formal nominativa y exige rotular «Vigente sin aprobación nominativa».
+ */
+export const DEMO_APPROVAL_MARKER_RE =
+  /\b(demo|demo-operativo|seed|prototipo|remediaci[oó]n|simulad[oa]|prueba|fictici[oa]|ejemplo|test|placeholder)\b|demo\s+operativo/i;
+
+export function hasDemoApprovalMarker(aprobadaPor?: string | null): boolean {
+  if (!aprobadaPor) return false;
+  return DEMO_APPROVAL_MARKER_RE.test(aprobadaPor);
+}
+

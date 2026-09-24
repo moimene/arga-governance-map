@@ -43,6 +43,7 @@ function template(patch: Partial<PlantillaProtegidaRow> = {}): PlantillaProtegid
 
 const emptyFlags: LegalTemplateReviewRow["flags"] = {
   missingApproval: false,
+  demoApprovalMarker: false,
   draftVersion: false,
   notesRequireReview: false,
   missingReference: false,

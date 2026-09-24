@@ -18,7 +18,7 @@ import { evaluateSemanticRules } from "./gate-pre-semantic";
 // (compartido con template-import-schema) para que gate e importer no diverjan.
 // META_REF_LEGAL_FORMAT usa la forma laxa: cualquier mención reconocible de
 // fuente legal (acepta "LSC (cuentas anuales)", "Arts. 295 LSC"; rechaza "n/a", "").
-import { SEMVER, REF_LEGAL_PATTERN_LAX as REF_LEGAL_PATTERN } from "./patterns";
+import { SEMVER, REF_LEGAL_PATTERN_LAX as REF_LEGAL_PATTERN, hasDemoApprovalMarker } from "./patterns";
 import { listTemplateExpressionVariables } from "./template-expression-vars";
 
 const VARIABLE_PATTERN =
@@ -102,7 +102,8 @@ function collectMetadataIssues(
   }
   const requiresApproval = target === "APROBADA" || target === "ACTIVA";
   if (requiresApproval) {
-    if (!t.aprobada_por || t.aprobada_por === "" || /^(falta|pendiente)/i.test(t.aprobada_por)) {
+    const trimmedAprobadaPor = (t.aprobada_por ?? "").trim();
+    if (!trimmedAprobadaPor || /^(falta|pendiente)/i.test(trimmedAprobadaPor)) {
       issues.push({
         severity: "BLOCKING",
         code: "META_APROBADA_POR",
@@ -116,6 +117,16 @@ function collectMetadataIssues(
         code: "META_APROBADA_POR",
         message: "fecha_aprobacion requerida para llegar a APROBADA/ACTIVA",
         field: "fecha_aprobacion",
+      });
+    }
+    if (t.aprobada_por && hasDemoApprovalMarker(t.aprobada_por)) {
+      issues.push({
+        severity: "WARNING",
+        code: "META_APROBADA_POR_DEMO",
+        message:
+          "aprobada_por contiene un marcador de demostración; la plantilla quedará vigente sin aprobación legal nominativa formal",
+        field: "aprobada_por",
+        hint: "Para obtener la condición de «Aprobada legalmente», especifique una persona u órgano nominativo real.",
       });
     }
   } else if (!t.aprobada_por || !t.fecha_aprobacion) {

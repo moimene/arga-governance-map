@@ -39,6 +39,7 @@ export const GATE_PRE_ISSUE_LABEL: Record<string, string> = {
   META_VERSION_SEMVER: "Número de versión con formato no válido",
   META_REF_LEGAL_FORMAT: "Referencia legal ausente o sin fuente legal reconocible",
   META_APROBADA_POR: "Aprobación formal incompleta (falta responsable o fecha)",
+  META_APROBADA_POR_DEMO: "Aprobación con marcador de demostración (vigente sin aprobación nominativa)",
   META_APROBADA_POR_PENDING: "Aprobación formal pendiente: se exigirá al promover la plantilla",
 
   // Capas 1-3 (gate-pre.ts)

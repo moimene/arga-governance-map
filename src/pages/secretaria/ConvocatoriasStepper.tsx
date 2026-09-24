@@ -81,6 +81,7 @@ import {
   channelsForNewCapture,
   isLegacyErdsChannel,
 } from "@/lib/secretaria/ead-channel-semantics";
+import { hasDemoApprovalMarker } from "@/lib/secretaria/template-admin/patterns";
 import {
   buildSoleShareholderRepresentativeProposal,
   evaluateAnnualAccountsTimeliness,
@@ -2238,9 +2239,12 @@ export default function ConvocatoriasStepper() {
           referencia_legal: effectiveBorradorTemplate.referencia_legal,
           organo_tipo: effectiveBorradorTemplate.organo_tipo,
           jurisdiccion: effectiveBorradorTemplate.jurisdiccion,
-          source_of_truth: effectiveBorradorTemplate.estado === "ACTIVA" && effectiveBorradorTemplate.aprobada_por
-            ? "approved_template"
-            : "demo_or_operative_template",
+          source_of_truth:
+            effectiveBorradorTemplate.estado === "ACTIVA" &&
+            effectiveBorradorTemplate.aprobada_por &&
+            !hasDemoApprovalMarker(effectiveBorradorTemplate.aprobada_por)
+              ? "approved_template"
+              : "demo_or_operative_template",
           // Distinción manual vs auto-seleccionada: si el usuario tocó el
           // selector, `selectedBorradorTemplateId` no es null.
           selection_mode: selectedBorradorTemplateId ? "manual" : "auto",

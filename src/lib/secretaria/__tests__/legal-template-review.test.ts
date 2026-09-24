@@ -341,4 +341,104 @@ describe("legal-template-review", () => {
     expect(summary.legalReportApproved).toBe(0);
     expect(summary.legalReportApprovedWithVariants).toBe(2);
   });
+
+  it("MOI-137: un marcador de demostración en aprobada_por impide el rótulo Aprobada legalmente y asigna Vigente sin aprobación nominativa", () => {
+    const rows = buildLegalTemplateReviewRows([
+      template({
+        id: "demo-arga",
+        tipo: "ACTA_SESION",
+        aprobada_por: "Comité Legal ARGA — Secretaría Societaria (demo-operativo)",
+      }),
+      template({
+        id: "demo-garrigues",
+        tipo: "ACTA_SESION",
+        aprobada_por: "Comité Legal Garrigues (seed G3 Task 8 — demo operativo)",
+      }),
+      template({
+        id: "demo-clon-nuevo",
+        tipo: "ACTA_SESION",
+        aprobada_por:
+          "Pack base LSC — clon de la plantilla 01618e42 v1.0.0, aprobada en origen por «Comite Legal ARGA - Secretaria Societaria (demo-operativo)»",
+      }),
+      template({
+        id: "aprobacion-nominativa-real",
+        tipo: "ACTA_SESION",
+        aprobada_por: "Lucía Martín Gómez (Secretaria del Consejo)",
+      }),
+    ]);
+
+    const [arga, garrigues, nuevo, nominativa] = rows;
+
+    // ARGA con marcador demo
+    expect(arga.flags.demoApprovalMarker).toBe(true);
+    expect(arga.canClaimLegalApproval).toBe(false);
+    expect(arga.status).toBe("operational_unapproved");
+    expect(arga.label).toBe("Vigente sin aprobación nominativa");
+    expect(arga.reasons.join(" ")).toContain("marcador de demostración");
+    expect(matchesLegalTemplateReviewFilter(arga, "LEGAL_APPROVED")).toBe(false);
+    expect(matchesLegalTemplateReviewFilter(arga, "DEMO_APPROVAL_MARKER")).toBe(true);
+    expect(matchesLegalTemplateReviewFilter(arga, "MISSING_APPROVAL")).toBe(true);
+
+    // Garrigues con marcador demo
+    expect(garrigues.flags.demoApprovalMarker).toBe(true);
+    expect(garrigues.canClaimLegalApproval).toBe(false);
+    expect(garrigues.status).toBe("operational_unapproved");
+    expect(garrigues.label).toBe("Vigente sin aprobación nominativa");
+
+    // Grupo Nuevo con marcador demo heredado
+    expect(nuevo.flags.demoApprovalMarker).toBe(true);
+    expect(nuevo.canClaimLegalApproval).toBe(false);
+    expect(nuevo.status).toBe("operational_unapproved");
+    expect(nuevo.label).toBe("Vigente sin aprobación nominativa");
+
+    // Aprobación nominativa real legítima
+    expect(nominativa.flags.demoApprovalMarker).toBe(false);
+    expect(nominativa.canClaimLegalApproval).toBe(true);
+    expect(nominativa.status).toBe("legally_approved");
+    expect(nominativa.label).toBe("Aprobada legalmente");
+  });
+
+  it("MOI-137: el marcador de demo prevalece sobre la coincidencia con el informe del Comité Legal", () => {
+    // Plantilla que casa con el informe legal del 01-05-2026 pero lleva marcador demo
+    const [row] = buildLegalTemplateReviewRows([
+      template({
+        id: "informe-pero-demo",
+        tipo: "CONVOCATORIA",
+        materia: "CONVOCATORIA_PRE",
+        aprobada_por: "Comite Legal ARGA - Secretaria Societaria (demo-operativo)",
+      }),
+    ]);
+
+    expect(row.approvalDecision).toBe("APROBADA_CON_VARIANTES");
+    expect(row.flags.legalReportApprovedWithVariants).toBe(true);
+    expect(row.flags.demoApprovalMarker).toBe(true);
+    expect(row.canClaimLegalApproval).toBe(false);
+    expect(row.status).toBe("operational_unapproved");
+    expect(row.label).toBe("Vigente sin aprobación nominativa");
+    expect(row.reasons.join(" ")).toContain("marcador de demostración");
+  });
+
+  it("MOI-137: captura prototipo, remediación autorizada y sesiones simuladas como marcadores demo", () => {
+    const [proto, simulada] = buildLegalTemplateReviewRows([
+      template({
+        id: "proto-remed",
+        tipo: "MODELO_ACUERDO",
+        aprobada_por: "Responsable del prototipo TGMS (remediación autorizada)",
+      }),
+      template({
+        id: "simulada-doc",
+        tipo: "MODELO_ACUERDO",
+        aprobada_por: "Aprobado en sesión simulada",
+      }),
+    ]);
+
+    expect(proto.flags.demoApprovalMarker).toBe(true);
+    expect(proto.canClaimLegalApproval).toBe(false);
+    expect(proto.label).toBe("Vigente sin aprobación nominativa");
+
+    expect(simulada.flags.demoApprovalMarker).toBe(true);
+    expect(simulada.canClaimLegalApproval).toBe(false);
+    expect(simulada.label).toBe("Vigente sin aprobación nominativa");
+  });
 });
+

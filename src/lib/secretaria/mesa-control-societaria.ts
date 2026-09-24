@@ -23,6 +23,7 @@ import {
   tipoSocialLabel,
 } from "./template-admin/labels";
 import { normalizeOrganoTipo } from "./template-admin/organo-canonico";
+import { hasDemoApprovalMarker } from "./template-admin/patterns";
 
 export type FunctionalMatterGroupId =
   | "GOBIERNO_ORGANOS"
@@ -1303,10 +1304,13 @@ function templateStage(template: PlantillaProtegidaRow): TemplateDocumentStage {
 }
 
 function templateStatusLabel(template: PlantillaProtegidaRow) {
-  // Lote 3 (B8): vigencia y aprobación son ejes distintos. No se rotula
-  // "Firmada"/"Aprobada" cuando faltan los datos formales de aprobación —
-  // exactamente el caso que la revisión legal marca missingApproval.
+  // Lote 3 (B8) + MOI-137: vigencia y aprobación son ejes distintos. No se rotula
+  // "aprobación formal registrada" cuando el aprobador lleva marcador de demostración
+  // o cuando faltan los datos formales de aprobación.
   if (template.estado === "ACTIVA") {
+    if (hasDemoApprovalMarker(template.aprobada_por)) {
+      return "Vigente · sin aprobación nominativa";
+    }
     return template.aprobada_por && template.fecha_aprobacion
       ? "Vigente · aprobación formal registrada"
       : "Vigente · aprobación formal pendiente";
