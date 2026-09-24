@@ -6,8 +6,9 @@
  *   bun run scripts/rotate-demo-passwords.ts            # dry-run: dice qué haría, no escribe
  *   bun run scripts/rotate-demo-passwords.ts --commit   # aplica y verifica con un login real
  *
- * - Lee las contraseñas NUEVAS de `.env`: DEMO_PASSWORD_ARGA (demo@arga-seguros.com)
- *   y DEMO_PASSWORD_GARRIGUES (demo@ y admin@garrigues-demo.dev). Jamás las imprime.
+ * - Lee las contraseñas NUEVAS de `.env`: DEMO_PASSWORD_ARGA (demo@arga-seguros.com),
+ *   DEMO_PASSWORD_GARRIGUES (demo@ y admin@garrigues-demo.dev) y DEMO_PASSWORD_NUEVO
+ *   (demo@ y admin@grupo-nuevo-demo.dev). Jamás las imprime.
  * - Lista blanca de cuentas: cualquier otro usuario de Auth queda intacto.
  * - Service-role solo en CLI; guard de target (aborta fuera de governance_OS).
  */
@@ -33,6 +34,8 @@ const CUENTAS = [
   { email: "demo@arga-seguros.com", env: "DEMO_PASSWORD_ARGA" },
   { email: "demo@garrigues-demo.dev", env: "DEMO_PASSWORD_GARRIGUES" },
   { email: "admin@garrigues-demo.dev", env: "DEMO_PASSWORD_GARRIGUES" },
+  { email: "demo@grupo-nuevo-demo.dev", env: "DEMO_PASSWORD_NUEVO" },
+  { email: "admin@grupo-nuevo-demo.dev", env: "DEMO_PASSWORD_NUEVO" },
 ] as const;
 
 function fail(msg: string): never {

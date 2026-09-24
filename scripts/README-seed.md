@@ -313,3 +313,14 @@ Gobierno de la matriz en dos fases idempotentes: `--personas` (censo 346 +
 no-socios de comités + ADMIN_UNICO Vives con inscripción + metadata senior
 partner) y `--comites` (membresías body-scoped + consejo EAD verificado).
 Requiere `SUPABASE_SERVICE_ROLE_KEY` y, para --comites, seed-garrigues-bodies.
+
+---
+
+## rotate-demo-passwords.ts (2026-09-05 / 2026-09-25)
+
+Rotación de contraseñas en Auth de las cuentas demo para los tres entornos (`DEMO_PASSWORD_ARGA` para ARGA, `DEMO_PASSWORD_GARRIGUES` para Garrigues y `DEMO_PASSWORD_NUEVO` para Grupo Nuevo). Las contraseñas viven exclusivamente en `.env` local y jamás en el repo.
+
+```bash
+bun run scripts/rotate-demo-passwords.ts            # dry-run
+bun run scripts/rotate-demo-passwords.ts --commit   # ejecuta
+```

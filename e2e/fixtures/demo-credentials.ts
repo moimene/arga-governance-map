@@ -11,7 +11,10 @@ export const DEMO_PASSWORD = process.env.E2E_DEMO_PASSWORD ?? process.env.DEMO_P
 export const GARRIGUES_DEMO_EMAIL = "demo@garrigues-demo.dev";
 export const GARRIGUES_DEMO_PASSWORD = process.env.DEMO_PASSWORD_GARRIGUES ?? "";
 
-export type Entorno = "arga" | "garrigues";
+export const NUEVO_DEMO_EMAIL = "demo@grupo-nuevo-demo.dev";
+export const NUEVO_DEMO_PASSWORD = process.env.DEMO_PASSWORD_NUEVO ?? "";
+
+export type Entorno = "arga" | "garrigues" | "nuevo";
 
 /** Rellena el formulario de /login (ya no existe ningún botón de acceso directo). */
 export async function fillLogin(page: Page, entorno: Entorno, email: string, password: string) {
@@ -22,8 +25,20 @@ export async function fillLogin(page: Page, entorno: Entorno, email: string, pas
 }
 
 export async function loginAsDemo(page: Page, entorno: Entorno = "arga") {
-  const email = entorno === "arga" ? DEMO_EMAIL : GARRIGUES_DEMO_EMAIL;
-  const password = entorno === "arga" ? DEMO_PASSWORD : GARRIGUES_DEMO_PASSWORD;
+  let email: string;
+  let password: string;
+
+  if (entorno === "arga") {
+    email = DEMO_EMAIL;
+    password = DEMO_PASSWORD;
+  } else if (entorno === "garrigues") {
+    email = GARRIGUES_DEMO_EMAIL;
+    password = GARRIGUES_DEMO_PASSWORD;
+  } else {
+    email = NUEVO_DEMO_EMAIL;
+    password = NUEVO_DEMO_PASSWORD;
+  }
+
   if (!password) {
     throw new Error(
       `falta DEMO_PASSWORD_${entorno.toUpperCase()} (o E2E_DEMO_PASSWORD) en .env: la contraseña demo se rotó el 2026-09-05 y ya no está en el repo`,
