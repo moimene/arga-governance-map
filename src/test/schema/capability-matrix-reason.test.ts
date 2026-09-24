@@ -1,5 +1,5 @@
 // W6 — capability_matrix.reason completa (guard de regresión).
-// Antes de la migración 20260613213000 había 6/35 celdas sin razón jurídica
+// Antes de la migración 20260613185529 había 6/35 celdas sin razón jurídica
 // (AUDITOR/COMPLIANCE × SNAPSHOT/VOTE/CERTIFICATION). Este test exige 35/35.
 import { describe, it, expect } from "vitest";
 import { supabase } from "@/integrations/supabase/client";
