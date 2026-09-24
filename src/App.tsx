@@ -32,6 +32,7 @@ import HallazgoDetalle from "@/pages/HallazgoDetalle";
 import ControlDetalle from "@/pages/ControlDetalle";
 import Conflictos from "@/pages/Conflictos";
 import Esg from "@/pages/Esg";
+import { SoloConFixturesDemo } from "@/components/fixtures-guard";
 import SiiDashboard from "@/pages/sii/SiiDashboard";
 import SiiCaseDetalle from "@/pages/sii/SiiCaseDetalle";
 import SiiPortalIntake from "@/pages/sii/SiiPortalIntake";
@@ -197,7 +198,7 @@ const App = () => (
                   <Route path="/hallazgos" element={<HallazgosList />} />
                   <Route path="/hallazgos/:id" element={<HallazgoDetalle />} />
                   <Route path="/conflictos" element={<Conflictos />} />
-                  <Route path="/esg" element={<Esg />} />
+                  <Route path="/esg" element={<SoloConFixturesDemo titulo="ESG — Sostenibilidad e Impacto"><Esg /></SoloConFixturesDemo>} />
                   <Route element={<SiiLayout />}>
                     {/* Sin RequireModule la whitelist `branding.modules` del tenant era
                         decorativa para el SII: cualquier usuario autenticado de cualquier
@@ -210,7 +211,7 @@ const App = () => (
                     <Route path="/sii/:id" element={<RequireModule moduleKey="sii"><SiiCaseDetalle /></RequireModule>} />
                   </Route>
                   <Route path="/documentacion" element={<Documentacion />} />
-                  <Route path="/notificaciones" element={<Notificaciones />} />
+                  <Route path="/notificaciones" element={<SoloConFixturesDemo titulo="Notificaciones"><Notificaciones /></SoloConFixturesDemo>} />
                   <Route path="/demo-operable/:scenarioId" element={<Suspense fallback={<ModuleFallback />}><DemoScenarioResult /></Suspense>} />
                 </Route>
                 {/* Suite Garrigues (Secretaría, GRC Compass, AI Governance) — layout unificado */}

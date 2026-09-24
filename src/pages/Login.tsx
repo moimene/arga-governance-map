@@ -18,6 +18,7 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LOGIN_BRANDS,
+  entornosVisibles,
   loginTenantMismatch,
   resolveLoginBrand,
   type LoginBrandFeature,
@@ -44,8 +45,6 @@ function FeatureIcon({ icon }: { icon: LoginBrandFeature["icon"] }) {
   }
 }
 
-const ENTORNOS: LoginBrandKey[] = ["arga", "garrigues"];
-
 export default function Login() {
   const { signIn, logout } = useAuth();
   const navigate = useNavigate();
@@ -53,6 +52,9 @@ export default function Login() {
 
   const [selected, setSelected] = useState<LoginBrandKey>(resolveLoginBrand(location.search).key);
   const brand = resolveLoginBrand(selected);
+  // Se fija con el entorno de LLEGADA: alternar a ARGA no hace desaparecer la
+  // tarjeta por la que se entró.
+  const [ENTORNOS] = useState<LoginBrandKey[]>(() => entornosVisibles(resolveLoginBrand(location.search).key));
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -157,9 +159,12 @@ export default function Login() {
             Paso 1 · Elige el entorno
           </div>
           <div role="radiogroup" aria-label="Entorno de gobernanza" className="mt-2 grid grid-cols-2 gap-3">
-            {ENTORNOS.map((key) => {
+            {ENTORNOS.map((key, idx) => {
               const b = LOGIN_BRANDS[key];
               const active = selected === key;
+              // Rejilla de dos columnas: con un número impar de entornos el
+              // último ocupa la fila entera en vez de dejar un hueco.
+              const ultimoSuelto = ENTORNOS.length % 2 === 1 && idx === ENTORNOS.length - 1;
               return (
                 <button
                   key={key}
@@ -170,6 +175,7 @@ export default function Login() {
                   onClick={() => selectEntorno(key)}
                   className={cn(
                     "flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                    ultimoSuelto && "col-span-2",
                     active
                       ? "border-foreground/60 bg-background shadow-sm"
                       : "border-border bg-muted/40 text-muted-foreground hover:border-foreground/30 hover:text-foreground",
@@ -251,7 +257,9 @@ export default function Login() {
               style={
                 selected === "garrigues"
                   ? { backgroundColor: "var(--g-brand-3308, #004438)", color: "#fff" }
-                  : undefined
+                  : brand.ctaBg
+                    ? { backgroundColor: brand.ctaBg, color: "#fff" }
+                    : undefined
               }
             >
               {submitting ? "Comprobando acceso…" : `Acceder a ${brand.nombre}`}

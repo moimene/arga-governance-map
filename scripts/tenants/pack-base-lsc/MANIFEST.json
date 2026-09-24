@@ -1,0 +1,103 @@
+{
+ "avisos_legales": [
+  {
+   "aviso": "las notas legales del origen citan normativa interna de ARGA: revisar que la plantilla no encarne una regla propia de ese grupo",
+   "etiqueta": "ACTA_SESION|ACTA_COMISION_DELEGADA|COMISION_DELEGADA|MEETING|1.0.1",
+   "source_id": "e23480e7-66c4-41a3-8148-bc8ca289e52c"
+  }
+ ],
+ "exclusiones": [
+  {
+   "etiqueta": "NOMBRAMIENTO_CONSEJERO_COOPTACION_CONSEJO (COOPTACION_CONSEJERO)",
+   "motivo": "versión activa con status=NULL: solo entra lo que está ACTIVE de forma expresa",
+   "source_id": "NOMBRAMIENTO_CONSEJERO_COOPTACION_CONSEJO",
+   "tabla": "rule_packs"
+  },
+  {
+   "etiqueta": "BR|LTDA|JUNTA_GENERAL|1.0",
+   "motivo": "jurisdicción BR fuera del alcance (ES)",
+   "source_id": "a6997697-cd20-4758-a7bb-fcbf88d819ab",
+   "tabla": "jurisdiction_rule_sets"
+  },
+  {
+   "etiqueta": "BR|LTDA|REUNIAO_SOCIOS|1.0",
+   "motivo": "jurisdicción BR fuera del alcance (ES)",
+   "source_id": "4c2d4b14-c178-4f2e-a7fe-40eaa3c34c1c",
+   "tabla": "jurisdiction_rule_sets"
+  },
+  {
+   "etiqueta": "BR|SA|ASSEMBLEIA_GERAL|1.0",
+   "motivo": "jurisdicción BR fuera del alcance (ES)",
+   "source_id": "c2c698b2-a80f-4cba-a842-be741ee43dbf",
+   "tabla": "jurisdiction_rule_sets"
+  },
+  {
+   "etiqueta": "BR|SA|JUNTA_GENERAL|1.0",
+   "motivo": "jurisdicción BR fuera del alcance (ES)",
+   "source_id": "284c65c6-dd3a-4403-8e79-94abbe76a867",
+   "tabla": "jurisdiction_rule_sets"
+  },
+  {
+   "etiqueta": "MX|SA_CV|ASAMBLEA_GENERAL|1.0",
+   "motivo": "jurisdicción MX fuera del alcance (ES)",
+   "source_id": "ead2f151-d94e-429c-9341-0cc0e0d25bf3",
+   "tabla": "jurisdiction_rule_sets"
+  },
+  {
+   "etiqueta": "MX|SA_CV|JUNTA_GENERAL|1.0",
+   "motivo": "jurisdicción MX fuera del alcance (ES)",
+   "source_id": "a77c3aee-49e1-4bd9-963d-95b499febc9e",
+   "tabla": "jurisdiction_rule_sets"
+  },
+  {
+   "etiqueta": "MX|SRL_CV|JUNTA_SOCIOS|1.0",
+   "motivo": "jurisdicción MX fuera del alcance (ES)",
+   "source_id": "ba5a3b85-77b6-425b-aa9e-c0961a6411b0",
+   "tabla": "jurisdiction_rule_sets"
+  },
+  {
+   "etiqueta": "PT|LDA|ASSEMBLEIA_SOCIOS|1.0",
+   "motivo": "jurisdicción PT fuera del alcance (ES)",
+   "source_id": "302c9fb7-8c0c-46b6-a707-0114a075c914",
+   "tabla": "jurisdiction_rule_sets"
+  },
+  {
+   "etiqueta": "PT|LDA|JUNTA_GENERAL|1.0",
+   "motivo": "jurisdicción PT fuera del alcance (ES)",
+   "source_id": "25657f79-d2a3-4d02-b087-ab662163bf7d",
+   "tabla": "jurisdiction_rule_sets"
+  },
+  {
+   "etiqueta": "PT|SA|ASSEMBLEIA_GERAL|1.0",
+   "motivo": "jurisdicción PT fuera del alcance (ES)",
+   "source_id": "baa04536-c60c-4be8-ae05-37ad522e5d70",
+   "tabla": "jurisdiction_rule_sets"
+  },
+  {
+   "etiqueta": "PT|SA|JUNTA_GENERAL|1.0",
+   "motivo": "jurisdicción PT fuera del alcance (ES)",
+   "source_id": "1c19c648-7cdc-4079-8907-b4057238f482",
+   "tabla": "jurisdiction_rule_sets"
+  }
+ ],
+ "exportado_en": "2026-09-19",
+ "ficheros": {
+  "jurisdiction-rule-sets.json": {
+   "filas": 5,
+   "sha256": "9a44200b3d52243356c108b864150113a7299e4ccf24497403123061993bff3b"
+  },
+  "plantillas.json": {
+   "filas": 72,
+   "sha256": "44e3e03bed03dee593fc1834f33f43a57d3b586594c5ec216a07e7d42c9bf89b"
+  },
+  "rule-packs.json": {
+   "filas": 58,
+   "sha256": "3dadfc8eeadc16509b20d8ad3de0f60bf03e02507663a6c81bb574bc7cd16586"
+  }
+ },
+ "origen": {
+  "proyecto": "hzqwefkwsxopwrmtksbg",
+  "tenant_id": "00000000-0000-0000-0000-000000000001"
+ },
+ "pack": "LSC_ES"
+}

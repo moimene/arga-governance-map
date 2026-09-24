@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTour } from "@/context/TourContext";
 import { useScope } from "@/context/ScopeContext";
-import { useTenantBranding } from "@/context/TenantBrandContext";
+import { useTenantBranding, useTenantBrandingLoading } from "@/context/TenantBrandContext";
 import { isModuleEnabled } from "@/lib/tenant-modules";
 import { dashboardGreeting } from "@/lib/tenant-scopes";
 import { brandName, groupFullLabel } from "@/lib/tenant-brand-labels";
@@ -39,6 +39,7 @@ import {
   Search,
 } from "lucide-react";
 import { recentActivity } from "@/data/dashboard";
+import { usaFixturesDemo } from "@/lib/tenant-fixtures";
 import { esgGroupScore, esgTotals } from "@/data/esg";
 import { socialAverages } from "@/data/esgSocial";
 import { Leaf } from "lucide-react";
@@ -50,12 +51,19 @@ export default function Dashboard() {
   const { start, step, completed } = useTour();
   const { scope } = useScope();
   const branding = useTenantBranding();
+  const brandingLoading = useTenantBrandingLoading();
   const navigate = useNavigate();
 
   const kpisQuery = useDashboardKpis();
   const alertsQuery = useDashboardAlerts();
   const { data: meetings = [] } = useUpcomingMeetings();
-  const { tenantId } = useTenantContext();
+  const { tenantId, isLoading: tenantLoading } = useTenantContext();
+  // Actividad reciente y ESG son fixtures estáticos de demo, no dato del tenant.
+  // Mientras el perfil o el branding están en vuelo, `branding` vale null igual
+  // que para ARGA: decidir entonces pintaría el fixture un frame justo al tenant
+  // que declaró no verlo. Hasta saberlo no se pinta ni el fixture ni el vacío.
+  const fixturesPendiente = tenantLoading || brandingLoading;
+  const fixturesDemo = !fixturesPendiente && usaFixturesDemo(branding);
   // Un error de refetch invalida también los datos retenidos en caché.
   const kpis = tenantId && kpisQuery.isSuccess ? kpisQuery.data : undefined;
   const kpisLoading = !!tenantId && kpisQuery.isLoading;
@@ -476,8 +484,13 @@ export default function Dashboard() {
             <Activity className="h-4 w-4 text-primary" />
             <h2 className="text-sm font-semibold">Actividad reciente</h2>
           </div>
-          <ul className="px-5 py-3">
-            {recentActivity.map((a, i) => (
+          {!fixturesDemo && !fixturesPendiente && (
+            <p className="px-5 py-6 text-xs text-muted-foreground">
+              Sin actividad que mostrar: esta tarjeta todavía no se alimenta de datos del entorno.
+            </p>
+          )}
+          <ul className={fixturesDemo ? "px-5 py-3" : "hidden"}>
+            {(fixturesDemo ? recentActivity : []).map((a, i) => (
               <li key={i} className="relative flex gap-3 pb-3 last:pb-0">
                 <div className="flex flex-col items-center">
                   <span className="mt-1.5 h-2 w-2 rounded-full bg-primary" />
@@ -630,7 +643,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ESG mini-summary */}
+      {/* ESG mini-summary — fixture estático: no se pinta en un tenant en blanco */}
+      {fixturesDemo && (
       <div className="mt-6">
         <Card className="overflow-hidden border-l-4 border-l-status-active">
           <Link to="/esg" className="group flex items-center justify-between gap-6 px-5 py-4 hover:bg-accent/40">
@@ -663,6 +677,7 @@ export default function Dashboard() {
           </Link>
         </Card>
       </div>
+      )}
     </div>
   );
 }

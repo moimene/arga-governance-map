@@ -36,6 +36,10 @@ export const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 // Seed de G0 creó el tenant y dos usuarios auth (SECRETARIO/ADMIN_TENANT).
 export const GARRIGUES_TENANT = "00000000-0000-0000-0000-000000000002";
 export const GARRIGUES_DEMO_EMAIL = "demo@garrigues-demo.dev";
+// Tenant en blanco. Un test (`tenant-cero-isolation`) vigila que estas dos
+// constantes no diverjan del catálogo `scripts/tenants/tenant-spec.ts`.
+export const NUEVO_TENANT = "00000000-0000-0000-0000-000000000003";
+export const NUEVO_DEMO_EMAIL = "demo@grupo-nuevo-demo.dev";
 // Real Cloud UUID for ARGA Seguros, S.A. (entity was pre-seeded with a
 // random UUID, not the 00000000-0000-0000-0000-000000000010 the plan
 // assumed). Verified on project hzqwefkwsxopwrmtksbg at T17 dispatch time:
@@ -70,7 +74,9 @@ export const DEMO_ENTITY_CARTERA = "00000000-0000-0000-0000-000000000020";
 // pero `signInWithPassword` no aparecía ni una vez. Por eso cada sonda se lo
 // fabricó por su cuenta; no duplicaban el helper, construían lo que faltaba.
 
-export type CuentaDemo = "ARGA" | "GARRIGUES";
+// "NUEVO" = tenant en blanco (scripts/tenants/tenant-spec.ts). Su cuenta solo
+// existe cuando el tenant está PROVISIONADO; hasta entonces nadie debe pedirla.
+export type CuentaDemo = "ARGA" | "GARRIGUES" | "NUEVO";
 
 const SUPABASE_URL_TEST =
   process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
@@ -87,6 +93,8 @@ const ANON_KEY_TEST =
 const PASSWORD_DE: Record<CuentaDemo, string | undefined> = {
   ARGA: process.env.DEMO_PASSWORD_ARGA || process.env.DEMO_PASSWORD,
   GARRIGUES: process.env.DEMO_PASSWORD_GARRIGUES || process.env.DEMO_PASSWORD,
+  // Sin caída a DEMO_PASSWORD: es un tenant nuevo con contraseña propia.
+  NUEVO: process.env.DEMO_PASSWORD_NUEVO,
 };
 
 /** Contraseña de la cuenta demo. LANZA si falta: una sonda sin contraseña debe ponerse roja, no saltarse en verde. */
@@ -99,6 +107,7 @@ export function demoPassword(cuenta: CuentaDemo): string {
 const EMAIL_DE: Record<CuentaDemo, string> = {
   ARGA: process.env.DEMO_EMAIL || "demo@arga-seguros.com",
   GARRIGUES: GARRIGUES_DEMO_EMAIL,
+  NUEVO: NUEVO_DEMO_EMAIL,
 };
 
 /**

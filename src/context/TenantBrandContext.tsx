@@ -13,6 +13,8 @@ export interface TenantBranding {
   scope_label?: string;
   sii_org_label?: string;
   tokens?: Record<string, string>;
+  /** "none" = el tenant no pinta los fixtures estáticos de demo. Ver `src/lib/tenant-fixtures.ts`. */
+  fixtures?: string;
 }
 
 const TenantBrandContext = createContext<TenantBranding | null>(null);

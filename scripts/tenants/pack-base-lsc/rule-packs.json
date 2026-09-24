@@ -1,0 +1,7681 @@
+[
+ {
+  "descripcion": "Acuerdo del Consejo para convocar Junta",
+  "materia": "ACUERDO_CONVOCATORIA_JUNTA",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SA_2a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "convocatoria del Consejo",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "convocatoria del Consejo",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SL": [
+      "CONVOCATORIA_CONSEJO"
+     ]
+    },
+    "contenidoMinimo": [],
+    "documentosObligatorios": [
+     {
+      "id": "borrador_convocatoria_junta",
+      "nombre": "Borrador de convocatoria de Junta y orden del dia"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "orden_dia",
+      "nombre": "Orden del dia propuesto"
+     },
+     {
+      "id": "fecha_lugar_modalidad",
+      "nombre": "Fecha, hora, lugar y modalidad de Junta"
+     }
+    ]
+   },
+   "id": "ACUERDO_CONVOCATORIA_JUNTA",
+   "materia": "ACUERDO_CONVOCATORIA_JUNTA",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "NO_SESSION"
+   ],
+   "organoTipo": "CONSEJO",
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "plazoInscripcionDias": 0,
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY",
+      "referencia": "art. 247.2 LSC"
+     },
+     "SA": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     },
+     "SL": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "4a316443080f02c9cd13d340c9d63716fc450209cc1cb855a39982411860b707",
+  "source_id": "ACUERDO_CONVOCATORIA_JUNTA",
+  "source_payload_hash": "4ce66f05189363fa6a69f5bc6d8350d490720f3258634182702c00ff32b349de",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Garrigues/Comité Legal — ADQUISICION_PROPIA",
+  "materia": "ADQUISICION_PROPIA",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 193.1 LSC",
+      "valor": 0.25
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "art. 193.2 LSC",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Orden del día"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta",
+      "nombre": "Propuesta de acuerdo (autocartera)"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta",
+      "nombre": "Propuesta de acuerdo"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 0
+    }
+   },
+   "id": "ADQUISICION_PROPIA",
+   "materia": "ADQUISICION_PROPIA",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL",
+    "NO_SESSION"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": null
+    },
+    "publicacion": []
+   },
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "plazoInscripcion": null,
+    "publicacionRequerida": false,
+    "referencia": "arts. 140-148 LSC"
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SA": {
+      "formula": "favor > contra",
+      "fuente": "LEY",
+      "referencia": "art. 201.1 LSC (mayoría ordinaria)"
+     },
+     "SL": {
+      "formula": "favor > 1/3_capital",
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "d73fbf9ad6fe753f8219806e13c5f75d63084fca99a962acf3ab74356ce13ebd",
+  "source_id": "ADQUISICION_PROPIA",
+  "source_payload_hash": null,
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Garrigues/Comité Legal — AMPLIACION_CAPITAL",
+  "materia": "AMPLIACION_CAPITAL",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ESTATUTARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.5
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Texto íntegro de la propuesta",
+     "Texto actual y propuesto"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta",
+      "nombre": "Texto íntegro de la propuesta (aumento de capital social)"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "informe_admin",
+      "nombre": "Informe del órgano de administración"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "propuesta",
+      "nombre": "Propuesta íntegra"
+     },
+     {
+      "id": "informe_admin_justificacion",
+      "nombre": "Informe justificativo"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "derecho_informacion_287",
+      "nombre": "Derecho de información art. 287 LSC"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "AMPLIACION_CAPITAL",
+   "materia": "AMPLIACION_CAPITAL",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 30,
+     "referencia": "art. 83 RRM"
+    },
+    "publicacion": [
+     "BORME"
+    ]
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcion": {
+     "dias": 30,
+     "fuente": "LEY",
+     "referencia": "art. 83 RRM (1 mes)"
+    },
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — 2/3 capital presente (tramo 25-50% en 2ª conv.); arts. 295-316 LSC"
+     },
+     "SL": {
+      "formula": "favor > 1/2_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 199.a LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "5562d2c151c28ca7e7cbd6470a46a676e87898656a215a45d70cb75ec1430de8",
+  "source_id": "AMPLIACION_CAPITAL",
+  "source_payload_hash": null,
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Garrigues/Comité Legal — AMPLIACION_OBJETO_SOCIAL",
+  "materia": "AMPLIACION_OBJETO_SOCIAL",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ESTATUTARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.5
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Texto íntegro de la propuesta",
+     "Texto actual y propuesto"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta",
+      "nombre": "Texto íntegro de la propuesta (ampliación de objeto social)"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "informe_admin",
+      "nombre": "Informe del órgano de administración"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "propuesta",
+      "nombre": "Propuesta íntegra"
+     },
+     {
+      "id": "informe_admin_justificacion",
+      "nombre": "Informe justificativo"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "derecho_informacion_287",
+      "nombre": "Derecho de información art. 287 LSC"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "AMPLIACION_OBJETO_SOCIAL",
+   "materia": "AMPLIACION_OBJETO_SOCIAL",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 30,
+     "referencia": "art. 83 RRM"
+    },
+    "publicacion": [
+     "BORME"
+    ]
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcion": {
+     "dias": 30,
+     "fuente": "LEY",
+     "referencia": "art. 83 RRM (1 mes)"
+    },
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — 2/3 capital presente (tramo 25-50% en 2ª conv.); art. 285 LSC; derecho de separación art. 346.1.a si sustitución"
+     },
+     "SL": {
+      "formula": "favor > 1/2_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 199.a LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "132c528242e68b81f93a9f160d89f39284767129e79a48406124395276387c3e",
+  "source_id": "AMPLIACION_OBJETO_SOCIAL",
+  "source_payload_hash": null,
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Aplicación del resultado del ejercicio",
+  "materia": "APLICACION_RESULTADO",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 193.1 LSC — quórum del 25% en primera convocatoria",
+      "valor": 25
+     },
+     "SA_2a": {
+      "fuente": "art. 190 LSC",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "Sin quórum legal de constitución en la junta de SL — el control es la mayoría con suelo de los arts. 198-199 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.2 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA",
+      "PUBLICACION_ESTATUTOS"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "fecha_hora_lugar",
+     "orden_dia",
+     "derecho_informacion_si_procede"
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "propuesta_aplicacion",
+      "nombre": "Propuesta de Aplicación de Resultado"
+     }
+    ]
+   },
+   "id": "APLICACION_RESULTADO",
+   "materia": "APLICACION_RESULTADO",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL",
+    "UNIPERSONAL_SOCIO",
+    "NO_SESSION"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {},
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "SA": {
+      "formula": "Favor > Contra",
+      "fuente": "art. 201.1 LSC"
+     },
+     "SL": {
+      "formula": "favor > 1/3_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC"
+     }
+    }
+   }
+  },
+  "payload_sha256": "2fdf6cb1759f4a32526d12b629b9bcb6be3cc9b0df2e1baf97b025983e40a84f",
+  "source_id": "APLICACION_RESULTADO",
+  "source_payload_hash": "73c23fa8982dac21ff24a5d968b1de14639a6a64dc6a47cb546f474abcf5f055",
+  "version": "1.0.1"
+ },
+ {
+  "descripcion": "Aprobación de Cuentas Anuales",
+  "materia": "APROBACION_CUENTAS",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "contenidoMinimo": {
+     "acuerdoEscrito": [],
+     "consignacion": [],
+     "sesion": [
+      "Fecha y lugar",
+      "Lista de asistentes",
+      "Orden del día",
+      "Votaciones y resultados",
+      "Acuerdos adoptados"
+     ]
+    },
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 193.1 LSC",
+      "valor": 0.25
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "art. 193.1 LSC",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA",
+      "PUBLICACION_ESTATUTOS"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Orden del día con indicación de asuntos",
+     "Cargo o nombre de quien convoca"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "cuentas_anuales",
+      "nombre": "Cuentas anuales formuladas"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "informe_gestion",
+      "nombre": "Informe de gestión"
+     },
+     {
+      "condicion": "SI_AUDITORIA_OBLIGATORIA",
+      "id": "informe_auditoria",
+      "nombre": "Informe de auditoría"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta_aplicacion_resultado",
+      "nombre": "Propuesta de aplicación del resultado"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "cuentas_anuales",
+      "nombre": "Cuentas anuales firmadas por todos los administradores"
+     },
+     {
+      "id": "informe_gestion",
+      "nombre": "Informe de gestión del ejercicio"
+     },
+     {
+      "condicion": "SI_AUDITORIA",
+      "id": "informe_auditoria",
+      "nombre": "Informe de auditoría (si obligatoria)"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "APROBACION_CUENTAS",
+   "materia": "APROBACION_CUENTAS",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": null,
+    "oposicion_acreedores": null,
+    "publicacion": []
+   },
+   "postAcuerdo": {
+    "deposito_cuentas": {
+     "instrumento": "CERTIFICACION",
+     "obligatorio": true,
+     "plazoDias": 30,
+     "referencia": "art. 279 LSC (deposito dentro del mes siguiente a la aprobacion)"
+    },
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 248.1 LSC"
+     },
+     "SA": {
+      "formula": "favor > contra",
+      "fuente": "LEY",
+      "referencia": "art. 201.1 LSC"
+     },
+     "SL": {
+      "formula": "favor > 1/3_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "cb5f9407f239daa0ca1b247053b5b61dd1e554535b934d0be7d8ff35abc021ac",
+  "source_id": "APROBACION_CUENTAS",
+  "source_payload_hash": "2e33461aac173f2fc03e116c3a09e9787ef2e9bbd2c4328d47cb30e15a97eea0",
+  "version": "1.0.1"
+ },
+ {
+  "descripcion": "Aprobación del Plan de Negocio",
+  "materia": "APROBACION_PLAN_NEGOCIO",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_CONSEJO"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SA_2a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SL": [
+      "CONVOCATORIA_CONSEJO"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Presentación del plan de negocio"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "plan_negocio",
+      "nombre": "Plan de negocio o estratégico del ejercicio"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "plan_negocio_doc",
+      "nombre": "Documento del plan de negocio aprobado"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 0,
+     "fuente": "LEY"
+    }
+   },
+   "id": "APROBACION_PLAN_NEGOCIO",
+   "materia": "APROBACION_PLAN_NEGOCIO",
+   "modosAdopcionPermitidos": [
+    "MEETING"
+   ],
+   "organoTipo": "CONSEJO",
+   "plazosMateriales": {},
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SA": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SL": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "7741ca2f8411908f7777f26fe2b25d959441ca76fe1144f10ccbcf521bab92dd",
+  "source_id": "APROBACION_PLAN_NEGOCIO",
+  "source_payload_hash": "b2626444aa6d78a05c43a437bd0b1a5a5a7d1332774ae8818ef32e53663dfcef",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Aprobación del Presupuesto Anual",
+  "materia": "APROBACION_PRESUPUESTO",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_CONSEJO",
+     "NO_SESSION": "ACTA_ACUERDO_ESCRITO"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SA_2a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SL": [
+      "CONVOCATORIA_CONSEJO"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Presupuesto anual",
+     "Cuadros de ingresos gastos e inversiones"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "presupuesto_borrador",
+      "nombre": "Borrador del presupuesto anual"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "presupuesto_aprobado",
+      "nombre": "Presupuesto anual aprobado en formato definitivo"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 0,
+     "fuente": "LEY"
+    }
+   },
+   "id": "APROBACION_PRESUPUESTO",
+   "materia": "APROBACION_PRESUPUESTO",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "NO_SESSION"
+   ],
+   "organoTipo": "CONSEJO",
+   "plazosMateriales": {},
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "plazoInscripcionDias": 0,
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY"
+     },
+     "SA": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     },
+     "SL": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "aa3a4e12c778afd827ce3be81c756be4d08c9fff6acffa88bf353ef951dc8747",
+  "source_id": "APROBACION_PRESUPUESTO",
+  "source_payload_hash": "6b6d3169983aca94d892306581dde163431266578d654d2243202d1c5e17ffab",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Aprobacion o modificacion del Reglamento del Consejo",
+  "materia": "APROBACION_REGLAMENTO_CONSEJO",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "clase": "ESPECIAL",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SA_2a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "convocatoria del Consejo",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "convocatoria del Consejo",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SL": [
+      "CONVOCATORIA_CONSEJO"
+     ]
+    },
+    "contenidoMinimo": [],
+    "documentosObligatorios": [
+     {
+      "id": "texto_reglamento",
+      "nombre": "Texto integro del Reglamento del Consejo"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "texto_reglamento",
+      "nombre": "Texto integro aprobado o modificado"
+     },
+     {
+      "id": "informe_gobierno_corporativo",
+      "nombre": "Informe de gobierno corporativo si cotizada"
+     }
+    ]
+   },
+   "id": "APROBACION_REGLAMENTO_CONSEJO",
+   "materia": "APROBACION_REGLAMENTO_CONSEJO",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "NO_SESSION"
+   ],
+   "organoTipo": "CONSEJO",
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcionDias": 30,
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY",
+      "referencia": "art. 247.2 LSC"
+     },
+     "SA": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     },
+     "SL": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "1592c5d0a383e96e939fb17ccbb5531ea7dbc97327d18146691c036757b55767",
+  "source_id": "APROBACION_REGLAMENTO_CONSEJO",
+  "source_payload_hash": "1d7e6c2d141a2a5053ef1617ab687546d763b11c8a075f4ca4cd5b8f08a4b873",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Aumento de capital social",
+  "materia": "AUMENTO_CAPITAL",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ESTATUTARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.5
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "valor": 0.25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Importe del aumento y forma de realización",
+     "Información sobre derecho de suscripción preferente"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta_aumento",
+      "nombre": "Propuesta de acuerdo de aumento de capital"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "informe_admin",
+      "nombre": "Informe del órgano de administración (art. 296 LSC)"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "propuesta_aumento",
+      "nombre": "Propuesta íntegra de aumento de capital"
+     },
+     {
+      "condicion": "SI_NO_DINERARIO",
+      "id": "informe_auditoria_aportaciones",
+      "nombre": "Informe auditor si aportación no dineraria"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "informe_admin",
+      "nombre": "Informe del organo de administracion"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "texto_acuerdo",
+      "nombre": "Texto del acuerdo de aumento de capital"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "AUMENTO_CAPITAL",
+   "materia": "AUMENTO_CAPITAL",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 60,
+     "referencia": "art. 19 RRM"
+    },
+    "publicacion": [
+     "BORME"
+    ]
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcion": {
+     "dias": 30,
+     "fuente": "LEY",
+     "referencia": "un mes (criterio Comite Legal + Garrigues 2026-06-12); escritura art. 314 LSC. La cita previa art. 19 RRM era erronea: ese articulo regula el cambio de domicilio a otra provincia."
+    },
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY"
+     },
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — mayoría absoluta si concurre >50%; 2/3 del capital presente en el tramo 25-50%"
+     },
+     "SL": {
+      "formula": "favor > 1/2_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 199.a LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "5cb464e779c65824137be428f7ba06679a03b41b254636ebd1e2dd99ffa1fc74",
+  "source_id": "AUMENTO_CAPITAL",
+  "source_payload_hash": "db05805560b28266f280cc83fa12c48df3b287b2d2c60bd6c59cb3f69ba0a04d",
+  "version": "1.0.1"
+ },
+ {
+  "descripcion": "Aumento de capital con aportaciones no dinerarias",
+  "materia": "AUMENTO_CAPITAL_NO_DINERARIO",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "clase": "ESTATUTARIA",
+   "constitucion": {
+    "quorum": {
+     "SA_1a": {
+      "fuente": "art. 194 LSC",
+      "valor": 50
+     },
+     "SA_2a": {
+      "fuente": "art. 194 LSC",
+      "valor": 25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "Sin quórum legal de constitución en la junta de SL — el control es la mayoría con suelo de los arts. 198-199 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.2 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA",
+      "PUBLICACION_ESTATUTOS"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "fecha_hora_lugar",
+     "orden_dia",
+     "derecho_informacion_si_procede"
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "texto_propuesta",
+      "nombre": "Propuesta de Aumento de Capital No Dinerario"
+     },
+     {
+      "id": "informe_experto",
+      "nombre": "Informe de Experto Independiente"
+     }
+    ]
+   },
+   "id": "AUMENTO_CAPITAL_NO_DINERARIO",
+   "materia": "AUMENTO_CAPITAL_NO_DINERARIO",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "art. 305 LSC",
+     "plazo_dias": 30
+    }
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "SA": {
+      "dobleCondicional": {
+       "mayoriaAlternativa": "2/3 emitidos",
+       "umbral": 50
+      },
+      "formula": "> 1/2 presente en 1a; >= 2/3 emitidos si < 50% en 2a",
+      "fuente": "art. 201.2 LSC"
+     },
+     "SL": {
+      "formula": "> 1/2 capital",
+      "fuente": "art. 199 LSC"
+     }
+    }
+   }
+  },
+  "payload_sha256": "f9a6d797982b5303fc1afd719c7ee683049dc307899e5ef74266ab182e36c629",
+  "source_id": "AUMENTO_CAPITAL_NO_DINERARIO",
+  "source_payload_hash": "11ff27b3f146cb3ce250243126d9ff188206caab5e0fd376b1f34cc948c80c51",
+  "version": "v1.0.0"
+ },
+ {
+  "descripcion": "Autorización de Garantía Significativa",
+  "materia": "AUTORIZACION_GARANTIA",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 193.1 LSC",
+      "valor": 0.25
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Naturaleza y cuantía de la garantía",
+     "Beneficiario y operación garantizada"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "descripcion_garantia",
+      "nombre": "Descripción de la garantía y evaluación del riesgo"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "descripcion_garantia",
+      "nombre": "Descripción de la garantía y análisis de riesgo"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "AUTORIZACION_GARANTIA",
+   "materia": "AUTORIZACION_GARANTIA",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {},
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY"
+     },
+     "SA": {
+      "formula": "favor > contra",
+      "fuente": "LEY",
+      "referencia": "art. 201.1 LSC"
+     },
+     "SL": {
+      "formula": "favor > mitad_capital_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "628dd8db02b099499a1f63a5746797cb4c7c389cac1ba4104799d769b688c4cf",
+  "source_id": "AUTORIZACION_GARANTIA",
+  "source_payload_hash": "4c1016e0788e1996c4670c81ffd21d41d08b269f75515e1462a3e88c34a9c8cb",
+  "version": "1.0.1"
+ },
+ {
+  "descripcion": "Autorizacion de garantia no esencial por Consejo",
+  "materia": "AUTORIZACION_GARANTIA",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_CONSEJO",
+     "NO_SESSION": "ACTA_ACUERDO_ESCRITO"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SA_2a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SL": [
+      "CONVOCATORIA_CONSEJO"
+     ]
+    },
+    "contenidoMinimo": [
+     "Naturaleza y cuantía de la garantía",
+     "Beneficiario",
+     "Análisis de riesgo"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "descripcion_garantia",
+      "nombre": "Descripción de la garantía"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "verificacion_umbral_160f",
+      "nombre": "Verificación umbral 25% activos (art. 160.f LSC)"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "descripcion_garantia",
+      "nombre": "Descripción de la garantía y análisis"
+     },
+     {
+      "id": "calculo_umbral",
+      "nombre": "Cálculo del porcentaje sobre activos"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 0,
+     "fuente": "LEY"
+    }
+   },
+   "id": "AUTORIZACION_GARANTIA_CONSEJO",
+   "materia": "AUTORIZACION_GARANTIA",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "NO_SESSION"
+   ],
+   "nota": "Para garantías cuyo importe NO supera el 25% activos — competencia del Consejo (art. 249 bis + 160.f LSC).",
+   "organoTipo": "CONSEJO",
+   "plazosMateriales": {},
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "plazoInscripcionDias": 0,
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY"
+     },
+     "SA": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY"
+     },
+     "SL": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "702a090056795df59d0f4ec63d415f053729fe5ebf2db80332c9ad866d79bb00",
+  "source_id": "AUTORIZACION_GARANTIA_CONSEJO",
+  "source_payload_hash": "e65db902481060b5eab73f3420553269ecc4c104e9a2df0ccc6e78381e0b330c",
+  "version": "1.1.0"
+ },
+ {
+  "descripcion": "Garrigues/Comité Legal — CAMBIO_DENOMINACION_SOCIAL",
+  "materia": "CAMBIO_DENOMINACION_SOCIAL",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ESTATUTARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.5
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Texto íntegro de la propuesta",
+     "Texto actual y propuesto"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta",
+      "nombre": "Texto íntegro de la propuesta (cambio de denominación)"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "informe_admin",
+      "nombre": "Informe del órgano de administración"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "propuesta",
+      "nombre": "Propuesta íntegra"
+     },
+     {
+      "id": "informe_admin_justificacion",
+      "nombre": "Informe justificativo"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "derecho_informacion_287",
+      "nombre": "Derecho de información art. 287 LSC"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "CAMBIO_DENOMINACION_SOCIAL",
+   "materia": "CAMBIO_DENOMINACION_SOCIAL",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 30,
+     "referencia": "art. 83 RRM"
+    },
+    "publicacion": [
+     "BORME"
+    ]
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcion": {
+     "dias": 30,
+     "fuente": "LEY",
+     "referencia": "art. 83 RRM (1 mes)"
+    },
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — 2/3 capital presente (tramo 25-50% en 2ª conv.); art. 285 LSC"
+     },
+     "SL": {
+      "formula": "favor > 1/2_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 199.a LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "240fc1256e04a795998fae51d2c052eb6e7d3df056d455db1da1ad704f0e7193",
+  "source_id": "CAMBIO_DENOMINACION_SOCIAL",
+  "source_payload_hash": null,
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Garrigues/Comité Legal — CAMBIO_DOMICILIO_SOCIAL",
+  "materia": "CAMBIO_DOMICILIO_SOCIAL",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ESTATUTARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.5
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Texto íntegro de la propuesta",
+     "Texto actual y propuesto"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta",
+      "nombre": "Texto íntegro de la propuesta (cambio de domicilio)"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "informe_admin",
+      "nombre": "Informe del órgano de administración"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "propuesta",
+      "nombre": "Propuesta íntegra"
+     },
+     {
+      "id": "informe_admin_justificacion",
+      "nombre": "Informe justificativo"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "derecho_informacion_287",
+      "nombre": "Derecho de información art. 287 LSC"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "CAMBIO_DOMICILIO_SOCIAL",
+   "materia": "CAMBIO_DOMICILIO_SOCIAL",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 30,
+     "referencia": "art. 83 RRM"
+    },
+    "publicacion": [
+     "BORME"
+    ]
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcion": {
+     "dias": 30,
+     "fuente": "LEY",
+     "referencia": "art. 83 RRM (1 mes)"
+    },
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — 2/3 capital presente (tramo 25-50% en 2ª conv.); art. 285.2 LSC (competencia del órgano de admin. salvo disposición estatutaria)"
+     },
+     "SL": {
+      "formula": "favor > 1/2_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 199.a LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "4c6336ba7b9399115369f4f02f3c199d6fef97c6381a6e391ab4b33474d94c17",
+  "source_id": "CAMBIO_DOMICILIO_SOCIAL",
+  "source_payload_hash": null,
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Cese de Consejero",
+  "materia": "CESE_CONSEJERO",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 193.1 LSC",
+      "valor": 0.25
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA",
+      "PUBLICACION_ESTATUTOS"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Orden del día identificando al consejero afectado"
+    ],
+    "documentosObligatorios": []
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "identificacion_cargo",
+      "nombre": "Identificacion del cargo afectado"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "causa_o_subtipo",
+      "nombre": "Causa o subtipo del cese"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "CESE_CONSEJERO",
+   "materia": "CESE_CONSEJERO",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 30,
+     "referencia": "art. 17 RRM"
+    }
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoReferencia": "art. 142 RRM (certificacion del acta con firmas legitimadas; la escritura es opcional, no obligatoria)",
+    "instrumentoRequerido": "CERTIFICACION",
+    "plazoInscripcion": {
+     "dias": 30,
+     "fuente": "LEY",
+     "referencia": "art. 17 RRM"
+    },
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SA": {
+      "formula": "favor > contra",
+      "fuente": "LEY",
+      "referencia": "art. 223.1 LSC — libre separación"
+     },
+     "SL": {
+      "formula": "favor > 1/3_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "9586de69343e376115eef222c92597d33722728bf83d1cf0f83d8f5c29005464",
+  "source_id": "CESE_CONSEJERO",
+  "source_payload_hash": "c176d933c3363106690404cad512591efaeee646cbe55498d6cf050cb0fb4d7f",
+  "version": "1.0.1"
+ },
+ {
+  "descripcion": "Cesión global de activo y pasivo",
+  "materia": "CESION_GLOBAL_ACTIVO",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "clase": "ESTRUCTURAL",
+   "constitucion": {
+    "quorum": {
+     "SA_1a": {
+      "fuente": "art. 194 LSC",
+      "valor": 50
+     },
+     "SA_2a": {
+      "fuente": "art. 194 LSC",
+      "valor": 25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "Sin quórum legal de constitución en la junta de SL — el control es la mayoría con suelo de los arts. 198-199 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.2 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA",
+      "PUBLICACION_ESTATUTOS"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "fecha_hora_lugar",
+     "orden_dia",
+     "derecho_informacion_si_procede"
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "proyecto",
+      "nombre": "Proyecto de Cesión Global"
+     },
+     {
+      "id": "informes",
+      "nombre": "Informes Administrativos"
+     }
+    ]
+   },
+   "id": "CESION_GLOBAL_ACTIVO",
+   "materia": "CESION_GLOBAL_ACTIVO",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "art. 305 LSC",
+     "plazo_dias": 30
+    }
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — mayoría absoluta si concurre >50%; 2/3 del capital presente en el tramo 25-50%"
+     },
+     "SL": {
+      "formula": ">= 2/3 capital",
+      "fuente": "art. 199 LSC"
+     }
+    }
+   }
+  },
+  "payload_sha256": "ffb52fdb5c6a5155b47f7fa2fa95c11064e11e55ec173058c338acfbc792b673",
+  "source_id": "CESION_GLOBAL_ACTIVO",
+  "source_payload_hash": "b8ad5b5eced59cf7f2069b924ae37871ad9cfc82e5329a9104ee78993ec9b8e3",
+  "version": "v1.0.0"
+ },
+ {
+  "descripcion": "Contratos entre socio unico y sociedad",
+  "materia": "CONTRATOS_SOCIO_UNICO_SOCIEDAD",
+  "organo_tipo": "SOCIO_UNICO",
+  "payload": {
+   "clase": "ESPECIAL",
+   "constitucion": {
+    "quorum": {
+     "SA_1a": {
+      "fuente": "SOCIO_UNICO",
+      "referencia": "arts. 15 y 16 LSC",
+      "valor": 1
+     },
+     "SA_2a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "SOCIO_UNICO",
+      "referencia": "arts. 15 y 16 LSC",
+      "valor": 1
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "NO_APLICA",
+      "referencia": "art. 15 LSC",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "art. 15 LSC",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "NO_APLICA"
+     ],
+     "SL": [
+      "NO_APLICA"
+     ]
+    },
+    "contenidoMinimo": [],
+    "documentosObligatorios": [
+     {
+      "id": "contrato_socio_unico",
+      "nombre": "Contrato o minuta con el socio unico"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "contrato",
+      "nombre": "Contrato firmado o minuta aprobada"
+     },
+     {
+      "id": "libro_registro_contratos_socio_unico",
+      "nombre": "Constancia en libro-registro especial art. 16 LSC"
+     }
+    ]
+   },
+   "id": "CONTRATOS_SOCIO_UNICO_SOCIEDAD",
+   "materia": "CONTRATOS_SOCIO_UNICO_SOCIEDAD",
+   "modosAdopcionPermitidos": [
+    "UNIPERSONAL_SOCIO"
+   ],
+   "organoTipo": "SOCIO_UNICO",
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "plazoInscripcionDias": 0,
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_aplica",
+    "mayoria": {
+     "SA": {
+      "formula": "decision del socio unico",
+      "fuente": "LEY",
+      "referencia": "art. 15 LSC"
+     },
+     "SL": {
+      "formula": "decision del socio unico",
+      "fuente": "LEY",
+      "referencia": "art. 15 LSC"
+     }
+    }
+   }
+  },
+  "payload_sha256": "8002bf3fd9c920738ff325001201bb270cd351e046d17c7531b935249fcca9f4",
+  "source_id": "CONTRATOS_SOCIO_UNICO_SOCIEDAD",
+  "source_payload_hash": "24b9a2bf7d4028ca0e83f87dedfea8e4d2b672f961aedd72cc9dea1963b06eb0",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Cooptación de Consejeros (SA art. 244 LSC)",
+  "materia": "COOPTACION",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "acta": {
+    "contenidoMinimo": {
+     "acuerdoEscrito": [
+      "Identidad consejero cooptado",
+      "Causa de vacante",
+      "Duración provisional"
+     ],
+     "consignacion": [],
+     "sesion": [
+      "Fecha y lugar",
+      "Consejeros asistentes",
+      "Acreditación de vacante",
+      "Candidato propuesto",
+      "Resultado votación"
+     ]
+    },
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_CONSEJO",
+     "NO_SESSION": "ACTA_ACUERDO_ESCRITO"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 247 LSC",
+      "valor": 0.5
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "Convocatoria Consejo",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "NO APLICA",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SL": []
+    },
+    "contenidoMinimo": [
+     "Identificación del candidato",
+     "Acreditación de vacante",
+     "Duración provisional"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "cv_candidato",
+      "nombre": "CV y declaración de idoneidad"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "justificacion_vacante",
+      "nombre": "Documentación acreditativa de la vacante"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "cv_candidato",
+      "nombre": "CV del consejero cooptado"
+     },
+     {
+      "id": "declaracion_idoneidad",
+      "nombre": "Declaración de idoneidad"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 0,
+     "fuente": "LEY"
+    }
+   },
+   "id": "COOPTACION",
+   "materia": "COOPTACION",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "NO_SESSION"
+   ],
+   "nota": "Cooptación exclusiva de SA (art. 244 LSC).",
+   "organoTipo": "CONSEJO",
+   "plazosMateriales": {
+    "ratificacion_jga": {
+     "fuente": "LEY",
+     "nota": "El cooptado debe ser ratificado en la primera JGA ordinaria posterior (art. 244 LSC)",
+     "referencia": "art. 244 LSC"
+    }
+   },
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "plazoInscripcionDias": 0,
+    "publicacionRequerida": false
+   },
+   "restriccionTipoSocial": [
+    "SA"
+   ],
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY",
+      "referencia": "art. 247.2 LSC"
+     },
+     "SA": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY",
+      "referencia": "art. 247.2 LSC"
+     },
+     "SL": {
+      "formula": "NO_APLICA",
+      "fuente": "LEY"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "9d263c34b3d9aa8c3f417bbc85108d8ddd11ba55244cf357d95ae5ba836ecc32",
+  "source_id": "COOPTACION",
+  "source_payload_hash": "bf9a5c2ea9b5e9fb26960292224aff423694b02992b65fb83cd818c7e3d75c1f",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Formulación de Cuentas Consolidadas",
+  "materia": "CUENTAS_CONSOLIDADAS",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": true,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_CONSEJO",
+     "NO_SESSION": "ACTA_ACUERDO_ESCRITO"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SA_2a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SL": [
+      "CONVOCATORIA_CONSEJO"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Cuentas consolidadas del grupo",
+     "Informe de auditoría del grupo"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "cuentas_consolidadas_borrador",
+      "nombre": "Borrador cuentas anuales consolidadas"
+     },
+     {
+      "condicion": "SI_OBLIGACION_AUDITAR",
+      "id": "informe_auditoria_grupo",
+      "nombre": "Informe de auditoría del grupo"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "cuentas_consolidadas_firmadas",
+      "nombre": "Cuentas consolidadas firmadas por todos los administradores"
+     },
+     {
+      "id": "informe_gestion_consolidado",
+      "nombre": "Informe de gestión consolidado del grupo"
+     }
+    ],
+    "plazoFormulacion": {
+     "fuente": "LEY",
+     "meses": 3,
+     "referencia": "art. 253 LSC"
+    },
+    "ventanaDisponibilidad": {
+     "dias": 0,
+     "fuente": "LEY"
+    }
+   },
+   "id": "CUENTAS_CONSOLIDADAS",
+   "materia": "CUENTAS_CONSOLIDADAS",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "NO_SESSION"
+   ],
+   "organoTipo": "CONSEJO",
+   "plazosMateriales": {
+    "deposito_rm": {
+     "fuente": "LEY",
+     "nota": "Depósito en RM dentro del mes siguiente a la aprobación JGA",
+     "referencia": "art. 279 LSC"
+    }
+   },
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "plazoInscripcionDias": 0,
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY",
+      "referencia": "art. 247.2 LSC"
+     },
+     "SA": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     },
+     "SL": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "71602b5b1b58f063425c5a785ad5f52be7c0bcc6c556ea21cb8cac4da5c1a642",
+  "source_id": "CUENTAS_CONSOLIDADAS",
+  "source_payload_hash": "c9bb843f4564711622a7dcb89f39b2bbfc651294b0f85b6791cbc771cce492e6",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Garrigues/Comité Legal — DELEGACION_CAPITAL",
+  "materia": "DELEGACION_CAPITAL",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ESTATUTARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.5
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Texto íntegro de la propuesta",
+     "Texto actual y propuesto"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta",
+      "nombre": "Texto íntegro de la propuesta (delegación para aumentar capital)"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "informe_admin",
+      "nombre": "Informe del órgano de administración"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "propuesta",
+      "nombre": "Propuesta íntegra"
+     },
+     {
+      "id": "informe_admin_justificacion",
+      "nombre": "Informe justificativo"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "derecho_informacion_287",
+      "nombre": "Derecho de información art. 287 LSC"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "DELEGACION_CAPITAL",
+   "materia": "DELEGACION_CAPITAL",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 30,
+     "referencia": "art. 83 RRM"
+    },
+    "publicacion": [
+     "BORME"
+    ]
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcion": {
+     "dias": 30,
+     "fuente": "LEY",
+     "referencia": "art. 83 RRM (1 mes)"
+    },
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — 2/3 capital presente (tramo 25-50% en 2ª conv.); art. 297 LSC"
+     },
+     "SL": {
+      "formula": "favor > 1/2_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 199.a LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "41dcd29ba3b2fd2ab8c9a868035f5c7112a3beae917eb03b6a6af32eaf5a6db2",
+  "source_id": "DELEGACION_CAPITAL",
+  "source_payload_hash": null,
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Delegación de Facultades",
+  "materia": "DELEGACION_FACULTADES",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_CONSEJO",
+     "NO_SESSION": "ACTA_ACUERDO_ESCRITO"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SA_2a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 246.1 LSC",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SL": [
+      "CONVOCATORIA_CONSEJO"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Materias a deliberar",
+     "Identificación del delegado y alcance"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "borrador_delegacion",
+      "nombre": "Borrador del acuerdo de delegación"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "verificacion_249bis",
+      "nombre": "Verificación de exclusión de materias indelegables art. 249 bis LSC"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "listado_facultades",
+      "nombre": "Listado completo de facultades delegadas"
+     },
+     {
+      "id": "exclusion_249bis",
+      "nombre": "Verificación de exclusión art. 249 bis LSC"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 0,
+     "fuente": "LEY"
+    }
+   },
+   "id": "DELEGACION_FACULTADES",
+   "materia": "DELEGACION_FACULTADES",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "NO_SESSION"
+   ],
+   "organoTipo": "CONSEJO",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 30,
+     "referencia": "art. 17 RRM"
+    }
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcionDias": 30,
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor >= 2/3_total_miembros",
+      "fuente": "LEY",
+      "referencia": "art. 249.3 LSC — dos terceras partes de los componentes del consejo"
+     },
+     "SA": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY",
+      "referencia": "art. 247.2 LSC"
+     },
+     "SL": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "7665b6af4d9a6f8c511cd739171ba6d44c144790d65b9fc0ed507e5f822337c8",
+  "source_id": "DELEGACION_FACULTADES",
+  "source_payload_hash": "842e7682c34f91d526e3879cd6834d7adffe135dd09e8a4d3526d7e10b512904",
+  "version": "1.1.0"
+ },
+ {
+  "descripcion": "Designación de representante de la socia única en una filial S.L.U.",
+  "materia": "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "acta": {
+    "contenidoMinimo": {
+     "acuerdoEscrito": [
+      "propuesta_texto",
+      "target_entity_id",
+      "titularidad_100_por_ciento",
+      "no_administrador_persona_juridica",
+      "identidad_representante",
+      "poder_general_publico_art183_1",
+      "instrucciones_especificas",
+      "relacion_respuestas",
+      "ausencia_oposicion_procedimiento",
+      "resultado_evaluacion",
+      "fecha_cierre"
+     ],
+     "consignacion": [],
+     "sesion": [
+      "fecha_y_lugar",
+      "consejeros_asistentes",
+      "target_entity_id",
+      "titularidad_100_por_ciento",
+      "no_administrador_persona_juridica",
+      "identidad_representante",
+      "poder_general_publico_art183_1",
+      "instrucciones_especificas",
+      "resultado_votacion"
+     ]
+    },
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_CONSEJO",
+     "NO_SESSION": "ACTA_ACUERDO_ESCRITO"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.2 LSC — mayoría de los vocales del Consejo de la S.A.",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "no aplica a Junta; materia exclusiva del Consejo",
+      "valor": 0
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "no aplica a Junta; materia exclusiva del Consejo",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "no aplica a Junta; materia exclusiva del Consejo",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "ESTATUTOS",
+      "referencia": "estatutos y reglamento del Consejo",
+      "valor": 0
+     },
+     "SAU": {
+      "fuente": "ESTATUTOS",
+      "referencia": "estatutos y reglamento del Consejo",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "ESTATUTOS",
+      "referencia": "estatutos sociales",
+      "valor": 0
+     },
+     "SLU": {
+      "fuente": "ESTATUTOS",
+      "referencia": "estatutos sociales",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SAU": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SL": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SLU": [
+      "CONVOCATORIA_CONSEJO"
+     ]
+    },
+    "contenidoMinimo": [
+     "Identificación inequívoca de la filial objetivo",
+     "Acreditación de la titularidad del cien por cien del capital",
+     "Identidad de la persona representante",
+     "Título de representación voluntaria aplicable conforme al artículo 183 LSC",
+     "Alcance, instrucciones específicas, vigencia y revocación"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "target_entity_identificada",
+      "nombre": "Identificación inequívoca de la filial objetivo"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "acreditacion_capital_100",
+      "nombre": "Acreditación vigente de la titularidad del 100 % del capital de la filial"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "certificado_no_administrador_pj",
+      "nombre": "Verificación de que la socia única no consta como administradora persona jurídica de la filial"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "titulo_representacion_art183",
+      "nombre": "Poder general en documento público con el alcance exigido por el artículo 183.1 LSC"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta_instrucciones_representante",
+      "nombre": "Propuesta con identidad, alcance, instrucciones específicas, vigencia y revocación"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "target_entity_identificada",
+      "nombre": "Identificación inequívoca de la filial objetivo"
+     },
+     {
+      "id": "acreditacion_capital_100",
+      "nombre": "Acreditación vigente de la titularidad del 100 % del capital de la filial"
+     },
+     {
+      "id": "certificado_no_administrador_pj",
+      "nombre": "Certificado de que la socia única no es administradora persona jurídica de la filial"
+     },
+     {
+      "id": "titulo_representacion_art183",
+      "nombre": "Evidencia del poder general en documento público exigido por el artículo 183.1 LSC"
+     },
+     {
+      "id": "propuesta_instrucciones_representante",
+      "nombre": "Propuesta con alcance, instrucciones específicas, vigencia y revocación"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 0,
+     "fuente": "LEY"
+    }
+   },
+   "id": "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL",
+   "materia": "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "NO_SESSION"
+   ],
+   "noSession": {
+    "canal_requerido_consejo": {
+     "fuente": "REGLAMENTO",
+     "referencia": "art. 248.2 LSC y art. 100 RRM",
+     "valor": [
+      "NOTIFICACION_CERTIFICADA",
+      "EMAIL_CON_ACUSE"
+     ]
+    },
+    "canal_requerido_junta_sl": {
+     "fuente": "LEY",
+     "referencia": "no aplicable a esta materia",
+     "valor": [
+      "NOTIFICACION_CERTIFICADA"
+     ]
+    },
+    "cierre_anticipado": false,
+    "condicion_consejo": "MAYORIA_SIN_OPOSICION",
+    "condicion_junta_sl": "UNANIMIDAD_CAPITAL",
+    "contenido_minimo_propuesta": [
+     "filial_objetivo",
+     "titularidad_100_por_ciento",
+     "identidad_representante",
+     "poder_general_publico_art183_1",
+     "instrucciones_especificas",
+     "plazo_respuesta"
+    ],
+    "habilitado_por_estatutos": {
+     "fuente": "LEY",
+     "referencia": "art. 248.2 LSC",
+     "valor": true
+    },
+    "habilitado_por_reglamento": {
+     "fuente": "LEY",
+     "referencia": "art. 248.2 LSC",
+     "valor": true
+    },
+    "silencio_equivale_a": "NADA",
+    "ventana_fuente": "REGLAMENTO",
+    "ventana_minima_dias": {
+     "fuente": "REGLAMENTO",
+     "referencia": "reglamento del Consejo",
+     "valor": 0
+    }
+   },
+   "organoTipo": "CONSEJO",
+   "plazosMateriales": {},
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "publicacionRequerida": false
+   },
+   "reglaEspecifica": {
+    "excluyeRepresentacionAdministradorPJArt212Bis": true,
+    "gates": {
+     "capital_socio_unico": {
+      "blocking": true,
+      "campo": "ownership_percentage",
+      "fuente": "capital_holdings",
+      "operador": "eq",
+      "valor": 100
+     },
+     "no_administrador_persona_juridica": {
+      "blocking": true,
+      "campo": "source_entity_is_corporate_administrator",
+      "failure_route": "REPRESENTANTE_ADMINISTRADOR_PJ_ART_212_BIS",
+      "fuente": "mandates",
+      "operador": "eq",
+      "valor": false
+     },
+     "target_entity": {
+      "blocking": true,
+      "campo": "target_entity_id",
+      "operador": "required"
+     },
+     "titulo_representacion_art183": {
+      "blocking": true,
+      "evidencia": [
+       "poder_general_en_documento_publico",
+       "facultad_para_administrar_todo_el_patrimonio_en_territorio_nacional"
+      ],
+      "operador": "eq",
+      "referencia": "art. 183.1 LSC",
+      "valor": "GENERAL_PUBLIC_POWER_ART_183_1"
+     }
+    },
+    "regimenRepresentacion": "SOCIO_UNICO_FILIAL"
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 248.1 LSC — mayoría absoluta de los consejeros concurrentes"
+     },
+     "SA": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 248.1 LSC — mayoría absoluta de los consejeros concurrentes"
+     },
+     "SL": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "ESTATUTOS",
+      "referencia": "art. 245.1 LSC y estatutos sociales"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "4dc88c743666d1c6615e717ad164e439d2397ca8c3f6780211e03b9bb9ab40fb",
+  "source_id": "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL",
+  "source_payload_hash": "568f8307bfe11e2ef5428952340ef763c3534e7997ea9f76c5479c6509a45978",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Disolución de la sociedad",
+  "materia": "DISOLUCION",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "clase": "ESTRUCTURAL",
+   "constitucion": {
+    "quorum": {
+     "SA_1a": {
+      "fuente": "art. 194 LSC",
+      "valor": 50
+     },
+     "SA_2a": {
+      "fuente": "art. 194 LSC",
+      "valor": 25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "Sin quórum legal de constitución en la junta de SL — el control es la mayoría con suelo de los arts. 198-199 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.2 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA",
+      "PUBLICACION_ESTATUTOS"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "fecha_hora_lugar",
+     "orden_dia",
+     "derecho_informacion_si_procede"
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "condicion": "NO_APLICA",
+      "id": "NA",
+      "nombre": "No aplica documento obligatorio especifico"
+     }
+    ]
+   },
+   "id": "DISOLUCION",
+   "materia": "DISOLUCION",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "art. 305 LSC",
+     "plazo_dias": 30
+    }
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — mayoría absoluta si concurre >50%; 2/3 del capital presente en el tramo 25-50%"
+     },
+     "SL": {
+      "formula": ">= 2/3 capital",
+      "fuente": "art. 199 LSC"
+     }
+    }
+   }
+  },
+  "payload_sha256": "0df6b6dd8174a99eb8794174f76ee8034791979a661491132a6dcd28eec9a9d6",
+  "source_id": "DISOLUCION",
+  "source_payload_hash": "8d1d95dd5e307500e360be658d26e3515e8edf9b9c9b2d38aacb82f1ef81de90",
+  "version": "v1.0.0"
+ },
+ {
+  "descripcion": "Distribucion de cargos del Consejo",
+  "materia": "DISTRIBUCION_CARGOS",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SA_2a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "convocatoria del Consejo",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "convocatoria del Consejo",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SL": [
+      "CONVOCATORIA_CONSEJO"
+     ]
+    },
+    "contenidoMinimo": [],
+    "documentosObligatorios": [
+     {
+      "id": "propuesta_cargos",
+      "nombre": "Propuesta de distribucion de cargos"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "aceptaciones_cargos",
+      "nombre": "Aceptacion de cargos internos cuando proceda"
+     }
+    ]
+   },
+   "id": "DISTRIBUCION_CARGOS",
+   "materia": "DISTRIBUCION_CARGOS",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "NO_SESSION"
+   ],
+   "organoTipo": "CONSEJO",
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcionDias": 10,
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY",
+      "referencia": "art. 247.2 LSC"
+     },
+     "SA": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     },
+     "SL": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "2259127e32badddcdafb5f6857d71f72d5af454424287ec145fd7e336546f47f",
+  "source_id": "DISTRIBUCION_CARGOS",
+  "source_payload_hash": "dcfcb125c6e5a0f973a47ec9d33fc43962d4311ff23ee0fdfec9f4dc697ac86f",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Distribución de Dividendos",
+  "materia": "DISTRIBUCION_DIVIDENDOS",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 193.1 LSC",
+      "valor": 0.25
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA",
+      "PUBLICACION_ESTATUTOS"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Orden del día",
+     "Propuesta de distribución"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta_distribucion",
+      "nombre": "Propuesta de distribución de dividendos"
+     },
+     {
+      "condicion": "SI_SL",
+      "id": "informe_liquidez",
+      "nombre": "Informe de liquidez (art. 348 LSC)"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "propuesta_distribucion",
+      "nombre": "Propuesta de distribución de dividendos"
+     },
+     {
+      "id": "cuentas_aprobadas",
+      "nombre": "Cuentas anuales ya aprobadas (condición previa)"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "DISTRIBUCION_DIVIDENDOS",
+   "materia": "DISTRIBUCION_DIVIDENDOS",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {},
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 248.1 LSC"
+     },
+     "SA": {
+      "formula": "favor > contra",
+      "fuente": "LEY",
+      "referencia": "art. 201.1 LSC"
+     },
+     "SL": {
+      "formula": "favor > 1/3_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "7d4083031b2588ad83e3fe5e6ff18c52a5924a348601641b09972e8ac2a50365",
+  "source_id": "DISTRIBUCION_DIVIDENDOS",
+  "source_payload_hash": "ac54bcaeb8f842c0690bad5b5c8b50a2b8b166c632cf2c18e3de7adf297364b2",
+  "version": "1.0.1"
+ },
+ {
+  "descripcion": "Dividendo a Cuenta (art. 277 LSC)",
+  "materia": "DIVIDENDO_A_CUENTA",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "acta": {
+    "contenidoMinimo": {
+     "acuerdoEscrito": [
+      "Cuantía y fecha de pago",
+      "Referencia al estado contable"
+     ],
+     "consignacion": [],
+     "sesion": [
+      "Fecha y lugar",
+      "Consejeros asistentes",
+      "Cuantía del dividendo",
+      "Referencia al estado contable",
+      "Resultado votación"
+     ]
+    },
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_CONSEJO",
+     "NO_SESSION": "ACTA_ACUERDO_ESCRITO"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 247 LSC",
+      "valor": 0.5
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "Convocatoria Consejo",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "Convocatoria Consejo",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SL": [
+      "CONVOCATORIA_CONSEJO"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Cuantía del dividendo",
+     "Referencia al estado contable"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "estado_contable",
+      "nombre": "Estado contable de liquidez (art. 277.2 LSC)"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta_dividendo",
+      "nombre": "Propuesta de distribución de dividendo a cuenta"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "estado_contable_liquidez",
+      "nombre": "Estado contable de liquidez (art. 277.2 LSC)"
+     },
+     {
+      "condicion": "SI_AUDITORIA",
+      "id": "informe_auditor_estado",
+      "nombre": "Informe del auditor sobre el estado contable"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 0,
+     "fuente": "LEY"
+    }
+   },
+   "id": "DIVIDENDO_A_CUENTA",
+   "materia": "DIVIDENDO_A_CUENTA",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "NO_SESSION"
+   ],
+   "organoTipo": "CONSEJO",
+   "plazosMateriales": {},
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "plazoInscripcionDias": 0,
+    "publicacionRequerida": false
+   },
+   "reglaEspecifica": {
+    "plazoEstadoContableDias": 3,
+    "referencia": "art. 277 LSC",
+    "requiereEstadoContable": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY",
+      "referencia": "art. 247.2 LSC"
+     },
+     "SA": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY",
+      "referencia": "art. 247.2 LSC"
+     },
+     "SL": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY",
+      "referencia": "art. 247.2 LSC"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "c8e2011d41dd35131f89e684714a203f6f6ada98bbf15faa511eaa7e8759596d",
+  "source_id": "DIVIDENDO_A_CUENTA",
+  "source_payload_hash": "8fcbf025214b9c6097b017745f49bc220d40a545e1b73ddd2939d1f6fd4ba0ea",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Ejecución de Aumento de Capital Delegado",
+  "materia": "EJECUCION_AUMENTO_DELEGADO",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "acta": {
+    "contenidoMinimo": {
+     "acuerdoEscrito": [
+      "Importe del aumento",
+      "Modalidad",
+      "Referencia al acuerdo delegante"
+     ],
+     "consignacion": [],
+     "sesion": [
+      "Fecha y lugar",
+      "Consejeros asistentes",
+      "Referencia al acuerdo delegante",
+      "Importe del aumento",
+      "Resultado votación"
+     ]
+    },
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_CONSEJO",
+     "NO_SESSION": "ACTA_ACUERDO_ESCRITO"
+    }
+   },
+   "clase": "ESTRUCTURAL",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SA_2a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SL": [
+      "CONVOCATORIA_CONSEJO"
+     ]
+    },
+    "contenidoMinimo": [
+     "Referencia al acuerdo de delegación JGA",
+     "Importe concreto del aumento",
+     "Modalidad",
+     "Plazo suscripción preferente"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "acuerdo_delegacion_jga",
+      "nombre": "Acuerdo JGA delegante (art. 297 LSC)"
+     },
+     {
+      "condicion": "SI_COTIZADA",
+      "id": "informe_admin_ampliacion",
+      "nombre": "Informe del órgano sobre la emisión"
+     },
+     {
+      "condicion": "SI_NO_DINERARIO",
+      "id": "informe_auditor_aportaciones",
+      "nombre": "Informe auditor sobre aportaciones no dinerarias"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "acuerdo_jga_delegacion",
+      "nombre": "Certificación del acuerdo JGA delegante"
+     },
+     {
+      "id": "proyecto_escritura",
+      "nombre": "Proyecto de escritura de ampliación"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 0,
+     "fuente": "LEY"
+    }
+   },
+   "id": "EJECUCION_AUMENTO_DELEGADO",
+   "materia": "EJECUCION_AUMENTO_DELEGADO",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "NO_SESSION"
+   ],
+   "organoTipo": "CONSEJO",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 30,
+     "referencia": "art. 315 LSC"
+    },
+    "publicacion": [
+     "BORME"
+    ]
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcionDias": 30,
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY",
+      "referencia": "art. 247.2 LSC"
+     },
+     "SA": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     },
+     "SL": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "55ec0f0a3a2956de2208231215a73be8ff0d2e3f4a6a11e0faea95a58a67ab59",
+  "source_id": "EJECUCION_AUMENTO_DELEGADO",
+  "source_payload_hash": "90a3a87aeb43b6eb4b842609aa8a4cfd70e8012ec6d3d6cefef3bf932432356c",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Garrigues/Comité Legal — EMISION_DEUDA_CONVERTIBLE",
+  "materia": "EMISION_DEUDA_CONVERTIBLE",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ESTATUTARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.5
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Texto íntegro de la propuesta",
+     "Texto actual y propuesto"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta",
+      "nombre": "Texto íntegro de la propuesta (emisión de obligaciones convertibles)"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "informe_admin",
+      "nombre": "Informe del órgano de administración"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "propuesta",
+      "nombre": "Propuesta íntegra"
+     },
+     {
+      "id": "informe_admin_justificacion",
+      "nombre": "Informe justificativo"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "derecho_informacion_287",
+      "nombre": "Derecho de información art. 287 LSC"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "EMISION_DEUDA_CONVERTIBLE",
+   "materia": "EMISION_DEUDA_CONVERTIBLE",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 30,
+     "referencia": "art. 83 RRM"
+    },
+    "publicacion": [
+     "BORME"
+    ]
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcion": {
+     "dias": 30,
+     "fuente": "LEY",
+     "referencia": "art. 83 RRM (1 mes)"
+    },
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — 2/3 capital presente (tramo 25-50% en 2ª conv.); arts. 401-418 LSC; informe de administradores y auditor"
+     },
+     "SL": {
+      "formula": "favor > 1/2_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 199.a LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "fa8b8039263ba8a601198c679145c4ca3259f4c5cd564ab1219c92369ace5e44",
+  "source_id": "EMISION_DEUDA_CONVERTIBLE",
+  "source_payload_hash": null,
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Emisión de obligaciones",
+  "materia": "EMISION_OBLIGACIONES",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "clase": "ESTATUTARIA",
+   "constitucion": {
+    "quorum": {
+     "SA_1a": {
+      "fuente": "art. 194 LSC",
+      "valor": 50
+     },
+     "SA_2a": {
+      "fuente": "art. 194 LSC",
+      "valor": 25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "Sin quórum legal de constitución en la junta de SL — el control es la mayoría con suelo de los arts. 198-199 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.2 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA",
+      "PUBLICACION_ESTATUTOS"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "fecha_hora_lugar",
+     "orden_dia",
+     "derecho_informacion_si_procede"
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "condiciones_emision",
+      "nombre": "Condiciones de Emisión"
+     }
+    ]
+   },
+   "id": "EMISION_OBLIGACIONES",
+   "materia": "EMISION_OBLIGACIONES",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "art. 305 LSC",
+     "plazo_dias": 30
+    }
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "SA": {
+      "dobleCondicional": {
+       "mayoriaAlternativa": "2/3 emitidos",
+       "umbral": 50
+      },
+      "formula": "> 1/2 presente en 1a; >= 2/3 emitidos si < 50% en 2a",
+      "fuente": "art. 201.2 LSC"
+     },
+     "SL": {
+      "formula": "> 1/2 capital",
+      "fuente": "art. 199 LSC"
+     }
+    }
+   }
+  },
+  "payload_sha256": "54be34f08149ee30dc0872c2dbb34fa804e66ba0a53c2d4deda7b857a436502f",
+  "source_id": "EMISION_OBLIGACIONES",
+  "source_payload_hash": "6613a7a787a1b06eb1315f1e43842e7f3f5da685e792b200694e5f8c150adf88",
+  "version": "v1.0.0"
+ },
+ {
+  "descripcion": "Escisión de sociedad",
+  "materia": "ESCISION",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "clase": "ESTRUCTURAL",
+   "constitucion": {
+    "quorum": {
+     "SA_1a": {
+      "fuente": "art. 194 LSC",
+      "valor": 50
+     },
+     "SA_2a": {
+      "fuente": "art. 194 LSC",
+      "valor": 25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "Sin quórum legal de constitución en la junta de SL — el control es la mayoría con suelo de los arts. 198-199 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.2 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA",
+      "PUBLICACION_ESTATUTOS"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "fecha_hora_lugar",
+     "orden_dia",
+     "derecho_informacion_si_procede"
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "proyecto",
+      "nombre": "Proyecto de Escisión"
+     },
+     {
+      "id": "informes",
+      "nombre": "Informes de Administrador y Experto"
+     },
+     {
+      "id": "cuentas_base",
+      "nombre": "Cuentas Anuales Base"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "balance",
+      "nombre": "Balance de escision"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "informe_admin",
+      "nombre": "Informe de administradores"
+     }
+    ]
+   },
+   "id": "ESCISION",
+   "materia": "ESCISION",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "art. 305 LSC",
+     "plazo_dias": 30
+    },
+    "oposicion_acreedores": {
+     "fuente": "art. 382 LSC",
+     "plazo_dias": 30
+    }
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — mayoría absoluta si concurre >50%; 2/3 del capital presente en el tramo 25-50%"
+     },
+     "SL": {
+      "formula": ">= 2/3 capital",
+      "fuente": "art. 199 LSC"
+     }
+    }
+   }
+  },
+  "payload_sha256": "baaa900239bb0c69accec0283f6efc01617bafce07b100e6da3e9a95a6b4b56d",
+  "source_id": "ESCISION",
+  "source_payload_hash": "8bbbf51423851372f19f0aa9fecbc0352ba723ff1674451b463d6969ec061671",
+  "version": "v1.0.0"
+ },
+ {
+  "descripcion": "Garrigues/Comité Legal — EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE",
+  "materia": "EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ESTATUTARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.5
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Texto íntegro de la propuesta",
+     "Texto actual y propuesto"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta",
+      "nombre": "Texto íntegro de la propuesta (exclusión del derecho de suscripción preferente)"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "informe_admin",
+      "nombre": "Informe del órgano de administración"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "propuesta",
+      "nombre": "Propuesta íntegra"
+     },
+     {
+      "id": "informe_admin_justificacion",
+      "nombre": "Informe justificativo"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "derecho_informacion_287",
+      "nombre": "Derecho de información art. 287 LSC"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE",
+   "materia": "EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 30,
+     "referencia": "art. 83 RRM"
+    },
+    "publicacion": [
+     "BORME"
+    ]
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcion": {
+     "dias": 30,
+     "fuente": "LEY",
+     "referencia": "art. 83 RRM (1 mes)"
+    },
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — 2/3 capital presente (tramo 25-50% en 2ª conv.); art. 308 LSC; informe + valor razonable"
+     },
+     "SL": {
+      "formula": "favor > 1/2_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 199.a LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "c602d568eb92aca22943f35db5987932b0fe0523cc45e16b1ffaa0620e8c1a53",
+  "source_id": "EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE",
+  "source_payload_hash": null,
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Exclusion de socio",
+  "materia": "EXCLUSION_SOCIO",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "clase": "ESPECIAL",
+   "constitucion": {
+    "quorum": {
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "arts. 194 y 201.2 LSC",
+      "valor": 0.5
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "arts. 194 y 201.2 LSC",
+      "valor": 0.25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "fecha_hora_lugar",
+     "orden_dia",
+     "derecho_informacion_si_procede"
+    ],
+    "documentosObligatorios": [
+     {
+      "id": "causa_exclusion",
+      "nombre": "Acreditacion de causa legal o estatutaria de exclusion"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "causa_exclusion",
+      "nombre": "Informe/documentacion de causa de exclusion"
+     },
+     {
+      "id": "valoracion_participaciones",
+      "nombre": "Procedimiento de valoracion y reembolso"
+     }
+    ]
+   },
+   "id": "EXCLUSION_SOCIO",
+   "materia": "EXCLUSION_SOCIO",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcionDias": 30,
+    "publicacionRequerida": false
+   },
+   "restriccionTipoSocial": [
+    "SL",
+    "SLU"
+   ],
+   "votacion": {
+    "abstenciones": "socio_afectado_no_computa",
+    "mayoria": {
+     "SA": {
+      "formula": "> 1/2 presente en 1a; >= 2/3 emitidos si < 50% en 2a",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC"
+     },
+     "SL": {
+      "formula": "favor >= 2/3 capital",
+      "fuente": "LEY",
+      "referencia": "art. 199.b LSC"
+     }
+    }
+   }
+  },
+  "payload_sha256": "4f424f5a8e97baea8cf258dfbe5c0f55fd7ab65d0d3ef523390d3aeab27bafde",
+  "source_id": "EXCLUSION_SOCIO",
+  "source_payload_hash": "586eefa0c558baa8ad054a1e22f7ed22cc69a4521be04c587972dfcf6216f97c",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Formulación de cuentas anuales por el Consejo",
+  "materia": "FORMULACION_CUENTAS",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "acta": {
+    "contenidoMinimo": {
+     "acuerdoEscrito": [
+      "propuesta_texto",
+      "relacion_respuestas",
+      "sentido_cada_socio",
+      "capital_participacion",
+      "firma_qes_ref",
+      "resultado_evaluacion",
+      "condicion_adopcion",
+      "fecha_cierre",
+      "ventana_inicio",
+      "ventana_fin",
+      "notificaciones_certificadas",
+      "snapshot_hash"
+     ],
+     "consignacion": [
+      "identidad_decisor",
+      "texto_decision",
+      "fecha",
+      "firma"
+     ],
+     "sesion": [
+      "asistentes",
+      "orden_dia",
+      "deliberaciones",
+      "votaciones",
+      "resultado"
+     ]
+    },
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "NO_SESSION": "ACTA_ACUERDO_ESCRITO",
+     "UNIPERSONAL_ADMIN": "ACTA_CONSIGNACION_ADMIN",
+     "UNIPERSONAL_SOCIO": "ACTA_CONSIGNACION_SOCIO",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "Estatutos",
+      "valor": "Mayoría"
+     },
+     "SA_1a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SA_2a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "art. 176.2 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "DIARIO",
+      "WEB_SOCIEDAD"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL"
+     ]
+    },
+    "contenidoMinimo": [
+     "denominacion_social",
+     "fecha_hora_lugar",
+     "orden_dia",
+     "derecho_informacion"
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "borrador_cuentas",
+      "nombre": "Borrador de Cuentas"
+     }
+    ]
+   },
+   "id": "FORMULACION_CUENTAS",
+   "materia": "FORMULACION_CUENTAS",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIPERSONAL_ADMIN"
+   ],
+   "organoTipo": "CONSEJO",
+   "plazosMateriales": {},
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 248.1 LSC — mayoría absoluta de los consejeros concurrentes"
+     },
+     "SA": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     },
+     "SL": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     }
+    }
+   }
+  },
+  "payload_sha256": "e9b5e6dab8e02b4b75a777081fe51c00a0d04d81d973406cb2bc43f1758ec870",
+  "source_id": "FORMULACION_CUENTAS",
+  "source_payload_hash": "01f60e6f6df2811d84426cefdb9c314673f7c337d112fdb758965db2eded22b2",
+  "version": "v1.0.0"
+ },
+ {
+  "descripcion": "Fusión de sociedades",
+  "materia": "FUSION",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "clase": "ESTRUCTURAL",
+   "constitucion": {
+    "quorum": {
+     "SA_1a": {
+      "fuente": "art. 194 LSC",
+      "valor": 50
+     },
+     "SA_2a": {
+      "fuente": "art. 194 LSC",
+      "valor": 25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "Sin quórum legal de constitución en la junta de SL — el control es la mayoría con suelo de los arts. 198-199 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.2 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA",
+      "PUBLICACION_ESTATUTOS"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "fecha_hora_lugar",
+     "orden_dia",
+     "derecho_informacion_si_procede"
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "proyecto_comun",
+      "nombre": "Proyecto Común de Fusión"
+     },
+     {
+      "id": "informe_admin",
+      "nombre": "Informe del Administrador"
+     },
+     {
+      "id": "informe_experto",
+      "nombre": "Informe de Experto Independiente"
+     },
+     {
+      "id": "cuentas_base",
+      "nombre": "Cuentas Anuales Últimos Ejercicios"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "balance",
+      "nombre": "Balance de fusion"
+     }
+    ]
+   },
+   "id": "FUSION",
+   "materia": "FUSION",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "art. 305 LSC",
+     "plazo_dias": 30
+    },
+    "oposicion_acreedores": {
+     "fuente": "art. 367 LSC",
+     "plazo_dias": 30
+    }
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — mayoría absoluta si concurre >50%; 2/3 del capital presente en el tramo 25-50%"
+     },
+     "SL": {
+      "formula": ">= 2/3 capital",
+      "fuente": "art. 199 LSC"
+     }
+    }
+   }
+  },
+  "payload_sha256": "632234c1fce529756e9afe88425332191a4bc628eea2d7fb9f1259caf7ac2a8f",
+  "source_id": "FUSION",
+  "source_payload_hash": "dda67c53e8988b365bafd9ac1cceb975e917d6c0ee4ca3a19cc3fa42ecee4f30",
+  "version": "v1.0.0"
+ },
+ {
+  "descripcion": "Formulación del Informe de Gestión",
+  "materia": "INFORME_GESTION",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": true,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_CONSEJO",
+     "NO_SESSION": "ACTA_ACUERDO_ESCRITO"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SA_2a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SL": [
+      "CONVOCATORIA_CONSEJO"
+     ]
+    },
+    "contenidoMinimo": [
+     "Evolución y resultados del negocio",
+     "Descripción de riesgos e incertidumbres",
+     "Hechos posteriores al cierre"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "borrador_informe_gestion",
+      "nombre": "Borrador del informe de gestión"
+     },
+     {
+      "condicion": "SI_OBLIGACION_EINF",
+      "id": "estado_informacion_no_financiera",
+      "nombre": "EINF (cotizadas >500 empleados)"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "informe_gestion_firmado",
+      "nombre": "Informe de gestión firmado por todos los administradores (art. 253 LSC)"
+     }
+    ],
+    "plazoFormulacion": {
+     "fuente": "LEY",
+     "meses": 3,
+     "referencia": "art. 253 LSC"
+    },
+    "ventanaDisponibilidad": {
+     "dias": 0,
+     "fuente": "LEY"
+    }
+   },
+   "id": "INFORME_GESTION",
+   "materia": "INFORME_GESTION",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "NO_SESSION"
+   ],
+   "organoTipo": "CONSEJO",
+   "plazosMateriales": {},
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "plazoInscripcionDias": 0,
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY"
+     },
+     "SA": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     },
+     "SL": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "2a068d20ee4c409ea749e44525614a83f7644f26fd4f71787707964ec3cb6bc3",
+  "source_id": "INFORME_GESTION",
+  "source_payload_hash": "aa3d1a15393c3b07de5fbd03ecbb744c0154e401351adceeb277a7701a2a50e4",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Garrigues/Comité Legal — LIQUIDACION",
+  "materia": "LIQUIDACION",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ESTRUCTURAL",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.5
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Texto íntegro de la propuesta",
+     "Texto actual y propuesto"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta",
+      "nombre": "Texto íntegro de la propuesta (disolución y apertura de liquidación)"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "informe_admin",
+      "nombre": "Informe del órgano de administración"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "propuesta",
+      "nombre": "Propuesta íntegra"
+     },
+     {
+      "id": "informe_admin_justificacion",
+      "nombre": "Informe justificativo"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "derecho_informacion_287",
+      "nombre": "Derecho de información art. 287 LSC"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "LIQUIDACION",
+   "materia": "LIQUIDACION",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 30,
+     "referencia": "art. 83 RRM"
+    },
+    "publicacion": [
+     "BORME"
+    ]
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcion": {
+     "dias": 30,
+     "fuente": "LEY",
+     "referencia": "art. 83 RRM (1 mes)"
+    },
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — 2/3 capital presente (tramo 25-50% en 2ª conv.); art. 368 LSC (requisitos de modificación estatutaria) + arts. 360-400 LSC"
+     },
+     "SL": {
+      "formula": "favor > 1/2_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 199.a LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "f41e37fa829a2a520f5c2f5bbc4253c22e3863cc1afabe6bda50ddd261d1ba08",
+  "source_id": "LIQUIDACION",
+  "source_payload_hash": null,
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Modificación de Estatutos Sociales",
+  "materia": "MODIFICACION_ESTATUTOS",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ESTATUTARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.5
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Propuesta de texto íntegro de la modificación",
+     "Texto actual y texto propuesto"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta_modificacion",
+      "nombre": "Texto íntegro de la propuesta de modificación"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "informe_admin",
+      "nombre": "Informe del órgano de administración sobre la modificación"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "propuesta_modificacion",
+      "nombre": "Propuesta íntegra de modificación"
+     },
+     {
+      "id": "informe_admin_justificacion",
+      "nombre": "Informe justificativo de la modificación"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "texto_integro",
+      "nombre": "Texto integro de la modificacion estatutaria"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "derecho_informacion_287",
+      "nombre": "Derecho de informacion art. 287 LSC"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "MODIFICACION_ESTATUTOS",
+   "materia": "MODIFICACION_ESTATUTOS",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 60,
+     "referencia": "art. 19 RRM"
+    },
+    "publicacion": [
+     "BORME"
+    ]
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcion": {
+     "dias": 60,
+     "fuente": "LEY",
+     "referencia": "art. 19 RRM"
+    },
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — mayoría absoluta si concurre >50%; 2/3 del capital presente en el tramo 25-50%"
+     },
+     "SL": {
+      "formula": "favor > 1/2_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 199.a LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "15d9bd4b8f6fcfaca3736ac74333a3147b0ed3fca84a325dc60e457d3f8802eb",
+  "source_id": "MODIFICACION_ESTATUTOS",
+  "source_payload_hash": "751f605af794593046df693b04d367e38161db9b901a5c62b4c4f33b722310db",
+  "version": "1.0.1"
+ },
+ {
+  "descripcion": "Nombramiento de Auditor de Cuentas",
+  "materia": "NOMBRAMIENTO_AUDITOR",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 193.1 LSC",
+      "valor": 0.25
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Identificación del auditor o firma auditora (nombre + ROAC)",
+     "Duración mínimo 3 años (art. 264.1 LSC)"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SI_COTIZADA",
+      "id": "propuesta_comision_auditoria",
+      "nombre": "Propuesta motivada Comisión Auditoría"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "declaracion_independencia",
+      "nombre": "Declaración independencia del auditor"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "propuesta_nombramiento",
+      "nombre": "Propuesta de nombramiento con duración"
+     },
+     {
+      "id": "declaracion_independencia_auditor",
+      "nombre": "Declaración independencia (art. 21 LAC)"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "aceptacion_auditor",
+      "nombre": "Aceptacion del auditor"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "duracion_3_9",
+      "nombre": "Duracion legal entre 3 y 9 anos"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "NOMBRAMIENTO_AUDITOR",
+   "materia": "NOMBRAMIENTO_AUDITOR",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 30,
+     "referencia": "art. 17 RRM"
+    }
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "NINGUNO",
+    "plazoInscripcionDias": 30,
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY"
+     },
+     "SA": {
+      "formula": "favor > 0.5 * capital_presente",
+      "fuente": "LEY",
+      "referencia": "art. 201.1 LSC"
+     },
+     "SL": {
+      "formula": "favor > 1/3_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "f5d88a54fe17c9018f3d1a91a748910f4251e797680cea7bb681f64128b43585",
+  "source_id": "NOMBRAMIENTO_AUDITOR",
+  "source_payload_hash": "0621410d5129c833fae007ebf14706777143c251c5e110a0b280d2071280c297",
+  "version": "1.1.1"
+ },
+ {
+  "descripcion": "Agregado retirado: resolver siempre a NOMBRAMIENTO_CONSEJERO o CESE_CONSEJERO antes de construir el perfil.",
+  "materia": "NOMBRAMIENTO_CESE",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 193.1 LSC",
+      "valor": 0.25
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "art. 193.2 LSC",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Orden del día"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta",
+      "nombre": "Propuesta de acuerdo (nombramiento de consejero (alias deprecado))"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta",
+      "nombre": "Propuesta de acuerdo"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 0
+    }
+   },
+   "id": "NOMBRAMIENTO_CESE",
+   "materia": "NOMBRAMIENTO_CESE",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL",
+    "NO_SESSION"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 30
+    },
+    "publicacion": []
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "NINGUNO",
+    "plazoInscripcion": {
+     "dias": 30,
+     "fuente": "LEY",
+     "referencia": "art. 83 RRM"
+    },
+    "publicacionRequerida": false,
+    "referencia": "art. 214 LSC"
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SA": {
+      "formula": "favor > contra",
+      "fuente": "LEY",
+      "referencia": "art. 201.1 LSC (mayoría ordinaria)"
+     },
+     "SL": {
+      "formula": "favor > 1/3_capital",
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "8da3845b20628bdfff9edd26605813f6444439d65fcf161b1eb7c301677e9e86",
+  "source_id": "NOMBRAMIENTO_CESE",
+  "source_payload_hash": null,
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Nombramiento de Consejero",
+  "materia": "NOMBRAMIENTO_CONSEJERO",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 193.1 LSC",
+      "valor": 0.25
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA",
+      "PUBLICACION_ESTATUTOS"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Orden del día con identificación del candidato",
+     "Categoría propuesta del consejero"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "cv_candidato",
+      "nombre": "Currículum vitae del candidato"
+     },
+     {
+      "condicion": "SI_COTIZADA",
+      "id": "informe_comision_nombramientos",
+      "nombre": "Informe de la Comisión de Nombramientos"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "cv_candidato",
+      "nombre": "CV del candidato"
+     },
+     {
+      "id": "declaracion_idoneidad",
+      "nombre": "Declaración de idoneidad y aceptación del cargo"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "NOMBRAMIENTO_CONSEJERO",
+   "materia": "NOMBRAMIENTO_CONSEJERO",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 30,
+     "referencia": "art. 17 RRM"
+    }
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcion": {
+     "dias": 30,
+     "fuente": "LEY",
+     "referencia": "art. 17 RRM"
+    },
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SA": {
+      "formula": "favor > contra",
+      "fuente": "LEY",
+      "referencia": "art. 201.1 LSC"
+     },
+     "SL": {
+      "formula": "favor > mitad_capital_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "fc67b3445cd374a178c4178e9734c09fa40a4dc494cd9be1e64e65b5989d8794",
+  "source_id": "NOMBRAMIENTO_CONSEJERO",
+  "source_payload_hash": "40c10be94d28c43719a40353febd637ef7c74ad9865670b69366865e633ad4f9",
+  "version": "1.0.1"
+ },
+ {
+  "descripcion": "Designación de representante de la sociedad en filial o participada",
+  "materia": "NOMBRAMIENTO_REPRESENTANTE_FILIAL",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "ESTATUTOS",
+      "referencia": "convocatoria del Consejo",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "ESTATUTOS",
+      "referencia": "convocatoria del Consejo",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SL": [
+      "CONVOCATORIA_CONSEJO"
+     ]
+    },
+    "documentosObligatorios": [
+     {
+      "id": "propuesta_representante_filial",
+      "nombre": "Propuesta de designación y alcance de la representación"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "identificacion_representante",
+      "nombre": "Identificación y aceptación de la persona representante"
+     },
+     {
+      "id": "cargo_o_actuacion_filial",
+      "nombre": "Cargo o actuación que la sociedad ejercerá en la filial"
+     }
+    ]
+   },
+   "id": "NOMBRAMIENTO_REPRESENTANTE_FILIAL",
+   "materia": "NOMBRAMIENTO_REPRESENTANTE_FILIAL",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "NO_SESSION"
+   ],
+   "organoTipo": "CONSEJO",
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "plazoInscripcionDias": 0,
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY",
+      "referencia": "art. 247.2 LSC"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "deefdb0cead6a3e7738eb8318debe20bd3a1aa999208c1c1d4388764223f3e48",
+  "source_id": "NOMBRAMIENTO_REPRESENTANTE_FILIAL",
+  "source_payload_hash": "8bdb7e455997cd93c5daf7697eac571d8b17f4745bbf2a8ba939e73aa9d3e118",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Operación con Parte Vinculada",
+  "materia": "OPERACION_VINCULADA",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_CONSEJO"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SA_2a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SL": [
+      "CONVOCATORIA_CONSEJO"
+     ]
+    },
+    "contenidoMinimo": [
+     "Identificación de la parte vinculada",
+     "Naturaleza y condiciones económicas",
+     "Beneficios y riesgos para la sociedad"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "informe_condiciones_mercado",
+      "nombre": "Informe de condiciones de mercado"
+     },
+     {
+      "condicion": "SI_COTIZADA",
+      "id": "informe_comision_auditoria",
+      "nombre": "Informe favorable Comisión Auditoría (cotizadas)"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "informe_valoracion",
+      "nombre": "Informe de valoración"
+     },
+     {
+      "id": "declaracion_vinculacion",
+      "nombre": "Declaración de la parte vinculada"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 0,
+     "fuente": "LEY"
+    }
+   },
+   "id": "OPERACION_VINCULADA",
+   "materia": "OPERACION_VINCULADA",
+   "modosAdopcionPermitidos": [
+    "MEETING"
+   ],
+   "organoTipo": "CONSEJO",
+   "plazosMateriales": {},
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "cuentan_como_contra",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad_no_vinculados",
+      "fuente": "LEY",
+      "referencia": "art. 228.e LSC"
+     },
+     "SA": {
+      "formula": "favor > presentes_mitad_no_vinculados",
+      "fuente": "LEY",
+      "referencia": "art. 228.e LSC"
+     },
+     "SL": {
+      "formula": "favor > presentes_mitad_no_vinculados",
+      "fuente": "LEY"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "1aa6e586235d0c5e6428deb2c67372311c611a63ba09f4cbc9234772a25e774b",
+  "source_id": "OPERACION_VINCULADA",
+  "source_payload_hash": "fb55b161e0bef57564a527e9fa99e7ad42bf7090274da0af622c38b1b1abe84c",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Garrigues/Comite Legal — PACTO_PARASOCIAL (art. 29 LSC)",
+  "materia": "PACTO_PARASOCIAL",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ESPECIAL",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 193.1 LSC",
+      "valor": 0.25
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "art. 193.2 LSC",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Texto del pacto o de su modificacion"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "texto_pacto",
+      "nombre": "Texto integro del pacto parasocial"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "texto_pacto",
+      "nombre": "Texto integro del pacto"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 0
+    }
+   },
+   "id": "PACTO_PARASOCIAL",
+   "materia": "PACTO_PARASOCIAL",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL",
+    "NO_SESSION"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "plazo_dias": null
+    },
+    "publicacion": []
+   },
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "publicacionRequerida": false,
+    "referencia": "art. 29 LSC — los pactos parasociales no se inscriben ni son oponibles a la sociedad"
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SA": {
+      "formula": "favor > contra",
+      "fuente": "LEY",
+      "referencia": "art. 29 LSC — el pacto vincula contractualmente a las partes firmantes (unanimidad de las partes del pacto), NO es oponible a la sociedad; la ratificacion societaria se adopta por mayoria ordinaria"
+     },
+     "SL": {
+      "formula": "favor > 1/3_capital",
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "9116391ef91ab7812f99cf3a2352a1e22b461268ede471767506cc0fa06463cd",
+  "source_id": "PACTO_PARASOCIAL",
+  "source_payload_hash": null,
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Otorgamiento de poderes de representacion",
+  "materia": "PODER_REPRESENTACION",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SA_2a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "convocatoria del Consejo",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "convocatoria del Consejo",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SL": [
+      "CONVOCATORIA_CONSEJO"
+     ]
+    },
+    "contenidoMinimo": [],
+    "documentosObligatorios": [
+     {
+      "id": "propuesta_poder",
+      "nombre": "Propuesta de apoderamiento y alcance de facultades"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "identificacion_apoderado",
+      "nombre": "Identificacion completa del apoderado"
+     },
+     {
+      "id": "facultades_poder",
+      "nombre": "Listado de facultades y limites"
+     }
+    ]
+   },
+   "id": "PODER_REPRESENTACION",
+   "materia": "PODER_REPRESENTACION",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "NO_SESSION"
+   ],
+   "organoTipo": "CONSEJO",
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcionDias": 10,
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY",
+      "referencia": "art. 247.2 LSC"
+     },
+     "SA": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     },
+     "SL": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "db53f187c2926eb3dae4fa35895d641707f364ad63aa5168d3705fe4302eb2b6",
+  "source_id": "PODER_REPRESENTACION",
+  "source_payload_hash": "41feb8fd81f3e3c4a1493c1c902550daaf048ab40b96d2bf6dc1fe415e7fbe8a",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Prestaciones accesorias en SL",
+  "materia": "PRESTACIONES_ACCESORIAS",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "clase": "ESTATUTARIA",
+   "constitucion": {
+    "quorum": {
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 194 LSC",
+      "valor": 0.5
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "art. 194 LSC",
+      "valor": 0.25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "fecha_hora_lugar",
+     "orden_dia",
+     "derecho_informacion_si_procede"
+    ],
+    "documentosObligatorios": [
+     {
+      "id": "texto_estatutario",
+      "nombre": "Texto integro de la modificacion estatutaria"
+     },
+     {
+      "id": "consentimiento_socio_afectado",
+      "nombre": "Consentimiento individual del socio obligado"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "texto_estatutario",
+      "nombre": "Texto estatutario completo"
+     },
+     {
+      "id": "consentimiento_individual",
+      "nombre": "Consentimiento escrito del socio afectado"
+     }
+    ]
+   },
+   "id": "PRESTACIONES_ACCESORIAS",
+   "materia": "PRESTACIONES_ACCESORIAS",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcionDias": 30,
+    "publicacionRequerida": false
+   },
+   "restriccionTipoSocial": [
+    "SL",
+    "SLU"
+   ],
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC"
+     },
+     "SL": {
+      "formula": "favor > 1/2_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 199.a LSC"
+     }
+    }
+   }
+  },
+  "payload_sha256": "f8fcc4476a6f532703f2607b8886669ace9d9e94ebb2dbadb52fa7b400049cc4",
+  "source_id": "PRESTACIONES_ACCESORIAS",
+  "source_payload_hash": "e2cdc237b5d9b5fc6fe8b8c58c59b03d372c69a0e0a0b9f2d5fc60d12413918e",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Garrigues/Comité Legal — PRORROGA_SOCIEDAD",
+  "materia": "PRORROGA_SOCIEDAD",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ESTATUTARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.5
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Texto íntegro de la propuesta",
+     "Texto actual y propuesto"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta",
+      "nombre": "Texto íntegro de la propuesta (prórroga de la duración)"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "informe_admin",
+      "nombre": "Informe del órgano de administración"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "propuesta",
+      "nombre": "Propuesta íntegra"
+     },
+     {
+      "id": "informe_admin_justificacion",
+      "nombre": "Informe justificativo"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "derecho_informacion_287",
+      "nombre": "Derecho de información art. 287 LSC"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "PRORROGA_SOCIEDAD",
+   "materia": "PRORROGA_SOCIEDAD",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 30,
+     "referencia": "art. 83 RRM"
+    },
+    "publicacion": [
+     "BORME"
+    ]
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcion": {
+     "dias": 30,
+     "fuente": "LEY",
+     "referencia": "art. 83 RRM (1 mes)"
+    },
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — 2/3 capital presente (tramo 25-50% en 2ª conv.); art. 285 LSC; derecho de separación si procede"
+     },
+     "SL": {
+      "formula": "favor > 1/2_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 199.a LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "271e14d597e9671e62fa71b7f71528588e9302a3303b2c9a697509ea1dfa1237",
+  "source_id": "PRORROGA_SOCIEDAD",
+  "source_payload_hash": null,
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Ratificación de Actos y Contratos",
+  "materia": "RATIFICACION_ACTOS",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_CONSEJO",
+     "NO_SESSION": "ACTA_ACUERDO_ESCRITO"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SA_2a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SL": [
+      "CONVOCATORIA_CONSEJO"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Descripción de los actos a ratificar",
+     "Justificación de la urgencia"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "copia_acto_contrato",
+      "nombre": "Copia del acto o contrato a ratificar"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "copia_acto",
+      "nombre": "Copia del acto ratificado"
+     },
+     {
+      "id": "informe_justificacion",
+      "nombre": "Informe sobre urgencia y circunstancias"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 0,
+     "fuente": "LEY"
+    }
+   },
+   "id": "RATIFICACION_ACTOS",
+   "materia": "RATIFICACION_ACTOS",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "NO_SESSION"
+   ],
+   "organoTipo": "CONSEJO",
+   "plazosMateriales": {},
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "plazoInscripcionDias": 0,
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY"
+     },
+     "SA": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY"
+     },
+     "SL": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "b45c7cf0ff34f1ff7109f4442db63e72ecf5546acf3d432553ecc50b762ac793",
+  "source_id": "RATIFICACION_ACTOS",
+  "source_payload_hash": "e8f1680a7b1b1fc324446f7f33a6f2bb59b5d76511ab97e71004cf9f16131a07",
+  "version": "1.1.0"
+ },
+ {
+  "descripcion": "Reducción de capital social",
+  "materia": "REDUCCION_CAPITAL",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ESTATUTARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.5
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "valor": 0.25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Finalidad de la reducción",
+     "Procedimiento y efectos para socios y acreedores"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta_reduccion",
+      "nombre": "Propuesta de acuerdo de reducción de capital"
+     },
+     {
+      "condicion": "SEGÚN_CASO",
+      "id": "balance_intermediario",
+      "nombre": "Balance intermedio si no hay cuentas recientes"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "propuesta_reduccion",
+      "nombre": "Propuesta íntegra de reducción"
+     },
+     {
+      "condicion": "SI_DEVOLUCION_APORTACIONES",
+      "id": "informe_oposicion_acreedores",
+      "nombre": "Publicación BORME para oposición acreedores (art. 319 LSC)"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "informe_admin",
+      "nombre": "Informe del organo de administracion"
+     },
+     {
+      "condicion": "SI_PROCEDE",
+      "id": "balance_si_procede",
+      "nombre": "Balance cuando proceda"
+     },
+     {
+      "condicion": "SI_PROCEDE",
+      "id": "oposicion_acreedores_si_procede",
+      "nombre": "Oposicion de acreedores cuando proceda"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "REDUCCION_CAPITAL",
+   "materia": "REDUCCION_CAPITAL",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 60,
+     "referencia": "art. 19 RRM"
+    },
+    "oposicion_acreedores": {
+     "fuente": "LEY",
+     "plazo_dias": 30,
+     "referencia": "art. 319 LSC"
+    },
+    "publicacion": [
+     "BORME"
+    ]
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcion": {
+     "dias": 60,
+     "fuente": "LEY",
+     "referencia": "art. 19 RRM"
+    },
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY"
+     },
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — mayoría absoluta si concurre >50%; 2/3 del capital presente en el tramo 25-50%"
+     },
+     "SL": {
+      "formula": "favor > 1/2_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 199.a LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "ef59f5a8207bbdf2c0c24a6b4c7a012273cf8f49c6f641a0d79b8356b712992a",
+  "source_id": "REDUCCION_CAPITAL",
+  "source_payload_hash": "175bd2a63b36a090baa81a5c0d34ba341aeb1068c4deba2cd198f27c13c5f2a9",
+  "version": "1.0.1"
+ },
+ {
+  "descripcion": "Garrigues/Comité Legal — REMUNERACION_CONSEJEROS",
+  "materia": "REMUNERACION_CONSEJEROS",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 193.1 LSC",
+      "valor": 0.25
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "art. 193.2 LSC",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Orden del día"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta",
+      "nombre": "Propuesta de acuerdo (política de remuneración de consejeros)"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta",
+      "nombre": "Propuesta de acuerdo"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 0
+    }
+   },
+   "id": "REMUNERACION_CONSEJEROS",
+   "materia": "REMUNERACION_CONSEJEROS",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL",
+    "NO_SESSION"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": null
+    },
+    "publicacion": []
+   },
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "plazoInscripcion": null,
+    "publicacionRequerida": false,
+    "referencia": "art. 217 LSC (y 529 sexdecies para cotizada)"
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SA": {
+      "formula": "favor > contra",
+      "fuente": "LEY",
+      "referencia": "art. 201.1 LSC (mayoría ordinaria)"
+     },
+     "SL": {
+      "formula": "favor > 1/3_capital",
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "28ee6a4e8e10b1bca58afe1172995aa8178e885b04bc98965c1d5b346df45bc4",
+  "source_id": "REMUNERACION_CONSEJEROS",
+  "source_payload_hash": null,
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Retribución de administradores",
+  "materia": "RETRIBUCION_ADMIN",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 193.1 LSC — quórum del 25% en primera convocatoria",
+      "valor": 25
+     },
+     "SA_2a": {
+      "fuente": "art. 190 LSC",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "Sin quórum legal de constitución en la junta de SL — el control es la mayoría con suelo de los arts. 198-199 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.2 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA",
+      "PUBLICACION_ESTATUTOS"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "fecha_hora_lugar",
+     "orden_dia",
+     "derecho_informacion_si_procede"
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "politica_retributiva",
+      "nombre": "Política de Retribución de Órganos"
+     }
+    ]
+   },
+   "id": "RETRIBUCION_ADMIN",
+   "materia": "RETRIBUCION_ADMIN",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL",
+    "UNIPERSONAL_SOCIO",
+    "NO_SESSION"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {},
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "INSTANCIA",
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "SA": {
+      "formula": "Mayoría simple",
+      "fuente": "art. 201 LSC"
+     },
+     "SL": {
+      "formula": "favor > 1/3_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC — mayoría de votos emitidos con suelo de 1/3 del capital"
+     }
+    }
+   }
+  },
+  "payload_sha256": "90d58681394d00c890ed8a4caf8cf7baefaa2d6a9b6a9b82bae368fa9dae712a",
+  "source_id": "RETRIBUCION_ADMIN",
+  "source_payload_hash": "13a447b90e0422bb44b8f8da6d68b42a4a00c7d24862727c2a581fffe6d0e3d5",
+  "version": "v1.0.0"
+ },
+ {
+  "descripcion": "Toma de razon del ejercicio del derecho de separacion",
+  "materia": "SEPARACION_SOCIO",
+  "organo_tipo": "SOPORTE_INTERNO",
+  "payload": {
+   "clase": "ESPECIAL",
+   "constitucion": {
+    "quorum": {
+     "SA_1a": {
+      "fuente": "NO_APLICA",
+      "valor": 0
+     },
+     "SA_2a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "NO_APLICA",
+      "referencia": "arts. 346-349 LSC",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "arts. 346-349 LSC",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "NO_APLICA"
+     ],
+     "SL": [
+      "NO_APLICA"
+     ]
+    },
+    "contenidoMinimo": [],
+    "documentosObligatorios": [
+     {
+      "id": "comunicacion_socio",
+      "nombre": "Comunicacion de ejercicio del derecho de separacion"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "causa_separacion",
+      "nombre": "Acreditacion de causa de separacion"
+     },
+     {
+      "id": "comunicacion_socio",
+      "nombre": "Comunicacion del socio en plazo"
+     },
+     {
+      "id": "valoracion_participaciones",
+      "nombre": "Procedimiento de valoracion y reembolso"
+     }
+    ]
+   },
+   "id": "SEPARACION_SOCIO",
+   "materia": "SEPARACION_SOCIO",
+   "modosAdopcionPermitidos": [
+    "NO_SESSION"
+   ],
+   "organoTipo": "SOPORTE_INTERNO",
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcionDias": 30,
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_aplica",
+    "mayoria": {
+     "SA": {
+      "formula": "no aplica: derecho individual del socio",
+      "fuente": "LEY",
+      "referencia": "art. 346 LSC"
+     },
+     "SL": {
+      "formula": "no aplica: derecho individual del socio",
+      "fuente": "LEY",
+      "referencia": "art. 346 LSC"
+     }
+    }
+   }
+  },
+  "payload_sha256": "565971a93854e1273a74d4a1049e08a051e0c998682049c58750776e73316715",
+  "source_id": "SEPARACION_SOCIO",
+  "source_payload_hash": "ad2b1fd3dc9f0dbff9952ba9ab47147248e17ed1de08b241a56c88a3c81fe0d9",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Decisiones Sociedad Unipersonal",
+  "materia": "SOCIEDAD_UNIPERSONAL",
+  "organo_tipo": "SOCIO_UNICO",
+  "payload": {
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "SA_1a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SA_2a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     }
+    },
+    "quorumConsejo": "NO_APLICA",
+    "quorumSA_1conv": 0,
+    "quorumSA_2conv": 0,
+    "quorumSL": 0
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     }
+    },
+    "baseJuridica": "Art. 173.3 LSC",
+    "canales": {
+     "SA": [],
+     "SL": []
+    },
+    "contenidoMinimo": [],
+    "documentosObligatorios": [],
+    "noRequiereConvocatoria": true,
+    "plazoDiasSA": 0,
+    "plazoDiasSL": 0
+   },
+   "documentacion": {
+    "documentosPreSesion": [],
+    "obligatoria": [
+     {
+      "condicion": "NO_APLICA",
+      "id": "NA",
+      "nombre": "Decision de socio unico sin documento obligatorio previo"
+     }
+    ],
+    "requiereInformeAdministradores": false,
+    "requiereInformeAuditor": false,
+    "tipoActaRequerido": "DECISION_SOCIO_UNICO"
+   },
+   "id": "SOCIEDAD_UNIPERSONAL",
+   "materia": "SOCIEDAD_UNIPERSONAL",
+   "modosAdopcionPermitidos": [
+    "UNIPERSONAL_SOCIO"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoPublico": "NUNCA",
+    "instrumentoRequerido": "NINGUNO",
+    "notaInscripcion": "Inscripción de unipersonalidad obligatoria (art. 13 LSC)",
+    "plazoInscripcionDias": 180,
+    "plazoPrescripcionImpugnacion": "1_AÑO",
+    "publicacionBORME": false,
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "NO_CUENTAN",
+    "mayoria": {
+     "SA": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     },
+     "SL": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     }
+    },
+    "mayoriaBase": "SIMPLE",
+    "permitirVotoCalidad": false,
+    "umbralesSA": {},
+    "umbralesSL": {}
+   }
+  },
+  "payload_sha256": "5cd1c1e44eb6e4fba027ec356257855f8afedbd9cc114254ac71cfe67a104f4a",
+  "source_id": "SOCIEDAD_UNIPERSONAL",
+  "source_payload_hash": "fe4f5cfc47ed666efc860ee5761a921eb798b9c707edf4d46202b69126454501",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Supresión del derecho de suscripción preferente",
+  "materia": "SUPRESION_PREFERENTE",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "clase": "ESTRUCTURAL",
+   "constitucion": {
+    "quorum": {
+     "SA_1a": {
+      "fuente": "art. 194 LSC",
+      "valor": 50
+     },
+     "SA_2a": {
+      "fuente": "art. 194 LSC",
+      "valor": 25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "Sin quórum legal de constitución en la junta de SL — el control es la mayoría con suelo de los arts. 198-199 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.2 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA",
+      "PUBLICACION_ESTATUTOS"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "fecha_hora_lugar",
+     "orden_dia",
+     "derecho_informacion_si_procede"
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "informe_admin_reforzado",
+      "nombre": "Informe del Administrador"
+     },
+     {
+      "condicion": "opcional",
+      "id": "informe_experto",
+      "nombre": "Informe de Experto (Opcional)"
+     },
+     {
+      "condicion": "SI_PROCEDE",
+      "id": "informe_auditor_si_procede",
+      "nombre": "Informe de auditor cuando proceda"
+     }
+    ]
+   },
+   "id": "SUPRESION_PREFERENTE",
+   "materia": "SUPRESION_PREFERENTE",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {},
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — mayoría absoluta si concurre >50%; 2/3 del capital presente en el tramo 25-50%"
+     },
+     "SL": {
+      "formula": ">= 2/3 capital",
+      "fuente": "art. 199 LSC"
+     }
+    }
+   }
+  },
+  "payload_sha256": "c13ceac019d51a136c98d3c411a1b8b4717fdedee43c438e66fe4883619beb3c",
+  "source_id": "SUPRESION_PREFERENTE",
+  "source_payload_hash": "e046fa09fdb40108ec044718829002372b40021118b046d9acafdfc646a069be",
+  "version": "v1.0.0"
+ },
+ {
+  "descripcion": "Transformación del tipo social",
+  "materia": "TRANSFORMACION",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "clase": "ESTRUCTURAL",
+   "constitucion": {
+    "quorum": {
+     "SA_1a": {
+      "fuente": "art. 194 LSC",
+      "valor": 50
+     },
+     "SA_2a": {
+      "fuente": "art. 194 LSC",
+      "valor": 25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "Sin quórum legal de constitución en la junta de SL — el control es la mayoría con suelo de los arts. 198-199 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.2 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA",
+      "PUBLICACION_ESTATUTOS"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "fecha_hora_lugar",
+     "orden_dia",
+     "derecho_informacion_si_procede"
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "proyecto",
+      "nombre": "Proyecto de Transformación"
+     },
+     {
+      "id": "balance",
+      "nombre": "Balance de Situación"
+     }
+    ]
+   },
+   "id": "TRANSFORMACION",
+   "materia": "TRANSFORMACION",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "art. 305 LSC",
+     "plazo_dias": 30
+    },
+    "oposicion_acreedores": {
+     "fuente": "art. 396 LSC",
+     "plazo_dias": 30
+    }
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — mayoría absoluta si concurre >50%; 2/3 del capital presente en el tramo 25-50%"
+     },
+     "SL": {
+      "formula": ">= 2/3 capital",
+      "fuente": "art. 199 LSC"
+     }
+    }
+   }
+  },
+  "payload_sha256": "09edf2a55b3534164c9accb7add37afd19841002c028cb64d7afbd38c873dd8b",
+  "source_id": "TRANSFORMACION",
+  "source_payload_hash": "c03997a904943a52dd8b97d3882b8d9846d95c938ed6a385111e2d0879c80138",
+  "version": "v1.0.0"
+ },
+ {
+  "descripcion": "Autorizacion de transmision de participaciones sociales",
+  "materia": "TRANSMISION_PARTICIPACIONES",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "clase": "ESPECIAL",
+   "constitucion": {
+    "quorum": {
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 193 LSC",
+      "valor": 0.25
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "fecha_hora_lugar",
+     "orden_dia",
+     "derecho_informacion_si_procede"
+    ],
+    "documentosObligatorios": [
+     {
+      "id": "comunicacion_transmision",
+      "nombre": "Comunicacion del socio transmitente"
+     },
+     {
+      "id": "restricciones_estatutarias",
+      "nombre": "Verificacion de restricciones estatutarias y derecho de adquisicion preferente"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "comunicacion_transmision",
+      "nombre": "Comunicacion de transmision proyectada"
+     },
+     {
+      "id": "libro_registro_socios",
+      "nombre": "Anotacion posterior en libro registro de socios"
+     }
+    ]
+   },
+   "id": "TRANSMISION_PARTICIPACIONES",
+   "materia": "TRANSMISION_PARTICIPACIONES",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcionDias": 30,
+    "publicacionRequerida": false
+   },
+   "restriccionTipoSocial": [
+    "SL",
+    "SLU"
+   ],
+   "votacion": {
+    "abstenciones": "socio_afectado_no_computa_si_conflicto",
+    "mayoria": {
+     "SA": {
+      "formula": "favor > contra",
+      "fuente": "LEY",
+      "referencia": "art. 201.1 LSC"
+     },
+     "SL": {
+      "formula": "favor > 1/3_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 107.2 LSC (mayoria ordinaria art. 198)"
+     }
+    }
+   }
+  },
+  "payload_sha256": "b6d82068b333aed2292f4cac8a19ab01d0bc5cadedb829da75fad0cfa62bc154",
+  "source_id": "TRANSMISION_PARTICIPACIONES",
+  "source_payload_hash": "b225f4029458e9c6137402088d81c5e8e966a289ad124bbdc5da8e0b6db09404",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Traslado de Domicilio Social (España)",
+  "materia": "TRASLADO_DOMICILIO_NACIONAL",
+  "organo_tipo": "CONSEJO",
+  "payload": {
+   "acta": {
+    "contenidoMinimo": {
+     "acuerdoEscrito": [
+      "Nuevo domicilio social completo",
+      "Fecha efectiva del cambio"
+     ],
+     "consignacion": [],
+     "sesion": [
+      "Fecha y lugar",
+      "Consejeros asistentes",
+      "Nuevo domicilio acordado",
+      "Resultado votación"
+     ]
+    },
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_CONSEJO",
+     "NO_SESSION": "ACTA_ACUERDO_ESCRITO"
+    }
+   },
+   "clase": "ORDINARIA",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SA_2a": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     },
+     "SL": {
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General",
+      "valor": "NA"
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "valor": 0
+     },
+     "SL": {
+      "fuente": "LEY",
+      "valor": 0
+     }
+    },
+    "canales": {
+     "SA": [
+      "CONVOCATORIA_CONSEJO"
+     ],
+     "SL": [
+      "CONVOCATORIA_CONSEJO"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Nuevo domicilio propuesto",
+     "Justificación del traslado"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "certificacion_nuevo_domicilio",
+      "nombre": "Certificación del nuevo domicilio"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "certificacion_domicilio",
+      "nombre": "Título o certificación del nuevo domicilio"
+     },
+     {
+      "id": "notificacion_hacienda",
+      "nombre": "Notificación a AEAT y registros administrativos"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 0,
+     "fuente": "LEY"
+    }
+   },
+   "id": "TRASLADO_DOMICILIO_NACIONAL",
+   "materia": "TRASLADO_DOMICILIO_NACIONAL",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "NO_SESSION"
+   ],
+   "nota": "Traslado dentro de España — competencia del Consejo (art. 285.1 LSC).",
+   "organoTipo": "CONSEJO",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 30,
+     "referencia": "art. 285.1 LSC"
+    },
+    "publicacion": [
+     "BORME"
+    ]
+   },
+   "postAcuerdo": {
+    "inscribible": true,
+    "instrumentoRequerido": "ESCRITURA",
+    "plazoInscripcionDias": 30,
+    "publicacionRequerida": true
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > total_miembros / 2",
+      "fuente": "LEY",
+      "referencia": "art. 247.2 LSC"
+     },
+     "SA": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     },
+     "SL": {
+      "formula": "NA",
+      "fuente": "NO_APLICA",
+      "referencia": "Organo no Junta General"
+     }
+    },
+    "votoCalidadPermitido": true
+   }
+  },
+  "payload_sha256": "8ac584582ebfddf01fab8fba47872d18d64d2605f366c94bdd5a39783a5f41d8",
+  "source_id": "TRASLADO_DOMICILIO_NACIONAL",
+  "source_payload_hash": "f6f8e9cf127122726457bffaa9686bc88cc2995380149a7340eaa5d85713bb95",
+  "version": "1.0.0"
+ },
+ {
+  "descripcion": "Garrigues/Comité Legal — VENTA_ACTIVOS_ESENCIALES",
+  "materia": "VENTA_ACTIVOS_ESENCIALES",
+  "organo_tipo": "JUNTA_GENERAL",
+  "payload": {
+   "acta": {
+    "requiereConformidadConjunta": false,
+    "requiereTranscripcionLibroActas": true,
+    "tipoActaPorModo": {
+     "MEETING": "ACTA_JUNTA",
+     "UNIVERSAL": "ACTA_JUNTA"
+    }
+   },
+   "clase": "ESTRUCTURAL",
+   "constitucion": {
+    "quorum": {
+     "CONSEJO": {
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC",
+      "valor": "mayoria_miembros"
+     },
+     "SA_1a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.5
+     },
+     "SA_2a": {
+      "fuente": "LEY",
+      "referencia": "art. 194.1 LSC",
+      "valor": 0.25
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 198 LSC",
+      "valor": 0
+     }
+    }
+   },
+   "convocatoria": {
+    "antelacionDias": {
+     "SA": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 30
+     },
+     "SL": {
+      "fuente": "LEY",
+      "referencia": "art. 176.1 LSC",
+      "valor": 15
+     }
+    },
+    "canales": {
+     "SA": [
+      "BORME",
+      "WEB_INSCRITA"
+     ],
+     "SL": [
+      "COMUNICACION_INDIVIDUAL_ESCRITA"
+     ]
+    },
+    "contenidoMinimo": [
+     "Fecha hora y lugar",
+     "Texto íntegro de la propuesta",
+     "Texto actual y propuesto"
+    ],
+    "documentosObligatorios": [
+     {
+      "condicion": "SIEMPRE",
+      "id": "propuesta",
+      "nombre": "Texto íntegro de la propuesta (enajenación de activos esenciales)"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "informe_admin",
+      "nombre": "Informe del órgano de administración"
+     }
+    ]
+   },
+   "documentacion": {
+    "obligatoria": [
+     {
+      "id": "propuesta",
+      "nombre": "Propuesta íntegra"
+     },
+     {
+      "id": "informe_admin_justificacion",
+      "nombre": "Informe justificativo"
+     },
+     {
+      "condicion": "SIEMPRE",
+      "id": "derecho_informacion_287",
+      "nombre": "Derecho de información art. 287 LSC"
+     }
+    ],
+    "ventanaDisponibilidad": {
+     "dias": 15,
+     "fuente": "LEY"
+    }
+   },
+   "id": "VENTA_ACTIVOS_ESENCIALES",
+   "materia": "VENTA_ACTIVOS_ESENCIALES",
+   "modosAdopcionPermitidos": [
+    "MEETING",
+    "UNIVERSAL"
+   ],
+   "organoTipo": "JUNTA_GENERAL",
+   "plazosMateriales": {
+    "inscripcion": {
+     "fuente": "LEY",
+     "plazo_dias": 30,
+     "referencia": "art. 83 RRM"
+    },
+    "publicacion": []
+   },
+   "postAcuerdo": {
+    "inscribible": false,
+    "instrumentoRequerido": "NINGUNO",
+    "plazoInscripcion": {
+     "dias": 30,
+     "fuente": "LEY",
+     "referencia": "art. 83 RRM (1 mes)"
+    },
+    "publicacionRequerida": false
+   },
+   "votacion": {
+    "abstenciones": "no_cuentan",
+    "mayoria": {
+     "CONSEJO": {
+      "formula": "favor > presentes_mitad",
+      "fuente": "LEY",
+      "referencia": "art. 247.1 LSC"
+     },
+     "SA": {
+      "formula": "reforzada art. 201.2 LSC",
+      "fuente": "LEY",
+      "referencia": "art. 201.2 LSC — 2/3 capital presente (tramo 25-50% en 2ª conv.); art. 160.f LSC"
+     },
+     "SL": {
+      "formula": "favor > 1/2_capital_total_con_voto",
+      "fuente": "LEY",
+      "referencia": "art. 199.a LSC"
+     }
+    },
+    "votoCalidadPermitido": false
+   }
+  },
+  "payload_sha256": "b0f95d86a1f78d285d1d58c674c87700f83d55c485aa6edcdf6571d241998d6e",
+  "source_id": "VENTA_ACTIVOS_ESENCIALES",
+  "source_payload_hash": null,
+  "version": "1.0.0"
+ }
+]

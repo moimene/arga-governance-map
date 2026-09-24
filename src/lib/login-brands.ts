@@ -12,7 +12,7 @@ export interface LoginBrandFeature {
   description?: string;
 }
 
-export type LoginBrandKey = "arga" | "garrigues";
+export type LoginBrandKey = "arga" | "garrigues" | "nuevo";
 
 export interface LoginBrand {
   key: LoginBrandKey;
@@ -25,6 +25,8 @@ export interface LoginBrand {
   footer: string;
   panelBg?: string; // fondo inline del panel izquierdo (sin provider aún)
   accentColor: string;
+  /** Fondo del botón de acceso. Pre-auth no hay provider de marca que lo resuelva. */
+  ctaBg?: string;
   defaultPath: string; // ruta destino tras autenticación
   emailPlaceholder: string;
   features: LoginBrandFeature[];
@@ -93,6 +95,42 @@ export const LOGIN_BRANDS: Record<string, LoginBrand> = {
       },
     ],
   },
+  // Tenant EN BLANCO (spec 2026-09-19): nace sin una sola sociedad y se cablea
+  // por pantalla. La fuente de verdad del tenant es
+  // `scripts/tenants/tenant-spec.ts`; un test vigila que este `tenantId` no
+  // diverja de aquel. Marca descriptiva y sin narrativa: no es un cliente.
+  nuevo: {
+    key: "nuevo",
+    tenantId: "00000000-0000-0000-0000-000000000003",
+    nombre: "Grupo Nuevo",
+    sufijo: "Entorno en blanco",
+    entorno: "Grupo creado desde cero: sin sociedades ni datos sembrados",
+    tagline: "Sistema de Gobernanza Corporativa — alta de un grupo desde cero",
+    badge: "Consola Corporativa TGMS",
+    footer: "TGMS · Entorno en blanco · Demo sin efecto jurídico",
+    panelBg: "#1f3a5f",
+    accentColor: "#3b6ea8",
+    ctaBg: "#1f3a5f",
+    defaultPath: "/",
+    emailPlaceholder: "usuario@grupo-nuevo-demo.dev",
+    features: [
+      {
+        icon: "network",
+        title: "Alta de sociedades y estructura de grupo",
+        description: "Matriz, filiales, capital, socios, órganos y cargos por pantalla",
+      },
+      {
+        icon: "scale",
+        title: "Secretaría Societaria sobre el derecho común",
+        description: "Convocatorias, acuerdos, actas y libros con el pack base LSC",
+      },
+      {
+        icon: "compass",
+        title: "GRC, AI Governance y canal interno",
+        description: "Todos los módulos abiertos para recorrer el sistema completo",
+      },
+    ],
+  },
 };
 
 export function resolveLoginBrand(searchOrKey: string): LoginBrand {
@@ -107,6 +145,18 @@ export function resolveLoginBrand(searchOrKey: string): LoginBrand {
   return Object.prototype.hasOwnProperty.call(LOGIN_BRANDS, t)
     ? LOGIN_BRANDS[t]
     : LOGIN_BRANDS.arga;
+}
+
+/**
+ * Entornos que el selector ofrece SIEMPRE. Un entorno fuera de esta lista (p. ej.
+ * un tenant en blanco) solo aparece cuando se llega por su enlace `?tenant=…`:
+ * la pantalla que ven las demos de ARGA y Garrigues no cambia, y cada entorno
+ * nuevo se entrega con su propio enlace de acceso.
+ */
+export const ENTORNOS_BASE: readonly LoginBrandKey[] = ["arga", "garrigues"];
+
+export function entornosVisibles(inicial: LoginBrandKey): LoginBrandKey[] {
+  return ENTORNOS_BASE.includes(inicial) ? [...ENTORNOS_BASE] : [...ENTORNOS_BASE, inicial];
 }
 
 /** Ruta de /login con el entorno preseleccionado. */
