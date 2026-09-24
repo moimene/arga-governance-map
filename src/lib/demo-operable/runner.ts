@@ -131,10 +131,10 @@ export interface DemoScenarioRunResult {
 
 export interface DemoRunOptions {
   scenarioRunId?: string;
+  tenantId?: string;
+  entityId?: string;
 }
 
-const ARGA_TENANT_ID = "00000000-0000-0000-0000-000000000001";
-const ARGA_ENTITY_ID = "00000000-0000-0000-0000-000000000010";
 const GENERATED_AT_SEED = "2026-04-27T00:00:00.000Z";
 
 function stableHash(input: string) {
@@ -225,8 +225,8 @@ export function runDemoScenario(scenarioId: DemoScenarioId, options: DemoRunOpti
     outcome: scenario.outcome,
     expectedOutcome: scenario.outcome,
     ids: {
-      tenantId: ARGA_TENANT_ID,
-      entityId: ARGA_ENTITY_ID,
+      tenantId: options.tenantId ?? "",
+      entityId: options.entityId ?? "",
       convocatoriaId: stableDemoId(scenarioId, "convocatoria", scenarioRunId),
       meetingId: stableDemoId(scenarioId, "meeting", scenarioRunId),
       agreementId: stableDemoId(scenarioId, "agreement", scenarioRunId),
@@ -297,6 +297,6 @@ export function runDemoScenario(scenarioId: DemoScenarioId, options: DemoRunOpti
   };
 }
 
-export function runAllDemoScenarios() {
-  return demoScenarioDefinitions.map((scenario) => runDemoScenario(scenario.id));
+export function runAllDemoScenarios(options: DemoRunOptions = {}) {
+  return demoScenarioDefinitions.map((scenario) => runDemoScenario(scenario.id, options));
 }

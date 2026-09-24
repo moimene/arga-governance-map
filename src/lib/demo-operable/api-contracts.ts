@@ -66,7 +66,11 @@ export function buildDemoGatePreviewResponse(run: DemoScenarioRunResult): DemoGa
 }
 
 export function buildDemoRunScenarioResponse(input: DemoRunScenarioRequest): DemoRunScenarioResponse {
-  const run = runDemoScenario(input.scenario, { scenarioRunId: input.scenarioRunId });
+  const run = runDemoScenario(input.scenario, {
+    scenarioRunId: input.scenarioRunId,
+    tenantId: input.tenantId,
+    entityId: input.entityId,
+  });
   const binding = getDemoPackBinding(input.scenario);
   const entity = binding ? getDemoPackEntity(binding.entityId) : undefined;
 

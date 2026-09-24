@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -13,9 +14,8 @@ import {
 import { Card } from "@/components/ui/card";
 import { buildPresenterScenarioPath, runAllDemoScenarios } from "@/lib/demo-operable";
 import type { DemoOutcome, DemoStepId } from "@/lib/demo-operable";
+import { useTenantContext } from "@/context/TenantContext";
 import { cn } from "@/lib/utils";
-
-const demoRuns = runAllDemoScenarios();
 
 const stepIcons: Record<DemoStepId, typeof FileCheck2> = {
   CONVOCATORIA: FileCheck2,
@@ -37,6 +37,11 @@ function outcomeLabel(outcome: DemoOutcome) {
 }
 
 export function DemoOperablePanel() {
+  const { tenantId, entityId } = useTenantContext();
+  const demoRuns = useMemo(
+    () => runAllDemoScenarios({ tenantId: tenantId ?? undefined, entityId: entityId ?? undefined }),
+    [tenantId, entityId],
+  );
   const primaryRun = demoRuns[0];
 
   return (
