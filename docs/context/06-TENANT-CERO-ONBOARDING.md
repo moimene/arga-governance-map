@@ -2,7 +2,7 @@
 
 > **Propósito.** Memoria de continuidad de la línea de trabajo «tercer tenant / onboarding real». Permite retomar el asunto en una conversación nueva sin releer el historial. Se sitúa en la suite `docs/context/` (→ `00`) y no sustituye a `CLAUDE.md`.
 >
-> **Fecha de creación:** 2026-09-19. **Última actualización:** 2026-09-25 (cierre de la tarea MOI-131: identidad «Grupo Nuevo» confirmada formalmente, Opción A). **Estado:** tenant «Grupo Nuevo» **PROVISIONADO en Cloud** con identidad confirmada; gates de aislamiento tri-tenant y bilateral verdes (88/88, logins reales); gates estáticos y build verificados limpios; trabajo empaquetado en rama `grupo-nuevo/tenant-cero-2026-09-19`. **Mantener vivo:** actualizar estado y fecha al cerrar cada conversación sobre este asunto.
+> **Fecha de creación:** 2026-09-19. **Última actualización:** 2026-09-25 (cierre de MOI-131 y MOI-132: identidad «Grupo Nuevo» y primer recorrido en local confirmados formalmente, Opciones A). **Estado:** tenant «Grupo Nuevo» **PROVISIONADO en Cloud** con identidad y vía de acceso confirmadas; gates de aislamiento tri-tenant y bilateral verdes (88/88, logins reales); gates estáticos y build verificados limpios; trabajo empaquetado en rama `grupo-nuevo/tenant-cero-2026-09-19`. **Mantener vivo:** actualizar estado y fecha al cerrar cada conversación sobre este asunto.
 
 ---
 
@@ -25,7 +25,7 @@
 - Gate `src/test/schema/tenant-cero-isolation.test.ts`: 25/25 con tres logins reales.
 - Nombre «Grupo Nuevo» confirmado formalmente como identidad definitiva de la plantilla de onboarding (Opción A, resuelto en MOI-131). Coincide plenamente con la fila de Cloud (`governance_OS`), los identificadores de reglas `GN_*` y las cuentas Auth.
 
-**Verificado el 2026-09-24 (sesión MOI-126):** typecheck 0 errores, eslint limpio, `bun run build` limpio (7.62s), 88 tests de aislamiento tri-tenant y bilateral verdes (`tenant-isolation` + `tenant-cero-isolation`), suite `src/test/garrigues/` (98 pass) y `src/test/tenants/` (44 pass) verdes, 4.890 tests en bloque (0 fail, 151 skip, 3 todo), dry-run posterior = 0 por crear, 0 filas `PROBE-%` residuales en Cloud. **No verificado aún en navegador:** la pantalla de login y el Dashboard con el tenant nuevo; requiere arranque en local (`bun run dev` → `/login?tenant=nuevo`) o despliegue tras incorporación en MOI-136.
+**Verificado el 2026-09-24 (sesión MOI-126):** typecheck 0 errores, eslint limpio, `bun run build` limpio (7.62s), 88 tests de aislamiento tri-tenant y bilateral verdes (`tenant-isolation` + `tenant-cero-isolation`), suite `src/test/garrigues/` (98 pass) y `src/test/tenants/` (44 pass) verdes, 4.890 tests en bloque (0 fail, 151 skip, 3 todo), dry-run posterior = 0 por crear, 0 filas `PROBE-%` residuales en Cloud. **Primer recorrido en navegador:** resuelto en MOI-132 por la Opción A: el primer recorrido se realiza en local (`bun run dev` → `/login?tenant=nuevo`), preservando la versión de producción sin exponer prematuramente el tercer entorno hasta su incorporación formal en MOI-136.
 
 **Rectificación de esta línea de trabajo.** La recomendación inicial («clonar el pack base desde `seed-rule-packs.ts`, no desde Cloud») era **incorrecta**: ese seed quedó atrás respecto a las correcciones del Comité Legal aplicadas por migración (13 de los 58 packs tienen hoy versión activa posterior a la 1.0.0). El origen correcto es el estado vivo de Cloud, congelado en el repo como snapshot. §4 está corregido.
 
@@ -131,7 +131,7 @@ Valor del ejercicio: es la primera vez que el producto se recorre como lo haría
 
 ## 6. Próximo paso natural
 
-1. Arrancar la aplicación en local o desplegar, y entrar por `/login?tenant=nuevo`.
+1. Arrancar la aplicación en local (`bun run dev`) y acceder a `http://localhost:5173/login?tenant=nuevo` con `demo@grupo-nuevo-demo.dev` (Opción A formalizada en MOI-132; no expone producción ni requiere publicación previa).
 2. Recorrido por pantalla con el guion (bloques 0 a 8) y registro de hallazgos en su tabla.
 3. Correr el gate bilateral `src/test/schema/tenant-isolation.test.ts` y el resto de sondas de `schema/` con el tercer tenant ya presente.
 4. Con los hallazgos, decidir por módulo: alta por pantalla o kit de arranque; y traer el resultado a este documento.
