@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AlertTriangle, PlusCircle, Route, Search, ShieldAlert, SlidersHorizontal } from "lucide-react";
 import { useAiIncidentsList } from "@/hooks/useAiIncidents";
-import { isAimsMaterialIncidentCandidate } from "@/lib/aims/readiness";
+import { incidenteCerrado, isAimsMaterialIncidentCandidate } from "@/lib/aims/readiness";
 import {
   chipClaseEstadoIncidente,
   chipClaseSeveridad,
@@ -40,7 +40,8 @@ export default function AiIncidentes() {
   const abiertos = incidents.filter(
     (i) => ["ABIERTO", "EN_INVESTIGACION"].includes(normalizeAimsStatus(i.status)),
   ).length;
-  const cerrados = incidents.filter((i) => normalizeAimsStatus(i.status) === "CERRADO").length;
+  // Mismo criterio que la portada y el read model: CERRADO y con fecha de cierre.
+  const cerrados = incidents.filter(incidenteCerrado).length;
   const materialCount = incidents.filter(isAimsMaterialIncidentCandidate).length;
   const filtered = incidents.filter((incident) => {
     const q = search.toLowerCase();

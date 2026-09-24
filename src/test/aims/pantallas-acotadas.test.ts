@@ -51,7 +51,7 @@ describe("§2.3 — ninguna pantalla ni componente AIMS por encima de 400 línea
   });
 
   it("el criterio no vive en las pantallas: quien toca un catálogo lo pasa por perfilAplicable o catalogoDeLosFindings", () => {
-    // Elegir el catálogo (84 vs 43) es criterio de `perfil-aplicabilidad`. Una
+    // Elegir el catálogo (84 vs 44) es criterio de `perfil-aplicabilidad`. Una
     // página puede importar los catálogos —para pasárselos al criterio— pero no
     // puede decidir con ellos por su cuenta: si los importa, tiene que llamar
     // al criterio.

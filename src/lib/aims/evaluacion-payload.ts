@@ -87,7 +87,7 @@ export type EvaluationFinding = {
    * Evidencias VIGENTES atadas a la medida en el momento de guardar. Se
    * persiste para que el read model del dashboard pueda aplicar la regla sin
    * volver a consultar. `undefined` en las filas anteriores al 2026-09-07:
-   * entonces no había dónde guardar evidencia, así que es «no medido».
+   * «pendiente de evidencia», que desde F1.T5 tampoco acredita.
    */
   evidenceCount?: number;
 };
@@ -160,8 +160,8 @@ export function buildEvaluationPayload(
   additionalMeasures: MedidaAdicionalRef[] = [],
   /**
    * Evidencias vigentes por código de medida. Se omite cuando el llamante no
-   * las ha medido: entonces el finding no lleva `evidenceCount` y la regla no
-   * degrada nada, que es lo correcto para «no medido».
+   * las ha medido: entonces el finding no lleva `evidenceCount` y un L5 queda
+   * «pendiente de evidencia», que no acredita (F1.T5). El wizard la pasa siempre.
    */
   evidenciasPorMedida?: Record<string, number>,
 ): EvaluationPayload {
@@ -220,6 +220,22 @@ export function buildEvaluationPayload(
         : "CONFORME";
 
   return { findings, checks, status, evaluadas, totales };
+}
+
+/**
+ * Filas de `ai_compliance_checks` de UNA evaluación (M01, F1.T14): cada
+ * comprobación lleva su sistema y el autodiagnóstico del que sale.
+ *
+ * `checked_by_id` NO va a propósito: es FK a `persons` y la resuelve el servidor
+ * desde el perfil de la sesión (enmienda E-01); lo que mandara el cliente se
+ * pisaría. Sin evaluación no se construye nada: una comprobación suelta es
+ * legado y no acredita.
+ */
+export function checksDeLaEvaluacion(checks: EvaluationCheck[], systemId: string, assessmentId: string) {
+  if (!systemId || !assessmentId) {
+    throw new Error("No se registran comprobaciones sin el sistema y la evaluación de la que salen.");
+  }
+  return checks.map((c) => ({ ...c, system_id: systemId, assessment_id: assessmentId }));
 }
 
 /**

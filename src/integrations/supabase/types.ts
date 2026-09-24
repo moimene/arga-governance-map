@@ -1,6 +1,7 @@
 // Tipos del esquema de `governance_OS` (hzqwefkwsxopwrmtksbg), GENERADOS.
 //
-// Generado el 2026-09-07 con:
+// Generado el 2026-09-07 con (regenerado el 2026-09-19 tras M01, 20260919100000, por la
+// Management API: GET /v1/projects/<ref>/types/typescript?included_schemas=public):
 //   supabase gen types typescript --db-url "postgresql://postgres.<ref>:<pw>@aws-1-eu-central-1.pooler.supabase.com:5432/postgres"
 // (introspección de solo lectura; la contraseña vive en .env como DATABASE_PASSWORD).
 // No editar a mano: regenerar con el mismo comando.
@@ -37,30 +38,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -741,6 +722,7 @@ export type Database = {
       }
       ai_compliance_checks: {
         Row: {
+          assessment_id: string | null
           checked_at: string | null
           checked_by_id: string | null
           created_at: string | null
@@ -753,6 +735,7 @@ export type Database = {
           system_id: string | null
         }
         Insert: {
+          assessment_id?: string | null
           checked_at?: string | null
           checked_by_id?: string | null
           created_at?: string | null
@@ -765,6 +748,7 @@ export type Database = {
           system_id?: string | null
         }
         Update: {
+          assessment_id?: string | null
           checked_at?: string | null
           checked_by_id?: string | null
           created_at?: string | null
@@ -777,6 +761,13 @@ export type Database = {
           system_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ai_compliance_checks_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "ai_risk_assessments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ai_compliance_checks_checked_by_id_fkey"
             columns: ["checked_by_id"]
@@ -795,11 +786,19 @@ export type Database = {
       }
       ai_incidents: {
         Row: {
+          affected_count: number | null
+          affects_critical_function: boolean | null
+          affects_personal_data: boolean | null
           closed_at: string | null
           corrective_action: string | null
           description: string | null
+          high_risk_to_subjects: boolean | null
+          ict_related: boolean | null
           id: string
+          incident_type: string | null
+          knowledge_at: string | null
           reported_at: string | null
+          ria_severity: string | null
           root_cause: string | null
           severity: string | null
           status: string | null
@@ -808,11 +807,19 @@ export type Database = {
           title: string
         }
         Insert: {
+          affected_count?: number | null
+          affects_critical_function?: boolean | null
+          affects_personal_data?: boolean | null
           closed_at?: string | null
           corrective_action?: string | null
           description?: string | null
+          high_risk_to_subjects?: boolean | null
+          ict_related?: boolean | null
           id?: string
+          incident_type?: string | null
+          knowledge_at?: string | null
           reported_at?: string | null
+          ria_severity?: string | null
           root_cause?: string | null
           severity?: string | null
           status?: string | null
@@ -821,11 +828,19 @@ export type Database = {
           title: string
         }
         Update: {
+          affected_count?: number | null
+          affects_critical_function?: boolean | null
+          affects_personal_data?: boolean | null
           closed_at?: string | null
           corrective_action?: string | null
           description?: string | null
+          high_risk_to_subjects?: boolean | null
+          ict_related?: boolean | null
           id?: string
+          incident_type?: string | null
+          knowledge_at?: string | null
           reported_at?: string | null
+          ria_severity?: string | null
           root_cause?: string | null
           severity?: string | null
           status?: string | null
@@ -845,37 +860,58 @@ export type Database = {
       }
       ai_risk_assessments: {
         Row: {
+          action_plan: Json | null
           assessment_date: string | null
           assessor_id: string | null
+          content_hash: string | null
           created_at: string | null
           findings: Json | null
           framework: string | null
+          frozen_at: string | null
+          frozen_by_id: string | null
           id: string
           notes: string | null
+          questionnaire_id: string | null
+          reviewed_at: string | null
+          reviewed_by_id: string | null
           score: number | null
           status: string | null
           system_id: string | null
         }
         Insert: {
+          action_plan?: Json | null
           assessment_date?: string | null
           assessor_id?: string | null
+          content_hash?: string | null
           created_at?: string | null
           findings?: Json | null
           framework?: string | null
+          frozen_at?: string | null
+          frozen_by_id?: string | null
           id?: string
           notes?: string | null
+          questionnaire_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by_id?: string | null
           score?: number | null
           status?: string | null
           system_id?: string | null
         }
         Update: {
+          action_plan?: Json | null
           assessment_date?: string | null
           assessor_id?: string | null
+          content_hash?: string | null
           created_at?: string | null
           findings?: Json | null
           framework?: string | null
+          frozen_at?: string | null
+          frozen_by_id?: string | null
           id?: string
           notes?: string | null
+          questionnaire_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by_id?: string | null
           score?: number | null
           status?: string | null
           system_id?: string | null
@@ -886,6 +922,13 @@ export type Database = {
             columns: ["assessor_id"]
             isOneToOne: false
             referencedRelation: "persons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_risk_assessments_questionnaire_id_fkey"
+            columns: ["questionnaire_id"]
+            isOneToOne: false
+            referencedRelation: "aims_classification_questionnaires"
             referencedColumns: ["id"]
           },
           {
@@ -906,6 +949,8 @@ export type Database = {
           id: string
           name: string
           owner_id: string | null
+          regulatory_profile: Json | null
+          regulatory_role: string | null
           risk_level: string | null
           status: string | null
           system_type: string | null
@@ -921,6 +966,8 @@ export type Database = {
           id?: string
           name: string
           owner_id?: string | null
+          regulatory_profile?: Json | null
+          regulatory_role?: string | null
           risk_level?: string | null
           status?: string | null
           system_type?: string | null
@@ -936,6 +983,8 @@ export type Database = {
           id?: string
           name?: string
           owner_id?: string | null
+          regulatory_profile?: Json | null
+          regulatory_role?: string | null
           risk_level?: string | null
           status?: string | null
           system_type?: string | null
@@ -1058,6 +1107,83 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      aims_classification_questionnaires: {
+        Row: {
+          applicable_frameworks: Json
+          catalog_profile: string | null
+          completed_at: string | null
+          completed_by: string | null
+          computed_risk_level: string | null
+          computed_role: string | null
+          content_hash: string | null
+          created_at: string
+          created_by: string | null
+          gpai_dependency: boolean
+          id: string
+          phase1_responses: Json
+          phase2_art63_justification: string | null
+          phase2_responses: Json
+          questionnaire_version: string
+          status: string
+          system_id: string
+          tenant_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          applicable_frameworks?: Json
+          catalog_profile?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          computed_risk_level?: string | null
+          computed_role?: string | null
+          content_hash?: string | null
+          created_at?: string
+          created_by?: string | null
+          gpai_dependency?: boolean
+          id?: string
+          phase1_responses?: Json
+          phase2_art63_justification?: string | null
+          phase2_responses?: Json
+          questionnaire_version: string
+          status?: string
+          system_id: string
+          tenant_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          applicable_frameworks?: Json
+          catalog_profile?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          computed_risk_level?: string | null
+          computed_role?: string | null
+          content_hash?: string | null
+          created_at?: string
+          created_by?: string | null
+          gpai_dependency?: boolean
+          id?: string
+          phase1_responses?: Json
+          phase2_art63_justification?: string | null
+          phase2_responses?: Json
+          questionnaire_version?: string
+          status?: string
+          system_id?: string
+          tenant_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aims_classification_questionnaires_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "ai_systems"
             referencedColumns: ["id"]
           },
         ]
@@ -1372,6 +1498,74 @@ export type Database = {
             columns: ["version_id"]
             isOneToOne: false
             referencedRelation: "aims_system_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      aims_evidence_items: {
+        Row: {
+          content_hash: string | null
+          created_at: string
+          document_date: string | null
+          evidentiary_posture: string
+          expires_on: string | null
+          external_ref: string | null
+          hash_algorithm: string
+          hash_computed_in: string
+          id: string
+          kind: string
+          links: Json
+          storage_path: string | null
+          system_id: string
+          tenant_id: string
+          title: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          content_hash?: string | null
+          created_at?: string
+          document_date?: string | null
+          evidentiary_posture?: string
+          expires_on?: string | null
+          external_ref?: string | null
+          hash_algorithm?: string
+          hash_computed_in?: string
+          id?: string
+          kind: string
+          links?: Json
+          storage_path?: string | null
+          system_id: string
+          tenant_id: string
+          title: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          content_hash?: string | null
+          created_at?: string
+          document_date?: string | null
+          evidentiary_posture?: string
+          expires_on?: string | null
+          external_ref?: string | null
+          hash_algorithm?: string
+          hash_computed_in?: string
+          id?: string
+          kind?: string
+          links?: Json
+          storage_path?: string | null
+          system_id?: string
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aims_evidence_items_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "ai_systems"
             referencedColumns: ["id"]
           },
         ]
@@ -14385,15 +14579,7 @@ export type Database = {
           case_id: string | null
           id: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "audit_log_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "sii_cases_view"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       sii_cases_view: {
         Row: {
@@ -14444,15 +14630,37 @@ export type Database = {
           title?: string | null
           type?: never
         }
-        Relationships: [
-          {
-            foreignKeyName: "evidences_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "sii_cases_view"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
+      }
+      sii_reports: {
+        Row: {
+          code: string | null
+          created_at: string | null
+          id: string | null
+          orden: number | null
+          origen: string | null
+          report: Json | null
+          tenant_id: string | null
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string | null
+          id?: string | null
+          orden?: number | null
+          origen?: string | null
+          report?: Json | null
+          tenant_id?: string | null
+        }
+        Update: {
+          code?: string | null
+          created_at?: string | null
+          id?: string | null
+          orden?: number | null
+          origen?: string | null
+          report?: Json | null
+          tenant_id?: string | null
+        }
+        Relationships: []
       }
     }
     Functions: {
@@ -14484,6 +14692,45 @@ export type Database = {
           p_version_id: string
         }
         Returns: Json
+      }
+      fn_aims_completar_cuestionario: {
+        Args: { p_id: string }
+        Returns: {
+          completed_at: string
+          content_hash: string
+          id: string
+          version: number
+        }[]
+      }
+      fn_aims_derivar_nivel: { Args: { p: Json }; Returns: string }
+      fn_aims_derivar_rol: { Args: { p: Json }; Returns: string }
+      fn_aims_freeze_assessment: {
+        Args: { p_assessment_id: string }
+        Returns: {
+          content_hash: string
+          frozen_at: string
+          id: string
+        }[]
+      }
+      fn_aims_perfil_catalogo: {
+        Args: { p_nivel: string; p_rol: string }
+        Returns: string
+      }
+      fn_aims_registrar_sistema: {
+        Args: { p_cuestionario: Json; p_sistema: Json }
+        Returns: {
+          content_hash: string
+          cuestionario_id: string
+          system_id: string
+        }[]
+      }
+      fn_aims_review_assessment: {
+        Args: { p_assessment_id: string }
+        Returns: {
+          id: string
+          reviewed_at: string
+          reviewed_by_id: string
+        }[]
       }
       fn_aprobar_acta: {
         Args: {
@@ -15879,12 +16126,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -15908,11 +16155,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -15933,11 +16180,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -15958,11 +16205,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -15975,11 +16222,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -15989,9 +16236,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       user_role_type: [

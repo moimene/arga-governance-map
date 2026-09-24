@@ -103,15 +103,32 @@ describe("G4 — ownership navegable del catálogo normativo (Cloud)", () => {
     }
   });
 
-  it("ARGA intacta: cero ownership por comité, se sigue pintando owner_function", async () => {
+  // Las POLÍTICAS de ARGA siguen sin comité: ahí no se ha tocado nada y el
+  // contrato de cero cambio sigue entero. Las OBLIGACIONES ya no: F5.T5 dio de
+  // alta el art. 4 del RIA con el CATIT como órgano (decisión D-U2 del usuario,
+  // 2026-09-20). El gate no se afloja —sigue exigiendo que no aparezca ownership
+  // por comité— salvo en las altas declaradas, una por una y con su tarea.
+  it("ARGA: cero ownership por comité en políticas, y en obligaciones solo el declarado", async () => {
     if (!arga) return;
     const { data: pol, error } = await arga.from("policies").select(POLICY_SELECT);
     expect(error).toBeNull();
     const polRows = (pol ?? []) as Array<{ owner_body: OwnerEmbed; owner_function: string | null }>;
     expect(polRows.length).toBeGreaterThan(0);
     expect(polRows.every((r) => r.owner_body === null)).toBe(true);
-    const { data: obl } = await arga.from("obligations").select(OBLIGATION_SELECT);
-    expect(((obl ?? []) as Array<{ owner_body: OwnerEmbed }>).every((r) => r.owner_body === null)).toBe(true);
+
+    const CON_ORGANO_DECLARADO: Record<string, string> = {
+      "OBL-RIA-ORG-04": "F5.T5 — art. 4 RIA, órgano CATIT (D-U2)",
+    };
+    const { data: obl } = await arga.from("obligations").select(`code, ${OBLIGATION_SELECT}`);
+    const conOrgano = ((obl ?? []) as Array<{ code: string; owner_body: OwnerEmbed }>)
+      .filter((r) => r.owner_body !== null)
+      .map((r) => r.code);
+    // Control positivo: la declarada SÍ tiene órgano, o el gate sería vacuo.
+    expect(conOrgano, "el alta declarada del art. 4 ha perdido su órgano").toContain("OBL-RIA-ORG-04");
+    expect(
+      conOrgano.filter((c) => !Object.prototype.hasOwnProperty.call(CON_ORGANO_DECLARADO, c)),
+      "obligaciones de ARGA con comité sin declarar",
+    ).toEqual([]);
   });
 });
 

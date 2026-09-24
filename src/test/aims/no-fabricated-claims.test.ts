@@ -243,8 +243,13 @@ describe("A3 — un cero sin dato no se pinta como un cero bueno", () => {
     // verde: «Riesgo Alto sin eval. aprobada: 0» leído como logro cuando lo que
     // pasa es que no hay inventario con que contarlo.
     const src = read(DASHBOARD);
+    // `KpiCard` vive en su componente desde F1.T3 (2026-09-19): el tono se lee
+    // allí y la arista es que el Dashboard lo importe y lo monte.
+    const kpi = read("src/components/ai-governance/dashboard/KpiCard.tsx");
+    expect(src).toMatch(/import \{ KpiCard \} from "@\/components\/ai-governance\/dashboard\/KpiCard"/);
+    expect((src.match(/<KpiCard\b/g) ?? []).length, "el Dashboard ya no monta las KPI").toBeGreaterThanOrEqual(4);
     expect(
-      /neutral:/.test(src),
+      /neutral:/.test(kpi),
       "KpiCard ya no tiene tono neutro: el cero sin dato vuelve a ser verde",
     ).toBe(true);
 
@@ -253,7 +258,7 @@ describe("A3 — un cero sin dato no se pinta como un cero bueno", () => {
     // `var(--status-success)` devolvía el cero sin dato al verde y el gate
     // seguía pasando (derrotado por mutación en la review adversarial).
     for (const clave of ["neutral:"]) {
-      for (const bloque of src.split(clave).slice(1)) {
+      for (const bloque of kpi.split(clave).slice(1)) {
         const valor = bloque.slice(0, 80);
         expect(
           /status-(success|active)/.test(valor),
@@ -262,7 +267,7 @@ describe("A3 — un cero sin dato no se pinta como un cero bueno", () => {
       }
     }
     for (const [etiqueta, coleccion] of [
-      ["Riesgo Alto sin eval. aprobada", "systems"],
+      ["Alto riesgo sin autodiagnóstico acreditado", "systems"],
       ["Incidentes abiertos", "incidents"],
     ] as const) {
       const i = src.indexOf(etiqueta);
@@ -380,6 +385,48 @@ describe("A3 — no se ofrece una capacidad que el sistema deniega", () => {
         expect(re.test(src), `${f}: vuelve a ofrecerse el cierre del expediente → ${re}`).toBe(false);
       }
     }
+  });
+
+  it("2026-09-19 (F1.T7) — ninguna superficie asigna a una sección un estado que exige revisor: ni verbo ni estado", () => {
+    // Se retiró el cierre del expediente, pero el selector de cada sección
+    // seguía ofreciendo «Conforme» y «Cerrada» (APPROVED/SEALED) sin revisor.
+    // Dos puertas: el VERBO (un botón que aprueba, cierra o sella) y el ESTADO
+    // (un selector alimentado con la lista completa). El comportamiento se
+    // renderiza en `tab-expediente-tecnico.test.tsx`; esto es el respaldo
+    // textual en toda la superficie, que un refactor puede reintroducir suelto.
+    const VERBOS = [
+      /\b(Aprobar|Cerrar|Sellar|Validar|Certificar)\s+(la\s+|esta\s+)?secci[oó]n/i,
+      /\bMarcar\s+como\s+(conforme|revisad[oa]|cerrad[oa]|aprobad[oa])/i,
+    ];
+    // Control del instrumento: cada patrón casa con el rótulo que prohíbe.
+    expect(VERBOS[0].test("Aprobar sección")).toBe(true);
+    expect(VERBOS[1].test("Marcar como conforme")).toBe(true);
+    const ESTADO = /\bESTADOS_SECCION\s*\.\s*(map|forEach|filter)\s*\(/;
+    expect(ESTADO.test("{ESTADOS_SECCION.map((e) =>")).toBe(true);
+
+    const ficheros = superficieAims();
+    expect(ficheros.length, "el barrido se ha quedado corto: la ausencia sería vacua").toBeGreaterThanOrEqual(30);
+    for (const f of ficheros) {
+      const src = sinComentarios(read(f));
+      for (const re of VERBOS) {
+        expect(re.test(src), `${f}: ofrece un verbo que exige revisor → ${src.match(re)?.[0]}`).toBe(false);
+      }
+      expect(ESTADO.test(src), `${f}: recorre la lista completa de estados de sección, SEALED y APPROVED incluidos`)
+        .toBe(false);
+    }
+
+    // Control positivo del ESTADO: el selector existe y se alimenta de la hoja.
+    const tab = sinComentarios(read("src/components/ai-governance/sistema/TabExpedienteTecnico.tsx"));
+    expect(tab).toContain("ESTADOS_SECCION_EDITABLES.map(");
+    // Y la escritura aplica el mismo criterio: retirar la opción del selector y
+    // dejar que el UPDATE acepte APPROVED sería la retirada a medias otra vez.
+    // CAPA DÉBIL, declarada: un señuelo que llame a la función sin lanzar
+    // satisface este grep. El rechazo se EJECUTA en `tab-expediente-tecnico.test.tsx`
+    // (el hook real contra un doble de `supabase.from`); esto queda de respaldo.
+    const hook = sinComentarios(read(HOOK));
+    const update = hook.slice(hook.indexOf("export function useUpdateTechnicalFileSection"));
+    expect(update).toContain('.from("aims_technical_file_sections")');
+    expect(update.slice(0, update.indexOf(".update("))).toContain("esEstadoSeccionEditable(status)");
   });
 });
 
@@ -905,6 +952,10 @@ describe("2026-09-06 — la ausencia de dato se dice, no se rellena", () => {
     // La pestaña de vigilancia se extrajo el 2026-09-08 y el mapa se renombró
     // (`INDICATOR_STATUS_CHIP` → `CHIP_INDICADOR`, `SECTION_STATUS_CHIP_NEUTRO`
     // → `CHIP_NEUTRO`): el invariante no cambia, sólo dónde se mide.
+    // Desde el 2026-09-19 (F1.T6) la clave del chip la da la hoja
+    // `estadoIndicador`, que devuelve SIN_MEDICION sin valor medido: el mapa
+    // no la conoce y cae al neutro. Su comportamiento se renderiza en
+    // `tab-vigilancia.test.tsx`; aquí sigue vigilado el fallback.
     const src = sinComentarios(read(TAB_VIGILANCIA));
     expect(
       /ind\.status\s*===\s*"OPTIMAL"/.test(src),
@@ -916,7 +967,7 @@ describe("2026-09-06 — la ausencia de dato se dice, no se rellena", () => {
     const cuerpo = mapa.slice(0, mapa.indexOf("};"));
     expect(/\bOK:/.test(cuerpo), "el estado 'OK', que es el DEFAULT de la columna, no se reconoce").toBe(true);
     // El fallback es el chip neutro, no el de aviso ni el de éxito.
-    const uso = src.slice(src.indexOf("CHIP_INDICADOR[normalizeAimsStatus(ind.status)]"));
+    const uso = src.slice(src.indexOf("CHIP_INDICADOR[estado.clave]"));
     expect(/\?\?\s*CHIP_NEUTRO/.test(uso.slice(0, 160)),
       "el estado desconocido de un indicador ya no cae al chip neutro").toBe(true);
     // Control positivo del propio chip neutro: mapearlo a un color de éxito o
@@ -1113,5 +1164,80 @@ describe("2026-09-07 — el escalado no redacta la justificación por el oficial
       "el escalado ya no manda el órgano destino").toBe(true);
     expect(/buildMeetingHandoffPath/.test(src),
       "el escalado ya no construye el handoff de Secretaría").toBe(true);
+  });
+});
+
+describe("2026-09-19 — F1.T6: la vigilancia no promete lo que no mide", () => {
+  it("ninguna superficie promete monitorización continua", () => {
+    // La pestaña de vigilancia se presentaba como «monitorización continua de
+    // deriva» sobre indicadores que nacen sin medición, sin umbral y sin forma
+    // de actualizarlos. Se juzga lo renderizable, no la prosa que lo explica.
+    const re = /monitorizaci[oó]n\s+continua|monitoreo\s+continuo|continuous\s+monitoring/i;
+    // Control del instrumento: el patrón casa con la frase que se retiró.
+    expect(re.test("Monitorización continua de deriva (drift)")).toBe(true);
+    const ficheros = superficieAims();
+    expect(ficheros).toContain(TAB_VIGILANCIA);
+    for (const f of ficheros) {
+      const hit = sinComentarios(read(f)).match(re);
+      expect(hit, `${f}: promete una monitorización que no existe → ${hit?.[0]}`).toBeNull();
+    }
+  });
+});
+
+// F1.T9 (programa de cobertura RIA, 2026-09-19; cierra GC-10, GC-17, GC-53).
+// Tres atribuciones que el dato no sostiene: `ai_systems` no tiene
+// `entity_id`, así que la ficha de una sociedad no puede decir qué sistemas son
+// SUYOS; el grupo no es una persona jurídica, así que no puede figurar como la
+// entidad que asume la declaración del art. 47; y Q2_2 no pregunta por el
+// art. 6.1 (anexo I), sino por el 6.2 y el anexo III.
+describe("F1.T9 — atribuciones falsas fuera", () => {
+  const ENTIDAD = "src/pages/EntidadDetalle.tsx";
+  const ATRIBUCION = /Sistemas\s+(?:de\s+)?IA\s+de\s+esta\s+(?:entidad|sociedad)/i;
+
+  it("el patrón de atribución casaría con el rótulo retirado (control positivo del instrumento)", () => {
+    expect(ATRIBUCION.test("Sistemas IA de esta entidad")).toBe(true);
+    expect(ATRIBUCION.test("Sistemas de IA de esta sociedad")).toBe(true);
+    expect(ATRIBUCION.test("Sistemas de IA del grupo (sin atribución a esta sociedad)")).toBe(false);
+  });
+
+  it("la ficha de una sociedad no se atribuye los sistemas de IA del grupo", () => {
+    const src = sinComentarios(read(ENTIDAD));
+    // Control positivo: la sección sigue pintando el inventario; sin esto, una
+    // sección vaciada dejaría la ausencia de abajo verde sin mirar nada.
+    expect(src).toContain("useAiSystemsList(");
+    expect(src).toContain("allAiSystems.map(");
+    expect(src).toContain("Sistemas de IA del grupo (sin atribución a esta sociedad)");
+    expect(src.match(ATRIBUCION)?.[0] ?? null, `${ENTIDAD} vuelve a atribuir los sistemas a la sociedad`).toBeNull();
+  });
+
+  it("la declaración del art. 47 no pone al grupo como entidad y lo avisa", () => {
+    const src = sinComentarios(read(DECLARACION));
+    // Control positivo: es el modal del art. 47 que decide por la hoja.
+    expect(src).toContain("vinculaArt47(");
+    expect(src.match(/groupFullLabel|groupPortfolioLabel|tenant-brand-labels/)?.[0] ?? null,
+      "la declaración rellena la entidad con el rótulo del grupo").toBeNull();
+    // Y lo dice, en pantalla y en el borrador descargable: dos usos del aviso.
+    expect(src).toMatch(/El grupo no es una persona jur[íi]dica/);
+    expect((src.match(/\{AVISO_ENTIDAD_ART47\}|\$\{AVISO_ENTIDAD_ART47\}/g) ?? []).length,
+      "el aviso no llega a la pantalla y al borrador").toBeGreaterThanOrEqual(2);
+  });
+
+  // Decisión del controlador al integrar F1 (19-09-2026): ARGA tiene 6 sistemas
+  // «Alto» y 0 cuestionarios, y la ficha de la sociedad los pintaba en rojo.
+  // Capa de TEXTO, débil y declarada: montar la ficha arrastra una docena de
+  // hooks; lo que se vigila es que el tono crítico solo se alcance con cuestionario.
+  it("la ficha de una sociedad no pinta en rojo un nivel sin cuestionario", () => {
+    const src = sinComentarios(read(ENTIDAD));
+    // Control positivo: el tono crítico sigue existiendo para los clasificados.
+    expect(src).toContain('"critical"');
+    expect(src).toMatch(/!tieneClasificacionGuiada\(sys\)\s*\?\s*"neutral"/);
+    expect(src).toContain("nivel declarado en ficha, sin cuestionario");
+  });
+
+  it("Q2_2 se rotula por el art. 6.2 y el anexo III, no por el 6.1", async () => {
+    const { PREGUNTAS } = await import("@/lib/aims/cuestionario-calificacion");
+    const q22 = PREGUNTAS.find((p) => p.id === "Q2_2");
+    expect(q22, "Q2_2 ha desaparecido del catálogo").toBeDefined();
+    expect(q22!.articulo).toBe("Art. 6.2 y anexo III");
   });
 });

@@ -3,8 +3,8 @@ import type { AiRiskAssessment } from "@/hooks/useAiAssessments";
 import type { AiSystem } from "@/hooks/useAiSystems";
 import { AESIA_RIA_REQUIREMENTS } from "@/lib/aims/catalog-aesia";
 import { mensajeUsuario } from "@/lib/aims/errores-rpc";
-import { evaluadaContraOtroCatalogo } from "@/lib/aims/perfil-aplicabilidad";
-import { assessmentAcreditaConformidad } from "@/lib/aims/readiness";
+import { cambiosDelCatalogoDesde, evaluadaContraOtroCatalogo } from "@/lib/aims/perfil-aplicabilidad";
+import { chipClaseEvaluacion, rotuloEvaluacion } from "@/lib/aims/legado";
 import { claseNivelRiesgo, etiqueta } from "@/lib/aims/vocabulario";
 
 /**
@@ -13,8 +13,8 @@ import { claseNivelRiesgo, etiqueta } from "@/lib/aims/vocabulario";
  * `notes` va rotulado como lo que es —texto libre de quien registró la
  * evaluación— porque hay filas en Cloud cuyo `notes` afirma «cumplimiento
  * estricto de todos los artículos» y lo escribió un e2e, no una auditoría.
- * Si acredita conformidad lo decide `assessmentAcreditaConformidad`, no esta
- * pantalla.
+ * Si acredita conformidad lo decide `legado.ts` (congelada y revisada), no
+ * esta pantalla.
  */
 
 export interface TabEvaluacionesProps {
@@ -65,7 +65,7 @@ export default function TabEvaluaciones({ system, assessments, error, onNueva, o
                 <div>
                   <span className="font-mono text-xs font-bold text-[var(--g-brand-3308)]">{etiqueta("marco", ass.framework) || "Sin marco"}</span>
                   <h3 className="text-sm font-bold text-[var(--g-text-primary)] mt-0.5">
-                    Evaluación del{" "}
+                    Autodiagnóstico del{" "}
                     {ass.assessment_date ? new Date(ass.assessment_date).toLocaleDateString("es-ES") : "N/D"}
                   </h3>
                 </div>
@@ -87,19 +87,25 @@ export default function TabEvaluaciones({ system, assessments, error, onNueva, o
               <div className="pt-2 border-t border-[var(--g-border-subtle)] flex justify-between items-center text-xs">
                 <span className="flex flex-wrap items-center gap-1.5">
                   <span
-                    className={`px-2 py-0.5 font-semibold text-[11px] ${
-                      assessmentAcreditaConformidad(ass.status)
-                        ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-                        : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
-                    }`}
+                    className={`px-2 py-0.5 font-semibold text-[11px] ${chipClaseEvaluacion(ass)}`}
                     style={{ borderRadius: "var(--g-radius-full)" }}
                   >
                     {etiqueta("estadoEvaluacion", ass.status) || "Sin estado"}
                   </span>
+                  {rotuloEvaluacion(ass) && (
+                    <span className={`px-2 py-0.5 font-semibold text-[11px] ${claseNivelRiesgo(null)}`} style={{ borderRadius: "var(--g-radius-full)" }}>
+                      {rotuloEvaluacion(ass)}
+                    </span>
+                  )}
                   {/* Chip neutro de la hoja (el mismo que un nivel sin clasificar). */}
                   {evaluadaContraOtroCatalogo(ass.findings, system, AESIA_RIA_REQUIREMENTS) && (
                     <span className={`px-2 py-0.5 font-semibold text-[11px] ${claseNivelRiesgo(null)}`} style={{ borderRadius: "var(--g-radius-full)" }}>
                       Evaluada contra otro catálogo
+                    </span>
+                  )}
+                  {cambiosDelCatalogoDesde(ass.findings, ass.assessment_date ?? ass.created_at).anterior && (
+                    <span className={`px-2 py-0.5 font-semibold text-[11px] ${claseNivelRiesgo(null)}`} style={{ borderRadius: "var(--g-radius-full)" }}>
+                      Respondida con una versión anterior del catálogo
                     </span>
                   )}
                 </span>

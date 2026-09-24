@@ -33,6 +33,9 @@ export const MOTIVO_L8_SIN_JUSTIFICAR = "No aplicable declarada sin justificaci�
 /** Copy único para la medida que se declara hecha y no aporta nada detrás. */
 export const MOTIVO_L5_SIN_EVIDENCIA = "Declarada sin evidencia";
 
+/** Copy único para la fila anterior al 2026-09-07, que no midió evidencia. */
+export const MOTIVO_L5_PENDIENTE_EVIDENCIA = "Pendiente de evidencia";
+
 /**
  * ¿Esta medida acredita conformidad?
  *
@@ -49,13 +52,12 @@ export function acreditaConformidad(
         /**
          * Evidencias VIGENTES atadas a la medida.
          *
-         * `undefined` y `0` NO son lo mismo, y la diferencia importa: las filas
-         * anteriores al 2026-09-07 no midieron evidencia (no había dónde
-         * guardarla), así que `undefined` significa «no medido» y no degrada
-         * nada. Un `0` sí es una medida que se declara hecha sin nada detrás.
-         *
-         * Es la misma regla que el proyecto ya aplica a los KPI: un error de
-         * lectura se propaga como «no medido», nunca como cero.
+         * `undefined` y `0` NO son lo mismo y se dicen distinto: las filas
+         * anteriores al 2026-09-07 no midieron evidencia («pendiente de
+         * evidencia»); un `0` es una medida que se declara hecha sin nada
+         * detrás. Pero desde el 2026-09-19 (F1.T5) NINGUNO acredita: la regla
+         * anterior —«no medido no degrada»— dejaba que 40 L5 sin evidencia
+         * sostuvieran el 49 % de Harvey.
          */
         evidenceCount?: number | null;
       }
@@ -67,13 +69,19 @@ export function acreditaConformidad(
   if (nivel === NIVEL_NO_APLICABLE) {
     return Boolean(finding?.justification && finding.justification.trim().length > 0);
   }
-  // `L5` = «documentada e implementada». Sin nada detrás es una
-  // autodeclaración, y un porcentaje construido con autodeclaraciones no vale
-  // para auditoría interna ni para certificación.
-  if (typeof finding?.evidenceCount === "number" && finding.evidenceCount <= 0) {
-    return false;
-  }
-  return true;
+  // `L5` = «documentada e implementada». Sin nada detrás —o sin haberlo
+  // medido— es una autodeclaración, y un porcentaje construido con
+  // autodeclaraciones no vale para auditoría interna ni para certificación.
+  return typeof finding?.evidenceCount === "number" && finding.evidenceCount > 0;
+}
+
+/** L5 sin recuento de evidencia (filas anteriores al 2026-09-07): el indicador las cuenta aparte. */
+export function pendientesDeEvidencia(
+  findings: { status?: string | null; evidenceCount?: number | null }[] | null | undefined,
+): number {
+  return (findings ?? []).filter(
+    (f) => (f.status ?? "").trim().toUpperCase() === "L5" && typeof f.evidenceCount !== "number",
+  ).length;
 }
 
 /** Por qué una medida de nivel conforme no acredita. `null` si acredita. */
@@ -83,5 +91,6 @@ export function motivoNoAcredita(
   const nivel = (finding?.status ?? "").trim().toUpperCase();
   if (!NIVELES_CONFORMES.has(nivel)) return null;
   if (acreditaConformidad(finding)) return null;
-  return nivel === NIVEL_NO_APLICABLE ? MOTIVO_L8_SIN_JUSTIFICAR : MOTIVO_L5_SIN_EVIDENCIA;
+  if (nivel === NIVEL_NO_APLICABLE) return MOTIVO_L8_SIN_JUSTIFICAR;
+  return typeof finding?.evidenceCount === "number" ? MOTIVO_L5_SIN_EVIDENCIA : MOTIVO_L5_PENDIENTE_EVIDENCIA;
 }

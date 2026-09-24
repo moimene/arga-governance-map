@@ -13,9 +13,12 @@ import { useAuth } from "@/context/AuthContext";
 import {
   AVISO_COBERTURA_PROVISIONAL,
   AVISO_ISO_NO_ES_OBLIGACION,
+  type CambiosDelCatalogo,
 } from "@/lib/aims/perfil-aplicabilidad";
 import { ETIQUETA_ROL, type RolRegulatorio } from "@/lib/aims/rol-regulatorio";
-import { chipClaseEstadoEvaluacion, etiqueta, normalizeAimsStatus } from "@/lib/aims/vocabulario";
+import { etiqueta, normalizeAimsStatus } from "@/lib/aims/vocabulario";
+import { chipClaseEvaluacion, rotuloEvaluacion } from "@/lib/aims/legado";
+import { pendientesDeEvidencia } from "@/lib/aims/conformidad";
 import type { AiRiskAssessment } from "@/hooks/useAiAssessments";
 
 export interface CabeceraInformeProps {
@@ -27,6 +30,8 @@ export interface CabeceraInformeProps {
   catalogoDeDespliegue: boolean;
   /** Resuelto en la página con `evaluadaContraOtroCatalogo`: el sistema se reclasificó después. */
   anteriorAClasificacion: boolean;
+  /** Resuelto en la página con `cambiosDelCatalogoDesde`: respondida con otra versión del catálogo. */
+  cambiosCatalogo: CambiosDelCatalogo;
   onExportJson: () => void;
   onPrint: () => void;
   onCongelar: () => void;
@@ -41,6 +46,7 @@ export default function CabeceraInforme({
   isIso,
   catalogoDeDespliegue,
   anteriorAClasificacion,
+  cambiosCatalogo,
   onExportJson,
   onPrint,
   onCongelar,
@@ -110,7 +116,7 @@ export default function CabeceraInforme({
               </span>
             </div>
             <h1 className="text-2xl font-bold text-[var(--g-text-primary)]">
-              Informe de Autodiagnóstico de Conformidad
+              Informe de autodiagnóstico de madurez
             </h1>
             <p className="text-sm text-[var(--g-text-secondary)]">
               Sistema Evaluado:{" "}
@@ -138,13 +144,22 @@ export default function CabeceraInforme({
                   : `${assessment.score}%`}
               </span>
               <span
-                className={`px-2.5 py-1 text-xs font-semibold uppercase tracking-wider ${chipClaseEstadoEvaluacion(assessment.status)}`}
+                className={`px-2.5 py-1 text-xs font-semibold uppercase tracking-wider ${chipClaseEvaluacion(assessment)}`}
                 style={{ borderRadius: "var(--g-radius-full)" }}
               >
                 {etiqueta("estadoEvaluacion", assessment.status)}
               </span>
             </div>
             <span className="text-xs text-[var(--g-text-secondary)]">Madurez Global del Sistema</span>
+            {rotuloEvaluacion(assessment) && (
+              <span className="text-xs font-semibold text-[var(--g-text-primary)]">{rotuloEvaluacion(assessment)}</span>
+            )}
+            {/* Aparte: las L5 de filas que no midieron evidencia ya no acreditan (F1.T5), pero el porcentaje guardado sí las contó. */}
+            {pendientesDeEvidencia(assessment.findings) > 0 && (
+              <span className="max-w-xs text-right text-xs text-[var(--g-text-secondary)]">
+                {pendientesDeEvidencia(assessment.findings)} medidas en L5 pendientes de evidencia: no acreditan, aunque el porcentaje guardado las contó.
+              </span>
+            )}
           </div>
         </div>
 
@@ -271,7 +286,7 @@ export default function CabeceraInforme({
           <p className="text-xs font-bold text-[var(--g-text-primary)]">Evaluación anterior a la clasificación vigente</p>
           <p className="text-xs text-[var(--g-text-secondary)]">
             Se midió contra el catálogo del{" "}
-            {catalogoDeDespliegue ? "responsable del despliegue" : "proveedor de alto riesgo (84 medidas)"}; el
+            {catalogoDeDespliegue ? "responsable del despliegue" : "proveedor de alto riesgo"}; el
             sistema está clasificado hoy como {(rol && ETIQUETA_ROL[rol as RolRegulatorio]) || rol || "sin rol"} ·{" "}
             {etiqueta("nivel", assessment.ai_systems?.risk_level) || "sin nivel"}. El porcentaje no se recalcula.{" "}
             {assessment.system_id && (
@@ -280,6 +295,35 @@ export default function CabeceraInforme({
                 className="font-semibold text-[var(--g-link)] hover:text-[var(--g-link-hover)] underline"
               >
                 Reevaluar contra su catálogo.
+              </Link>
+            )}
+          </p>
+        </div>
+      )}
+
+      {cambiosCatalogo.anterior && (
+        <div
+          className="p-4 bg-[var(--g-surface-subtle)] border-l-4 border-[var(--status-warning)] space-y-1"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <p className="text-xs font-bold text-[var(--g-text-primary)]">Respondida con una versión anterior del catálogo</p>
+          <p className="text-xs text-[var(--g-text-secondary)]">
+            Desde que se respondió{" "}
+            {[
+              cambiosCatalogo.corregidas.length > 0 &&
+                `han cambiado de texto ${cambiosCatalogo.corregidas.length} ${cambiosCatalogo.corregidas.length === 1 ? "medida respondida, marcada en el desglose" : "medidas respondidas, marcadas en el desglose"}`,
+              cambiosCatalogo.nuevas.length > 0 &&
+                `han entrado ${cambiosCatalogo.nuevas.length} ${cambiosCatalogo.nuevas.length === 1 ? "medida nueva, que aparece" : "medidas nuevas, que aparecen"} sin evaluar`,
+            ]
+              .filter(Boolean)
+              .join(" y ")}
+            . Las respuestas se dieron a la versión anterior y el porcentaje no se recalcula.{" "}
+            {assessment.system_id && (
+              <Link
+                to={`/ai-governance/evaluaciones/nuevo?system_id=${assessment.system_id}`}
+                className="font-semibold text-[var(--g-link)] hover:text-[var(--g-link-hover)] underline"
+              >
+                Reevaluar con el catálogo vigente.
               </Link>
             )}
           </p>
@@ -296,7 +340,7 @@ export default function CabeceraInforme({
           </p>
           <p className="text-xs text-[var(--g-text-secondary)]">
             Este autodiagnóstico se ha medido contra el catálogo del responsable del despliegue, no
-            contra las 84 medidas del proveedor de un sistema de alto riesgo. {AVISO_ISO_NO_ES_OBLIGACION}
+            contra el catálogo del proveedor de un sistema de alto riesgo. {AVISO_ISO_NO_ES_OBLIGACION}
           </p>
         </div>
       )}

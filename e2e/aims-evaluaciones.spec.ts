@@ -87,12 +87,12 @@ for (const entorno of ['arga', 'garrigues'] as const) {
     test('el listado enlaza al alta y el alta llega al paso de medidas sin escribir', async ({ page }) => {
       await page.goto('/ai-governance/evaluaciones');
       await expect(page).not.toHaveURL(/\/login/);
-      await expect(page.getByRole('heading', { name: 'Evaluaciones de riesgo IA' })).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole('heading', { name: 'Autodiagnóstico de madurez' })).toBeVisible({ timeout: 15_000 });
 
       await page.getByRole('button', { name: 'Nueva evaluación' }).click();
       await expect(page).toHaveURL(/\/ai-governance\/evaluaciones\/nuevo$/);
       await expect(
-        page.getByRole('heading', { name: /Nuevo Autodiagnóstico de Conformidad/i }),
+        page.getByRole('heading', { name: /Nuevo autodiagnóstico de madurez/i }),
       ).toBeVisible({ timeout: 10_000 });
       await expect(page.getByText('1. Parámetros del Autodiagnóstico')).toBeVisible();
 
@@ -128,7 +128,7 @@ for (const entorno of ['arga', 'garrigues'] as const) {
       await page.goto('/ai-governance/evaluaciones/nuevo');
       await expect(page).not.toHaveURL(/\/login/);
       await expect(
-        page.getByRole('heading', { name: /Nuevo Autodiagnóstico de Conformidad/i }),
+        page.getByRole('heading', { name: /Nuevo autodiagnóstico de madurez/i }),
       ).toBeVisible({ timeout: 15_000 });
 
       // El botón de guardar decía «Guardar y Precintar Autodiagnóstico» sobre dos

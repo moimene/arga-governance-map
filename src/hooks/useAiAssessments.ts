@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient, skipToken } from "@tanstack/reac
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { checksVigentes } from "@/lib/aims/checks-vigentes";
+import { checksDeLaEvaluacion, type EvaluationCheck } from "@/lib/aims/evaluacion-payload";
 
 export type AiRiskAssessment = {
   id: string;
@@ -38,6 +39,8 @@ export type AiRiskAssessment = {
   frozen_by_id?: string | null;
   reviewed_at?: string | null;
   reviewed_by_id?: string | null;
+  /** Cuestionario contra el que se midió (M01). Todavía no lo escribe ninguna pantalla. */
+  questionnaire_id?: string | null;
 };
 
 export type AiComplianceCheck = {
@@ -49,8 +52,13 @@ export type AiComplianceCheck = {
   status: string;
   evidence_url: string | null;
   checked_at: string | null;
+  /** Persona que la registró: la pone el servidor desde el perfil de la sesión (E-01). */
   checked_by_id: string | null;
   created_at: string;
+  /** Autodiagnóstico del que sale (M01). `null` en las legacy: no acreditan. */
+  assessment_id: string | null;
+  /** La evaluación embebida, para que `checksVigentes` no deje a un borrador tapar lo revisado. */
+  evaluacion?: { status: string | null; reviewed_at: string | null } | null;
 };
 
 // El guard del tenant va en la queryFn (`skipToken`), no en `enabled`: TanStack
@@ -124,9 +132,10 @@ export function useComplianceChecksBySystem(systemId: string | undefined) {
   return useQuery({
     queryKey: ["ai_compliance_checks", tenantId, systemId],
     queryFn: tenantId && systemId ? async () => {
+      // La evaluación embebida: sin ella `checksVigentes` no distingue un borrador.
       const { data, error } = await supabase
         .from("ai_compliance_checks")
-        .select("*, ai_systems!inner(tenant_id)")
+        .select("*, ai_systems!inner(tenant_id), evaluacion:ai_risk_assessments!assessment_id(status, reviewed_at)")
         .eq("ai_systems.tenant_id", tenantId!)
         .eq("system_id", systemId)
         .order("created_at", { ascending: true });
@@ -144,9 +153,10 @@ export function useAllComplianceChecks() {
   return useQuery({
     queryKey: ["ai_compliance_checks", tenantId, "all"],
     queryFn: tenantId ? async () => {
+      // La evaluación embebida: sin ella `checksVigentes` no distingue un borrador.
       const { data, error } = await supabase
         .from("ai_compliance_checks")
-        .select("*, ai_systems!inner(tenant_id)")
+        .select("*, ai_systems!inner(tenant_id), evaluacion:ai_risk_assessments!assessment_id(status, reviewed_at)")
         .eq("ai_systems.tenant_id", tenantId!)
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -318,20 +328,16 @@ export function useReviewAssessment() {
 export function useCreateComplianceChecks() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: Partial<AiComplianceCheck>[]) => {
+    // Las comprobaciones de UNA evaluación: la hoja les pone sistema y
+    // evaluación, y la autoría la pone el servidor (M01, E-01).
+    mutationFn: async ({ systemId, assessmentId, checks }: { systemId: string; assessmentId: string; checks: EvaluationCheck[] }) => {
       const { data, error } = await supabase
         .from("ai_compliance_checks")
-        .insert(payload)
+        .insert(checksDeLaEvaluacion(checks, systemId, assessmentId))
         .select();
       if (error) throw error;
       return data as AiComplianceCheck[];
     },
-    onSuccess: (_, variables) => {
-      qc.invalidateQueries({ queryKey: ["ai_compliance_checks"] });
-      const systemId = variables[0]?.system_id;
-      if (systemId) {
-        qc.invalidateQueries({ queryKey: ["ai_compliance_checks", systemId] });
-      }
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ai_compliance_checks"] }),
   });
 }

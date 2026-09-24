@@ -1,0 +1,17 @@
+{
+  "consola": "https://eu.app.harvey.ai (Chrome, instancia UE; app.harvey.ai responde sin acceso)",
+  "peticiones": [
+    {
+      "id": "H-01",
+      "tema": "17 criterios de aplicabilidad, correcciones a la matriz del experto y calendario del Ómnibus",
+      "prompt": "docs/legal/harvey/2026-09-19-H-01-prompt.md",
+      "hilo": "https://eu.app.harvey.ai/assistant/assist/453044984",
+      "fuentes": "Unión Europea",
+      "enviada": "2026-09-19",
+      "estado": "RESPONDIDA",
+      "respuesta": "docs/legal/harvey/2026-09-19-H-01-respuesta.md",
+      "respondida": "2026-09-19",
+      "resultado": "16 CORRECTO + 1 CON MATIZ útil (C2). El matiz de C15 (art. 73.4) no se sostiene en el literal: C15 queda CORRECTO. 8 consideraciones adicionales incorporables."
+    }
+  ]
+}

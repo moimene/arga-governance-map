@@ -20,6 +20,7 @@ import {
 import { usePoliciesList } from "@/hooks/usePoliciesObligations";
 import { Brain, ChevronRight, ClipboardList, Compass, Download, Edit3, ExternalLink, Network } from "lucide-react";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
+import { tieneClasificacionGuiada } from "@/lib/aims/cuestionario-calificacion";
 
 const matTone = (m: string): "critical" | "warning" | "info" | "neutral" => {
   const l = formatMateriality(m);
@@ -296,13 +297,18 @@ export default function EntidadDetalle() {
 
         <TabsContent value="ai" className="mt-4">
           <Card className="p-6">
-            <div className="mb-4 flex items-center gap-2">
+            <div className="mb-2 flex items-center gap-2">
               <Brain className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold text-foreground">Sistemas IA de esta entidad</h3>
+              {/* `ai_systems` no tiene `entity_id`: la lista es el inventario
+                  entero del tenant y no se atribuye a esta sociedad (F1.T9). */}
+              <h3 className="text-sm font-semibold text-foreground">Sistemas de IA del grupo (sin atribución a esta sociedad)</h3>
               <Link to="/ai-governance/sistemas" className="ml-auto text-xs text-primary hover:underline flex items-center gap-1">
                 <ExternalLink className="h-3 w-3" />Ver inventario completo
               </Link>
             </div>
+            <p className="mb-4 text-xs text-muted-foreground">
+              El inventario todavía no registra qué sociedad es proveedora o responsable del despliegue de cada sistema.
+            </p>
             {allAiSystems.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <Brain className="h-8 w-8 text-muted-foreground mb-2" />
@@ -329,17 +335,23 @@ export default function EntidadDetalle() {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{sys.system_type ?? "—"}</TableCell>
                       <TableCell>
+                        {/* Sin cuestionario, el nivel es el declarado en ficha y no se
+                            pinta como riesgo medido: neutro, como en el inventario. */}
                         {sys.risk_level && (
-                          <StatusBadge
-                            label={sys.risk_level}
-                            tone={
-                              sys.risk_level === "Alto" || sys.risk_level === "Inaceptable"
-                                ? "critical"
-                                : sys.risk_level === "Limitado"
-                                ? "warning"
-                                : "active"
-                            }
-                          />
+                          <span title={tieneClasificacionGuiada(sys) ? undefined : "nivel declarado en ficha, sin cuestionario"}>
+                            <StatusBadge
+                              label={sys.risk_level}
+                              tone={
+                                !tieneClasificacionGuiada(sys)
+                                  ? "neutral"
+                                  : sys.risk_level === "Alto" || sys.risk_level === "Inaceptable"
+                                  ? "critical"
+                                  : sys.risk_level === "Limitado"
+                                  ? "warning"
+                                  : "active"
+                              }
+                            />
+                          </span>
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{sys.vendor ?? "—"}</TableCell>

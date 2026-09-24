@@ -83,6 +83,37 @@ export const ETIQUETA_ESTADO_SECCION: Record<EstadoSeccion, string> = {
   SEALED: "Cerrada",
 };
 
+/**
+ * «Conforme» (APPROVED) y «Cerrada» (SEALED) afirman un juicio que exige un
+ * revisor, y la aplicación no tiene camino de revisión de secciones: el cliente
+ * no los asigna. Se siguen LEYENDO (hay filas sembradas así), pero ni se ofrecen
+ * en el selector ni se escriben. Los estados de trabajo sí.
+ */
+export const ESTADOS_SECCION_CON_REVISOR = ["APPROVED", "SEALED"] as const;
+// Literal y no derivado de ESTADOS_SECCION: ninguna superficie recorre la lista
+// completa (lo vigila no-fabricated-claims). Que las dos particiones cubran
+// exactamente ESTADOS_SECCION lo prueba expediente-tecnico.test.ts.
+export const ESTADOS_SECCION_EDITABLES = ["PENDING", "IN_REVIEW", "NON_CONFORMING"] as const;
+
+/** ¿Puede el cliente escribir este estado? Solo los de trabajo; lo desconocido, no. */
+export function esEstadoSeccionEditable(status: string | null | undefined): boolean {
+  return (ESTADOS_SECCION_EDITABLES as readonly string[]).includes(normalizarEstadoSeccion(status));
+}
+
+/** ¿Afirma este estado una revisión? Solo entonces se lee `reviewed_at` como «Revisada». */
+export function esEstadoSeccionConRevisor(status: string | null | undefined): boolean {
+  return (ESTADOS_SECCION_CON_REVISOR as readonly string[]).includes(normalizarEstadoSeccion(status));
+}
+
+/**
+ * Una sección cerrada no se reabre desde la aplicación: el guard de escritura
+ * mira el estado de DESTINO, así que editarla la devolvería a un estado de
+ * trabajo. La inmutabilidad en servidor llega con F9.T2 (M19).
+ */
+export function esSeccionCerrada(status: string | null | undefined): boolean {
+  return normalizarEstadoSeccion(status) === "SEALED";
+}
+
 export function etiquetaEstadoSeccion(status: string | null | undefined): string {
   const n = normalizarEstadoSeccion(status);
   return (ETIQUETA_ESTADO_SECCION as Record<string, string>)[n] ?? (status ?? "Sin estado");

@@ -32,8 +32,14 @@
  * valide, la pantalla lo declara provisional.
  */
 
-import type { RequirementDef } from "./catalog-aesia";
-import { ROLES_DE_DESPLIEGUE, perfilCatalogo, tieneClasificacionGuiada, type PerfilCatalogo } from "./cuestionario-calificacion";
+import { AESIA_RIA_REQUIREMENTS, ISO_42001_REQUIREMENTS, VERSION_CATALOGO_RIA, type RequirementDef } from "./catalog-aesia";
+import {
+  ROLES_DE_DESPLIEGUE,
+  ROTULO_PROVISIONAL,
+  perfilCatalogo,
+  tieneClasificacionGuiada,
+  type PerfilCatalogo,
+} from "./cuestionario-calificacion";
 
 export type FuenteMedida = "RIA" | "RGPD" | "ISO_42001" | "DEONTOLOGIA";
 export type CaracterMedida = "OBLIGACION" | "MARCO_OPERATIVO";
@@ -43,6 +49,8 @@ export type ProcedenciaMedida = {
   fuente: FuenteMedida;
   caracter: CaracterMedida;
   norma: string;
+  /** Presente mientras el carácter espera veredicto (hoy, H-02A). */
+  provisional?: string;
 };
 
 export const AVISO_COBERTURA_PROVISIONAL =
@@ -54,10 +62,11 @@ export const AVISO_SIN_ROL =
 export const AVISO_ISO_NO_ES_OBLIGACION =
   "Los controles de ISO/IEC 42001 se presentan como marco operativo de madurez y documentación, no como obligaciones jurídicas autónomas.";
 
-const p = (fuente: FuenteMedida, caracter: CaracterMedida, norma: string): ProcedenciaMedida => ({
+const p = (fuente: FuenteMedida, caracter: CaracterMedida, norma: string, provisional?: string): ProcedenciaMedida => ({
   fuente,
   caracter,
   norma,
+  provisional,
 });
 
 /**
@@ -75,8 +84,15 @@ export const PROCEDENCIA_DESPLIEGUE: Record<string, ProcedenciaMedida> = {
   MD_ALF_04: p("RIA", "OBLIGACION", "Art. 4"),
   MD_ALF_05: p("ISO_42001", "MARCO_OPERATIVO", "ISO/IEC 42001, anexo A"),
 
-  MD_TRA_01: p("RIA", "OBLIGACION", "Art. 50.1"),
+  // F1.T11: el art. 50.1 obliga al PROVEEDOR; para el responsable del
+  // despliegue el aviso es marco operativo. Provisional hasta H-02A: si el
+  // veredicto es INCORRECTO vuelve a p("RIA", "OBLIGACION", "Art. 50.1").
+  MD_TRA_01: p("RIA", "MARCO_OPERATIVO", "Art. 50.1 (obliga al proveedor)", ROTULO_PROVISIONAL),
   MD_TRA_02: p("RIA", "OBLIGACION", "Art. 50.4"),
+  // H-02A (P5): el 50.3 es la única obligación del art. 50 que el RIA pone
+  // directamente sobre el responsable del despliegue además del 50.4, y faltaba.
+  // Es condicional al tipo de sistema; el carácter no lo es: cuando aplica, obliga.
+  MD_TRA_06: p("RIA", "OBLIGACION", "Art. 50.3"),
   MD_TRA_03: p("DEONTOLOGIA", "MARCO_OPERATIVO", "Deontología profesional"),
   MD_TRA_04: p("DEONTOLOGIA", "MARCO_OPERATIVO", "Deontología profesional"),
   MD_TRA_05: p("DEONTOLOGIA", "MARCO_OPERATIVO", "Deontología profesional"),
@@ -88,12 +104,17 @@ export const PROCEDENCIA_DESPLIEGUE: Record<string, ProcedenciaMedida> = {
   MD_PD_05: p("RGPD", "OBLIGACION", "Art. 30 RGPD"),
   MD_PD_06: p("RGPD", "OBLIGACION", "Arts. 13 y 14 RGPD"),
 
-  MD_CS_01: p("RIA", "OBLIGACION", "Cap. V"),
-  MD_CS_02: p("RIA", "OBLIGACION", "Cap. V y anexo XII"),
+  // F1.T11: el cap. V y el anexo XII obligan al proveedor del MODELO, y el
+  // art. 25.1 califica al sujeto sin imponerle un deber de vigilancia. Marco
+  // operativo provisional hasta H-02A; con INCORRECTO vuelven a OBLIGACION con
+  // su norma de antes («Cap. V», «Cap. V y anexo XII», «Art. 25.1»).
+  MD_CS_01: p("RIA", "MARCO_OPERATIVO", "Cap. V (obliga al proveedor del modelo)", ROTULO_PROVISIONAL),
+  MD_CS_02: p("RIA", "MARCO_OPERATIVO", "Cap. V y anexo XII (obligan al proveedor del modelo)", ROTULO_PROVISIONAL),
   MD_CS_03: p("DEONTOLOGIA", "MARCO_OPERATIVO", "Gestión de proveedor"),
   MD_CS_04: p("DEONTOLOGIA", "MARCO_OPERATIVO", "Gestión de proveedor"),
-  // Art. 25.1: es la vigilancia que impide convertirse en proveedor sin saberlo.
-  MD_CS_05: p("RIA", "OBLIGACION", "Art. 25.1"),
+  // Vigilar las tres circunstancias del art. 25.1 evita convertirse en
+  // proveedor sin saberlo: buena práctica, no deber del artículo.
+  MD_CS_05: p("RIA", "MARCO_OPERATIVO", "Art. 25.1 (califica al sujeto)", ROTULO_PROVISIONAL),
   MD_CS_06: p("DEONTOLOGIA", "MARCO_OPERATIVO", "Gestión de proveedor"),
   MD_CS_07: p("DEONTOLOGIA", "MARCO_OPERATIVO", "Gestión de proveedor"),
 
@@ -136,7 +157,7 @@ export const DESPLIEGUE_REQUIREMENTS: RequirementDef[] = [
     title: "Alfabetización en materia de IA",
     articleRef: "Art. 4",
     description:
-      "Garantizar un nivel suficiente de alfabetización en IA del personal que usa el sistema, teniendo en cuenta sus conocimientos técnicos, su experiencia, su formación, el contexto de uso y las personas sobre las que se usa. Vincula a proveedores y a responsables del despliegue de CUALQUIER nivel de riesgo.",
+      "Adoptar medidas para apoyar la promoción de la alfabetización en materia de IA del personal y demás personas que se encargan del funcionamiento y la utilización del sistema, teniendo en cuenta sus conocimientos técnicos, su experiencia, su formación, el contexto de uso y las personas sobre las que se usa (art. 4 en la redacción del Reglamento (UE) 2026/1744). Es una obligación de medios: no exige garantizar un nivel específico y se acredita con las medidas adoptadas (formación, instrucciones, política de uso). Vincula a proveedores y a responsables del despliegue de CUALQUIER nivel de riesgo.",
     subparts: [
       { subpartId: "ALF.PROGRAMA", articleNumber: "Art. 4", titleShort: "Programa de formación", orderIndex: 1 },
       { subpartId: "ALF.CONTEXTO", articleNumber: "Art. 4", titleShort: "Adecuación al perfil y al contexto", orderIndex: 2 },
@@ -154,15 +175,17 @@ export const DESPLIEGUE_REQUIREMENTS: RequirementDef[] = [
     title: "Transparencia frente a las personas",
     articleRef: "Art. 50",
     description:
-      "Obligaciones de transparencia de determinados sistemas de IA: informar de que se interactúa con una IA y marcar el contenido generado o manipulado artificialmente.",
+      "Obligaciones de transparencia del art. 50. El proveedor diseña el sistema para que se informe de que se interactúa con una IA (50.1) y marca el contenido sintético (50.2); al responsable del despliegue le obligan dos apartados: informar a las personas expuestas a un sistema de reconocimiento de emociones o de categorización biométrica (50.3, condicional al tipo de sistema) y divulgar que el contenido que publica se ha generado o manipulado de manera artificial (50.4).",
     subparts: [
       { subpartId: "TRA.INTERACCION", articleNumber: "Art. 50.1", titleShort: "Interacción con personas físicas", orderIndex: 1 },
-      { subpartId: "TRA.CONTENIDO", articleNumber: "Art. 50.4", titleShort: "Marcado del contenido generado", orderIndex: 2 },
-      { subpartId: "TRA.CLIENTE", articleNumber: "Deontología", titleShort: "Información al cliente y revisión humana", orderIndex: 3 },
+      { subpartId: "TRA.CONTENIDO", articleNumber: "Art. 50.4", titleShort: "Divulgación del contenido generado", orderIndex: 2 },
+      { subpartId: "TRA.EMOCIONES", articleNumber: "Art. 50.3", titleShort: "Reconocimiento de emociones y categorización biométrica", orderIndex: 3 },
+      { subpartId: "TRA.CLIENTE", articleNumber: "Deontología", titleShort: "Información al cliente y revisión humana", orderIndex: 4 },
     ],
     measures: [
       { id: "MD_TRA_01", code: "MD_TRA_01", description: "Aviso de interacción con un sistema de IA en las superficies en que atiende a personas físicas", subpartId: "TRA.INTERACCION" },
-      { id: "MD_TRA_02", code: "MD_TRA_02", description: "Marcado del contenido generado o manipulado que se publique para informar al público sobre asuntos de interés público", subpartId: "TRA.CONTENIDO" },
+      { id: "MD_TRA_02", code: "MD_TRA_02", description: "Divulgación de que el contenido que se publique para informar al público sobre asuntos de interés público se ha generado o manipulado de manera artificial", subpartId: "TRA.CONTENIDO" },
+      { id: "MD_TRA_06", code: "MD_TRA_06", description: "Condicional: SOLO si el sistema es de reconocimiento de emociones o de categorización biométrica. Informar del funcionamiento del sistema a las personas expuestas a él, y tratar sus datos conforme al RGPD. Si el sistema no lo es, la medida no aplica: márquela como no aplicable y diga por qué", subpartId: "TRA.EMOCIONES" },
       { id: "MD_TRA_03", code: "MD_TRA_03", description: "Información al cliente sobre el uso de IA generativa en el servicio prestado", subpartId: "TRA.CLIENTE" },
       { id: "MD_TRA_04", code: "MD_TRA_04", description: "Revisión humana acreditada antes de cualquier entrega, con constancia de quién revisa", subpartId: "TRA.CLIENTE" },
       { id: "MD_TRA_05", code: "MD_TRA_05", description: "Criterio interno de cuándo la asistencia por IA debe declararse en el propio entregable", subpartId: "TRA.CLIENTE" },
@@ -338,12 +361,27 @@ export function perfilAplicable(
     };
   }
 
+  // Importador y distribuidor (arts. 23 y 24) no tienen catálogo propio (DA-1)
+  // y el art. 4 no les vincula: el del responsable del despliegue les mediría
+  // la alfabetización como obligación suya. Falla abierto al completo.
+  if (rol !== "RESPONSABLE_DESPLIEGUE" && ROLES_DE_DESPLIEGUE.has(rol)) {
+    return {
+      requirements: catalogoProveedor,
+      etiqueta: "Proveedor de sistema de alto riesgo",
+      motivo:
+        "Importador o distribuidor: no hay catálogo validado para este rol (arts. 23 y 24), así que se mide contra el catálogo completo del proveedor y se dice.",
+      provisional: false,
+      sinRolDeclarado: false,
+      catalogProfile: perfilCatalogo(rol, nivel),
+    };
+  }
+
   if (ROLES_DE_DESPLIEGUE.has(rol)) {
     return {
       requirements: DESPLIEGUE_REQUIREMENTS,
       etiqueta: `Responsable del despliegue · riesgo ${nivel.toLowerCase()}`,
       motivo:
-        "Las 84 medidas guía desarrollan las obligaciones del PROVEEDOR de un sistema de alto riesgo (arts. 9 a 15, 17, 72 y 73). Este perfil se mide contra las que sí vinculan a esta posición regulatoria.",
+        "Las medidas guía del catálogo del proveedor desarrollan las obligaciones del PROVEEDOR de un sistema de alto riesgo (arts. 9 a 15, 17, 72 y 73). Este perfil se mide contra las que sí vinculan a esta posición regulatoria.",
       provisional: true,
       sinRolDeclarado: false,
       catalogProfile: perfilCatalogo(rol, nivel),
@@ -363,9 +401,22 @@ export function perfilAplicable(
   };
 }
 
-/** Procedencia de una medida, si el perfil la declara. */
+/**
+ * Procedencia de las medidas de ISO/IEC 42001, derivada del carácter que declara
+ * cada requisito del catálogo (siempre MARCO_OPERATIVO) y de su número.
+ */
+const PROCEDENCIA_ISO: Record<string, ProcedenciaMedida> = Object.fromEntries(
+  ISO_42001_REQUIREMENTS.filter((r) => r.caracter).flatMap((r) =>
+    r.measures.map((m) => {
+      const bloque = r.subparts.find((s) => s.subpartId === m.subpartId);
+      return [m.id, p("ISO_42001", r.caracter, `ISO/IEC 42001, ${bloque?.articleNumber ?? r.articleRef}`)] as const;
+    }),
+  ),
+);
+
+/** Procedencia de una medida, si el perfil o el catálogo ISO la declaran. */
 export function procedenciaDe(measureId: string): ProcedenciaMedida | null {
-  return PROCEDENCIA_DESPLIEGUE[measureId] ?? null;
+  return PROCEDENCIA_DESPLIEGUE[measureId] ?? PROCEDENCIA_ISO[measureId] ?? null;
 }
 
 /**
@@ -375,7 +426,7 @@ export function procedenciaDe(measureId: string): ProcedenciaMedida | null {
  * Desde que hay perfil por rol, dos evaluaciones con `framework = EU_AI_ACT`
  * pueden venir de catálogos distintos, y pintar la de un responsable del
  * despliegue contra las 84 medidas del proveedor mostraría 84 «Pendiente» y
- * ninguna de las 43 respondidas.
+ * ninguna de las 44 respondidas.
  *
  * Se resuelve por el DATO —qué códigos reconcilia cada candidato— y no por una
  * columna que no lo dice. Empate o cero coincidencias: el primero, que es el
@@ -430,4 +481,57 @@ export function evaluadaContraOtroCatalogo(
   // ISO 42001) no hay evaluación RIA que comparar: no se afirma nada.
   if (!evaluado.some((r) => r.measures.some((m) => codigos.has(m.id)))) return false;
   return evaluado !== perfilAplicable(sistema, catalogoProveedor).requirements;
+}
+
+export type CambiosDelCatalogo = {
+  /** La evaluación respondió al menos una medida con un texto que ya no es el vigente. */
+  anterior: boolean;
+  /** Medidas respondidas cuyo texto ha cambiado desde entonces. */
+  corregidas: string[];
+  /** Medidas que entraron en la versión vigente y la evaluación no respondió. */
+  nuevas: string[];
+};
+
+const SIN_CAMBIOS: CambiosDelCatalogo = { anterior: false, corregidas: [], nuevas: [] };
+
+/**
+ * ¿Se respondió esta evaluación con una versión anterior del catálogo?
+ *
+ * La fila no guarda la versión (la columna `catalog_version` llega con F2.T3).
+ * Dos señales la delatan:
+ *  - cada finding guarda el texto de la medida tal como se preguntó (`title`):
+ *    si ya no coincide con el vigente, la respuesta se dio a otra formulación;
+ *  - con la fecha de la evaluación, las medidas cuya versión de entrada
+ *    (`desde`) es posterior entraron después: la evaluación es anterior aunque
+ *    ningún texto respondido haya cambiado.
+ * En los dos casos la pantalla debe decirlo en vez de pintar la respuesta vieja
+ * bajo el texto nuevo, o las medidas nuevas como si faltaran por descuido.
+ *
+ * Sin ningún código de los catálogos (el legado `VAL-*`/`ISO-05` de ARGA) no se
+ * afirma nada; sin fecha, sólo afirma la señal del texto.
+ */
+export function cambiosDelCatalogoDesde(
+  findings: { code?: string | null; title?: string | null }[] | null | undefined,
+  fecha?: string | null,
+): CambiosDelCatalogo {
+  const lista = findings ?? [];
+  if (lista.length === 0) return SIN_CAMBIOS;
+  const catalogo = catalogoDeLosFindings(lista, [AESIA_RIA_REQUIREMENTS, DESPLIEGUE_REQUIREMENTS, ISO_42001_REQUIREMENTS]);
+  const medidas = catalogo.flatMap((r) => r.measures);
+  const vigente = new Map(medidas.map((m) => [m.id, m.description.trim()]));
+  // `catalogoDeLosFindings` devuelve el primero si no hay ningún acierto.
+  if (!lista.some((f) => f.code && vigente.has(f.code))) return SIN_CAMBIOS;
+  const corregidas = lista
+    .filter((f) => f.code && vigente.has(f.code) && typeof f.title === "string" && f.title.trim() !== "")
+    .filter((f) => f.title.trim() !== vigente.get(f.code))
+    .map((f) => f.code as string);
+  const dia = fecha ? fecha.slice(0, 10) : null;
+  const respondidas = new Set(lista.map((f) => f.code));
+  // ponytail: sin fecha, «nuevas» son las de la versión vigente; con varias
+  // subidas hará falta `catalog_version` (F2.T3) para acotarlas sin fecha.
+  const nuevas = medidas
+    .filter((m) => m.desde && !respondidas.has(m.id) && (dia ? dia < m.desde : m.desde === VERSION_CATALOGO_RIA))
+    .map((m) => m.id);
+  if (corregidas.length === 0 && !(dia && nuevas.length > 0)) return SIN_CAMBIOS;
+  return { anterior: true, corregidas, nuevas };
 }

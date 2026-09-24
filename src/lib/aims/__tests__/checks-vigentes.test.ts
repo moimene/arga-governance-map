@@ -34,7 +34,9 @@ describe("de cada requisito manda la comprobación más reciente", () => {
 
   it("gana la última escrita, no la primera", () => {
     const vigentes = checksVigentes([
-      fila("R1", "2026-05-21T10:00:00Z", "NO_CONFORME"),
+      // PARCIAL y no NO_CONFORME: una no conformidad sin acreditar no la
+      // desplaza una conformidad posterior (ver más abajo).
+      fila("R1", "2026-05-21T10:00:00Z", "PARCIAL"),
       fila("R1", "2026-07-19T10:00:00Z", "CONFORME"),
     ]);
     expect(vigentes).toHaveLength(1);
@@ -43,7 +45,7 @@ describe("de cada requisito manda la comprobación más reciente", () => {
 
   it("con marcas iguales gana la que llega después (orden de escritura)", () => {
     const vigentes = checksVigentes([
-      fila("R1", "2026-07-19T10:00:00Z", "NO_CONFORME"),
+      fila("R1", "2026-07-19T10:00:00Z", "PARCIAL"),
       fila("R1", "2026-07-19T10:00:00Z", "CONFORME"),
     ]);
     expect(vigentes[0].status).toBe("CONFORME");
@@ -72,6 +74,133 @@ describe("de cada requisito manda la comprobación más reciente", () => {
       { system_id: "sys-1", requirement_code: "R1", created_at: null, status: "A" },
     ]);
     expect(vigentes).toHaveLength(1);
+  });
+});
+
+/**
+ * M01 (F1.T14): cada comprobación nueva lleva la evaluación de la que sale, y la
+ * lectura la embebe (`evaluacion`). Sin eso, cerrar un autodiagnóstico SIN
+ * contestar nada —que el camino de escritura deja en `BORRADOR` y aun así
+ * inserta un `PENDIENTE` por requisito— tapaba una evaluación ya cerrada por
+ * el mero hecho de ser posterior.
+ *
+ * El criterio es «cerrada» (`status` distinto de `BORRADOR`), no «revisada»:
+ * `reviewed_at` viaja en el embebido para F1.T4 (`legado.ts`, que acredita solo
+ * lo congelado y revisado), pero esta hoja no lo lee. Los casos de abajo lo
+ * fijan con `reviewed_at: null` en la cerrada.
+ */
+describe("un borrador no desplaza a una evaluación cerrada", () => {
+  const deEvaluacion = (
+    created_at: string,
+    status: string,
+    evaluacion: { status: string; reviewed_at: string | null } | null,
+  ) => ({ ...fila("R1", created_at, status), assessment_id: evaluacion ? "a" : null, evaluacion });
+
+  it("una cerrada gana a un borrador posterior", () => {
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-09-01T10:00:00Z", "CONFORME", { status: "CON_GAPS", reviewed_at: "2026-09-02T10:00:00Z" }),
+      deEvaluacion("2026-09-10T10:00:00Z", "PENDIENTE", { status: "BORRADOR", reviewed_at: null }),
+    ]);
+    expect(vigentes).toHaveLength(1);
+    expect(vigentes[0].status, "el borrador posterior tapó la evaluación cerrada").toBe("CONFORME");
+  });
+
+  it("sin revisar también: el criterio es cerrada, no revisada", () => {
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-09-01T10:00:00Z", "CONFORME", { status: "CON_GAPS", reviewed_at: null }),
+      deEvaluacion("2026-09-10T10:00:00Z", "PENDIENTE", { status: "BORRADOR", reviewed_at: null }),
+    ]);
+    expect(vigentes[0].status).toBe("CONFORME");
+  });
+
+  it("el orden de llegada no cambia el resultado", () => {
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-09-10T10:00:00Z", "PENDIENTE", { status: "BORRADOR", reviewed_at: null }),
+      deEvaluacion("2026-09-01T10:00:00Z", "CONFORME", { status: "CON_GAPS", reviewed_at: "2026-09-02T10:00:00Z" }),
+    ]);
+    expect(vigentes[0].status).toBe("CONFORME");
+  });
+
+  it("control positivo: una evaluación cerrada posterior SÍ desplaza a la anterior", () => {
+    // Sin esto, un filtro que congelara la primera comprobación para siempre
+    // pasaría el caso de arriba.
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-09-01T10:00:00Z", "CONFORME", { status: "CON_GAPS", reviewed_at: "2026-09-02T10:00:00Z" }),
+      deEvaluacion("2026-09-10T10:00:00Z", "NO_CONFORME", { status: "CON_GAPS", reviewed_at: null }),
+    ]);
+    expect(vigentes[0].status).toBe("NO_CONFORME");
+  });
+
+  it("un borrador que es lo único que hay se conserva: no se pierde dato", () => {
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-09-10T10:00:00Z", "PENDIENTE", { status: "BORRADOR", reviewed_at: null }),
+    ]);
+    expect(vigentes).toHaveLength(1);
+  });
+
+  // Decisión del controlador al integrar F1 (19-09-2026). Caso de ARGA: el
+  // `EU_AI_ACT_ART_10` NO_CONFORME de FraudGuard (18-04) quedaba desplazado por
+  // el `AIA-10` «Conforme» del día siguiente, los dos de legado. Una
+  // conformidad que no acredita no prueba que la brecha se cerrara.
+  it("entre las que no acreditan, una conformidad posterior no desplaza a una no conformidad", () => {
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-04-18T10:00:00Z", "NO_CONFORME", null),
+      deEvaluacion("2026-04-19T10:00:00Z", "Conforme", null),
+    ]);
+    expect(vigentes[0].status, "una conformidad de legado borró una no conformidad declarada").toBe("NO_CONFORME");
+  });
+
+  it("ni un borrador posterior sin contestar", () => {
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-05-21T10:00:00Z", "No conforme", null),
+      deEvaluacion("2026-10-01T10:00:00Z", "PENDIENTE", { status: "BORRADOR", reviewed_at: null }),
+    ]);
+    expect(vigentes[0].status).toBe("No conforme");
+  });
+
+  it("control: una no conformidad posterior sí desplaza a una conformidad de legado", () => {
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-05-21T10:00:00Z", "CONFORME", null),
+      deEvaluacion("2026-07-19T10:00:00Z", "NO_CONFORME", null),
+    ]);
+    expect(vigentes[0].status).toBe("NO_CONFORME");
+  });
+
+  it("control: una evaluación cerrada posterior sí desplaza a la no conformidad de legado", () => {
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-05-21T10:00:00Z", "NO_CONFORME", null),
+      deEvaluacion("2026-10-01T10:00:00Z", "CONFORME", { status: "CONFORME", reviewed_at: null }),
+    ]);
+    expect(vigentes[0].status).toBe("CONFORME");
+  });
+
+  // Una legacy no acredita (F1.T14): no puede tapar a un borrador posterior.
+  // Los dos pesan lo mismo —ninguno acredita— y decide la fecha, como antes de
+  // M01. Caso de ARGA: «Motor de triaje» con 28 filas legacy; cerrar después
+  // un autodiagnóstico sin contestar debe mostrar el PENDIENTE nuevo, no el
+  // CONFORME del seed.
+  it("un borrador posterior desplaza a una legacy anterior (decide la fecha)", () => {
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-05-21T10:00:00Z", "CONFORME", null),
+      deEvaluacion("2026-10-01T10:00:00Z", "PENDIENTE", { status: "BORRADOR", reviewed_at: null }),
+    ]);
+    expect(vigentes[0].status, "una legacy que no acredita tapó el borrador posterior").toBe("PENDIENTE");
+  });
+
+  it("una cerrada posterior desplaza a una legacy anterior", () => {
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-05-21T10:00:00Z", "CONFORME", null),
+      deEvaluacion("2026-10-01T10:00:00Z", "NO_CONFORME", { status: "CON_GAPS", reviewed_at: null }),
+    ]);
+    expect(vigentes[0].status).toBe("NO_CONFORME");
+  });
+
+  it("una cerrada gana a una legacy aunque la legacy sea posterior", () => {
+    const vigentes = checksVigentes([
+      deEvaluacion("2026-09-20T10:00:00Z", "NO_CONFORME", { status: "CON_GAPS", reviewed_at: null }),
+      deEvaluacion("2026-10-01T10:00:00Z", "CONFORME", null),
+    ]);
+    expect(vigentes[0].status, "una fila sin evaluación desplazó a una evaluación cerrada").toBe("NO_CONFORME");
   });
 });
 

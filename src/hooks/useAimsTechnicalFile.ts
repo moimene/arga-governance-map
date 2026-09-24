@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, skipToken } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
-import { ANEXO_IV_SECCIONES } from "@/lib/aims/expediente-tecnico";
+import { ANEXO_IV_SECCIONES, esEstadoSeccionEditable } from "@/lib/aims/expediente-tecnico";
 
 // Los tipos siguientes reflejan las columnas REALES de Cloud
 // (`information_schema`, verificado 2026-08-29). La versión anterior declaraba
@@ -119,17 +119,58 @@ export function useAimsMonitoringIndicators(systemId: string | undefined) {
 }
 
 /**
+ * Secciones e indicadores de TODO el tenant, para los monitores del Dashboard
+ * (F1.T3): cada monitor lee su objeto y, sin él, dice «no medido».
+ */
+export function useAimsTechnicalFileSectionsDelTenant() {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    queryKey: ["aims_technical_file_sections", tenantId, "all"],
+    queryFn: tenantId ? async () => {
+      const { data, error } = await supabase
+        .from("aims_technical_file_sections")
+        .select("system_id, section_code, status, reviewed_by_id")
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+      return (data ?? []) as Pick<AimsTechnicalFileSection, "system_id" | "section_code" | "status" | "reviewed_by_id">[];
+    } : skipToken,
+  });
+}
+
+export function useAimsMonitoringIndicatorsDelTenant() {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    queryKey: ["aims_monitoring_indicators", tenantId, "all"],
+    queryFn: tenantId ? async () => {
+      const { data, error } = await supabase
+        .from("aims_monitoring_indicators")
+        .select("system_id, current_value")
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+      return (data ?? []) as Pick<AimsMonitoringIndicator, "system_id" | "current_value">[];
+    } : skipToken,
+  });
+}
+
+/**
  * Actualiza una sección del expediente técnico.
  *
  * La escritura va acotada por tenant Y por id, y se comprueba que vuelve fila:
  * la RLS filtra un UPDATE ajeno a CERO FILAS SIN ERROR, así que sin esta
  * comprobación una edición de otro entorno se daría por guardada.
+ *
+ * Solo escribe estados de trabajo (`esEstadoSeccionEditable`): «Conforme» y
+ * «Cerrada» exigen un revisor que la aplicación no tiene, y retirarlos del
+ * selector dejando que el UPDATE los acepte sería una retirada a medias.
  */
 export function useUpdateTechnicalFileSection() {
   const qc = useQueryClient();
   const { tenantId } = useTenantContext();
   return useMutation({
     mutationFn: async ({ id, content, status }: { id: string; content: Record<string, unknown>; status: string }) => {
+      if (!esEstadoSeccionEditable(status)) {
+        throw new Error(`El estado «${status}» exige un revisor y no se asigna desde la aplicación.`);
+      }
       const { data, error } = await supabase
         .from("aims_technical_file_sections")
         .update({ content, status })
@@ -238,9 +279,11 @@ export function useRegistrarVersion() {
 /**
  * Registra un indicador de vigilancia poscomercialización.
  *
- * `status` se fija en `OK`, el único valor que la columna escribe por defecto y
- * el único que consta en el dato: ofrecer una escala que la tabla no declara
- * (no hay CHECK) sería inventarla.
+ * No escribe `status`: la columna lo rellena con su DEFAULT 'OK', que no es un
+ * resultado medido. El estado que se pinta lo deriva `estadoIndicador` (hoja
+ * `@/lib/aims/vigilancia`) de `current_value`, y un alta sin valor figura «sin
+ * medición». Ofrecer una escala que la tabla no declara (no hay CHECK) sería
+ * inventarla.
  */
 export function useRegistrarIndicador() {
   const qc = useQueryClient();
@@ -261,7 +304,6 @@ export function useRegistrarIndicador() {
           indicator_name: v.indicatorName,
           metric_key: v.metricKey,
           last_observed_at: v.lastObservedAt,
-          status: "OK",
         })
         .select()
         .single();

@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, ClipboardCheck, FileWarning, Route, Search, SlidersHorizontal, PlusCircle } from "lucide-react";
 import { useAllAssessments } from "@/hooks/useAiAssessments";
-import { assessmentAcreditaConformidad, isAimsTechnicalFileGapCandidate } from "@/lib/aims/readiness";
-import { chipClaseEstadoEvaluacion, etiqueta, opcionesFiltro } from "@/lib/aims/vocabulario";
+import { isAimsTechnicalFileGapCandidate } from "@/lib/aims/readiness";
+import { chipClaseEvaluacion, evaluacionAcredita, rotuloEvaluacion } from "@/lib/aims/legado";
+import { etiqueta, opcionesFiltro } from "@/lib/aims/vocabulario";
 import FilterGroup from "@/components/ai-governance/FilterGroup";
 
 // El marco no es vocabulario de estado/severidad/nivel: su badge se queda aquí.
@@ -50,7 +51,7 @@ export default function Evaluaciones() {
   const [actionFilter, setActionFilter] = useState("Todos");
   const { data: assessments = [], isLoading, error } = useAllAssessments();
 
-  const approvedCount = assessments.filter((ass) => assessmentAcreditaConformidad(ass.status)).length;
+  const approvedCount = assessments.filter(evaluacionAcredita).length;
   const gapCount = assessments.filter(isAimsTechnicalFileGapCandidate).length;
   const scoredAssessments = assessments.filter((ass) => typeof ass.score === "number");
   const averageScore = scoredAssessments.length > 0
@@ -80,10 +81,10 @@ export default function Evaluaciones() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <ClipboardCheck className="h-5 w-5 shrink-0 text-[var(--g-brand-3308)]" />
-            <h1 className="text-xl font-bold text-[var(--g-text-primary)]">Evaluaciones de riesgo IA</h1>
+            <h1 className="text-xl font-bold text-[var(--g-text-primary)]">Autodiagnóstico de madurez</h1>
           </div>
           <p className="max-w-[72ch] text-sm text-[var(--g-text-secondary)]">
-            Cobertura AI Act e ISO 42001 por sistema, con señal explícita cuando el expediente técnico debe derivarse a GRC.
+            Madurez de las medidas de cada sistema frente al RIA e ISO 42001; no es una evaluación del riesgo. Señala cuándo el expediente técnico debe derivarse a GRC.
           </p>
         </div>
         <button
@@ -121,7 +122,7 @@ export default function Evaluaciones() {
           </div>
           {[
             { label: "Evaluaciones", value: assessments.length, tone: "info" },
-            { label: "Conformes o aprobadas", value: approvedCount, tone: "success" },
+            { label: "Acreditadas (congeladas y revisadas)", value: approvedCount, tone: approvedCount > 0 ? "success" : "info" },
             { label: "Requieren GRC", value: gapCount, tone: gapCount > 0 ? "error" : "success" },
           ].map((stat) => (
             <div
@@ -222,7 +223,7 @@ export default function Evaluaciones() {
                 </thead>
                 <tbody className="divide-y divide-[var(--g-border-subtle)]">
                   {filtered.map((ass) => {
-                    const statusCls = chipClaseEstadoEvaluacion(ass.status);
+                    const statusCls = chipClaseEvaluacion(ass);
                     const frameCls = FRAMEWORK_BADGE[ass.framework ?? ""] ?? "bg-[var(--g-surface-subtle)] text-[var(--g-text-secondary)]";
                     const hasGrcHandoff = isAimsTechnicalFileGapCandidate(ass);
                     return (
@@ -274,6 +275,7 @@ export default function Evaluaciones() {
                           >
                             {assessmentStatusLabel(ass.status)}
                           </span>
+                          {rotuloEvaluacion(ass) && <p className="mt-1 text-[11px] leading-4 text-[var(--g-text-secondary)]">{rotuloEvaluacion(ass)}</p>}
                         </td>
                         <td className="px-6 py-4">
                           {hasGrcHandoff ? (
@@ -302,7 +304,7 @@ export default function Evaluaciones() {
 
             <div className="divide-y divide-[var(--g-border-subtle)] lg:hidden" role="list" aria-label="Lista móvil de evaluaciones IA">
               {filtered.map((ass) => {
-                const statusCls = chipClaseEstadoEvaluacion(ass.status);
+                const statusCls = chipClaseEvaluacion(ass);
                 const frameCls = FRAMEWORK_BADGE[ass.framework ?? ""] ?? "bg-[var(--g-surface-subtle)] text-[var(--g-text-secondary)]";
                 const hasGrcHandoff = isAimsTechnicalFileGapCandidate(ass);
                 return (
@@ -342,6 +344,7 @@ export default function Evaluaciones() {
                       >
                         {formatDate(ass.assessment_date)}
                       </span>
+                      {rotuloEvaluacion(ass) && <span className="text-xs text-[var(--g-text-secondary)]">{rotuloEvaluacion(ass)}</span>}
                     </div>
                     <div className="mt-3">
                       {ass.score !== null ? (

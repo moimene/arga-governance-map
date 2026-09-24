@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useRegistrarIndicador, type AimsMonitoringIndicator } from "@/hooks/useAimsTechnicalFile";
 import { mensajeUsuario } from "@/lib/aims/errores-rpc";
-import { normalizeAimsStatus } from "@/lib/aims/vocabulario";
+import { estadoIndicador, tieneMedicion } from "@/lib/aims/vigilancia";
 
 /**
  * Vigilancia poscomercialización (art. 72 RIA).
@@ -13,6 +13,10 @@ import { normalizeAimsStatus } from "@/lib/aims/vocabulario";
  * todo va bien se pintaba en ámbar, como problema. Sólo se enumera el
  * vocabulario que consta; lo desconocido cae a NEUTRO y nunca a ámbar, porque
  * un estado que no se sabe leer no es una alerta.
+ *
+ * Y sin valor medido no hay estado que leer: el DEFAULT 'OK' de la columna no
+ * es un resultado. La clave del chip la da `estadoIndicador` (hoja), que
+ * devuelve SIN_MEDICION; el mapa no la conoce y cae al neutro.
  */
 
 export interface TabVigilanciaProps {
@@ -70,7 +74,8 @@ export default function TabVigilancia({ systemId, indicators, error }: TabVigila
             Vigilancia Poscomercialización & Indicadores de Rendimiento (Art. 72 RIA)
           </h2>
           <p className="text-xs text-[var(--g-text-secondary)]">
-            Monitorización continua de deriva (drift), precisión, latencia y equidad algorítmica.
+            Indicadores declarados para este sistema. Sin un valor medido, el indicador figura
+            «sin medición» y no se afirma su resultado.
           </p>
         </div>
         <button
@@ -124,8 +129,8 @@ export default function TabVigilancia({ systemId, indicators, error }: TabVigila
           </div>
           <div className="md:col-span-3 flex items-center justify-end gap-2">
             <span className="mr-auto text-[var(--g-text-secondary)]">
-              Se registra en estado OK, el único que la tabla escribe. Sin medición y sin umbral: se
-              declaran después.
+              Se registra sin medición y sin umbral: hasta que conste un valor medido, figura «sin
+              medición».
             </span>
             <button
               type="button"
@@ -158,52 +163,56 @@ export default function TabVigilancia({ systemId, indicators, error }: TabVigila
         </p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {indicators.map((ind) => (
-            <div
-              key={ind.id}
-              className="p-4 bg-[var(--g-surface-subtle)]/30 border border-[var(--g-border-subtle)] space-y-2 text-xs"
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              <div className="flex justify-between items-start">
-                <span className="font-bold text-sm text-[var(--g-text-primary)]">{ind.indicator_name}</span>
-                <span
-                  className={`px-2 py-0.5 font-semibold text-[10px] ${CHIP_INDICADOR[normalizeAimsStatus(ind.status)] ?? CHIP_NEUTRO}`}
-                  style={{ borderRadius: "var(--g-radius-full)" }}
-                >
-                  {ind.status}
-                </span>
+          {indicators.map((ind) => {
+            const estado = estadoIndicador(ind);
+            return (
+              <div
+                key={ind.id}
+                className="p-4 bg-[var(--g-surface-subtle)]/30 border border-[var(--g-border-subtle)] space-y-2 text-xs"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <div className="flex justify-between items-start">
+                  <span className="font-bold text-sm text-[var(--g-text-primary)]">{ind.indicator_name}</span>
+                  <span
+                    data-indicador-estado={estado.clave}
+                    className={`px-2 py-0.5 font-semibold text-[10px] ${CHIP_INDICADOR[estado.clave] ?? CHIP_NEUTRO}`}
+                    style={{ borderRadius: "var(--g-radius-full)" }}
+                  >
+                    {estado.etiqueta}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[var(--g-text-secondary)] pt-1">
+                  <div>
+                    Métrica: <span className="font-semibold text-[var(--g-text-primary)]">{ind.metric_key || "N/D"}</span>
+                  </div>
+                  <div>
+                    Umbral:{" "}
+                    <span className="font-mono text-[var(--g-text-primary)]">
+                      {ind.threshold_config ? JSON.stringify(ind.threshold_config) : "No definido"}
+                    </span>
+                  </div>
+                  <div>
+                    Valor actual:{" "}
+                    <span className="font-bold text-[var(--g-text-primary)]">
+                      {!tieneMedicion(ind.current_value)
+                        ? "Sin medición"
+                        : typeof ind.current_value === "object"
+                        ? JSON.stringify(ind.current_value)
+                        : String(ind.current_value)}
+                    </span>
+                  </div>
+                  <div>
+                    Última observación:{" "}
+                    <span className="text-[var(--g-text-primary)]">
+                      {ind.last_observed_at
+                        ? new Date(ind.last_observed_at).toLocaleDateString("es-ES")
+                        : "Sin observaciones"}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-[var(--g-text-secondary)] pt-1">
-                <div>
-                  Métrica: <span className="font-semibold text-[var(--g-text-primary)]">{ind.metric_key || "N/D"}</span>
-                </div>
-                <div>
-                  Umbral:{" "}
-                  <span className="font-mono text-[var(--g-text-primary)]">
-                    {ind.threshold_config ? JSON.stringify(ind.threshold_config) : "No definido"}
-                  </span>
-                </div>
-                <div>
-                  Valor actual:{" "}
-                  <span className="font-bold text-[var(--g-brand-3308)]">
-                    {ind.current_value == null
-                      ? "Sin medición"
-                      : typeof ind.current_value === "object"
-                      ? JSON.stringify(ind.current_value)
-                      : String(ind.current_value)}
-                  </span>
-                </div>
-                <div>
-                  Última observación:{" "}
-                  <span className="text-[var(--g-text-primary)]">
-                    {ind.last_observed_at
-                      ? new Date(ind.last_observed_at).toLocaleDateString("es-ES")
-                      : "Sin observaciones"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

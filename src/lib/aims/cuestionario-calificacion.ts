@@ -26,12 +26,30 @@
  * interpretable cuando cambien las preguntas.
  */
 
-export const CUESTIONARIO_VERSION = "1.1";
+/**
+ * 1.1.1 (19-09-2026): F1.T10 cambia la ayuda de Q2_1 (y con ella qué significa
+ * responder «No») y F1.T11 los marcos que se sellan para unas mismas respuestas.
+ * Se sube al integrar F1, con 0 cuestionarios en Cloud (medido): ninguno sellado
+ * con «1.1» se lee con la ayuda nueva. El servidor no valida el valor; solo lo sella.
+ *
+ * 1.1.2 (20-09-2026): los dos matices de H-02A sobre la ayuda de Q2_1 (letras d)
+ * y h)). Cambia otra vez qué significa responder «No», así que sube la versión.
+ */
+export const CUESTIONARIO_VERSION = "1.1.2";
 
 export type IdPregunta = "Q1_1" | "Q1_2" | "Q1_3" | "Q1_4" | "Q2_1" | "Q2_2" | "Q2_3" | "Q2_4" | "Q2_5";
 export type Respuestas = Partial<Record<IdPregunta, boolean>>;
 
 export type Ayuda = { queSignifica: string; ejemplos: string[]; comoSaberlo: string };
+
+/**
+ * Rótulo de lo que se cambió antes de tener veredicto (programa de cobertura
+ * RIA, F1.T10 y F1.T11): el lote H-02A de Harvey valida las ayudas del art. 5 y
+ * el carácter de cuatro medidas del responsable del despliegue. Con CORRECTO se
+ * retira el rótulo; con INCORRECTO se revierte el cambio (ledger del programa).
+ * La ayuda no se sella: cambiarla no altera el hash de ningún cuestionario.
+ */
+export const ROTULO_PROVISIONAL = "Provisional, pendiente de validación";
 
 export type PreguntaGuiada = {
   id: IdPregunta;
@@ -40,6 +58,8 @@ export type PreguntaGuiada = {
   articulo: string;
   /** Qué citaba la spec cuando el artículo se corrigió, para que Legal vea el cambio. */
   notaSpec?: string;
+  /** Presente mientras la ayuda espera veredicto (hoy, H-02A). */
+  provisional?: string;
   ayuda: Ayuda;
   siImplica: string;
   noImplica: string;
@@ -129,15 +149,23 @@ export const PREGUNTAS: PreguntaGuiada[] = [
     fase: 2,
     titulo: "¿El sistema realiza alguna actividad que la ley considera inaceptable?",
     articulo: "Art. 5 (prácticas prohibidas)",
+    // Diez letras tras el Reglamento (UE) 2026/1744, y el 5.1 bis. H-02A confirmó
+    // las cuatro letras (c), d), f) y h) y añadió dos matices que están aquí: la d)
+    // sí alcanza a las variables que equivalen de hecho a un perfil, y la h) se
+    // separa en tres escenarios (el diferido con fines policiales va al art. 26.10,
+    // NO al art. 29, que es la cuarta cita de Harvey que no resiste el literal).
+    // El rótulo provisional se mantiene: retirarlo es F1.T15 y lo decide Legal.
+    provisional: ROTULO_PROVISIONAL,
     ayuda: {
       queSignifica:
-        "Se refiere a usos de IA que la Unión Europea ha prohibido completamente. Marque «Sí» SOLO si el sistema hace alguna de estas cosas: puntúa o clasifica a personas por su comportamiento social para perjudicarlas; las manipula de forma inconsciente; explota vulnerabilidades (edad, discapacidad, situación económica); o identifica personas por biometría en espacios públicos en tiempo real, salvo excepciones policiales.",
+        "Son los usos de la IA que el art. 5 prohíbe. Marque «Sí» si el sistema hace, o se usa para, cualquiera de estas prácticas: a) técnicas subliminales, manipuladoras o engañosas que alteran de forma sustancial el comportamiento de una persona y le causan, o pueden causarle, un perjuicio considerable; b) aprovechar vulnerabilidades por edad, discapacidad o situación social o económica con ese mismo efecto; b bis) generar o manipular imágenes, vídeos o audios realistas de las partes íntimas de una persona física identificable, o de esa persona en actividades sexualmente explícitas, sin su consentimiento libre, específico, informado, inequívoco y explícito; b ter) generar o manipular material de abuso sexual infantil (art. 2, letras c) y e), de la Directiva 2011/93/UE); c) evaluar o clasificar a personas por su comportamiento social o sus rasgos personales cuando la puntuación lleva a un trato perjudicial en contextos ajenos a aquel en que se obtuvieron los datos, o injustificado o desproporcionado (no exige intención: basta con que ese trato se produzca); d) evaluar el riesgo de que una persona cometa un delito basándose únicamente en su perfil o en sus rasgos de personalidad (la prohibición no alcanza a los sistemas que apoyan la valoración humana a partir de hechos objetivos y verificables directamente relacionados con una actividad delictiva); e) crear o ampliar bases de datos de reconocimiento facial con imágenes extraídas de forma no selectiva de internet o de circuitos cerrados de televisión; f) inferir las emociones de una persona en el lugar de trabajo o en centros educativos, salvo por motivos médicos o de seguridad (alcanza a cualquier empleador que lo use con ese fin); g) categorizar a personas por sus datos biométricos para deducir su raza, opiniones políticas, afiliación sindical, convicciones religiosas o filosóficas, vida sexual u orientación sexual; h) identificación biométrica remota «en tiempo real» en espacios de acceso público con fines de garantía del cumplimiento del Derecho, salvo las excepciones tasadas del propio artículo. Tres escenarios que conviene no confundir: en tiempo real y con fines de garantía del cumplimiento del Derecho, prohibida por la letra h); en diferido y con esos mismos fines, no prohibida, pero de alto riesgo y sujeta a las condiciones del art. 26.10 (autorización previa, uso acotado a un delito concreto y registro); con cualquier otra finalidad, tampoco es la h): se analiza como posible alto riesgo (anexo III, punto 1 a)) y, si trata datos biométricos para identificar de forma unívoca a alguien, por el art. 9 del RGPD. Queda fuera la verificación de identidad —confirmar que alguien es quien dice ser, uno contra uno—, que no es identificación remota. Las letras b bis) y b ter) se aplican desde el 2-12-2026 con el alcance del art. 5.1 bis: al proveedor le alcanzan si esa generación es la finalidad prevista o un resultado razonablemente previsible y reproducible sin salvaguardias razonables; al responsable del despliegue, si usa el sistema con ese fin.",
       ejemplos: [
-        "Puntuación social que perjudica a las personas.",
-        "Identificación biométrica remota en tiempo real en espacios de acceso público.",
+        "Un sistema que puntúa a clientes por su comportamiento en redes sociales y les niega o encarece un servicio por ello (letra c), aunque no se diseñara para perjudicarles.",
+        "Una herramienta que infiere el estado de ánimo de los empleados en sus videollamadas (letra f).",
+        "No entra en la letra d) un sistema que puntúa expedientes de siniestro por indicios objetivos de fraude, sin evaluar el riesgo de que una persona cometa un delito por su perfil; pero sí entraría si las variables combinadas equivalen de hecho a un perfil del asegurado. Y quedar fuera del art. 5 no lo saca del anexo III ni de los arts. 22 y 9 del RGPD.",
       ],
       comoSaberlo:
-        "Si tiene dudas, la respuesta casi seguro es «No». Estas prácticas son excepcionales y evidentes.",
+        "Repase las letras una a una con quien conoce el uso real del sistema. Si alguna describe lo que hace o para qué se usa, marque «Sí». Si no puede descartarla, no confirme la clasificación: consúltelo antes con el equipo legal.",
     },
     siImplica: "Inaceptable — flujo bloqueado",
     noImplica: "Continuar",
@@ -146,7 +174,8 @@ export const PREGUNTAS: PreguntaGuiada[] = [
     id: "Q2_2",
     fase: 2,
     titulo: "¿El sistema se usa para alguna de estas finalidades consideradas de alto riesgo?",
-    articulo: "Arts. 6.1 y 6.2, anexo III",
+    // El 6.1 remite al anexo I (productos): esta pregunta es la del 6.2.
+    articulo: "Art. 6.2 y anexo III",
     ayuda: {
       queSignifica:
         "Marque «Sí» si el sistema se usa para: (1) identificación biométrica o categorización de personas; (2) gestión de infraestructuras críticas; (3) educación (admisión, evaluación); (4) empleo (selección, evaluación de trabajadores); (5) acceso a servicios esenciales (crédito, seguros de vida y salud, prestaciones sociales); (6) aplicación de la ley; (7) migración y control de fronteras; (8) administración de justicia y procesos democráticos.",
@@ -167,13 +196,17 @@ export const PREGUNTAS: PreguntaGuiada[] = [
       "¿Considera que, a pesar de estar en la lista anterior, este sistema concreto no genera un riesgo real para las personas?",
     articulo: "Art. 6.3 (excepción motivada)",
     ayuda: {
+      // Texto de la spec del equipo legal con solo dos cambios, los validados
+      // (Harvey C10 y último párrafo del 6.3 cotejado literal): fuera el
+      // ejemplo del scoring y dentro el aviso de perfilado. Quién documenta la
+      // excepción (art. 6.4) y el desarrollo de sus letras esperan a H-02.
       queSignifica:
-        "Es una excepción legal: si puede demostrar que el sistema, aunque pertenece a una categoría de alto riesgo, no supone en la práctica un peligro significativo para la salud, la seguridad o los derechos de las personas, puede documentar una clasificación inferior. Si marca «Sí» deberá escribir una justificación detallada, que queda registrada y puede ser revisada por la autoridad competente.",
+        "Es una excepción legal: si puede demostrar que el sistema, aunque pertenece a una categoría de alto riesgo, no supone en la práctica un peligro significativo para la salud, la seguridad o los derechos de las personas, puede documentar una clasificación inferior. La excepción no se aplica nunca si el sistema elabora perfiles de personas físicas (art. 6.3, último párrafo): en ese caso es siempre de alto riesgo. Si marca «Sí» deberá escribir una justificación detallada, que queda registrada y puede ser revisada por la autoridad competente.",
       ejemplos: [
-        "Un sistema de scoring crediticio usado sólo para operaciones internas de bajo importe y sin decisiones automatizadas sobre personas.",
+        "«No»: el sistema elabora perfiles de personas físicas (art. 3.52, que remite al art. 4.4 del RGPD).",
       ],
       comoSaberlo:
-        "Pregúntese si el sistema influye de forma material en una decisión sobre una persona. Si no lo hace, la excepción puede aplicar; motívelo por escrito.",
+        "Compruebe primero si el sistema elabora perfiles de personas físicas: si lo hace, la respuesta es «No». Si no los elabora, pregúntese si el sistema influye de forma material en una decisión sobre una persona. Si no lo hace, la excepción puede aplicar; motívelo por escrito.",
     },
     siImplica: "Motivación obligatoria (art. 6.3) — puede reducir la clasificación",
     noImplica: "Alto riesgo confirmado",
@@ -309,15 +342,33 @@ export type MarcoNormativo = {
 export const ROLES_DE_DESPLIEGUE = new Set(["RESPONSABLE_DESPLIEGUE", "IMPORTADOR", "DISTRIBUIDOR"]);
 export const ROLES_DE_PROVEEDOR = new Set(["PROVEEDOR", "PROVEEDOR_GPAI", "PROVEEDOR_POSTERIOR"]);
 
+/**
+ * A quién vincula el art. 4: a los proveedores y responsables del despliegue
+ * de SISTEMAS de IA. El proveedor posterior (art. 3.68) es proveedor de un
+ * sistema; el proveedor de un modelo de uso general, el importador y el
+ * distribuidor no están entre sus destinatarios.
+ */
+const ROLES_ART_4 = new Set(["PROVEEDOR", "PROVEEDOR_POSTERIOR", "RESPONSABLE_DESPLIEGUE"]);
+
+const NUMERACION_CAP_V =
+  "La spec cita «Capítulo V-A (arts. 51–55)», numeración de borrador; en el texto final es el capítulo V, arts. 51–56.";
+
 export function derivarMarcos(
   rol: string | null | undefined,
   nivel: string | null | undefined,
   gpai: boolean,
 ): MarcoNormativo[] {
   if (!rol || !nivel) return [];
-  const out: MarcoNormativo[] = [
-    { code: "RIA_ART_4", norma: "RIA", articulos: "Art. 4", titulo: "Alfabetización en materia de IA (todos los sistemas)" },
-  ];
+  const out: MarcoNormativo[] = [];
+  if (ROLES_ART_4.has(rol)) {
+    out.push({
+      code: "RIA_ART_4",
+      norma: "RIA",
+      articulos: "Art. 4",
+      titulo: "Alfabetización en materia de IA: medidas para apoyarla (proveedores y responsables del despliegue)",
+      nota: "Art. 4.1 en la redacción del Reglamento (UE) 2026/1744: «adoptarán medidas para apoyar la promoción de la alfabetización en materia de IA» de su personal; «no exige» garantizar un nivel específico. Se acredita con las medidas adoptadas.",
+    });
+  }
   if (rol === "IMPORTADOR" || rol === "DISTRIBUIDOR") {
     out.push({
       code: "RIA_ARTS_23_24",
@@ -365,10 +416,14 @@ export function derivarMarcos(
       norma: "RIA",
       articulos: "Cap. V, arts. 51–56",
       titulo: "Modelos de IA de uso general",
+      // Cautela en las dos ramas (F1.T11): ser proveedor del SISTEMA que
+      // integra un modelo de uso general no hace proveedor del MODELO.
       nota:
-        ROLES_DE_PROVEEDOR.has(rol)
-          ? "La spec cita «Capítulo V-A (arts. 51–55)», numeración de borrador; en el texto final es el capítulo V, arts. 51–56."
-          : "Las obligaciones del cap. V vinculan al PROVEEDOR del modelo de uso general; para el responsable del despliegue este marco es la trazabilidad del modelo y del proveedor en la cadena de suministro. La spec lo lista para todo sistema con dependencia GPAI; el alcance lo decide el equipo legal. (Numeración: la spec cita «cap. V-A, arts. 51–55»; en el texto final es el cap. V, arts. 51–56.)",
+        rol === "PROVEEDOR_GPAI"
+          ? NUMERACION_CAP_V
+          : ROLES_DE_PROVEEDOR.has(rol)
+            ? `Las obligaciones del cap. V vinculan al PROVEEDOR del modelo de uso general: ser proveedor del sistema que lo integra no convierte en proveedor del modelo. Para este sistema el marco es la trazabilidad del modelo y de su proveedor en la cadena de suministro; el alcance lo decide el equipo legal. ${NUMERACION_CAP_V}`
+            : `Las obligaciones del cap. V vinculan al PROVEEDOR del modelo de uso general; para el responsable del despliegue este marco es la trazabilidad del modelo y del proveedor en la cadena de suministro. La spec lo lista para todo sistema con dependencia GPAI; el alcance lo decide el equipo legal. ${NUMERACION_CAP_V}`,
     });
   }
   out.push(
