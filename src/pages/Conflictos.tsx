@@ -32,16 +32,27 @@ const CATEGORIA_POR_CODIGO = new Map(
 );
 import { Scale, ShieldAlert, CheckCircle, AlertTriangle, Bell, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useTenantBranding } from "@/context/TenantBrandContext";
+import { useTenantBranding, useTenantBrandingLoading } from "@/context/TenantBrandContext";
 import { groupFullLabel } from "@/lib/tenant-brand-labels";
+import { usaFixturesDemo } from "@/lib/tenant-fixtures";
+
+export function debeMostrarOpvDemo(
+  branding: ReturnType<typeof useTenantBranding>,
+  brandingLoading?: boolean,
+): boolean {
+  if (brandingLoading) return false;
+  return !branding && usaFixturesDemo(branding);
+}
 
 export default function ConflictosList() {
   const [selectedOpv, setSelectedOpv] = useState<RelatedPartyTransaction | null>(null);
   const branding = useTenantBranding();
+  const brandingLoading = useTenantBrandingLoading();
   const { data: conflicts = [], isLoading: loadingConflicts } = useConflictsList();
   const { data: attestations = [], isLoading: loadingAtts } = useAttestationsList();
   const { tenantId } = useTenantContext();
   const hayProcedenciaDeclarada = tenantId === CONFLICTOS_TENANT;
+  const mostrarOpvDemo = debeMostrarOpvDemo(branding, brandingLoading);
 
   const conflictKpis = useMemo(() => {
     // `0` afirma «no hay ninguno». Cuando HAY filas pero ninguna lleva
@@ -187,7 +198,7 @@ export default function ConflictosList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {branding ? (
+                {!mostrarOpvDemo ? (
                   <TableRow><TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">Sin operaciones vinculadas registradas para este grupo (datos de ejemplo del tenant demo ocultos).</TableCell></TableRow>
                 ) : (
                   relatedPartyTransactions.map((o) => (

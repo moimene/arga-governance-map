@@ -14,6 +14,9 @@ import { organoNaturalezaBadges } from "@/lib/organo-naturaleza";
 import { AlertTriangle, CalendarPlus, Download, FileCheck2, Network, Plus, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useTenantBranding, useTenantBrandingLoading } from "@/context/TenantBrandContext";
+import { usaFixturesDemo } from "@/lib/tenant-fixtures";
+import type { Regulation } from "@/data/regulations";
 
 type BodyAgreement = {
   id: string;
@@ -24,8 +27,19 @@ type BodyAgreement = {
   proposal_text: string | null;
 };
 
+export function resolverReglamentoOrgano(
+  branding: ReturnType<typeof useTenantBranding>,
+  regulationId: string | null | undefined,
+  brandingLoading?: boolean,
+): Regulation | null {
+  if (brandingLoading || !regulationId) return null;
+  return usaFixturesDemo(branding) ? getRegulationById(regulationId) : null;
+}
+
 export default function OrganoDetalle() {
   const { id = "" } = useParams();
+  const branding = useTenantBranding();
+  const brandingLoading = useTenantBrandingLoading();
   const { data: body, isLoading } = useBodyBySlug(id);
   const { data: members = [] } = useBodyMandates(body?.id);
   const { data: bodyMeetings = [] } = useBodyMeetings(body?.id);
@@ -56,7 +70,11 @@ export default function OrganoDetalle() {
     return <div className="p-10 text-center text-sm text-muted-foreground">Órgano no encontrado. <Link to="/organos" className="text-primary underline">Volver</Link></div>;
   }
   const entity = (body as typeof body & { entity?: { common_name?: string; legal_name?: string | null } | null }).entity ?? null;
-  const regulation = body.regulation_id ? getRegulationById(body.regulation_id) : null;
+  const regulation = resolverReglamentoOrgano(
+    branding,
+    body.regulation_id,
+    brandingLoading,
+  );
   const alertCount = members.filter((m) => m.status && m.status !== "Activo" && m.status !== "VIGENTE").length;
   const naturalezaBadges = organoNaturalezaBadges(body.config);
 

@@ -59,9 +59,14 @@ export function UserMenu() {
   const fullName =
     displayName ||
     (user?.user_metadata?.full_name as string) ||
-    (user?.email ? user.email.split("@")[0] : "Dña. Lucía Paredes Vega");
+    (user?.email
+      ? user.email.split("@")[0]
+      : !branding
+        ? "Dña. Lucía Paredes Vega"
+        : "Usuario");
 
-  const email = user?.email || "demo@arga-seguros.com";
+  const email =
+    user?.email || (!branding ? "demo@arga-seguros.com" : "usuario@empresa.com");
   const initials = getInitials(fullName);
 
   const handleSelectDemoRole = (roleCode: string) => {

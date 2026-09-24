@@ -142,10 +142,18 @@ describe("RequireGrcModule", () => {
     expect(screen.getByText("vista-del-modulo")).toBeTruthy();
   });
 
-  it("lista blanca vacía falla ABIERTO: un seed a medio escribir no deja al tenant sin producto", () => {
-    brandingActual = { modules: [] };
+  it("configuración no declarada falla ABIERTO (seed a medio escribir / unconfigured)", () => {
+    brandingActual = {};
     cargando = false;
     montarEn("gdpr");
     expect(screen.getByText("vista-del-modulo")).toBeTruthy();
+  });
+
+  it("lista blanca deliberadamente vacía falla CERRADO (MOI-54: state = 'empty')", () => {
+    brandingActual = { modules: [] };
+    cargando = false;
+    montarEn("gdpr");
+    expect(screen.queryByText("vista-del-modulo")).toBeNull();
+    expect(screen.getByText("dashboard")).toBeTruthy();
   });
 });

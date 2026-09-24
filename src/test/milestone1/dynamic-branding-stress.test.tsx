@@ -35,17 +35,17 @@ describe("Adversarial Stress Test: Tenant Brand Labels Resolver", () => {
       expect(groupPortfolioLabel(null)).toBe("Vista de grupo: cartera societaria ARGA");
     });
 
-    it("returns verbatim defaults when branding is an empty object", () => {
+    it("returns neutral defaults (not ARGA) when branding is an empty object (MOI-54)", () => {
       const b: TenantBranding = {};
       expect(shellLabel(b)).toBe(DEFAULT_SHELL_LABEL);
-      expect(scopeLabel(b)).toBe(DEFAULT_SCOPE_LABEL);
-      expect(siiOrgLabel(b)).toBe(DEFAULT_SII_ORG_LABEL);
-      expect(brandName(b)).toBe(DEFAULT_BRAND_NAME);
-      expect(groupFullLabel(b)).toBe(DEFAULT_GROUP_FULL_LABEL);
-      expect(groupPortfolioLabel(b)).toBe(`Vista de grupo: cartera societaria ${DEFAULT_BRAND_NAME}`);
+      expect(scopeLabel(b)).toBe("Grupo");
+      expect(siiOrgLabel(b)).toBe("Entidad");
+      expect(brandName(b)).toBe("Grupo");
+      expect(groupFullLabel(b)).toBe("Grupo");
+      expect(groupPortfolioLabel(b)).toBe("Vista de grupo: cartera societaria Grupo");
     });
 
-    it("gracefully falls back when properties are empty strings or only whitespace", () => {
+    it("gracefully falls back to neutral defaults when properties are empty strings or whitespace (MOI-54)", () => {
       const b: TenantBranding = {
         nombre: "   ",
         shell_label: "",
@@ -53,14 +53,14 @@ describe("Adversarial Stress Test: Tenant Brand Labels Resolver", () => {
         sii_org_label: "",
       };
       expect(shellLabel(b)).toBe(DEFAULT_SHELL_LABEL);
-      expect(scopeLabel(b)).toBe(DEFAULT_SCOPE_LABEL);
-      expect(siiOrgLabel(b)).toBe(DEFAULT_SII_ORG_LABEL);
-      expect(brandName(b)).toBe(DEFAULT_BRAND_NAME);
-      expect(groupFullLabel(b)).toBe(DEFAULT_GROUP_FULL_LABEL);
-      expect(groupPortfolioLabel(b)).toBe(`Vista de grupo: cartera societaria ${DEFAULT_BRAND_NAME}`);
+      expect(scopeLabel(b)).toBe("Grupo");
+      expect(siiOrgLabel(b)).toBe("Entidad");
+      expect(brandName(b)).toBe("Grupo");
+      expect(groupFullLabel(b)).toBe("Grupo");
+      expect(groupPortfolioLabel(b)).toBe("Vista de grupo: cartera societaria Grupo");
     });
 
-    it("handles non-string types safely without throwing runtime errors", () => {
+    it("handles non-string types safely without throwing runtime errors and falls back to neutral (MOI-54)", () => {
       const b = {
         nombre: 12345,
         shell_label: true,
@@ -69,11 +69,11 @@ describe("Adversarial Stress Test: Tenant Brand Labels Resolver", () => {
       } as unknown as TenantBranding;
 
       expect(shellLabel(b)).toBe(DEFAULT_SHELL_LABEL);
-      expect(scopeLabel(b)).toBe(DEFAULT_SCOPE_LABEL);
-      expect(siiOrgLabel(b)).toBe(DEFAULT_SII_ORG_LABEL);
-      expect(brandName(b)).toBe(DEFAULT_BRAND_NAME);
-      expect(groupFullLabel(b)).toBe(DEFAULT_GROUP_FULL_LABEL);
-      expect(groupPortfolioLabel(b)).toBe(`Vista de grupo: cartera societaria ${DEFAULT_BRAND_NAME}`);
+      expect(scopeLabel(b)).toBe("Grupo");
+      expect(siiOrgLabel(b)).toBe("Entidad");
+      expect(brandName(b)).toBe("Grupo");
+      expect(groupFullLabel(b)).toBe("Grupo");
+      expect(groupPortfolioLabel(b)).toBe("Vista de grupo: cartera societaria Grupo");
     });
   });
 
@@ -116,9 +116,9 @@ describe("Adversarial Stress Test: Tenant Brand Labels Resolver", () => {
       expect(groupPortfolioLabel(partial)).toBe("Vista de grupo: cartera societaria Acme Corp");
       expect(groupPortfolioLabel(partial)).not.toContain("ARGA");
 
-      // Shell and scope fallback to default if not specified
+      // Shell falls back to neutral default, scope derives from tenant name (MOI-54: never ARGA)
       expect(shellLabel(partial)).toBe(DEFAULT_SHELL_LABEL);
-      expect(scopeLabel(partial)).toBe(DEFAULT_SCOPE_LABEL);
+      expect(scopeLabel(partial)).toBe("Acme Corp");
     });
   });
 

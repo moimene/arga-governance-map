@@ -19,6 +19,10 @@ export function scopesForTenant(
   return [`${scopeLabel(branding)} (Global)`];
 }
 
-export function dashboardGreeting(branding: TenantBranding | null): string {
+export function dashboardGreeting(
+  branding: TenantBranding | null,
+  options?: { isLoading?: boolean },
+): string {
+  if (options?.isLoading) return "Buen día";
   return branding ? "Buen día" : "Buen día, Lucía";
 }
