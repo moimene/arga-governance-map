@@ -464,9 +464,21 @@ export function clonarPlantilla(spec: TenantSpec, p: PackBasePlantilla, exportad
   };
 }
 
-// ───────────────────────── snapshot en el repo ─────────────────────────────
+function resolvePackBaseDir(): string {
+  if (typeof __dirname !== "undefined") {
+    return join(__dirname, "pack-base-lsc");
+  }
+  try {
+    if (typeof import.meta !== "undefined" && typeof import.meta.url === "string" && import.meta.url.startsWith("file:")) {
+      return join(fileURLToPath(new URL(".", import.meta.url)), "pack-base-lsc");
+    }
+  } catch {
+    // fallback below
+  }
+  return join(process.cwd(), "scripts", "tenants", "pack-base-lsc");
+}
 
-export const PACK_BASE_DIR = join(fileURLToPath(new URL(".", import.meta.url)), "pack-base-lsc");
+export const PACK_BASE_DIR = resolvePackBaseDir();
 
 export interface PackBaseManifest {
   pack: "LSC_ES";
