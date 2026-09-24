@@ -4,6 +4,33 @@ import * as matchers from "@testing-library/jest-dom/matchers";
 const require = createRequire(import.meta.url);
 const { JSDOM } = require("jsdom");
 
+// Carga .env para runners donde no se inyecta por defecto (ej. vitest directo)
+if (!process.env.DEMO_PASSWORD_ARGA) {
+  try {
+    const fs = require("node:fs");
+    const path = require("node:path");
+    const envPath = path.resolve(process.cwd(), ".env");
+    if (fs.existsSync(envPath)) {
+      const lines = fs.readFileSync(envPath, "utf8").split("\n");
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const eqIdx = trimmed.indexOf("=");
+        if (eqIdx > 0) {
+          const key = trimmed.slice(0, eqIdx).trim();
+          let val = trimmed.slice(eqIdx + 1).trim();
+          if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.slice(1, -1);
+          }
+          if (!(key in process.env)) {
+            process.env[key] = val;
+          }
+        }
+      }
+    }
+  } catch {}
+}
+
 function ensureDom() {
   if (typeof globalThis.window !== "undefined" && typeof globalThis.document !== "undefined") {
     return;

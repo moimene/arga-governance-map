@@ -17,9 +17,11 @@
  * que certifique una entrega ERDS o una firma cualificada sería afirmar un
  * hecho que nadie ha producido.
  *
- * El filtro vive en código porque el dato de Cloud no se toca desde este
- * carril; retirar o reclasificar esas filas queda anotado como deuda del dueño
- * del dato (Secretaría + Comité Legal).
+ * RESOLUCIÓN DE CATÁLOGO (MOI-145, 2026-09-25): Dichas 3 filas fueron puestas
+ * en `is_active = false` en Cloud y el catálogo activo quedó purgado (migración
+ * `20260925100000_secretaria_desactivar_tipos_certificacion_envio_qes.sql`).
+ * Este filtro en código se mantiene como defensa en profundidad en cliente para
+ * blindar cualquier superficie presente o futura que consulte el catálogo.
  *
  * CRITERIO — se excluye un tipo si:
  *   1. exige firma electrónica cualificada (`requires_qes`), o
