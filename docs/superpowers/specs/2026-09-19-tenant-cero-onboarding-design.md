@@ -19,7 +19,7 @@ Dos productos salen de aquí: el tenant de prueba y, sobre todo, el **procedimie
 | T2 | Suelo jurídico | SA y SL comunes. Sin cotizada, sector regulado ni formas especiales |
 | T3 | Alcance | Instancia básica, **todos los módulos abiertos**: no se declara lista blanca `branding.modules` |
 | T4 | Origen del pack base | **El estado vivo de Cloud, no `scripts/seed-rule-packs.ts`** (ver §5.1). Rectifica la recomendación inicial de clonar desde el seed |
-| T5 | Identidad | «Grupo Nuevo», clave `nuevo`, tenant `00000000-0000-0000-0000-000000000003`, prefijo de packs `GN`. Marca descriptiva y sin narrativa; se cambia en un solo fichero |
+| T5 | Identidad | «Grupo Nuevo», clave `nuevo`, tenant `00000000-0000-0000-0000-000000000003`, prefijo de packs `GN`. Marca descriptiva y sin narrativa (confirmado formalmente como definitivo en MOI-131, Opción A) |
 | T6 | Visibilidad en login | El entorno nuevo **solo aparece llegando por `/login?tenant=nuevo`**. El selector que ven las demos de ARGA y Garrigues no cambia |
 | T7 | Fixtures de demo | El tenant declara `branding.fixtures = "none"`. ARGA (branding NULL) y Garrigues (sin la clave) siguen viendo lo mismo que hoy |
 

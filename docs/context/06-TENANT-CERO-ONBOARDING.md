@@ -2,7 +2,7 @@
 
 > **Propósito.** Memoria de continuidad de la línea de trabajo «tercer tenant / onboarding real». Permite retomar el asunto en una conversación nueva sin releer el historial. Se sitúa en la suite `docs/context/` (→ `00`) y no sustituye a `CLAUDE.md`.
 >
-> **Fecha de creación:** 2026-09-19. **Última actualización:** 2026-09-24 (cierre de la tarea MOI-126). **Estado:** tenant «Grupo Nuevo» **PROVISIONADO en Cloud** con autorización expresa del usuario; gates de aislamiento tri-tenant y bilateral verdes (88/88, logins reales); gates estáticos y build verificados limpios; trabajo empaquetado en rama `grupo-nuevo/tenant-cero-2026-09-19`. **Mantener vivo:** actualizar estado y fecha al cerrar cada conversación sobre este asunto.
+> **Fecha de creación:** 2026-09-19. **Última actualización:** 2026-09-25 (cierre de la tarea MOI-131: identidad «Grupo Nuevo» confirmada formalmente, Opción A). **Estado:** tenant «Grupo Nuevo» **PROVISIONADO en Cloud** con identidad confirmada; gates de aislamiento tri-tenant y bilateral verdes (88/88, logins reales); gates estáticos y build verificados limpios; trabajo empaquetado en rama `grupo-nuevo/tenant-cero-2026-09-19`. **Mantener vivo:** actualizar estado y fecha al cerrar cada conversación sobre este asunto.
 
 ---
 
@@ -23,7 +23,7 @@
 - **Pack base LSC congelado** en `scripts/tenants/pack-base-lsc/` con manifiesto de hashes. Lo regenera `scripts/export-pack-base-lsc.ts`, que solo lee de Cloud.
 - Aplicación: tercer entorno de login **visible solo por `/login?tenant=nuevo`**; `branding.fixtures = "none"` apaga los fixtures de ARGA (ESG, Notificaciones, dos tarjetas del Dashboard) para ese tenant y para nadie más.
 - Gate `src/test/schema/tenant-cero-isolation.test.ts`: 25/25 con tres logins reales.
-- Nombre «Grupo Nuevo» elegido por defecto por el asistente. Cambiarlo ahora exige tocar `scripts/tenants/tenant-spec.ts`, `src/lib/login-brands.ts` **y** la fila `tenants` de Cloud (re-ejecutar la fase `fundacion` actualiza la marca; los emails y el prefijo `GN_` ya están escritos).
+- Nombre «Grupo Nuevo» confirmado formalmente como identidad definitiva de la plantilla de onboarding (Opción A, resuelto en MOI-131). Coincide plenamente con la fila de Cloud (`governance_OS`), los identificadores de reglas `GN_*` y las cuentas Auth.
 
 **Verificado el 2026-09-24 (sesión MOI-126):** typecheck 0 errores, eslint limpio, `bun run build` limpio (7.62s), 88 tests de aislamiento tri-tenant y bilateral verdes (`tenant-isolation` + `tenant-cero-isolation`), suite `src/test/garrigues/` (98 pass) y `src/test/tenants/` (44 pass) verdes, 4.890 tests en bloque (0 fail, 151 skip, 3 todo), dry-run posterior = 0 por crear, 0 filas `PROBE-%` residuales en Cloud. **No verificado aún en navegador:** la pantalla de login y el Dashboard con el tenant nuevo; requiere arranque en local (`bun run dev` → `/login?tenant=nuevo`) o despliegue tras incorporación en MOI-136.
 
@@ -49,7 +49,7 @@ El sistema está adaptado a dos contextos (ARGA Seguros, grupo asegurador fictic
 | T2 | Suelo jurídico | **SA y SL comunes**: basta un pack base LSC extraído de los rule packs actuales más las plantillas núcleo. Sin cotizada, sector regulado ni formas especiales en esta fase. |
 | T3 | Alcance | **Instancia básica para probar toda la capacidad** (precisión del usuario, literal: «es mucho más básica, queremos probar toda la capacidad»). Grupo sencillo, sin narrativa elaborada ni dato sembrado; todos los módulos abiertos; el objetivo es recorrer el sistema entero partiendo de cero. |
 | T4 | Origen del pack base | **Estado vivo de Cloud, congelado en el repo como snapshot**; no `seed-rule-packs.ts` (decisión técnica de la sesión de implementación; rectifica la recomendación inicial). |
-| T5 | Identidad | «Grupo Nuevo» / `nuevo` / `…0003` / prefijo `GN` — **valor por defecto elegido por el asistente, pendiente de que el usuario lo confirme o lo cambie**. |
+| T5 | Identidad | «Grupo Nuevo» / `nuevo` / `…0003` / prefijo `GN` — **confirmado formalmente como nombre definitivo de la plantilla de onboarding (Opción A, resuelto en MOI-131)**. |
 | T6 | Login | El entorno nuevo solo aparece llegando por `/login?tenant=nuevo`; el selector de las demos de ARGA y Garrigues no cambia. |
 | T7 | Fixtures | `branding.fixtures = "none"` por declaración expresa; ARGA y Garrigues ven lo mismo que antes. |
 
@@ -123,7 +123,7 @@ Valor del ejercicio: es la primera vez que el producto se recorre como lo haría
 
 ## 5. Pendiente de decidir
 
-- Confirmar o cambiar el nombre «Grupo Nuevo» (ver el coste de cambiarlo en §0).
+- ~~Confirmar o cambiar el nombre «Grupo Nuevo»~~: Resuelto en MOI-131 por la opción A (confirmado «Grupo Nuevo» como identidad definitiva de la plantilla de onboarding, en total coherencia con Cloud y `GN_*`).
 - Criterio del Comité Legal sobre la plantilla `ACTA_COMISION_DELEGADA` (§0).
 - Para los módulos de solo lectura (§3.4): alta por pantalla o kit de arranque genérico. Decidir después de la primera pasada sin kit.
 - Si el pack base LSC sigue siendo copia por tenant (modelo actual) o se introduce herencia de un tenant «sistema» (cambio de modelo: fuera de alcance salvo decisión expresa).
