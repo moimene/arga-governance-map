@@ -2,7 +2,7 @@
 
 > **Propósito.** Memoria de continuidad de la línea de trabajo «tercer tenant / onboarding real». Permite retomar el asunto en una conversación nueva sin releer el historial. Se sitúa en la suite `docs/context/` (→ `00`) y no sustituye a `CLAUDE.md`.
 >
-> **Fecha de creación:** 2026-09-19. **Última actualización:** 2026-09-25 (cierre de MOI-53: recorrido por pantalla de bloques 0, 1, 2 y 8 completado; 3 sociedades creadas en Cloud con data_class = 'DEMO'; 15 hallazgos H-01 a H-15 documentados; dictamen de huecos en 2.7 cerrado; seguimiento abierto en MOI-219 y MOI-220; aislamiento tri-tenant verificado 88/88). **Estado:** tenant «Grupo Nuevo» **OPERATIVO y VALIDADO EN ALTA Y AISLAMIENTO**; 3 sociedades dadas de alta mediante UI real; 10 personas en censo; 87 capturas de evidencia archivadas. **Mantener vivo:** actualizar estado y fecha al cerrar cada conversación sobre este asunto.
+> **Fecha de creación:** 2026-09-19. **Última actualización:** 2026-09-25 (cierre de MOI-15: recorrido por pantalla de bloques 3 y 4 completado; marco normativo activado y publicado; convocatoria de Consejo con DOCX server-side y reunión materializada con bloqueo de cronología; gate de cuentas anuales de Junta validado; acuerdos sin sesión adoptados con votos WORM unánimes; decisión de socio único formalizada en SLU; acuerdo de administrador solidario validado por motor LSC; tramitador registral completado con asiento de presentación en RM; 38 libros obligatorios y Cap table 100% verificados; Board Pack generado en vivo; hallazgos H-16 a H-25 documentados; aislamiento tri-tenant verificado sin contaminación). **Estado:** tenant «Grupo Nuevo» **OPERATIVO, VALIDADO EN ALTA Y EN CICLO SOCIETARIO COMPLETO**; 3 sociedades dadas de alta; 4 acuerdos adoptados; 1 reunión convocada; 1 expediente registral presentado; 38 libros persistidos; >145 capturas de evidencia archivadas. **Mantener vivo:** actualizar estado y fecha al cerrar cada conversación sobre este asunto.
 
 ---
 
@@ -142,24 +142,67 @@ El recorrido de los bloques 0, 1, 2 y 8 del guion se ha completado exhaustivamen
 2. **Filial A (2.2): `Servicios Nuevos Integrales, S.L.U.`** (`7ea1d208-6c67-4021-baf4-ecb9de2abacd`, NIF `B87654321`):
    - Matriz 2.1 al 100% (3.000 participaciones). `tipo_social = 'SL'`, `es_unipersonal = true`.
    - Cargo: Administrador Único (Carlos Mendoza Ruiz).
-   - Estado: `INCOMPLETA_CARGOS` (ver hallazgo técnico RPC trazado en **MOI-219**).
+   - Estado: `OPERATIVA` (promovida tras la migración de fix de `fn_promover_sociedad_operativa` en **MOI-219** para formas de administración sin Consejo).
 3. **Filial B (2.3): `Tecnología e Innovación Nueva, S.L.`** (`9d209ef6-ca87-44d4-a12c-86f12a0ea368`, NIF `B76543210`):
    - Matriz 2.1 (70%) + Minoritario Alianza Norte (30%).
    - Cargos: 3 Administradores Solidarios (2 en alta inicial + 1 vía `/secretaria/cargos/nuevo` en paso 2.5).
-   - Estado: `INCOMPLETA_CARGOS` (ver hallazgo técnico RPC trazado en **MOI-219**).
+   - Estado: `OPERATIVA` (promovida tras la migración de fix de `fn_promover_sociedad_operativa` en **MOI-219** para formas de administración sin Consejo).
 
 ### 6.2 Dictamen de los dos huecos del punto 2.7
 - **Hueco 1 («Crear órgano en matriz post-alta»): DESMENTIDO.** Existe botón funcional «Crear órgano» en `/secretaria/catalogo-organos` con modal interactivo completo. La persistencia en servidor está implementada mediante la RPC `fn_secretaria_upsert_organ_profile` (verificada en código).
 - **Hueco 2 («Editar matriz o % de Filial B post-alta»): CONFIRMADO.** No existe UI ni acción en la ficha de sociedad para modificar la matriz ni el porcentaje de participación una vez finalizado el asistente de alta. Trazado como tarea de backlog en **MOI-220**.
 
 ### 6.3 Hallazgo técnico servidor relevante
-- La RPC `fn_promover_sociedad_operativa` contiene una regla genérica que exige `condiciones_persona (count >= 2, PRESIDENTE + SECRETARIO)` pensada únicamente para Consejos de Administración. Al no distinguir si la forma de gobierno es `ADMINISTRADOR_UNICO`, `ADMINISTRADORES_SOLIDARIOS` o `ADMINISTRADORES_MANCOMUNADOS`, deja erróneamente en `INCOMPLETA_CARGOS` a sociedades válidamente constituidas con administradores sin Consejo. Trazado en Linear como **MOI-219**.
+- La RPC `fn_promover_sociedad_operativa` contenía inicialmente una regla genérica que exigía `condiciones_persona (count >= 2, PRESIDENTE + SECRETARIO)` pensada únicamente para Consejos de Administración. Al no contemplar `ADMINISTRADOR_UNICO` ni `ADMINISTRADORES_SOLIDARIOS`, dejaba erróneamente en `INCOMPLETA_CARGOS` a sociedades válidas. Este defecto fue subsanado y aplicado a Cloud mediante migración en el issue **MOI-219**, pasando ambas filiales a estado `OPERATIVA`.
 
 ### 6.4 Próximos pasos naturales
-1. Abordar el recorrido de operatividad integral en los módulos restantes según guion (Bloques 3 a 7: Secretaría transaccional, AIMS 360, GRC, SII, Board Pack; cubiertos en MOI-15, MOI-55 y MOI-146).
-2. Ejecutar la solución del issue **MOI-219** (`fn_promover_sociedad_operativa`) para desbloquear la promoción a `OPERATIVA` de las sociedades 2.2 y 2.3.
-3. Ejecutar la solución del issue **MOI-220** (edición de matriz y % post-alta).
+1. Abordar el recorrido de operatividad integral en los módulos restantes según guion (Bloques 5 a 7: AIMS 360, GRC, SII; cubiertos en MOI-55 y MOI-146).
+2. Ejecutar la solución del issue **MOI-220** (edición de matriz y % post-alta).
+3. Abordar **MOI-221** (idempotencia y protección anti-duplicación en emisión de convocatorias).
 4. Decidir para los módulos de solo lectura de consola TGMS (§3.4): desarrollo de alta por pantalla vs kit de arranque en bootstrap.
+
+### 6.5 Estado tras validación del ciclo societario y documental (Cierre de MOI-15, 2026-09-25)
+
+El recorrido de los bloques 3 (Marco normativo) y 4 (Ciclo societario completo) del guion canónico se ha completado íntegramente por pantalla sobre Cloud DB (`governance_OS`), con más de 55 nuevas capturas PNG archivadas en `docs/superpowers/evidence/2026-09-25-tenant-cero-recorrido/` y 11 filas de hallazgos H-16 a H-26 registradas en `docs/superpowers/plans/2026-09-19-tenant-cero-guion-recorrido.md`.
+
+**Hitos societarios acreditados en Grupo Nuevo:**
+1. **Marco normativo activado y publicado (3.1 - 3.3):**
+   - 53/53 materias del catálogo cubiertas con reglas activas del Pack base LSC.
+   - Gestor de plantillas verificado con rol `ADMIN_TENANT`: 86 plantillas gobernadas (72 plantillas `ACTIVA` del pack base LSC en Cloud DB + 14 plantillas puente provisionales en catálogo local con procedencia «Pack base LSC» en notas).
+2. **Convocatoria y bloqueo estricto de cronología (4.1):**
+   - Convocatoria de Consejo de Administración de 2.1 completada a través del stepper de 8 pasos para la convocatoria canónica `28bc0b69-200c-4616-97ea-393a629050fa`.
+   - DOCX server-side renderizado con SHA-512 `585e44dd4f4e7ad786454156f159a2fb7d2319181384e3343d16d50c8e5b1dfd3dac3eb42d8e4ce3b89a63ddd5f49d2f105b535ac0d7981556f8ea7697d9eaf5` (SHA-256 `4cac99e9e47a80325ef6a579652acb427f5e22968bf496f236ce2aa84afa3061`, 28.125 B) bajo contrato canónico `2026-07-21.1`.
+   - Reunión materializada en Cloud (`meetings`, id `ffd71122-0dfa-43d0-8238-ddd8e78dec73`) en estado `CONVOCADA`. Bloqueo formal de cronología verificado en UI y DB (`MEETING_OPEN_TOO_EARLY`, código Postgres 22023), impidiendo abrir la reunión antes de su fecha/hora legal.
+3. **Validación documental PRE en Junta General (4.2):**
+   - Gate PRE de aprobación de cuentas anuales validado, requiriendo los 4 documentos preceptivos (Cuentas Anuales, Informe de Gestión, Propuesta de Aplicación de Resultado, Informe de Auditoría).
+   - Bloqueo formal en servidor con código `0AK01` (`CONVOCATION_RPC_SUPPORTS_ONLY_ACTIVE_ES_DEMO_CDA`), documentado como frontera conocida en **MOI-142** y **MOI-143**.
+4. **Acuerdos por escrito y sin sesión de Consejo (4.3):**
+   - Stepper de 5 pasos completado para `APROBACION_PLAN_NEGOCIO` (Plan Estratégico 2026-2029).
+   - Votos WORM de los 3 consejeros (`Carlos Mendoza`, `Beatriz Gil`, `Javier Navarro`) emitidos con éxito vía `fn_no_session_cast_response`.
+   - Materialización transaccional completada en estado `ADOPTED` (`e2efa1ef-20f8-42b1-ae2f-7b33ba524b1d`) con `profile_hash: nf_36285d86` y 63 fuentes normativas activas.
+5. **Decisión del socio único en filial unipersonal 2.2 (4.4):**
+   - Stepper de 3 pasos completado para `APROBACION_PRESUPUESTO` en `Servicios Nuevos Integrales, S.L.U.`.
+   - Socio único `Corporación Nueva, S.A.` reconocido automáticamente (art. 15 LSC).
+   - Decisión formalizada en Secretaría con id `c16aff69-3039-4b91-9fbe-8ffb7c0607fc` y consignada en el registro de decisiones unipersonales.
+6. **Actuación de administradores solidarios en filial 2.3 (4.5):**
+   - Stepper de 4 pasos completado para Administradores Solidarios en `Tecnología e Innovación Nueva, S.L.`.
+   - Administradora actuante `Laura Ibáñez Vega` seleccionada entre los 3 administradores vigentes.
+   - Evaluación por motor LSC positiva ("Acuerdo solidario válido, Severity: OK") y acuerdo materializado en estado `ADOPTED` con id `6c0959c5-4be1-44d1-8644-ce8aec5aa765`.
+7. **Tramitador registral de extremo a extremo (4.6):**
+   - Validación de inscribibilidad: acuerdos no inscribibles bloquean el trámite.
+   - Acuerdo inscribible `NOMBRAMIENTO_CONSEJERO` (`172f33d4…`): dictaminado `Documento base: ESCRITURA`.
+   - Instrumento notarial protocolizado (Notaría García-Valdecasas).
+   - Documento preparatorio DOCX generado y archivado (`a31d52f6…`, SHA-512 `41f69540…`).
+   - Filing preparado en estado `ELEVADA` (`053a52a8…`) y asiento de presentación asentado en el Registro Mercantil en estado `PRESENTADA` con número `ASIENTO-2026-0925-001`.
+8. **Certificaciones autónomas (4.7):**
+   - Pantalla de certificaciones autónomas operativa. Bloqueo en emisión por catálogo y custodia final EAD Trust pendiente de decisión en **MOI-144** y **MOI-145**.
+9. **Libros societarios y Cap Table (4.8):**
+   - 38 libros obligatorios persistidos con plazos de legalización (30/04/2027).
+   - Cap table actual en modo Sociedad 100% verificado: Matriz (60/40), Filial 2.2 (100% matriz), Filial 2.3 (70/30).
+10. **Comunicaciones, calendario y Board Pack ejecutivo (4.9 y 4.10):**
+    - Bandeja de comunicaciones neutral honesta (0 envíos simulados).
+    - Calendario agregador calcula vencimientos en ventana de 90 días sin alertas espurias.
+    - Board Pack genera informe ejecutivo dinámico para el Consejo de Administración de `Corporación Nueva, S.A.` (Presidente Carlos Mendoza, Secretaria Elena Gómez, orden del día de presupuesto 2026), exportable e impermeable entre tenants.
 
 ## 7. Referencias
 
