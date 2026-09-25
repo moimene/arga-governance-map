@@ -2402,6 +2402,22 @@ export default function ConvocatoriasStepper() {
       setCurrent(2);
       return;
     }
+    const meetingTimeMs = new Date(`${fechaReunion}T${horaReunion}:00`).getTime();
+    if (meetingTimeMs <= Date.now()) {
+      toast.error("La fecha y hora de la reunión deben ser posteriores al momento actual.");
+      setCurrent(2);
+      return;
+    }
+    const duplicateConvocatoria = previousConvocatorias.find(
+      (c) =>
+        c.body_id === selectedBodyId &&
+        c.fecha_1 === meetingIso &&
+        (c.estado === "EMITIDA" || c.estado === "CONVOCADA")
+    );
+    if (duplicateConvocatoria) {
+      toast.error("Ya existe una convocatoria emitida para este órgano en la misma fecha y hora.");
+      return;
+    }
     const invalidNonDecisionItem = agendaItems.find(
       (item) =>
         item.titulo.trim().length > 0 &&

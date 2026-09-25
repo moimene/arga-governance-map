@@ -16,16 +16,15 @@
 - **Ni una sociedad, persona, órgano o acuerdo.** Eso se hace por pantalla.
 - ARGA y Garrigues: recuento idéntico antes y después en las seis tablas tocadas, medido por el propio script en cada ejecución.
 
-**En el repo, empaquetado en rama `grupo-nuevo/tenant-cero-2026-09-19`:**
+**En el repo (`main`) y en producción, incorporado y ratificado formalmente bajo MOI-136:**
 
-- Spec `docs/superpowers/specs/2026-09-19-tenant-cero-onboarding-design.md`, plan `docs/superpowers/plans/2026-09-19-tenant-cero-bootstrap.md` (Tareas 1–7 hechas) y guion `docs/superpowers/plans/2026-09-19-tenant-cero-guion-recorrido.md`.
-- `scripts/tenant-bootstrap.ts` (fases `fundacion` y `pack-base`, dry-run por defecto, idempotente) + lógica pura en `scripts/tenants/`. El catálogo declara `cloud: "PROVISIONADO"`.
-- **Pack base LSC congelado** en `scripts/tenants/pack-base-lsc/` con manifiesto de hashes. Lo regenera `scripts/export-pack-base-lsc.ts`, que solo lee de Cloud.
-- Aplicación: tercer entorno de login **visible solo por `/login?tenant=nuevo`**; `branding.fixtures = "none"` apaga los fixtures de ARGA (ESG, Notificaciones, dos tarjetas del Dashboard) para ese tenant y para nadie más.
-- Gate `src/test/schema/tenant-cero-isolation.test.ts`: 25/25 con tres logins reales.
-- Nombre «Grupo Nuevo» confirmado formalmente como identidad definitiva de la plantilla de onboarding (Opción A, resuelto en MOI-131). Coincide plenamente con la fila de Cloud (`governance_OS`), los identificadores de reglas `GN_*` y las cuentas Auth.
-
-**Verificado el 2026-09-24 (sesión MOI-126):** typecheck 0 errores, eslint limpio, `bun run build` limpio (7.62s), 88 tests de aislamiento tri-tenant y bilateral verdes (`tenant-isolation` + `tenant-cero-isolation`), suite `src/test/garrigues/` (98 pass) y `src/test/tenants/` (44 pass) verdes, 4.890 tests en bloque (0 fail, 151 skip, 3 todo), dry-run posterior = 0 por crear, 0 filas `PROBE-%` residuales en Cloud. **Primer recorrido en navegador:** resuelto en MOI-132 por la Opción A: el primer recorrido se realiza en local (`bun run dev` → `/login?tenant=nuevo`), preservando la versión de producción sin exponer prematuramente el tercer entorno hasta su incorporación formal en MOI-136.
+- Spec `docs/superpowers/specs/2026-09-19-tenant-cero-onboarding-design.md`, plan `docs/superpowers/plans/2026-09-19-tenant-cero-bootstrap.md` y guion `docs/superpowers/plans/2026-09-19-tenant-cero-guion-recorrido.md`.
+- `scripts/tenant-bootstrap.ts` (fases `fundacion` y `pack-base`, dry-run por defecto, idempotente, con soporte de siembra de `standalone_certification_kinds` filtrado conforme a política EAD Trust en MOI-233) + lógica en `scripts/tenants/`.
+- **Pack base LSC congelado** en `scripts/tenants/pack-base-lsc/` con manifiesto de hashes.
+- Aplicación: tercer entorno de login **visible solo por `/login?tenant=nuevo`**; `branding.fixtures = "none"` apaga los fixtures de ARGA para ese tenant y para nadie más.
+- Cuentas demo enlazadas en censo con personas físicas reales: `admin@` a Carlos Mendoza Ruiz y `demo@` a Elena Gómez Blanco (MOI-133, migración `20260925130000`).
+- Gate `src/test/schema/tenant-cero-isolation.test.ts`: 25/25 con tres logins reales; suites `tenants` y `secretaria` 100% verdes.
+- Nombre «Grupo Nuevo» confirmado como identidad definitiva (Opción A, MOI-131). Incorporación a `main` y producción ratificada formalmente por Moisés Menéndez el 25-09-2026 en MOI-136.
 
 **Rectificación de esta línea de trabajo.** La recomendación inicial («clonar el pack base desde `seed-rule-packs.ts`, no desde Cloud») era **incorrecta**: ese seed quedó atrás respecto a las correcciones del Comité Legal aplicadas por migración (13 de los 58 packs tienen hoy versión activa posterior a la 1.0.0). El origen correcto es el estado vivo de Cloud, congelado en el repo como snapshot. §4 está corregido.
 
@@ -90,7 +89,7 @@ Consecuencia de T1: se mantiene la decisión D2 del spec de Garrigues (tenant nu
 **Capa C — Residuos y huecos de UI.**
 - UUID de tenant cableado en 7 ficheros de `src` fuera de tests: `ErpConsolePanel.tsx`, `useWhistleblowing.ts`, `lib/sii/roles-por-tenant.ts`, `lib/aims/governing-body.ts`, `login-brands.ts`, `lib/demo-operable/runner.ts`, `pages/Dashboard.tsx`. Casi todos fallan cerrado de forma correcta para un tenant desconocido (SII: «Pendiente de designación»; AIMS: sin órgano de IA, el panel no se pinta; panel demo-operable solo ARGA).
 - Fixtures estáticos de `src/data/*` consumidos por `Dashboard.tsx` (actividad reciente, ESG), `Esg.tsx`, `Notificaciones.tsx`, `Conflictos.tsx` y `OrganoDetalle.tsx`: pintarían dato de ARGA en el tenant nuevo. Hay que gatear por tenant o mostrar estado vacío honesto.
-- Huecos funcionales que un grupo desde cero destapará: (1) no hay UI para crear un órgano después del alta de la sociedad; (2) no hay UI para modificar la estructura de grupo a posteriori (matriz y % solo se fijan en el alta); (3) no hay alta masiva de sociedades, solo de personas.
+- Huecos funcionales analizados: (1) creación de órganos post-alta: DESMENTIDO (existe interfaz en `/secretaria/catalogo-organos` y RPC `fn_secretaria_upsert_organ_profile`, comprobado con la creación de la `Comisión de Retribuciones` en 2.1); (2) modificación de estructura de grupo a posteriori: CONFIRMADO (matriz y % solo se fijan en el alta, trazado en MOI-148); (3) no hay alta masiva de sociedades, solo de personas.
 
 ### 3.4 Mapa de capacidad desde cero: qué se puede poblar por pantalla y qué no
 
@@ -103,7 +102,7 @@ Medido sobre las escrituras reales de `src` (INSERT/UPSERT directos y RPC invoca
 | **GRC Compass** | **Parcial.** Riesgos (`/grc/risk-360/nuevo`), incidentes, excepciones y terceros (TPRM) tienen alta. | Obligaciones, controles y módulos GRC se leen de dato sembrado. |
 | **SII** | **Sí.** Alta de comunicaciones por el portal; persistencia en `sii.reports` por tenant. | Roles del canal: «Pendiente de designación» hasta declararlos en `lib/sii/roles-por-tenant.ts`. El catálogo inicial de un tenant desconocido es vacío (no hereda los casos de ARGA). |
 | **Consola TGMS: políticas, obligaciones, controles, hallazgos, planes de acción, delegaciones, conflictos, notificaciones regulatorias** | **No.** Cero inserts desde la UI: son superficies de solo lectura sobre dato sembrado por script. | En un tenant en blanco quedarán vacías y sin forma de poblarlas por pantalla. |
-| **Órganos (post-alta) y estructura de grupo** | **No.** Los órganos solo nacen dentro del alta de sociedad; matriz y % solo se fijan ahí. | Huecos (1) y (2) de la Capa C. |
+| **Órganos (post-alta) y estructura de grupo** | **Parcial.** Órganos sí se pueden crear post-alta por pantalla en `/secretaria/catalogo-organos`; matriz y % solo se fijan en el alta (Hueco 2 confirmado, trazado en MOI-148). | Hueco 1 resuelto; Hueco 2 en MOI-148. |
 | **ESG, notificaciones, actividad reciente** | **No aplica.** Son fixtures estáticos de ARGA en `src/data/*`. | Hay que gatearlos o vaciarlos para el tenant nuevo. |
 | **Board Pack, Governance Map, Dashboard** | **Derivados.** Se componen de lo anterior: serán tan ricos como el dato que exista. | — |
 
