@@ -28,7 +28,9 @@ if (!process.env.DEMO_PASSWORD_ARGA) {
         }
       }
     }
-  } catch {}
+  } catch {
+    // Entorno sin .env accesible en test unitario: no bloquear.
+  }
 }
 
 function ensureDom() {
