@@ -1,0 +1,226 @@
+[
+ {
+  "company_form": "SA",
+  "jurisdiction": "ES",
+  "legal_reference": null,
+  "name": null,
+  "pack_id": null,
+  "rule_config": {
+   "allows_universal": true,
+   "allows_written_resolution": {
+    "enabled": true,
+    "requires_unanimity": true,
+    "scope": [
+     "board"
+    ]
+   },
+   "books": {
+    "legalization_channel": "TELEMATICA",
+    "legalization_deadline_days_after_year_end": 120
+   },
+   "majority": {
+    "ordinary": "simple",
+    "structural": "absolute"
+   },
+   "notice_min_days_first_call": 3,
+   "notice_min_days_second_call": 3,
+   "publication_channels": [],
+   "quorum": {
+    "art194_applies": false,
+    "first_call_pct": null,
+    "second_call_pct": null
+   },
+   "registry_submission": {
+    "deadline_days_from_deed": 30,
+    "requires_notarial": "conditional"
+   },
+   "second_call_gap_min_hours": 0,
+   "version": "1.0"
+  },
+  "rule_set_version": "1.0",
+  "source_id": "c4cc8dc6-f300-4f29-bfd2-77e52872f1a7",
+  "statutory_override": false,
+  "tenant_id": "00000000-0000-0000-0000-000000000001",
+  "typology_code": "CDA"
+ },
+ {
+  "company_form": "SA",
+  "jurisdiction": "ES",
+  "legal_reference": "RD Leg. 1/2010 (LSC) — art. 247",
+  "name": "España SA — Consejo de Administración",
+  "pack_id": null,
+  "rule_config": {
+   "allows_universal": true,
+   "allows_written_resolution": {
+    "enabled": true,
+    "requires_unanimity": false,
+    "scope": [
+     "board"
+    ]
+   },
+   "books": {
+    "legalization_channel": "TELEMATICA",
+    "legalization_deadline_days_after_year_end": 120
+   },
+   "majority": {
+    "ordinary": "simple",
+    "structural": "absolute"
+   },
+   "notice_min_days_first_call": 3,
+   "notice_min_days_second_call": null,
+   "publication_channels": [],
+   "quorum": {
+    "art194_applies": false,
+    "first_call_pct": 50,
+    "second_call_pct": null
+   },
+   "registry_submission": {
+    "deadline_days_from_deed": 30,
+    "requires_notarial": "conditional"
+   },
+   "second_call_gap_min_hours": null,
+   "version": "1.0"
+  },
+  "rule_set_version": "1.0",
+  "source_id": "493ab995-5e95-477d-8f85-23050c220b03",
+  "statutory_override": false,
+  "tenant_id": "00000000-0000-0000-0000-000000000001",
+  "typology_code": "CONSEJO_ADMINISTRACION"
+ },
+ {
+  "company_form": "SA",
+  "jurisdiction": "ES",
+  "legal_reference": "RD Leg. 1/2010 (LSC) — art. 176.1 (un mes; cómputo de fecha a fecha)",
+  "name": "España SA — Junta General",
+  "pack_id": null,
+  "rule_config": {
+   "allows_universal": true,
+   "allows_written_resolution": {
+    "enabled": false,
+    "requires_unanimity": false,
+    "scope": []
+   },
+   "books": {
+    "legalization_channel": "TELEMATICA",
+    "legalization_deadline_days_after_year_end": 120
+   },
+   "majority": {
+    "ordinary": "simple",
+    "second_call_between_25_50": "two_thirds",
+    "structural": "two_thirds"
+   },
+   "notice_min_days_first_call": 30,
+   "notice_min_days_second_call": 5,
+   "publication_channels": [
+    "BORME"
+   ],
+   "quorum": {
+    "art194_applies": true,
+    "first_call_pct": 25,
+    "second_call_pct": null
+   },
+   "registry_submission": {
+    "deadline_days_from_deed": 30,
+    "requires_notarial": "conditional"
+   },
+   "second_call_gap_min_hours": 24,
+   "version": "1.0"
+  },
+  "rule_set_version": "1.0",
+  "source_id": "47448c9d-b477-42a2-8055-a47d766a7bd2",
+  "statutory_override": false,
+  "tenant_id": "00000000-0000-0000-0000-000000000001",
+  "typology_code": "JUNTA_GENERAL"
+ },
+ {
+  "company_form": "SL",
+  "jurisdiction": "ES",
+  "legal_reference": "RD Leg. 1/2010 (LSC) — art. 166, 179, 198",
+  "name": "España SL — Junta General",
+  "pack_id": null,
+  "rule_config": {
+   "allows_universal": true,
+   "allows_written_resolution": {
+    "enabled": true,
+    "requires_unanimity": false,
+    "scope": [
+     "board",
+     "shareholders"
+    ]
+   },
+   "books": {
+    "legalization_channel": "TELEMATICA",
+    "legalization_deadline_days_after_year_end": 120
+   },
+   "majority": {
+    "ordinary": "simple",
+    "structural": "two_thirds"
+   },
+   "notice_min_days_first_call": 15,
+   "notice_min_days_second_call": 5,
+   "publication_channels": [],
+   "quorum": {
+    "art194_applies": false,
+    "first_call_pct": 0,
+    "second_call_pct": null
+   },
+   "registry_submission": {
+    "deadline_days_from_deed": 30,
+    "requires_notarial": "conditional"
+   },
+   "second_call_gap_min_hours": 1,
+   "version": "1.0"
+  },
+  "rule_set_version": "1.0",
+  "source_id": "14fabd1c-378c-46e2-8909-8b05eea5c39a",
+  "statutory_override": false,
+  "tenant_id": "00000000-0000-0000-0000-000000000001",
+  "typology_code": "JUNTA_GENERAL"
+ },
+ {
+  "company_form": "SRL",
+  "jurisdiction": "ES",
+  "legal_reference": null,
+  "name": null,
+  "pack_id": null,
+  "rule_config": {
+   "allows_universal": true,
+   "allows_written_resolution": {
+    "enabled": true,
+    "requires_unanimity": true,
+    "scope": [
+     "shareholders"
+    ]
+   },
+   "books": {
+    "legalization_channel": "TELEMATICA",
+    "legalization_deadline_days_after_year_end": 120
+   },
+   "majority": {
+    "ordinary": "simple",
+    "structural": "two_thirds"
+   },
+   "notice_min_days_first_call": 15,
+   "notice_min_days_second_call": 5,
+   "publication_channels": [
+    "BORME"
+   ],
+   "quorum": {
+    "art194_applies": false,
+    "first_call_pct": null,
+    "second_call_pct": null
+   },
+   "registry_submission": {
+    "deadline_days_from_deed": 30,
+    "requires_notarial": "conditional"
+   },
+   "second_call_gap_min_hours": 24,
+   "version": "1.0"
+  },
+  "rule_set_version": "1.0",
+  "source_id": "981bac26-0593-47fb-9c86-2f5dd46ccd12",
+  "statutory_override": false,
+  "tenant_id": "00000000-0000-0000-0000-000000000001",
+  "typology_code": "JUNTA_GENERAL"
+ }
+]

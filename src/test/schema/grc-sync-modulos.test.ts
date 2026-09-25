@@ -64,7 +64,7 @@ const CATCH_ALL_DECLARADO: Record<string, string> = {
  * este gate no juzga su módulo: lo puso una siembra a mano. Lo que sí hace es
  * contarlas, para que la exclusión no se trague en silencio filas nuevas.
  */
-const NATIVAS_ESPERADAS: Record<CuentaDemo, number> = { ARGA: 8, GARRIGUES: 0 };
+const NATIVAS_ESPERADAS: Record<CuentaDemo, number> = { ARGA: 8, GARRIGUES: 0, NUEVO: 0 };
 
 async function leer(cliente: SupabaseClient, tenant: string) {
   const [obl, esp, mod] = await Promise.all([

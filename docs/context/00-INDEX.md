@@ -16,6 +16,7 @@
 4. **`03-ESTRATEGIA-MODULOS.md`** — Secretaría real vs. AIMS/GRC prototipo, consola unificada, ownership y carve-out futuro.
 5. **`04-CHARTER-LEGAL-NORMATIVO.md`** — rigor legal no negociable + registro normativo (norma → módulo → obligación → evidencia).
 6. **`05-PRODUCTO-Y-MERCADO.md`** — posicionamiento, ICP, modelo comercial, marco competitivo y escaneo de mercado.
+7. **`06-TENANT-CERO-ONBOARDING.md`** — tercera instancia (tenant en blanco «Grupo Nuevo») para arrancar un grupo desde cero: estado de la implementación, pack base LSC, mapa de capacidad por pantalla, decisiones T1–T7; tenant ya provisionado en Cloud y gate a tres tenants verde; pendiente el recorrido por pantalla (2026-09-19).
 
 **Después**, y solo cuando vayas a tocar código o datos, pasa a la verdad operativa:
 

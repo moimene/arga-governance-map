@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
+  ENTORNOS_BASE,
   LOGIN_BRANDS,
   brandForTenant,
+  entornosVisibles,
   loginTenantMismatch,
   resolveLoginBrand,
 } from "@/lib/login-brands";
@@ -64,5 +66,33 @@ describe("loginTenantMismatch — la selección de entorno se contrasta con el p
   it("rechaza un tenant que no está en la pantalla", () => {
     expect(brandForTenant("eed5e854-0000-0000-0000-000000000000")).toBeNull();
     expect(loginTenantMismatch(arga, "eed5e854-0000-0000-0000-000000000000")).toMatch(/no está disponible/);
+  });
+});
+
+describe("tercer entorno — tenant en blanco", () => {
+  const NUEVO = "00000000-0000-0000-0000-000000000003";
+
+  it("se resuelve por su enlace y pertenece a su propio tenant", () => {
+    const b = resolveLoginBrand("?tenant=nuevo");
+    expect(b.key).toBe("nuevo");
+    expect(b.tenantId).toBe(NUEVO);
+    expect(brandForTenant(NUEVO)?.key).toBe("nuevo");
+  });
+
+  it("no presenta como propio nada de ARGA ni de Garrigues", () => {
+    expect(JSON.stringify(LOGIN_BRANDS.nuevo)).not.toMatch(/ARGA|Garrigues|asegurador|despacho/i);
+  });
+
+  it("una cuenta de otro entorno se rechaza, y la suya encaja", () => {
+    expect(loginTenantMismatch(LOGIN_BRANDS.nuevo, NUEVO)).toBeNull();
+    expect(loginTenantMismatch(LOGIN_BRANDS.nuevo, ARGA)).toMatch(/pertenece al entorno ARGA/);
+    expect(loginTenantMismatch(LOGIN_BRANDS.arga, NUEVO)).toMatch(/pertenece al entorno Grupo Nuevo/);
+  });
+
+  it("el selector de las demos no cambia: el entorno nuevo solo aparece por su enlace", () => {
+    expect([...ENTORNOS_BASE]).toEqual(["arga", "garrigues"]);
+    expect(entornosVisibles("arga")).toEqual(["arga", "garrigues"]);
+    expect(entornosVisibles("garrigues")).toEqual(["arga", "garrigues"]);
+    expect(entornosVisibles("nuevo")).toEqual(["arga", "garrigues", "nuevo"]);
   });
 });
