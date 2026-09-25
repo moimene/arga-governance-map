@@ -43,15 +43,18 @@ import {
   SERVICE_KEY_NAMES,
   aprobadaPorClon,
   cargarPackBase,
+  clonarCertificationKind,
   clonarPlantilla,
   clonarRulePack,
   clonarRuleSet,
   idPlantillaClonada,
   packIdPara,
   resolverEntorno,
+  seleccionarCertificationKinds,
   targetEsGovernanceOs,
   type PackBase,
   type PackBasePlantilla,
+  type StandaloneCertificationKindOrigen,
 } from "./tenants/bootstrap-lib";
 import { validateTemplateForActivation } from "../src/lib/secretaria/template-admin/gate-pre";
 import type { EstadoPlantilla, PlantillaCandidate } from "../src/lib/secretaria/template-admin/types";
@@ -91,7 +94,7 @@ const HOY = new Date().toISOString().slice(0, 10);
 
 // ─────────────────────── vigilancia de contaminación ───────────────────────
 
-const TABLAS_VIGILADAS = ["rule_packs", "jurisdiction_rule_sets", "plantillas_protegidas", "grc_modules", "user_profiles", "rbac_user_roles"] as const;
+const TABLAS_VIGILADAS = ["rule_packs", "jurisdiction_rule_sets", "plantillas_protegidas", "grc_modules", "user_profiles", "rbac_user_roles", "standalone_certification_kinds"] as const;
 
 async function recuento(tabla: string, tenantId: string): Promise<number> {
   const { count, error } = await admin.from(tabla).select("*", { count: "exact", head: true }).eq("tenant_id", tenantId);
@@ -315,10 +318,28 @@ async function packBase() {
   const setsNuevos = pack.ruleSets.filter((r) => !setsYa.has(claveSet(r)));
   const plPendientes = pack.plantillas.filter((p) => estadoPorId.get(idPlantillaClonada(spec, p.source_id)) !== "ACTIVA");
 
+  // ── tipos de certificación societaria autónoma ──
+  const { data: certsCloud, error: eCerts } = await admin
+    .from("standalone_certification_kinds")
+    .select("*")
+    .eq("tenant_id", ARGA_TENANT_ID);
+  if (eCerts) fail(`Leyendo standalone_certification_kinds: ${eCerts.message}`);
+
+  const seleccionCerts = seleccionarCertificationKinds((certsCloud ?? []) as unknown as StandaloneCertificationKindOrigen[]);
+  const { data: certsDestino, error: eCertsDest } = await admin
+    .from("standalone_certification_kinds")
+    .select("id, kind_code, is_active")
+    .eq("tenant_id", spec.tenantId);
+  if (eCertsDest) fail(`Leyendo standalone_certification_kinds destino: ${eCertsDest.message}`);
+
+  const certsDestMap = new Map((certsDestino ?? []).map((c) => [c.kind_code as string, c]));
+  const certsPendientes = seleccionCerts.incluidos.filter((c) => !certsDestMap.has(c.kind_code));
+
   console.table([
     { tabla: "rule_packs", snapshot: pack.rulePacks.length, "por crear": packsNuevos.length, nota: `${versionesNuevas.length} versiones por insertar` },
     { tabla: "jurisdiction_rule_sets", snapshot: pack.ruleSets.length, "por crear": setsNuevos.length, nota: "" },
     { tabla: "plantillas_protegidas", snapshot: pack.plantillas.length, "por crear": plPendientes.filter((p) => !estadoPorId.has(idPlantillaClonada(spec, p.source_id))).length, nota: `${plPendientes.length} por llevar a ACTIVA` },
+    { tabla: "standalone_certification_kinds", snapshot: seleccionCerts.incluidos.length, "por crear": certsPendientes.length, nota: `${seleccionCerts.excluidos.length} excluidos por política EAD Trust (${certsDestMap.size} ya existen)` },
   ]);
   if (divergentes.length) {
     console.log(`⚠ ${divergentes.length} pack(s) con versión activa distinta de la del snapshot; NO se tocan: ${divergentes.map((p) => packIdPara(spec, p.source_id)).join(", ")}`);
@@ -371,6 +392,19 @@ async function packBase() {
     activadas++;
   }
   console.log(`✓ plantillas_protegidas (${activadas} llevadas a ACTIVA)`);
+
+  let insertadosCerts = 0;
+  for (const c of certsPendientes) {
+    const fila = clonarCertificationKind(spec, c);
+    const { error: insErr } = await admin
+      .from("standalone_certification_kinds")
+      .upsert(fila, { onConflict: "tenant_id, kind_code" });
+    if (insErr) fail(`Error insertando tipo de certificación ${c.kind_code}: ${insErr.message}`);
+    insertadosCerts++;
+  }
+  if (insertadosCerts > 0) {
+    console.log(`✓ standalone_certification_kinds (${insertadosCerts} tipos sembrados)`);
+  }
 }
 
 // ─────────────────────────────── verificación ──────────────────────────────

@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   aprobadaPorClon,
   canonicalJson,
+  clonarCertificationKind,
   clonarPlantilla,
   clonarRulePack,
   clonarRuleSet,
@@ -15,6 +16,7 @@ import {
   neutralizarAvisoPrototipo,
   packIdPara,
   resolverEntorno,
+  seleccionarCertificationKinds,
   seleccionarPlantillas,
   seleccionarRulePacks,
   seleccionarRuleSets,
@@ -24,6 +26,7 @@ import {
   type PlantillaOrigen,
   type RulePackOrigen,
   type RuleSetOrigen,
+  type StandaloneCertificationKindOrigen,
 } from "../../../scripts/tenants/bootstrap-lib";
 import { TENANT_SPECS } from "../../../scripts/tenants/tenant-spec";
 
@@ -200,5 +203,85 @@ describe("clonado a un tenant", () => {
     expect(c.content_hash_sha256).toBe(sha256Hex(c.capa1_inmutable));
     expect(c.notas_legal).toMatch(/Clon de la plantilla 33333333/);
     expect(aprobadaPorClon(p)).toMatch(/aprobada en origen por «Comité Legal ARGA»/);
+  });
+
+  it("seleccionarCertificationKinds: excluye tipos inactivos, con requires_qes o que afirman envío/entrega", () => {
+    const tiposPrueba: StandaloneCertificationKindOrigen[] = [
+      {
+        id: "11111111-1111-1111-1111-111111111111",
+        kind_code: "CERT_ACUERDO_360",
+        label: "Certificación de acuerdo 360",
+        source_domain: "agreements",
+        legal_effect: "REGISTRAL",
+        requires_visto_bueno: true,
+        requires_rm_reference: true,
+        requires_qes: false,
+        template_binding_key: "CERTIFICACION_AUTONOMA:ACUERDO_360",
+        authority_policy: null,
+        disclaimer_policy: null,
+        is_active: true,
+      },
+      {
+        id: "22222222-2222-2222-2222-222222222222",
+        kind_code: "CERT_ENVIO_CONVOCATORIA",
+        label: "Certificado de emisión y envío de convocatoria",
+        source_domain: "convocatorias",
+        legal_effect: "INTERNO",
+        requires_visto_bueno: false,
+        requires_rm_reference: false,
+        requires_qes: false,
+        template_binding_key: null,
+        authority_policy: null,
+        disclaimer_policy: null,
+        is_active: false,
+      },
+      {
+        id: "33333333-3333-3333-3333-333333333333",
+        kind_code: "CERT_ERDS_ENTREGA",
+        label: "Certificado de entrega electrónica certificada ERDS",
+        source_domain: "erds",
+        legal_effect: "TERCERO",
+        requires_visto_bueno: false,
+        requires_rm_reference: false,
+        requires_qes: true,
+        template_binding_key: null,
+        authority_policy: null,
+        disclaimer_policy: null,
+        is_active: true,
+      },
+    ];
+
+    const { incluidos, excluidos } = seleccionarCertificationKinds(tiposPrueba);
+    expect(incluidos).toHaveLength(1);
+    expect(incluidos[0].kind_code).toBe("CERT_ACUERDO_360");
+    expect(excluidos).toHaveLength(2);
+    expect(excluidos.map((e) => e.etiqueta)).toEqual(
+      expect.arrayContaining(["CERT_ENVIO_CONVOCATORIA", "CERT_ERDS_ENTREGA"]),
+    );
+  });
+
+  it("clonarCertificationKind: id determinista, tenantId explícito y requires_qes siempre false", () => {
+    const origen: StandaloneCertificationKindOrigen = {
+      id: "11111111-1111-1111-1111-111111111111",
+      kind_code: "CERT_VIGENCIA_CARGO",
+      label: "Certificado de vigencia de cargo",
+      source_domain: "condiciones_persona",
+      legal_effect: "TERCERO",
+      requires_visto_bueno: true,
+      requires_rm_reference: true,
+      requires_qes: false,
+      template_binding_key: "CERTIFICACION_AUTONOMA:VIGENCIA_CARGO",
+      authority_policy: { test: true },
+      disclaimer_policy: { demo: true },
+      is_active: true,
+    };
+
+    const c = clonarCertificationKind(spec, origen);
+    expect(c.tenant_id).toBe(spec.tenantId);
+    expect(c.kind_code).toBe("CERT_VIGENCIA_CARGO");
+    expect(c.requires_qes).toBe(false);
+    expect(c.is_active).toBe(true);
+    expect(c.id).toBe(clonarCertificationKind(spec, origen).id);
+    expect(c.id).not.toBe(origen.id);
   });
 });

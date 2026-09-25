@@ -190,8 +190,23 @@ export interface PackBasePlantilla {
   fecha_aprobacion_origen: string | null;
 }
 
+export interface StandaloneCertificationKindOrigen {
+  id: string;
+  kind_code: string;
+  label: string;
+  source_domain: string;
+  legal_effect: string;
+  requires_visto_bueno: boolean;
+  requires_rm_reference: boolean;
+  requires_qes: boolean;
+  template_binding_key: string | null;
+  authority_policy: Record<string, unknown> | null;
+  disclaimer_policy: Record<string, unknown> | null;
+  is_active: boolean;
+}
+
 export interface Exclusion {
-  tabla: "rule_packs" | "jurisdiction_rule_sets" | "plantillas_protegidas";
+  tabla: "rule_packs" | "jurisdiction_rule_sets" | "plantillas_protegidas" | "standalone_certification_kinds";
   source_id: string;
   etiqueta: string;
   motivo: string;
@@ -356,6 +371,51 @@ export function seleccionarPlantillas(filas: PlantillaOrigen[], jurisdiccion = "
   return { incluidas, excluidas, avisos };
 }
 
+const TERMINOS_CERTIFICACION_NO_VIGENTE =
+  /\bERDS\b|entrega\s+electr[oó]nica|entrega\s+certificada|\benv[ií]o\b|\benviad|firma\s+(electr[oó]nica\s+)?cualificada|\bQES\b|sello\s+de\s+tiempo/i;
+
+export function seleccionarCertificationKinds(filas: StandaloneCertificationKindOrigen[]): {
+  incluidos: StandaloneCertificationKindOrigen[];
+  excluidos: Exclusion[];
+} {
+  const incluidos: StandaloneCertificationKindOrigen[] = [];
+  const excluidos: Exclusion[] = [];
+  const orden = (k: StandaloneCertificationKindOrigen) => k.kind_code;
+  for (const f of [...filas].sort((a, b) => orden(a).localeCompare(orden(b)))) {
+    const etiqueta = f.kind_code;
+    if (!f.is_active) {
+      excluidos.push({
+        tabla: "standalone_certification_kinds",
+        source_id: f.id,
+        etiqueta,
+        motivo: "inactivo en el origen",
+      });
+      continue;
+    }
+    if (f.requires_qes === true) {
+      excluidos.push({
+        tabla: "standalone_certification_kinds",
+        source_id: f.id,
+        etiqueta,
+        motivo: "afirma firma cualificada (requires_qes)",
+      });
+      continue;
+    }
+    const texto = `${f.kind_code} ${f.label}`;
+    if (TERMINOS_CERTIFICACION_NO_VIGENTE.test(texto)) {
+      excluidos.push({
+        tabla: "standalone_certification_kinds",
+        source_id: f.id,
+        etiqueta,
+        motivo: "afirma envío, entrega o capacidad no vigente",
+      });
+      continue;
+    }
+    incluidos.push(f);
+  }
+  return { incluidos, excluidos };
+}
+
 // ─────────────────────────── clonado a un tenant ───────────────────────────
 
 export function packIdPara(spec: Pick<TenantSpec, "packIdPrefix">, sourceId: string): string {
@@ -406,6 +466,24 @@ export function clonarRuleSet(spec: TenantSpec, r: PackBaseRuleSet) {
     is_active: true,
     pack_id: null,
     rule_config: r.rule_config,
+  };
+}
+
+export function clonarCertificationKind(spec: TenantSpec, k: StandaloneCertificationKindOrigen) {
+  return {
+    id: uuidV5(`${spec.tenantId}:certification_kind:${k.kind_code}`),
+    tenant_id: spec.tenantId,
+    kind_code: k.kind_code,
+    label: k.label,
+    source_domain: k.source_domain,
+    legal_effect: k.legal_effect,
+    requires_visto_bueno: k.requires_visto_bueno,
+    requires_rm_reference: k.requires_rm_reference,
+    requires_qes: false,
+    template_binding_key: k.template_binding_key,
+    authority_policy: k.authority_policy,
+    disclaimer_policy: k.disclaimer_policy,
+    is_active: true,
   };
 }
 
