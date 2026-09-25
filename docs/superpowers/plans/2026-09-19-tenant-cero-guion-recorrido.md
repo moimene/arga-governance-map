@@ -137,10 +137,15 @@ Severidad: **B** bloquea el recorrido · **A** capacidad ausente · **M** defect
    - 3 Sociedades (1 Matriz SA, 2 Filiales SL/SLU — todas en `OPERATIVA`), 8 Órganos, 13 Personas (9 físicas + 1 jurídica socia + 3 auxiliares), 8 Condiciones/cargos, 6 Evidencias de autoridad.
    - 2 Convocatorias de Consejo de Administración en Cloud (1 canónica `28bc0b69…` con reunión y 1 huérfana `64532414…` por doble emisión documentada en H-26; 0 convocatorias de Junta emitida debido al bloqueo por gate PRE `0AK01`).
    - 1 Reunión (`CONVOCADA`, bloqueo cronológico verificado), 4 Acuerdos, 1 Acuerdo sin sesión (`ADOPTED`, 3 votos WORM), 1 Decisión socio único formalizada, 1 Expediente registral (`PRESENTADA`, `ASIENTO-2026-0925-001`), 38 Libros obligatorios, 5 Registros de capital holdings (Cap table 100% verificado).
-4. **Seguimiento en Linear:**
-   - **MOI-219**: Resuelto y aplicado en Cloud mediante migración (soporte de administradores sin Consejo en `fn_promover_sociedad_operativa`, pasando filiales a `OPERATIVA`).
-   - **MOI-220**: Capacidad ausente para modificar sociedad matriz y % de participación post-alta (Hueco 2).
+4. **Seguimiento en Linear y Correcciones Metodológicas (Ratificadas por Moisés el 2026-09-25):**
+   - **Corrección 1 (2.7 Creación de comisión post-alta)**: Se constató en pantalla la existencia del modal de creación de comisiones en `/secretaria/catalogo-organos` (H-13, desmintiendo la sospecha de ausencia).
+   - **Corrección 2 (Paso Reglas)**: Anotado el paso de diagnóstico, activación y mapeo de reglas LSC para los órganos creados.
+   - **Corrección 3 (Declaración de ejecución asistida en 4.6 - D5)**: Se declara formalmente que para probar el flujo de tramitación registral en 4.6 sin esperar a la celebración formal de la sesión del Consejo, el acuerdo inscribible `172f33d4` fue insertado de forma programática. Asimismo, se anota que la materia `NOMBRAMIENTO_CONSEJERO` corresponde estatutariamente a la Junta General (art. 214 LSC) salvo supuesto de cooptación (art. 244 LSC); en un ciclo ordinario de producción, el trámite se originará desde la sesión de Junta.
+   - **Corrección 4 (Aceptación de Moisés)**: Recorrido aceptado formalmente por Moisés el 2026-09-25 con estas cuatro salvedades metodológicas incorporadas.
+   - **MOI-219**: Resuelto y aplicado en Cloud mediante migración (soporte de administradores sin Consejo en `fn_promover_sociedad_operativa`, pasando filiales a `OPERATIVA`). Saneado registro duplicado D1 en Cloud DB (359 versiones).
+   - **MOI-220**: Duplica **MOI-148** («Secretaría · Poder cambiar la sociedad matriz o el porcentaje de participación después del alta»), traspasada la evidencia del Hueco 2 a MOI-148 y marcado MOI-220 como duplicado.
    - **MOI-221**: Idempotencia y protección anti-duplicación en emisión de convocatorias (H-26).
    - **MOI-142** / **MOI-143**: Emisión de convocatorias y actas de Junta General de accionistas.
    - **MOI-144** / **MOI-145**: Custodia final y catálogo de certificaciones autónomas.
 5. **Próximos bloques:** Los bloques 5 (AIMS 360), 6 (GRC Compass) y 7 (Canal interno SII) completarán el recorrido de **operatividad integral**, abordados en sus tareas correspondientes de backlog (MOI-55, MOI-146).
+

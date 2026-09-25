@@ -36,10 +36,6 @@ dist-ssr
 .claude-flow/data/
 .claude-flow/logs/
 .claude-flow/sessions/
-
-# Project-local Archify runtime (provenance pinned in docs/architecture)
-.agents/skills/archify/
-
 # Serena (codebase indexing tool — local cache, no committable)
 .serena/
 
@@ -61,10 +57,6 @@ playwright-report/
 test-results/
 .playwright-mcp/
 .vercel
-
-# Archify browser evidence contains machine-local absolute paths
-docs/architecture/*.visual-check.*
-
 # External skill/MCP material (EAD Trust, etc.)
 skill y MCP EAD TRUST/
 

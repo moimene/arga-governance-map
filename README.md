@@ -15,7 +15,3 @@ Durante la fase actual de desarrollo-test-demo, `governance_OS` (`hzqwefkwsxopwr
 Staging está preparado como capacidad futura/pre-release para E2E destructivos y aislamiento, pero no bloquea la evolución actual del prototipo. Antes de tocar Supabase hay que ejecutar `bun run db:check-target` y confirmar que el target es `governance_OS`.
 
 Detalle: `docs/superpowers/specs/2026-05-17-governance-os-active-dev-environment-policy.md`.
-
-## Arquitectura de la plataforma
-
-El [atlas funcional navegable](docs/architecture/index.html) reúne el panorama TGMS y cinco mapas de detalle generados con Archify. La metodología está en [`docs/architecture/README.md`](docs/architecture/README.md); las fuentes tipadas se validan con `bun run architecture:validate`, los seis HTML se regeneran con `bun run architecture:build` y su profundidad responsive se comprueba con `bun run architecture:depth-check`.

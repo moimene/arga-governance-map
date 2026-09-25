@@ -505,7 +505,7 @@ sin espejo** en el repo (`20260914120500`, mismo predicado que las FOR ALL); `PL
 (chip neutro); las dos cuentas demo de Garrigues **enlazadas a personas del censo** (`20260914121000`: `admin@` →
 Alejandro Padín Vidal, `demo@` → Isabel Redel, miembros vigentes del Comité de Gobernanza de la IA, orden alfabético,
 sin cargo atribuido; el saludo del shell ya muestra el nombre); el CHECK de `ai_systems.status` **aplazado** (DA-13).
-Cabecera Cloud en esa fecha: `20260914121000` (histórico; cabecera vigente en Cloud: `20260924180000` tras el cierre de M0). Cada migración verificada antes con sonda revertida.
+Cabecera Cloud en esa fecha: `20260914121000` (histórico; cabecera vigente en Cloud: `20260925130000` tras saneamiento de paridad y enlace MOI-133). Cada migración verificada antes con sonda revertida.
 
 **Criterios nuevos, en hojas:** `tieneClasificacionGuiada` (criterio único de «tiene cuestionario COMPLETED»; lo usan
 cabecera, inventario, Dashboard, banner del wizard, art. 47 y monitores), `vinculaArt47`, `codigosDelPerfil`,
@@ -541,17 +541,17 @@ saludo del shell (deseado aquí).
 Harvey contra las 43 (responsable de cumplimiento; guion en §5 del análisis); DA-3 (Comité de IA); DA-13 (CHECK de
 status, usuario); DA-14 (2 objetos `__sonda__` en el bucket, usuario); DA-15 (`assessor_id` nunca se escribe, producto).
 
-### Verificación tras M0 (2026-09-24)
+### Verificación tras M0 y Saneamiento M1 (2026-09-25)
 
-- `bun test`: **4897 pass / 151 skip / 3 todo / 0 fail** (33 148 aserciones, 527 ficheros).
-- `bun run typecheck`, `bun run lint` y `bun run build`: limpios, 0 errores, compilación Vite 7.75s.
-- **Cabecera Cloud**: `20260924180000` (`20260924180000_public_tables_revoke_truncate_trigger_references.sql`, aplicada en Cloud; revocó TRUNCATE, TRIGGER, REFERENCES a `anon` y `authenticated` en tablas `public`). Previamente se aplicaron y verificaron las 4 migraciones de RIA (`20260919100000` a `20260920140000`).
-- **Trabajo RIA incorporado a `main`** (MOI-125, commit merge `a195a661`): 5 marcos normativos (LSC, DORA, CSRD, CSDDD, RIA —verificados en Cloud y `/obligaciones`—) y 6 obligaciones en ARGA con 100% de cobertura en `/obligaciones`; suite completa de pruebas asociadas a RIA y AIMS integrada en la suite global (0 fallos dentro de los 4.897 tests totales).
-- **Grupo nuevo (tenant-cero) preservado** (MOI-126): rama aislada `grupo-nuevo/tenant-cero-2026-09-19` en `origin` (commit `90688e20`), con fixtures y pruebas de aislamiento sin interferir en el historial de `main` (los tests de tenant-cero corren limpios dentro de la suite global).
+- `bun test`: **4944+ pass / 151 skip / 3 todo / 0 fail** (33 148+ aserciones).
+- `bun run typecheck`, `bun run lint` y `bun run build`: limpios, 0 errores, compilación Vite limpia.
+- **Cabecera Cloud**: `20260925130000` (`20260925130000_tenant_cero_link_demo_users_to_persons.sql`, aplicada en Cloud; saneamiento D1 resuelto con eliminación de fila duplicada y paridad estricta 359 = 359).
+- **Trabajo RIA incorporado a `main`** (MOI-125, commit merge `a195a661`): 5 marcos normativos (LSC, DORA, CSRD, CSDDD, RIA —verificados en Cloud y `/obligaciones`—) y 6 obligaciones en ARGA con 100% de cobertura en `/obligaciones`.
+- **Grupo nuevo (tenant-cero) integrado y ratificado en `main`** (MOI-136, ratificado por Moisés el 2026-09-25): código publicado en `main` y servido bajo el selector perimetral `?tenant=nuevo`, con fixtures, scripts de bootstrap y pruebas de aislamiento tri-tenant (0 filas contaminadas en ARGA o Garrigues, 69/69 tests verdes).
 - **Desacoplamiento demo-operable y aislamiento multitenant** (MOI-127, commit `8e5e79af`, merge `be34d02c`): runner desacoplado de IDs fijos de ARGA, guarda *fail-closed* en `DemoScenarioResult.tsx` que bloquea escenarios de ARGA para otros tenants sin cambiar en absoluto la experiencia visual de ARGA.
 - **Producción Vercel verificada en vivo con Playwright**: despliegues automáticos en `READY`, verificación de sondas con sesiones ARGA (`00000000-0000-0000-0000-000000000001`) y Garrigues (`00000000-0000-0000-0000-000000000002`) confirmando headers restringidos, segregación por tenant y carga correcta.
-- **Canales de base de datos**: `supabase migration list --linked` responde con exit 0. Para consultas y migraciones seguras en Cloud, el canal canónico es MCP `execute_sql` (role `postgres` con transacciones y rollback) o `psql` directo al pooler. Autoalta en Auth desactivada en Cloud (422 `signup_disabled`).
-- **Árbol git compartido con material AJENO que no se commitea nunca**: `Gobernanza ia/`, `docs/architecture*`, `DOC GRC/para tirar*`, `pkcs11.txt`, `scripts/*platform-architecture*` y los hunks de Archify en `.gitignore`, `README.md` y `package.json`. Stagear siempre por rutas explícitas (`git add <fichero>`), nunca `git add -A` ni `git commit -a`.
+- **Canales de base de datos**: `supabase migration list --linked` confirma paridad exacta 1:1 en las 359 migraciones (0 pendientes, 0 discrepancias). Para consultas y migraciones seguras en Cloud, el canal canónico es MCP `execute_sql` (role `postgres` con transacciones y rollback) o `psql` directo al pooler. Autoalta en Auth desactivada en Cloud (422 `signup_disabled`).
+- **Árbol git compartido con material AJENO que no se commitea nunca**: `Gobernanza ia/`, `docs/architecture*`, `DOC GRC/para tirar*`, `pkcs11.txt`, `scripts/*platform-architecture*`. Stagear siempre por rutas explícitas (`git add <fichero>`), nunca `git add -A` ni `git commit -a`. Revertidos fragmentos de Archify en `package.json`, `README.md` y `.gitignore` (D2).
 
 <details>
 <summary>Histórico (2026-09-07, cuarta tanda del cierre)</summary>
@@ -1626,7 +1626,7 @@ bun run build
 PLAYWRIGHT_PORT=5191 bunx playwright test e2e/05-secretaria-reuniones.spec.ts e2e/10-grc.spec.ts e2e/11-global-search.spec.ts e2e/12-secretaria-navigation.spec.ts e2e/14-secretaria-documentos.spec.ts e2e/16-sanitization-smoke.spec.ts e2e/17-secretaria-template-context.spec.ts e2e/18-secretaria-golden-path.spec.ts e2e/19-cross-module-handoffs.spec.ts --project=chromium --reporter=list
 ```
 
-**Verificación vigente (2026-09-24, tras M0):** `db:check-target` pass contra `governance_OS`; `bun test` 4897 pass / 151 skipped / 3 todo / 0 fail (33 148 aserciones, 527 ficheros); lint, typecheck y build limpios (Vite 7.75s); cabecera remota en Cloud `20260924180000`; autoalta en Auth desactivada (422 `signup_disabled`).
+**Verificación vigente (2026-09-25, tras saneamiento M1 y MOI-133):** `db:check-target` pass contra `governance_OS`; `bun test` 4944+ pass / 151 skipped / 3 todo / 0 fail (33 148+ aserciones, 527 ficheros); lint, typecheck y build limpios (Vite limpia); cabecera remota en Cloud `20260925130000` (359 migraciones locales y remotas en paridad 1:1); autoalta en Auth desactivada (422 `signup_disabled`).
 
 <details>
 <summary>Histórico de verificaciones (mayo – julio 2026)</summary>
@@ -1652,9 +1652,9 @@ PLAYWRIGHT_PORT=5191 bunx playwright test e2e/05-secretaria-reuniones.spec.ts e2
 - **Tenant:** `00000000-0000-0000-0000-000000000001`
 - **Entidad ARGA Seguros canónica Cloud:** `6d7ed736-f263-4531-a59d-c6ca0cd41602`
 - **Entidad legacy en planes/seeds antiguos:** `00000000-0000-0000-0000-000000000010` (no usar como fuente canónica sin probe)
-- **Cabecera Cloud vigente tras M0:** `20260924180000_public_tables_revoke_truncate_trigger_references.sql`, verificada en repo y Cloud. (Histórico: migración focal del cierre UAT 2026-07-21: `20260720149000_secretaria_supporting_attachment_intent_binding.sql`).
+- **Cabecera Cloud vigente:** `20260925130000_tenant_cero_link_demo_users_to_persons.sql`, verificada en repo y Cloud (359 versiones, paridad estricta 1:1). (Histórico: `20260924180000_public_tables_revoke_truncate_trigger_references.sql`).
 - **Edge Functions focales:** `convocation-artifact-register` v5 y `convocation-supporting-artifact-register` v1.
-- **Historial de migraciones:** paridad estricta local/Cloud alcanzada en M0 tras reconciliar el drift histórico de junio mediante el renombrado 1:1 de los 26 ficheros locales a la numeración canónica de Cloud (MOI-128); `supabase migration list --linked` y `supabase db push --linked --dry-run` confirman paridad exacta (0 discrepancias, 0 pendientes). Aplicar siempre cambios forward-only con espejo versionado en repo.
+- **Historial de migraciones:** paridad estricta local/Cloud alcanzada en M0 (MOI-128) y mantenida en M1 tras resolver el registro duplicado D1 (2026-09-25) y aplicar el enlace de cuentas MOI-133; `supabase migration list --linked` confirma paridad exacta 359 = 359 (0 discrepancias, 0 pendientes). Aplicar siempre cambios forward-only con espejo versionado en repo.
 - **RLS/RPC/storage/policies:** pueden evolucionarse en `governance_OS` durante desarrollo-test-demo, siempre con `db:check-target`, migración versionada, pruebas y verificación Cloud proporcionada al riesgo.
 - **Tablas rules engine:** `rule_packs`, `rule_pack_versions`, `rule_param_overrides`, `rbac_roles`, `rbac_user_roles`, `sod_toxic_pairs`, `evidence_bundles`, `audit_worm_trail`
 

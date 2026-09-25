@@ -18,6 +18,8 @@ if (!process.env.DEMO_PASSWORD_ARGA) {
         const eqIdx = trimmed.indexOf("=");
         if (eqIdx > 0) {
           const key = trimmed.slice(0, eqIdx).trim();
+          // D8: Restringir a variables estrictamente necesarias para tests (DEMO_PASSWORD_*)
+          if (!key.startsWith("DEMO_PASSWORD_")) continue;
           let val = trimmed.slice(eqIdx + 1).trim();
           if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
             val = val.slice(1, -1);
