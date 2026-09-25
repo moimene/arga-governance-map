@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Building2, ChevronLeft, Coins, Layers, Users, Gavel, UserCheck,
   ShieldCheck, Scroll, UserPlus, ArrowRightLeft, BookOpen,
@@ -104,7 +106,45 @@ export default function SociedadDetalle() {
   const { id } = useParams<{ id: string }>();
   const [tab, setTab] = useState<TabId>("perfil");
   const scope = useSecretariaScope();
+  const queryClient = useQueryClient();
   const { data: s, isLoading } = useSociedad(id);
+  const [isPromoting, setIsPromoting] = useState(false);
+
+  const handlePromover = async () => {
+    if (!s?.id || !s?.tenant_id) return;
+    setIsPromoting(true);
+    try {
+      const { data: promResult, error: promError } = await supabase.rpc(
+        "fn_promover_sociedad_operativa",
+        {
+          p_tenant_id: s.tenant_id,
+          p_entity_id: s.id,
+        },
+      );
+      if (promError) {
+        toast.warning("No se pudo promover a operativa", {
+          description: promError.message,
+        });
+      } else if (
+        promResult &&
+        typeof promResult === "object" &&
+        "already_operativa" in promResult &&
+        promResult.already_operativa === true
+      ) {
+        toast.info("La sociedad ya estaba en estado operativa");
+        await queryClient.invalidateQueries({ queryKey: ["sociedades"] });
+      } else {
+        toast.success("Sociedad promovida a OPERATIVA correctamente");
+        await queryClient.invalidateQueries({ queryKey: ["sociedades"] });
+      }
+    } catch (err) {
+      toast.error("Error al re-evaluar la sociedad", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setIsPromoting(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -167,18 +207,30 @@ export default function SociedadDetalle() {
 
       {s.onboarding_status && s.onboarding_status !== "OPERATIVA" ? (
         <div
-          className="mb-5 flex items-start gap-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 text-sm text-[var(--g-text-secondary)]"
+          className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 text-sm text-[var(--g-text-secondary)]"
           style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
         >
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
-          <div>
-            <p className="font-semibold text-[var(--g-text-primary)]">
-              Alta pendiente: {onboardingStatusLabel(s.onboarding_status)}
-            </p>
-            <p className="mt-1">
-              La ficha existe y es navegable, pero todavía quedan datos o cargos iniciales por completar antes de tratarla como operativa.
-            </p>
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+            <div>
+              <p className="font-semibold text-[var(--g-text-primary)]">
+                Alta pendiente: {onboardingStatusLabel(s.onboarding_status)}
+              </p>
+              <p className="mt-1">
+                La ficha existe y es navegable, pero todavía quedan datos o cargos iniciales por completar antes de tratarla como operativa.
+              </p>
+            </div>
           </div>
+          <button
+            type="button"
+            disabled={isPromoting}
+            aria-busy={isPromoting}
+            onClick={handlePromover}
+            className="inline-flex shrink-0 items-center justify-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-brand-3308)] px-3 py-2 text-xs font-semibold text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-60"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            {isPromoting ? "Re-evaluando…" : "Re-evaluar y promover a operativa"}
+          </button>
         </div>
       ) : null}
 
