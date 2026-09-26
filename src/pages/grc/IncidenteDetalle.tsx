@@ -1,10 +1,10 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useIncident, type RegulatoryNotificationLite } from "@/hooks/useIncidents";
-import { hoursUntilDeadline, deadlineLabel } from "@/hooks/useRegulatoryNotif";
-import { 
-  ArrowLeft, Clock, CheckCircle, AlertTriangle, Send, Route, 
-  PenTool, Loader2, FileText, CheckCircle2, ShieldCheck, AlertCircle, 
-  ExternalLink, Users, MessageSquareText, ShieldAlert 
+import { hoursUntilDeadline, deadlineLabel, useCreateRegulatoryNotification } from "@/hooks/useRegulatoryNotif";
+import {
+  ArrowLeft, Clock, CheckCircle, AlertTriangle, Send, Route,
+  PenTool, Loader2, FileText, CheckCircle2, ShieldCheck, AlertCircle,
+  ExternalLink, Users, MessageSquareText, ShieldAlert, Plus
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -87,7 +87,14 @@ export default function IncidenteDetalle() {
   const [showDelayModal, setShowDelayModal] = useState(false);
   const [delayReason, setDelayReason] = useState("");
   const [clientCommSent, setClientCommSent] = useState(false);
-  
+
+  // MOI-149 (D-23): alta por pantalla de notificaciones regulatorias.
+  const createRegNot = useCreateRegulatoryNotification();
+  const [showRegNotForm, setShowRegNotForm] = useState(false);
+  const [regNotAuthority, setRegNotAuthority] = useState("");
+  const [regNotType, setRegNotType] = useState("");
+  const [regNotDeadline, setRegNotDeadline] = useState("");
+
   // Escalation form fields
   const [escalateMatter, setEscalateMatter] = useState("");
   const [escalateCommittee, setEscalateCommittee] = useState("CDA");
@@ -163,6 +170,34 @@ export default function IncidenteDetalle() {
     // Decir "transmitida formalmente a la autoridad" era afirmar un acto que no
     // ocurre.
     toast.info("Justificación anotada solo en esta pantalla. No se ha transmitido nada a la autoridad supervisora.");
+  };
+
+  const handleCreateRegNot = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!regNotAuthority.trim()) {
+      toast.error("Indique la autoridad destinataria.");
+      return;
+    }
+    createRegNot.mutate(
+      {
+        authority: regNotAuthority,
+        notificationType: regNotType || null,
+        notificationDeadline: regNotDeadline ? new Date(regNotDeadline).toISOString() : null,
+        incidentId: incident.id,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Notificación regulatoria registrada.");
+          setRegNotAuthority("");
+          setRegNotType("");
+          setRegNotDeadline("");
+          setShowRegNotForm(false);
+        },
+        onError: (err) => {
+          toast.error(err instanceof Error ? err.message : "No se pudo registrar la notificación.");
+        },
+      }
+    );
   };
 
   const handleSendClientCommunication = () => {
@@ -463,12 +498,83 @@ export default function IncidenteDetalle() {
             className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)]"
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
           >
-            <div className="px-5 py-4 border-b border-[var(--g-border-subtle)] flex items-center gap-2">
-              <Send className="h-4 w-4 text-[var(--g-brand-3308)]" />
-              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
-                Registro de Notificaciones Regulatorias
-              </h2>
+            <div className="px-5 py-4 border-b border-[var(--g-border-subtle)] flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Send className="h-4 w-4 text-[var(--g-brand-3308)]" />
+                <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
+                  Registro de Notificaciones Regulatorias
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRegNotForm((v) => !v)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] transition-colors"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {showRegNotForm ? "Cancelar" : "Añadir notificación"}
+              </button>
             </div>
+
+            {showRegNotForm && (
+              <form
+                onSubmit={handleCreateRegNot}
+                className="px-5 py-4 border-b border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] grid grid-cols-1 sm:grid-cols-3 gap-3"
+              >
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="regnot-authority" className="text-xs font-medium text-[var(--g-text-primary)]">
+                    Autoridad *
+                  </label>
+                  <input
+                    id="regnot-authority"
+                    type="text"
+                    required
+                    value={regNotAuthority}
+                    onChange={(e) => setRegNotAuthority(e.target.value)}
+                    placeholder="DGSFP, CNMV, AEPD…"
+                    className="h-9 px-3 text-sm border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="regnot-type" className="text-xs font-medium text-[var(--g-text-primary)]">
+                    Tipo de notificación
+                  </label>
+                  <input
+                    id="regnot-type"
+                    type="text"
+                    value={regNotType}
+                    onChange={(e) => setRegNotType(e.target.value)}
+                    placeholder="Notificación inicial, informe intermedio…"
+                    className="h-9 px-3 text-sm border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="regnot-deadline" className="text-xs font-medium text-[var(--g-text-primary)]">
+                    Plazo
+                  </label>
+                  <input
+                    id="regnot-deadline"
+                    type="datetime-local"
+                    value={regNotDeadline}
+                    onChange={(e) => setRegNotDeadline(e.target.value)}
+                    className="h-9 px-3 text-sm border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  />
+                </div>
+                <div className="sm:col-span-3 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={createRegNot.isPending}
+                    className="px-4 py-1.5 text-xs font-semibold bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-50 transition-colors"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    {createRegNot.isPending ? "Registrando…" : "Registrar notificación"}
+                  </button>
+                </div>
+              </form>
+            )}
 
             {regNots.length === 0 ? (
               <div className="px-5 py-6 text-sm text-[var(--g-text-secondary)]">

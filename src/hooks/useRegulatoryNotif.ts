@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { buildRegulatoryNotificationInsert } from "@/lib/grc/regulatory-notification-insert";
 
 export function useRegulatoryNotifications() {
   const { tenantId } = useTenantContext();
@@ -17,6 +18,44 @@ export function useRegulatoryNotifications() {
         .order("notification_deadline", { ascending: true });
       if (error) throw error;
       return data ?? [];
+    },
+  });
+}
+
+/**
+ * MOI-149 (D-23, alta por pantalla): único camino de escritura sobre
+ * `regulatory_notifications` en toda la aplicación. `tenantId` sale de la
+ * sesión (`useTenantContext`), nunca del formulario, para que el alta no
+ * pueda aterrizar en un tenant distinto del que la creó.
+ */
+export function useCreateRegulatoryNotification() {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      authority: string;
+      notificationType?: string | null;
+      notificationDeadline?: string | null;
+      incidentId?: string | null;
+      referenceNumber?: string | null;
+    }) => {
+      if (!tenantId) throw new Error("Sin tenant de sesión: no se puede dar de alta la notificación.");
+      const row = buildRegulatoryNotificationInsert({ ...input, tenantId });
+      const { data, error } = await supabase
+        .from("regulatory_notifications")
+        .insert(row)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["grc", tenantId, "regulatory-notifications"] });
+      qc.invalidateQueries({ queryKey: ["grc", "alertas"] });
+      qc.invalidateQueries({ queryKey: ["grc", "incidents"] });
+      if (variables.incidentId) {
+        qc.invalidateQueries({ queryKey: ["grc", "incident", variables.incidentId] });
+      }
     },
   });
 }
