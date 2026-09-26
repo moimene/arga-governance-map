@@ -9,6 +9,7 @@ import {
   normalizeCapa3Draft,
   normalizeCapa3Fields,
   normalizeNumberDraftValue,
+  resolveNumberDraftInput,
 } from "../capa3-fields";
 
 describe("capa3-fields", () => {
@@ -450,6 +451,32 @@ describe("MOI-206 — campos boolean/booleano y number/numero con tipo real", ()
       expect(normalizeNumberDraftValue("")).toBeUndefined();
       expect(normalizeNumberDraftValue("no aplica")).toBeUndefined();
       expect(normalizeNumberDraftValue(null)).toBeUndefined();
+    });
+  });
+
+  describe("resolveNumberDraftInput — MOI-206 (revisión): tecleo intermedio no se descarta", () => {
+    it("conserva el '-' inicial de un negativo en vez de descartarlo", () => {
+      // Regresión: handleNumberChange comprobaba Number.isFinite(Number(raw))
+      // antes de guardar, así que un "-" (Number("-") es NaN) no actualizaba
+      // el borrador y el <input> controlado revertía al valor anterior en
+      // cada pulsación — imposible teclear un negativo pese a que field.min
+      // puede ser negativo (p.ej. un importe).
+      expect(resolveNumberDraftInput("-")).toBe("-");
+    });
+
+    it("conserva un decimal a medio escribir ('3.')", () => {
+      expect(resolveNumberDraftInput("3.")).toBe("3.");
+      expect(resolveNumberDraftInput("-5.")).toBe("-5.");
+    });
+
+    it("un número completo, positivo o negativo, pasa igual", () => {
+      expect(resolveNumberDraftInput("-5")).toBe("-5");
+      expect(resolveNumberDraftInput("42")).toBe("42");
+    });
+
+    it("solo el texto vacío (o solo espacios) se trata como 'sin contestar'", () => {
+      expect(resolveNumberDraftInput("")).toBeUndefined();
+      expect(resolveNumberDraftInput("   ")).toBeUndefined();
     });
   });
 

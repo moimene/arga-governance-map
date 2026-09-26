@@ -309,6 +309,21 @@ export function normalizeNumberDraftValue(value: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+/**
+ * MOI-206 (revisión): valor a guardar en el borrador de un campo `number` a
+ * partir del texto crudo tecleado en el `<input>`. No descarta un tecleo
+ * intermedio no-finito (p.ej. el "-" inicial de un negativo, o "3." antes
+ * del segundo decimal) — solo trata como "sin contestar" (`undefined`, el
+ * borrador borra la clave) el texto vacío. Guardar el string crudo tal cual
+ * evita que el input controlado revierta al valor anterior en cada
+ * pulsación todavía no parseable; `normalizeNumberDraftValue`/
+ * `normalizeCapa3Value` ya saben parsear ese string a número real al
+ * persistir o consumir el borrador.
+ */
+export function resolveNumberDraftInput(raw: string): string | undefined {
+  return raw.trim() === "" ? undefined : raw;
+}
+
 function normalizeOpciones(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const out: string[] = [];

@@ -27,7 +27,7 @@ import {
   isNumberCapa3Field,
   isRequiredCapa3Field,
   normalizeBooleanDraftValue,
-  normalizeNumberDraftValue,
+  resolveNumberDraftInput,
   type Capa3Values,
   type NormalizedCapa3Field,
 } from "@/lib/secretaria/capa3-fields";
@@ -138,12 +138,9 @@ export function Capa3Form({
   const handleNumberChange = useCallback(
     (campo: string, raw: string) => {
       const next = { ...values };
-      if (raw.trim() === "") {
-        delete next[campo];
-      } else {
-        const parsed = Number(raw);
-        if (Number.isFinite(parsed)) next[campo] = parsed;
-      }
+      const resolved = resolveNumberDraftInput(raw);
+      if (resolved === undefined) delete next[campo];
+      else next[campo] = resolved;
       onChange(next as Capa3Values);
     },
     [values, onChange]
@@ -312,7 +309,11 @@ export function Capa3Form({
               <input
                 id={`capa3-${field.campo}`}
                 type="number"
-                value={normalizeNumberDraftValue(rawValue) ?? ""}
+                // MOI-206 fix (revisión): valueText (capa3ValueToText) refleja
+                // el string crudo tal cual mientras se edita — normalizeNumberDraftValue
+                // devolvería "" para un intermedio como "-" o "3." y forzaría
+                // el snap-back del valor controlado en cada tecla.
+                value={valueText}
                 min={field.min}
                 max={field.max}
                 onChange={(e) => handleNumberChange(field.campo, e.target.value)}
