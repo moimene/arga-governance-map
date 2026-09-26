@@ -149,6 +149,7 @@ const LEGAL_REVIEW_FILTER_LABELS: Record<LegalTemplateReviewFilter, string> = {
   MISSING_OWNER: "Falta órgano o forma de adopción",
   DUPLICATE_MATTER: "Duplicidad de plantilla vigente",
   LOCAL_FIXTURE: "Cobertura provisional",
+  OUTDATED_CITATION_PENDING: "Cita desfasada pendiente (MOI-138)",
 };
 
 function normalizeSearch(value?: string | null) {
