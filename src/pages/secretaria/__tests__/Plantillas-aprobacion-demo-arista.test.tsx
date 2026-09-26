@@ -1,13 +1,40 @@
 /**
  * MOI-137 — Prueba de arista (pantalla → librería), página Plantillas.
  *
- * Monta la página completa con datos reales (buildLegalTemplateReviewRows SIN
- * mockear) y comprueba que una plantilla ACTIVA con marcador de demostración
- * en `aprobada_por` nunca se pinta como «Aprobada legalmente». Hoy la página
- * no renderiza ese rótulo en ningún sitio (solo agrega incidencias por flag y
- * muestra el campo crudo `aprobada_por` bajo «Aprobada por», que es honesto);
- * este test es el que cae si algún día alguien vuelve a pintar el rótulo
- * calculado sin pasar por el veto del marcador de demo.
+ * Revisión adversarial (rev.findings[0], severidad P1): la versión anterior
+ * de este test buscaba el texto «Aprobada legalmente» en el DOM, pero
+ * Plantillas.tsx JAMÁS pinta ese literal (solo lee
+ * `reviewByTemplateId.get(id)?.flags.draftVersion` para un aviso puntual) —
+ * el test pasaba con o sin cualquiera de los tres guards de MOI-137 y por
+ * tanto no podía ponerse en rojo nunca. Corregido con la opción (b): se
+ * asierta sobre lo que la página SÍ consume y muestra de verdad — el KPI
+ * «Revisión legal pendiente» del encabezado, que agrega
+ * `reviewSummary.needsReview` (== filas con `requiresLegalReview`, es decir
+ * `!canClaimLegalApproval`) sobre las plantillas vigentes reales
+ * (`buildLegalTemplateReviewRows` SIN mockear).
+ *
+ * Se montan 4 plantillas ACTIVA, cada una diseñada para aislar UN guard:
+ *  - A: marcador de demostración, con un tipo (CERTIFICACION) que el informe
+ *    del Comité Legal aprueba sin condiciones adicionales — si se retira el
+ *    veto `!hasDemoMarker` de `canClaimLegalApproval`, esta fila pasaría a
+ *    "Aprobada legalmente" vía `committeeApproved`.
+ *  - B: cita "aprobada en origen por" (D-20, clon), mismo tipo, mismo efecto
+ *    si se retira `!hasCitedOrigin`.
+ *  - C: tenant Grupo Nuevo (…0003), SIN marcador de demo ni cita de origen,
+ *    pero con `referencia_legal` vacía (un motivo real de revisión) — si se
+ *    retira el gate de tenant D-20 en `resolveLegalTemplateApprovalPlan`, el
+ *    informe de ARGA "aprobaría" esta plantilla de otro tenant y su único
+ *    motivo (falta de referencia) quedaría bypaseado por `committeeApproved`.
+ *  - CTRL: aprobación nominativa real, sin ningún marcador — control
+ *    positivo: si el test escondiera todo indiscriminadamente (p.ej. un KPI
+ *    roto que siempre da 0), esta fila lo destaparía porque SÍ debe contar
+ *    como aprobada y NO debe sumar al contador de revisión pendiente.
+ *
+ * Con los tres guards intactos, el recuento esperado de "revisión legal
+ * pendiente" es exactamente 3 (A + B + C; CTRL no cuenta). Retirar
+ * cualquiera de los tres guards baja ese número a 2 — la aserción por valor
+ * exacto (no solo ">0") es lo que pone el test en rojo. Verificado por
+ * mutación real: ver commit de este cambio.
  */
 import { afterAll as __afterAllRestore, mock as __bunMockRestore } from "bun:test";
 import * as __realModule0 from "react-router-dom";
@@ -80,9 +107,20 @@ vi.mock("@/hooks/useCurrentUser", () => ({
 }));
 
 vi.mock("@/components/secretaria/shell", () => ({
+  // El KPI "Revisión legal pendiente" solo se pinta en modo sociedad con una
+  // entidad seleccionada (Plantillas.tsx:1241) — sin esto, la sección entera
+  // no se monta y no hay nada verificable en el DOM.
   useSecretariaScope: () => ({
-    mode: "grupo",
-    selectedEntity: null,
+    mode: "sociedad",
+    selectedEntity: {
+      id: "entidad-test",
+      name: "Entidad Test",
+      legalName: "Entidad Test S.A.",
+      legalForm: "SA",
+      jurisdiction: "ES",
+      tipoSocial: null,
+      status: "ACTIVA",
+    },
     isLoadingEntities: false,
   }),
 }));
@@ -103,17 +141,20 @@ function renderPlantillas() {
   );
 }
 
-function demoMarkedActiveTemplate(overrides: Partial<PlantillaProtegidaRow> = {}): PlantillaProtegidaRow {
+const ARGA_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+const GARRIGUES_TENANT_ID = "00000000-0000-0000-0000-000000000002";
+const GRUPO_NUEVO_TENANT_ID = "00000000-0000-0000-0000-000000000003";
+
+function baseCertificacion(overrides: Partial<PlantillaProtegidaRow>): PlantillaProtegidaRow {
   return {
-    id: "tpl-demo-marker",
-    tenant_id: "00000000-0000-0000-0000-000000000003",
-    tipo: "MODELO_ACUERDO",
-    materia: "FORMULACION_CUENTAS",
+    id: "tpl-base",
+    tenant_id: ARGA_TENANT_ID,
+    tipo: "CERTIFICACION",
+    materia: null,
     jurisdiccion: "ES",
-    version: "1.0.0",
+    version: "1.2.0",
     estado: "ACTIVA",
-    aprobada_por:
-      "Pack base LSC — clon de la plantilla … aprobada en origen por «Comite Legal ARGA - Secretaria Societaria (demo-operativo)»",
+    aprobada_por: null,
     fecha_aprobacion: "2026-07-01",
     contenido_template: null,
     capa1_inmutable: "Texto jurídico vigente".padEnd(120, "."),
@@ -124,24 +165,85 @@ function demoMarkedActiveTemplate(overrides: Partial<PlantillaProtegidaRow> = {}
     variables: [],
     protecciones: {},
     snapshot_rule_pack_required: false,
-    adoption_mode: "MEETING",
+    adoption_mode: null,
     organo_tipo: "CONSEJO_ADMIN",
-    tipo_social: "SL",
+    tipo_social: null,
     contrato_variables_version: null,
     created_at: "2026-07-01T00:00:00Z",
-    materia_acuerdo: "FORMULACION_CUENTAS",
+    materia_acuerdo: null,
     approval_checklist: null,
     version_history: null,
     ...overrides,
-  };
+  } as PlantillaProtegidaRow;
 }
 
+// A — aísla el veto del marcador de demostración: el informe del Comité
+// Legal aprueba cualquier CERTIFICACION sin condiciones (matcher `{ tipo:
+// "CERTIFICACION" }`), así que sin el guard `!hasDemoMarker` esta fila
+// pasaría a "Aprobada legalmente" por `committeeApproved`.
+const demoMarkerTemplate = baseCertificacion({
+  id: "tpl-demo-marker",
+  materia_acuerdo: "CERT_DEMO_MARKER_TEST",
+  aprobada_por: "Aprobado en sesión demo del Comité Legal",
+});
+
+// B — aísla el veto de citedOriginApproval (D-20): mismo tipo aprobado sin
+// condiciones, pero el texto cita la aprobación de OTRA plantilla ("origen"
+// del clon), nunca de esta copia.
+const citedOriginTemplate = baseCertificacion({
+  id: "tpl-cited-origin",
+  materia_acuerdo: "CERT_CITED_ORIGIN_TEST",
+  aprobada_por: "Pack base — clon de la plantilla de origen, aprobada en origen por «Comité Legal ARGA»",
+});
+
+// C — aísla el gate de tenant D-20: tenant distinto de ARGA, sin marcador de
+// demo ni cita de origen, pero con un motivo real de revisión (falta de
+// referencia legal). Si el informe de ARGA "aprobase" cualquier
+// CERTIFICACION también fuera de ARGA, `committeeApproved` bypasearía ese
+// motivo y la fila pasaría a "Aprobada legalmente".
+const tenantGateTemplate = baseCertificacion({
+  id: "tpl-tenant-gate",
+  tenant_id: GRUPO_NUEVO_TENANT_ID,
+  materia_acuerdo: "CERT_TENANT_GATE_TEST",
+  referencia_legal: null,
+  aprobada_por: "Ratificado por el consejo interno del Grupo Nuevo",
+});
+
+// CTRL — control positivo: aprobación nominativa real, sin ningún marcador.
+// Debe seguir contando como aprobada y NO sumar al contador de revisión
+// pendiente; sin este control, un KPI roto que siempre marcase "0" pasaría
+// el test igualmente.
+const nominativeApprovalTemplate = baseCertificacion({
+  id: "tpl-control-positivo",
+  tenant_id: GARRIGUES_TENANT_ID,
+  materia_acuerdo: "CERT_CONTROL_POSITIVO",
+  aprobada_por: "Alejandro Padín Vidal, Secretario del Consejo de Administración",
+});
+
 describe("Plantillas (página) — MOI-137 arista pantalla→librería", () => {
-  it("no pinta «Aprobada legalmente» ante una plantilla ACTIVA con marcador de demostración", () => {
-    mockState.rows = [demoMarkedActiveTemplate()];
+  it("cuenta exactamente 3 plantillas con revisión legal pendiente (una por guard) y ninguna aprobación real se pierde", () => {
+    mockState.rows = [
+      demoMarkerTemplate,
+      citedOriginTemplate,
+      tenantGateTemplate,
+      nominativeApprovalTemplate,
+    ];
 
     renderPlantillas();
 
+    // Salvaguarda débil (el rótulo calculado no se pinta hoy en esta
+    // página): se conserva para que, si algún día empieza a pintarse sin
+    // pasar por el veto, este test también lo detecte.
     expect(screen.queryAllByText("Aprobada legalmente")).toHaveLength(0);
+
+    // Aserción real: el KPI "Revisión legal pendiente" del encabezado agrega
+    // `requiresLegalReview` sobre las 4 filas vigentes. El valor exacto (3,
+    // no ">0") es lo que cae si se retira cualquiera de los tres guards,
+    // porque cada uno gobierna a UNA sola de las 4 filas.
+    expect(
+      screen.getByText(
+        "Biblioteca operativa con advertencias: 4 plantillas vigentes, 0 archivadas y 3 con revisión legal pendiente.",
+      ),
+    ).toBeInTheDocument();
   });
 });
