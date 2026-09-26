@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient, skipToken } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 
 export type AiSystem = {
   id: string;
@@ -73,7 +74,7 @@ export function useUpdateAiSystem() {
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<AiSystem> }) => {
       const { data, error } = await supabase
         .from("ai_systems")
-        .update(updates)
+        .update(updates as unknown as TablesUpdate<"ai_systems">)
         .eq("tenant_id", tenantId!)
         .eq("id", id)
         .select()

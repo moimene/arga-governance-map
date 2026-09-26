@@ -56,7 +56,7 @@ export function useEvidenceBySystem(systemId: string | undefined) {
         .eq("system_id", systemId)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as AimsEvidenceItem[];
+      return (data ?? []) as unknown as AimsEvidenceItem[];
     } : skipToken,
   });
 }
@@ -142,7 +142,7 @@ export function useRegistrarEvidencia() {
         .select()
         .single();
       if (error) throw error;
-      return data as AimsEvidenceItem;
+      return data as unknown as AimsEvidenceItem;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["aims_evidence_items"] }),
   });
@@ -172,7 +172,7 @@ export function useVincularEvidencia() {
       // La RLS filtra una escritura ajena a cero filas SIN error: sin esto, un
       // vínculo que no se ha guardado se daría por guardado.
       if (!data) throw new Error("No se pudo vincular: la evidencia no es de este entorno.");
-      return data as AimsEvidenceItem;
+      return data as unknown as AimsEvidenceItem;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["aims_evidence_items"] }),
   });

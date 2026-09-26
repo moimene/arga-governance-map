@@ -7,6 +7,7 @@ import {
   type Respuestas,
   type ResultadoCuestionario,
 } from "@/lib/aims/cuestionario-calificacion";
+import type { Json } from "@/integrations/supabase/types";
 
 /**
  * Cuestionario guiado de calificación regulatoria — acceso a
@@ -107,7 +108,7 @@ export function useCuestionariosDeSistema(systemId: string | undefined) {
         .eq("system_id", systemId)
         .order("version", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as CuestionarioCalificacion[];
+      return (data ?? []) as unknown as CuestionarioCalificacion[];
     } : skipToken,
   });
 }
@@ -165,7 +166,7 @@ export function useIniciarCuestionario() {
         .select()
         .single();
       if (error) throw error;
-      return data as CuestionarioCalificacion;
+      return data as unknown as CuestionarioCalificacion;
     },
     onSuccess: (_, systemId) =>
       qc.invalidateQueries({ queryKey: ["aims_classification_questionnaires", tenantId, systemId] }),
@@ -194,7 +195,7 @@ export function useGuardarBorradorCuestionario() {
       if (!data) {
         throw new Error("No se pudo guardar el borrador: no pertenece a este entorno o ya no está en borrador.");
       }
-      return data as CuestionarioCalificacion;
+      return data as unknown as CuestionarioCalificacion;
     },
     onSuccess: (_, v) =>
       qc.invalidateQueries({ queryKey: ["aims_classification_questionnaires", tenantId, v.systemId] }),
@@ -245,8 +246,8 @@ export function useRegistrarSistemaClasificado() {
   return useMutation({
     mutationFn: async ({ sistema, cuestionario }: { sistema: SistemaARegistrar; cuestionario: PayloadCuestionario }) => {
       const { data, error } = await supabase.rpc("fn_aims_registrar_sistema", {
-        p_sistema: sistema,
-        p_cuestionario: cuestionario,
+        p_sistema: sistema as unknown as Json,
+        p_cuestionario: cuestionario as unknown as Json,
       });
       if (error) throw error;
       const fila = (data ?? [])[0] as { system_id: string; cuestionario_id: string; content_hash: string } | undefined;

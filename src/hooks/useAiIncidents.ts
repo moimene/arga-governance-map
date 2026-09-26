@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient, skipToken } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
 export type AiIncident = {
   id: string;
@@ -126,7 +127,7 @@ export function useCreateAiIncident() {
     mutationFn: async (payload: Partial<AiIncident>) => {
       const { data, error } = await supabase
         .from("ai_incidents")
-        .insert({ ...payload, tenant_id: tenantId! })
+        .insert({ ...payload, tenant_id: tenantId! } as unknown as TablesInsert<"ai_incidents">)
         .select()
         .single();
       if (error) throw error;
@@ -145,7 +146,7 @@ export function useUpdateAiIncident() {
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<AiIncident> }) => {
       const { data, error } = await supabase
         .from("ai_incidents")
-        .update(updates)
+        .update(updates as unknown as TablesUpdate<"ai_incidents">)
         .eq("tenant_id", tenantId!)
         .eq("id", id)
         .select()

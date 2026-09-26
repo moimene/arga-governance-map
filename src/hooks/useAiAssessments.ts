@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { checksVigentes } from "@/lib/aims/checks-vigentes";
 import { checksDeLaEvaluacion, type EvaluationCheck } from "@/lib/aims/evaluacion-payload";
+import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
 export type AiRiskAssessment = {
   id: string;
@@ -77,7 +78,7 @@ export function useAssessmentsBySystem(systemId: string | undefined) {
         .eq("system_id", systemId)
         .order("assessment_date", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as AiRiskAssessment[];
+      return (data ?? []) as unknown as AiRiskAssessment[];
     } : skipToken,
   });
 }
@@ -230,7 +231,7 @@ export function useDraftAssessment(systemId: string | undefined, framework: stri
         .order("created_at", { ascending: false })
         .limit(1);
       if (error) throw error;
-      return ((data ?? [])[0] ?? null) as AiRiskAssessment | null;
+      return ((data ?? [])[0] ?? null) as unknown as AiRiskAssessment | null;
     } : skipToken,
     // El borrador es dato del propio usuario: no se refresca por debajo
     // mientras escribe, o el autoguardado pelearía con la recarga.
@@ -279,7 +280,7 @@ export function useSaveAssessment() {
       if (!id) {
         const { data, error } = await supabase
           .from("ai_risk_assessments")
-          .insert({ ...payload, system_id: systemId })
+          .insert({ ...payload, system_id: systemId } as unknown as TablesInsert<"ai_risk_assessments">)
           .select()
           .single();
         if (error) throw error;
@@ -291,7 +292,7 @@ export function useSaveAssessment() {
       //    `draftId` vivo reescribía el borrador de EU_AI_ACT como ISO_42001.
       const { data, error } = await supabase
         .from("ai_risk_assessments")
-        .update(payload)
+        .update(payload as unknown as TablesUpdate<"ai_risk_assessments">)
         .eq("id", id)
         .eq("system_id", systemId)
         .eq("framework", payload.framework)
