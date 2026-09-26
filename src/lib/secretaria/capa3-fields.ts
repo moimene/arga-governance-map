@@ -14,6 +14,13 @@ export interface NormalizedCapa3Field {
   default?: string;
   min_items?: number;
   max_items?: number | null;
+  /**
+   * Límites opcionales para campos `number`/`numero` (MOI-206). Paralelo a
+   * `min_items`/`max_items` de los arrays: se aplican como atributos nativos
+   * `min`/`max` del `<input type="number">`, no como clamp silencioso.
+   */
+  min?: number;
+  max?: number;
   item_schema?: Record<string, NormalizedCapa3ItemField>;
   /**
    * Lista cerrada de opciones permitidas (Codex P2 round 5): si está presente
@@ -35,7 +42,12 @@ export interface NormalizedCapa3ItemField {
 }
 
 export type Capa3ArrayItem = Record<string, string>;
-export type Capa3Value = string | Capa3ArrayItem[];
+/**
+ * MOI-206: los campos `boolean`/`booleano` y `number`/`numero` guardan su
+ * tipo real (en vez de `String(value)`) para que el motor Handlebars no
+ * trate el texto "No" como verdadero. Ver `normalizeCapa3Value`.
+ */
+export type Capa3Value = string | number | boolean | Capa3ArrayItem[];
 export type Capa3Values = Record<string, Capa3Value>;
 
 export interface NormalizedCapa3Draft {
@@ -61,6 +73,8 @@ interface RawCapa3Field {
   opciones?: unknown;
   min_items?: unknown;
   max_items?: unknown;
+  min?: unknown;
+  max?: unknown;
   item_schema?: unknown;
   help_text?: unknown;
 }
@@ -112,8 +126,9 @@ function normalizeDraftValue(value: unknown) {
 
 export function capa3ValueToText(value: unknown) {
   if (value === null || value === undefined) return "";
+  if (typeof value === "boolean") return value ? "Sí" : "No";
   if (typeof value === "string") return value.trim();
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "number") return String(value);
   if (Array.isArray(value)) {
     return value
       .map((item) => {
@@ -233,6 +248,67 @@ export function isArrayCapa3Field(
   return tipo === "array" || tipo === "array_repeatable" || !!field.item_schema;
 }
 
+// MOI-206: predicados de tipo para los campos raíz `boolean`/`booleano` y
+// `number`/`numero` de `capa3_editables`. Solo miran `field.tipo` — los
+// campos sin tipo declarado (la inmensa mayoría, texto libre) no entran por
+// aquí y conservan el comportamiento previo.
+export function isBooleanCapa3Field(field: Pick<NormalizedCapa3Field, "tipo">) {
+  const tipo = field.tipo?.toLowerCase();
+  return tipo === "boolean" || tipo === "booleano";
+}
+
+export function isNumberCapa3Field(field: Pick<NormalizedCapa3Field, "tipo">) {
+  const tipo = field.tipo?.toLowerCase();
+  return tipo === "number" || tipo === "numero";
+}
+
+const YES_TOKENS = new Set(["si", "sí", "yes", "true"]);
+const NO_TOKENS = new Set(["no", "false"]);
+
+function stripAccentsLower(value: string) {
+  return value
+    .trim()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+}
+
+/**
+ * Interpreta un valor de campo `boolean`/`booleano` — venga ya tipado del
+ * nuevo control de tres estados, o como texto legacy de un borrador guardado
+ * antes de MOI-206 ("Sí", "No", "true", "false"…). Devuelve `undefined`
+ * cuando no hay respuesta o el texto no es reconocible (equivale a "sin
+ * contestar", nunca a "no").
+ */
+export function normalizeBooleanDraftValue(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    if (value === 1) return true;
+    if (value === 0) return false;
+    return undefined;
+  }
+  if (typeof value !== "string") return undefined;
+  const token = stripAccentsLower(value);
+  if (!token) return undefined;
+  if (YES_TOKENS.has(token)) return true;
+  if (NO_TOKENS.has(token)) return false;
+  return undefined;
+}
+
+/**
+ * Interpreta un valor de campo `number`/`numero`. Acepta el número real del
+ * nuevo `<input type="number">` y texto legacy con coma decimal española.
+ * Devuelve `undefined` cuando no hay respuesta o el texto no es un número.
+ */
+export function normalizeNumberDraftValue(value: unknown): number | undefined {
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = Number(trimmed.replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 function normalizeOpciones(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const out: string[] = [];
@@ -261,6 +337,17 @@ function normalizeInteger(value: unknown): number | undefined {
 function normalizeMaxItems(value: unknown): number | null | undefined {
   if (value === null) return null;
   return normalizeInteger(value);
+}
+
+/**
+ * MOI-206: límite `min`/`max` de un campo `number`/`numero`. A diferencia de
+ * `normalizeInteger` (cupos de array, siempre entero ≥0) un límite de campo
+ * numérico puede ser negativo o decimal (p.ej. un porcentaje o un importe).
+ */
+function normalizeFiniteNumber(value: unknown): number | undefined {
+  if (typeof value !== "number" && typeof value !== "string") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function normalizeItemSchema(value: unknown): Record<string, NormalizedCapa3ItemField> | undefined {
@@ -340,6 +427,19 @@ function normalizeArrayDraftValue(
 
 function normalizeCapa3Value(field: NormalizedCapa3Field, value: unknown): Capa3Value {
   if (isArrayCapa3Field(field)) return normalizeArrayDraftValue(field, value);
+  // MOI-206: tipo real en vez de String(value). Sin esto, un borrador con
+  // texto "No" llega tal cual a Handlebars y `{{#if campo}}` lo trata como
+  // verdadero (cualquier string no vacío lo es), imprimiendo la cláusula
+  // contraria. `undefined` (sin contestar/irreconocible) se traduce a ""
+  // para no alterar el contrato de "vacío" que ya usa `capa3ValueHasContent`.
+  if (isBooleanCapa3Field(field)) {
+    const parsed = normalizeBooleanDraftValue(value);
+    return parsed === undefined ? "" : parsed;
+  }
+  if (isNumberCapa3Field(field)) {
+    const parsed = normalizeNumberDraftValue(value);
+    return parsed === undefined ? "" : parsed;
+  }
   const normalized = normalizeDraftValue(value);
   // Contrato `opciones` (lista cerrada): los valores fuera de la lista quedan
   // descartados también al normalizar drafts/seeds, no solo en `default`.
@@ -377,6 +477,8 @@ export function normalizeCapa3Fields(value: unknown): NormalizedCapa3Field[] {
     const itemSchema = normalizeItemSchema(raw.item_schema);
     const minItems = normalizeInteger(raw.min_items);
     const maxItems = normalizeMaxItems(raw.max_items);
+    const min = normalizeFiniteNumber(raw.min);
+    const max = normalizeFiniteNumber(raw.max);
     // Codex P2 round 5+16: preservar `default` y `opciones`. Round 16: el
     // empty string "" es un override explícito válido (SQL contract:
     // NULL = no override, "" = clear el campo). Antes el truthiness check
@@ -413,6 +515,8 @@ export function normalizeCapa3Fields(value: unknown): NormalizedCapa3Field[] {
     }
     if (minItems !== undefined) entry.min_items = minItems;
     if (maxItems !== undefined) entry.max_items = maxItems;
+    if (min !== undefined) entry.min = min;
+    if (max !== undefined) entry.max = max;
     if (defaultValue !== undefined) entry.default = defaultValue;
     if (opciones !== undefined) entry.opciones = opciones;
     normalized.push(entry);

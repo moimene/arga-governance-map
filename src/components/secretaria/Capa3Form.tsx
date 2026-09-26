@@ -23,7 +23,11 @@ import {
   capa3ValueHasContent,
   capa3ValueToText,
   isArrayCapa3Field,
+  isBooleanCapa3Field,
+  isNumberCapa3Field,
   isRequiredCapa3Field,
+  normalizeBooleanDraftValue,
+  normalizeNumberDraftValue,
   type Capa3Values,
   type NormalizedCapa3Field,
 } from "@/lib/secretaria/capa3-fields";
@@ -117,6 +121,34 @@ export function Capa3Form({
     [values, onChange]
   );
 
+  // MOI-206: control de tres estados (sí/no/sin contestar). "Sin contestar"
+  // quita la clave en vez de guardar "" — así capa3ValueHasContent distingue
+  // "todavía sin responder" de una respuesta "No" ya persistida.
+  const handleBooleanChange = useCallback(
+    (campo: string, raw: string) => {
+      const next = { ...values };
+      if (raw === "true") next[campo] = true;
+      else if (raw === "false") next[campo] = false;
+      else delete next[campo];
+      onChange(next as Capa3Values);
+    },
+    [values, onChange]
+  );
+
+  const handleNumberChange = useCallback(
+    (campo: string, raw: string) => {
+      const next = { ...values };
+      if (raw.trim() === "") {
+        delete next[campo];
+      } else {
+        const parsed = Number(raw);
+        if (Number.isFinite(parsed)) next[campo] = parsed;
+      }
+      onChange(next as Capa3Values);
+    },
+    [values, onChange]
+  );
+
   const isFieldRequired = (field: Capa3Field): boolean => {
     if (isRequiredCapa3Field(field)) return true;
     if (field.obligatoriedad === "OBLIGATORIO_SI_TELEMATICA" && telematicaEnabled) return true;
@@ -201,8 +233,9 @@ export function Capa3Form({
               {field.descripcion}
             </p>
 
-            {/* Input — Codex P2 round 5: si el campo declara `opciones`,
-                renderiza un <select> con lista cerrada. Si no, textarea libre. */}
+            {/* Input — orden: array → opciones (lista cerrada) → boolean
+                (tres estados, MOI-206) → number (input numérico + min/max,
+                MOI-206) → textarea libre como último recurso. */}
             {fieldReadOnly ? (
               <div
                 className={`px-3 py-2 text-sm text-[var(--g-text-primary)] ${config.bgClass}`}
@@ -245,6 +278,55 @@ export function Capa3Form({
                   </option>
                 ))}
               </select>
+            ) : isBooleanCapa3Field(field) ? (
+              // MOI-206: control de tres estados. El valor guardado es un
+              // booleano real (o ausente si "sin contestar"), nunca el texto
+              // "Sí"/"No" — así el motor de plantillas no confunde un "No"
+              // (string no vacío, verdadero en Handlebars) con una respuesta
+              // negativa.
+              <select
+                id={`capa3-${field.campo}`}
+                // normalizeBooleanDraftValue tolera además un `default` legacy
+                // en texto ("SÍ"/"No") que un override de entity_settings
+                // pueda seguir precargando sin re-normalizar antes del render.
+                value={(() => {
+                  const parsed = normalizeBooleanDraftValue(rawValue);
+                  return parsed === true ? "true" : parsed === false ? "false" : "";
+                })()}
+                onChange={(e) => handleBooleanChange(field.campo, e.target.value)}
+                aria-required={required}
+                aria-invalid={required && isEmpty}
+                aria-describedby={`capa3-${field.campo}-desc`}
+                className={`w-full px-3 py-2 text-sm text-[var(--g-text-primary)] bg-[var(--g-surface-card)] border ${
+                  required && isEmpty
+                    ? config.borderClass
+                    : "border-[var(--g-border-subtle)]"
+                } focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] transition-colors`}
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <option value="">Sin contestar</option>
+                <option value="true">Sí</option>
+                <option value="false">No</option>
+              </select>
+            ) : isNumberCapa3Field(field) ? (
+              <input
+                id={`capa3-${field.campo}`}
+                type="number"
+                value={normalizeNumberDraftValue(rawValue) ?? ""}
+                min={field.min}
+                max={field.max}
+                onChange={(e) => handleNumberChange(field.campo, e.target.value)}
+                aria-required={required}
+                aria-invalid={required && isEmpty}
+                aria-describedby={`capa3-${field.campo}-desc`}
+                className={`w-full px-3 py-2 text-sm text-[var(--g-text-primary)] bg-[var(--g-surface-card)] border ${
+                  required && isEmpty
+                    ? config.borderClass
+                    : "border-[var(--g-border-subtle)]"
+                } focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] transition-colors`}
+                style={{ borderRadius: "var(--g-radius-md)" }}
+                placeholder={`${field.descripcion}...`}
+              />
             ) : (
               <textarea
                 id={`capa3-${field.campo}`}
