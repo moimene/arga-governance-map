@@ -2,9 +2,16 @@ import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { AlertTriangle, FileText, Loader2, Plus, RefreshCw } from "lucide-react";
-import { useCreateSecretariaDocumentArtifact, useInformesArtifacts } from "@/hooks/useSecretariaDocumentArtifacts";
+import {
+  useCreateSecretariaDocumentArtifact,
+  useInformesArtifacts,
+  useSecretariaDocumentArtifacts,
+} from "@/hooks/useSecretariaDocumentArtifacts";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { EvidenceStatusBadge } from "@/components/secretaria/EvidenceStatusBadge";
+import { buildInformeSourceFields, informeHashDisplay } from "@/lib/secretaria/informe-source-reference";
+
+const DECLARE_WITHOUT_ARTIFACT = "__declarar_sin_artefacto__";
 
 const INFORME_TYPES = [
   { value: "INFORME_PRECEPTIVO", label: "Informe preceptivo" },
@@ -30,25 +37,31 @@ export default function InformesPreceptivos() {
   const [searchParams] = useSearchParams();
   const agreementId = searchParams.get("agreement");
   const informes = useInformesArtifacts();
+  const documentArtifacts = useSecretariaDocumentArtifacts();
   const createArtifact = useCreateSecretariaDocumentArtifact();
   const [title, setTitle] = useState(agreementId ? "Informe preceptivo del acuerdo" : "");
   const [artifactKind, setArtifactKind] = useState("INFORME_PRECEPTIVO");
-  const [sourceRef, setSourceRef] = useState(agreementId ? `agreement:${agreementId}` : "");
+  const [selectedArtifactId, setSelectedArtifactId] = useState("");
+  const [declaredRef, setDeclaredRef] = useState("");
 
   async function handleCreate() {
     if (!title.trim()) return;
     try {
+      const source = agreementId
+        ? buildInformeSourceFields({ kind: "agreement", agreementId })
+        : selectedArtifactId && selectedArtifactId !== DECLARE_WITHOUT_ARTIFACT
+          ? buildInformeSourceFields({
+              kind: "artifact",
+              artifactId: selectedArtifactId,
+              hash: documentArtifacts.data?.find((a) => a.id === selectedArtifactId)?.hash_sha512 ?? null,
+            })
+          : declaredRef.trim()
+            ? buildInformeSourceFields({ kind: "declared", reference: declaredRef.trim() })
+            : buildInformeSourceFields({ kind: "none" });
       await createArtifact.mutateAsync({
         artifactKind,
         title: title.trim(),
-        sourceDomain: agreementId ? "agreement" : sourceRef.trim() ? "manual_preceptive_document" : null,
-        sourceId: agreementId,
-        sourceHash: agreementId ? null : sourceRef.trim() || null,
-        sourcePayload: agreementId
-          ? { agreement_id: agreementId, source_ref: sourceRef.trim() }
-          : sourceRef.trim()
-            ? { source_ref: sourceRef.trim() }
-            : {},
+        ...source,
         metadata: {
           creation_channel: "informes_preceptivos_page",
           trust_boundary: "DEMO_OPERATIVA",
@@ -57,7 +70,8 @@ export default function InformesPreceptivos() {
       });
       toast.success("Informe creado");
       setTitle("");
-      setSourceRef("");
+      setSelectedArtifactId("");
+      setDeclaredRef("");
     } catch (e) {
       toast.error("No se pudo crear el informe", {
         description: e instanceof Error ? e.message : String(e),
@@ -137,15 +151,39 @@ export default function InformesPreceptivos() {
               style={{ borderRadius: "var(--g-radius-md)" }}
             />
           </label>
-          <label className="space-y-1 text-sm">
-            <span className="font-medium text-[var(--g-text-primary)]">Referencia/hash fuente</span>
-            <input
-              value={sourceRef}
-              onChange={(e) => setSourceRef(e.target.value)}
-              className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:ring-2 focus:ring-[var(--g-border-focus)]"
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            />
-          </label>
+          {agreementId ? (
+            <div className="space-y-1 text-sm">
+              <span className="font-medium text-[var(--g-text-primary)]">Documento fuente</span>
+              <p className="px-3 py-2 text-xs text-[var(--g-text-secondary)]">Acuerdo vinculado (huella pendiente de generación)</p>
+            </div>
+          ) : (
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-[var(--g-text-primary)]">Documento fuente</span>
+              <select
+                value={selectedArtifactId}
+                onChange={(e) => setSelectedArtifactId(e.target.value)}
+                className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:ring-2 focus:ring-[var(--g-border-focus)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <option value="">Sin documento fuente</option>
+                {(documentArtifacts.data ?? []).map((doc) => (
+                  <option key={doc.id} value={doc.id}>
+                    {doc.title}
+                  </option>
+                ))}
+                <option value={DECLARE_WITHOUT_ARTIFACT}>Otro (declarar referencia, sin huella)</option>
+              </select>
+              {selectedArtifactId === DECLARE_WITHOUT_ARTIFACT ? (
+                <input
+                  value={declaredRef}
+                  onChange={(e) => setDeclaredRef(e.target.value)}
+                  placeholder="Referencia declarada (no se guardará como huella)"
+                  className="mt-1 w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:ring-2 focus:ring-[var(--g-border-focus)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                />
+              ) : null}
+            </label>
+          )}
           <button
             type="button"
             onClick={handleCreate}
@@ -185,7 +223,7 @@ export default function InformesPreceptivos() {
                   <td className="px-4 py-3"><EvidenceStatusBadge status={artifact.evidence_status} /></td>
                   <td className="max-w-[360px] px-4 py-3">
                     <p className="truncate font-mono text-xs text-[var(--g-text-secondary)]">
-                      {artifact.hash_sha512 ?? artifact.source_hash ?? "Pendiente"}
+                      {informeHashDisplay(artifact)}
                     </p>
                   </td>
                 </tr>
