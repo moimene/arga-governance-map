@@ -10,17 +10,23 @@
  * versión ya escrita):
  *
  *   fundacion  tenants (+branding) · usuarios Auth · user_profiles ·
- *              rbac_user_roles · grc_modules
+ *              rbac_user_roles · grc_modules · enlace opcional
+ *              user_profiles.person_id (ver --persona-id más abajo)
  *   pack-base  rule_packs (+versión ACTIVE) · jurisdiction_rule_sets ES ·
  *              plantillas_protegidas (BORRADOR → … → ACTIVA por la RPC)
  *
  * NO siembra ni una sociedad, ni una persona, ni un órgano: eso se hace por
- * pantalla y es el objeto de la prueba.
+ * pantalla y es el objeto de la prueba. El enlace a persona (D-23, MOI-147)
+ * es la excepción declarada: no tiene pantalla propia (2 filas por tenant no
+ * la justifican) y vive aquí, idempotente y sin pisar nunca un person_id ya
+ * puesto.
  *
  * Uso:
  *   bun run scripts/tenant-bootstrap.ts --tenant nuevo                  # dry-run: plan contra Cloud, no escribe
  *   bun run scripts/tenant-bootstrap.ts --tenant nuevo --commit         # ejecuta
  *   bun run scripts/tenant-bootstrap.ts --tenant nuevo --fase fundacion # solo una fase
+ *   bun run scripts/tenant-bootstrap.ts --tenant nuevo --commit \
+ *     --persona-id demo@grupo-nuevo-demo.dev=<uuid-de-persons>          # enlaza person_id (repetible; no pisa uno ya puesto)
  *
  * Service-role (salta RLS): SOLO CLI, nunca UI. Guard de target: governance_OS.
  * Contrato que el script VIGILA y no solo promete: el recuento de filas de ARGA
@@ -49,6 +55,8 @@ import {
   clonarRuleSet,
   idPlantillaClonada,
   packIdPara,
+  parsearPersonaOverrides,
+  personaParaUsuario,
   resolverEntorno,
   seleccionarCertificationKinds,
   targetEsGovernanceOs,
@@ -82,6 +90,15 @@ const spec: TenantSpec =
 
 const problemas = validarTenantSpec(spec);
 if (problemas.length) fail(`El spec de «${spec.key}» no es válido:\n${problemas.map((p) => `    - ${p}`).join("\n")}`);
+
+function personaOverridesOFail(): Map<string, string> {
+  try {
+    return parsearPersonaOverrides(process.argv);
+  } catch (e) {
+    fail(e instanceof Error ? e.message : String(e));
+  }
+}
+const PERSONA_OVERRIDES = personaOverridesOFail();
 
 const { url, serviceKey } = resolverEntorno(process.env);
 if (!targetEsGovernanceOs(url)) fail(`Target inesperado (${url}) — este script solo corre contra governance_OS.`);
@@ -148,11 +165,27 @@ async function fundacion() {
   const plan: Array<{ paso: string; accion: string }> = [
     { paso: "tenants", accion: existente ? "UPDATE branding (la fila ya existe)" : "INSERT fila + branding" },
   ];
-  const usuarios: Array<{ email: string; role: string; userId: string | null }> = [];
+  const usuarios: Array<{ email: string; role: string; userId: string | null; personId?: string }> = [];
   for (const u of spec.users) {
     const userId = await findUserByEmail(u.email);
     usuarios.push({ ...u, userId });
     plan.push({ paso: u.email, accion: `${userId ? "reutiliza usuario Auth" : "CREA usuario Auth"} + perfil ${u.role} + rbac_user_roles` });
+
+    const personaId = personaParaUsuario(u, PERSONA_OVERRIDES);
+    if (personaId) {
+      let personaAccion = `enlazar person_id=${personaId}`;
+      if (userId) {
+        const { data: profPersona, error: eProfPersona } = await admin
+          .from("user_profiles").select("person_id").eq("user_id", userId).maybeSingle();
+        if (eProfPersona) fail(`Leyendo user_profiles.person_id de ${u.email}: ${eProfPersona.message}`);
+        if (profPersona?.person_id) {
+          personaAccion = profPersona.person_id === personaId
+            ? "ya enlazado (sin cambios)"
+            : `YA TIENE person_id=${profPersona.person_id}: no se pisa`;
+        }
+      }
+      plan.push({ paso: `${u.email} · persona`, accion: personaAccion });
+    }
   }
   const { data: modsExistentes, error: eMods } = await admin.from("grc_modules").select("id").eq("tenant_id", spec.tenantId);
   if (eMods) fail(`Leyendo grc_modules: ${eMods.message}`);
@@ -181,7 +214,7 @@ async function fundacion() {
       if (error) fail(`createUser ${u.email}: ${error.message}`);
       userId = data.user.id;
     }
-    const { data: prof, error: eProf } = await admin.from("user_profiles").select("id, tenant_id").eq("user_id", userId).maybeSingle();
+    const { data: prof, error: eProf } = await admin.from("user_profiles").select("id, tenant_id, person_id").eq("user_id", userId).maybeSingle();
     if (eProf) fail(`Leyendo user_profiles ${u.email}: ${eProf.message}`);
     if (prof && prof.tenant_id !== spec.tenantId) {
       // Jamás se mueve un usuario de tenant en silencio: `fn_current_tenant_id()`
@@ -205,6 +238,25 @@ async function fundacion() {
       if (error) fail(`insert rbac_user_roles ${u.email}: ${error.message}`);
     }
     console.log(`✓ ${u.email} → ${u.role}`);
+
+    const personaId = personaParaUsuario(u, PERSONA_OVERRIDES);
+    if (personaId) {
+      const personaActual = prof?.person_id ?? null;
+      if (personaActual) {
+        if (personaActual !== personaId) {
+          console.log(`  … ${u.email} ya tiene person_id=${personaActual}: no se pisa (se pidió ${personaId})`);
+        }
+      } else {
+        const { data: personaFila, error: ePersona } = await admin
+          .from("persons").select("id").eq("id", personaId).eq("tenant_id", spec.tenantId).maybeSingle();
+        if (ePersona) fail(`Leyendo persons ${personaId}: ${ePersona.message}`);
+        if (!personaFila) fail(`--persona-id ${u.email}=${personaId}: no existe esa persona en el tenant ${spec.tenantId} (¿dada de alta por pantalla?).`);
+        const { error: eLinkPersona } = await admin
+          .from("user_profiles").update({ person_id: personaId }).eq("user_id", userId).is("person_id", null);
+        if (eLinkPersona) fail(`Enlazando person_id de ${u.email}: ${eLinkPersona.message}`);
+        console.log(`✓ ${u.email} → persona ${personaId}`);
+      }
+    }
   }
 
   if (modsNuevos.length) {

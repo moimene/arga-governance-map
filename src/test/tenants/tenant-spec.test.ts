@@ -100,6 +100,14 @@ describe("validarTenantSpec — cada regla se rompe a propósito", () => {
     rompe((s) => { s.packIdPrefix = "gn"; }, /packIdPrefix inválido/);
   });
 
+  it("rechaza un personId que no sea UUID pero acepta que esté ausente (D-23, MOI-147)", () => {
+    rompe((s) => { s.users[0].personId = "no-es-un-uuid"; }, /personId de .* no es un UUID/);
+    const s = base();
+    delete s.users[0].personId;
+    delete s.users[1].personId;
+    expect(validarTenantSpec(s)).toEqual([]);
+  });
+
   it("la contraseña es una variable de entorno, nunca un literal", () => {
     rompe((s) => { s.passwordEnvVar = "hunter2"; }, /passwordEnvVar inválida/);
     expect(JSON.stringify(TENANT_SPECS).toLowerCase()).not.toMatch(/"password"\s*:/);
