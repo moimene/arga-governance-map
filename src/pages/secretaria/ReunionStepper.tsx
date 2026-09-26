@@ -13,7 +13,8 @@ import {
   Zap,
 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { readMeetingHandoff } from "@/lib/secretaria/cross-module-handoff";
+import { readMeetingHandoff, appendHandoffParams } from "@/lib/secretaria/cross-module-handoff";
+import { useCreateAimsSecretariaDerivation } from "@/hooks/useAimsSecretariaDerivations";
 import { handoffEventLabel } from "@/lib/handoff-event-labels";
 import { useAiIncidentHandoffReference } from "@/hooks/useAiIncidents";
 // B7 Lote 3: los datos legacy de agenda pueden traer alias de materia; el
@@ -4502,6 +4503,10 @@ function UniversalMeetingIntake() {
   const selectedUniversalLabel = universalMeetingLabel(selectedOrganoTipo);
   const normativeProfile = useEntityNormativeProfile(selectedEntityId);
   const createUniversalMeeting = useCreateUniversalMeeting();
+  // MOI-56: handoff propagado desde ReunionIntake (appendHandoffParams). Solo
+  // se persiste la derivación si de verdad llegó de AIMS con un incidente.
+  const handoff = readMeetingHandoff((key) => searchParams.get(key));
+  const createDerivation = useCreateAimsSecretariaDerivation();
   const [fecha, setFecha] = useState("");
   const [horaInicio, setHoraInicio] = useState("10:00");
   const [lugar, setLugar] = useState("");
@@ -4585,6 +4590,23 @@ function UniversalMeetingIntake() {
         normativeSnapshot: normativeSnapshot as unknown as Record<string, unknown> | null,
       });
       toast.success(result.reused ? `${selectedUniversalLabel} existente reutilizada` : `${selectedUniversalLabel} creada`);
+      // MOI-56: la reunión se acaba de crear (o ya existía) DE VERDAD -- este
+      // es el punto único de escritura para el destino "reunión". Un fallo
+      // aquí no bloquea la navegación (la reunión ya es real): se avisa y
+      // queda como seguimiento manual, nunca se descarta en silencio.
+      if (handoff.source === "aims" && handoff.sourceId) {
+        try {
+          await createDerivation.mutateAsync({
+            sourceIncidentId: handoff.sourceId,
+            sourceEvent: handoff.event ?? "AIMS_INCIDENT_MATERIAL",
+            target: { kind: "meeting", meetingId: result.id },
+          });
+        } catch (derivationError) {
+          toast.error("La reunión se creó, pero no se pudo guardar el seguimiento con AIMS", {
+            description: derivationError instanceof Error ? derivationError.message : undefined,
+          });
+        }
+      }
       navigate(`/secretaria/reuniones/${result.id}?scope=sociedad&entity=${encodeURIComponent(selectedEntityId)}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al crear reunión universal");
@@ -4844,9 +4866,17 @@ function ReunionIntake() {
   const scopedNuevaConvocatoriaPath = scopedEntityId
     ? `/secretaria/convocatorias/nueva?scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`
     : "/secretaria/convocatorias/nueva";
-  const scopedJuntaUniversalPath = scopedEntityId
-    ? `/secretaria/reuniones/nueva?flow=junta-universal&scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`
-    : "/secretaria/reuniones/nueva?flow=junta-universal";
+  // MOI-56: la reunión universal es el único camino de esta intake que crea
+  // la reunión DE VERDAD (los otros dos solo navegan a la convocatoria). El
+  // handoff se propaga aquí para que `UniversalMeetingIntake` pueda persistir
+  // la derivación al crearla — antes de esto, el `ai_incident` se mostraba en
+  // el banner de arriba y se perdía en cuanto se pulsaba este enlace.
+  const scopedJuntaUniversalPath = appendHandoffParams(
+    scopedEntityId
+      ? `/secretaria/reuniones/nueva?flow=junta-universal&scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`
+      : "/secretaria/reuniones/nueva?flow=junta-universal",
+    { source, event, sourceId, organ, matter, rationale, isCrossModule },
+  );
   const sourceLabel = source === "grc" ? "GRC Compass" : source === "aims" ? "AIMS 360" : "Secretaría";
 
   return (

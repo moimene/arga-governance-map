@@ -15,6 +15,7 @@ import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 import { isModuleEnabled } from "@/lib/tenant-modules";
 import { useTenantBranding } from "@/context/TenantBrandContext";
 import CabeceraIncidente from "@/components/ai-governance/incidente/CabeceraIncidente";
+import DerivacionesSecretaria from "@/components/ai-governance/incidente/DerivacionesSecretaria";
 import RelojesRegulatorios from "@/components/ai-governance/incidente/RelojesRegulatorios";
 import SubexpedientesRegimen from "@/components/ai-governance/incidente/SubexpedientesRegimen";
 import EdicionIncidente from "@/components/ai-governance/incidente/EdicionIncidente";
@@ -159,6 +160,8 @@ export default function AiIncidenteDetalle() {
         onCancelEdit={() => setIsEditing(false)}
         onSave={handleSave}
       />
+
+      <DerivacionesSecretaria incidentId={incident.id} />
 
       <RelojesRegulatorios clocks={clocks} doraVisible={doraVisible} />
 

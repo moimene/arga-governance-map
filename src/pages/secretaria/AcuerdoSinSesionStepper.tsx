@@ -28,6 +28,8 @@ import { usePactosVigentes } from "@/hooks/usePactosParasociales";
 import { PactosCompliancePanel } from "@/components/secretaria/PactosCompliancePanel";
 import { authoritativeNoSessionRecipients } from "@/lib/secretaria/no-session-recipient-eligibility";
 import { EAD_INTERPOSITION_CHANNEL } from "@/lib/secretaria/ead-channel-semantics";
+import { readMeetingHandoff } from "@/lib/secretaria/cross-module-handoff";
+import { useCreateAimsSecretariaDerivation } from "@/hooks/useAimsSecretariaDerivations";
 
 const STEPS = [
   { n: 1, label: "Tipo y órgano",    hint: "Seleccionar sociedad, órgano y tipo de acuerdo" },
@@ -200,6 +202,11 @@ export default function AcuerdoSinSesionStepper() {
   const createResolution = useCreateNoSessionResolution();
   const adoptAgreement = useAdoptNoSessionAgreement();
   const { data: requestedPlantilla } = usePlantillaProtegida(requestedPlantillaId ?? undefined);
+  // MOI-56: handoff desde el enlace "Derivar a acuerdo sin sesión" de
+  // CabeceraIncidente. `readMeetingHandoff` es el mismo contrato de claves que
+  // ya usa ReunionStepper (MOI-158) -- no se inventa un segundo formato.
+  const handoff = readMeetingHandoff((key) => searchParams.get(key));
+  const createDerivation = useCreateAimsSecretariaDerivation();
 
   const [current, setCurrent] = useState(1);
 
@@ -415,6 +422,23 @@ export default function AcuerdoSinSesionStepper() {
       toast.success(
         decision === "APROBADO" ? "Acuerdo adoptado correctamente" : "Acuerdo rechazado — proceso cerrado",
       );
+      // MOI-56: el acuerdo se acaba de ADOPTAR de verdad -- punto único de
+      // escritura para el destino "acuerdo". Un rechazo (RECHAZADO) no crea
+      // agreementId y no hay destino que enlazar. Fallo no bloqueante: el
+      // acuerdo ya es real, se avisa en vez de descartar en silencio.
+      if (decision === "APROBADO" && agreementId && handoff.source === "aims" && handoff.sourceId) {
+        try {
+          await createDerivation.mutateAsync({
+            sourceIncidentId: handoff.sourceId,
+            sourceEvent: handoff.event ?? "AIMS_INCIDENT_MATERIAL",
+            target: { kind: "agreement", agreementId },
+          });
+        } catch (derivationError) {
+          toast.error("El acuerdo se adoptó, pero no se pudo guardar el seguimiento con AIMS", {
+            description: derivationError instanceof Error ? derivationError.message : undefined,
+          });
+        }
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al cerrar";
       toast.error("No se pudo cerrar el proceso", { description: msg });
