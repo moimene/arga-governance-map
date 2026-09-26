@@ -11,6 +11,14 @@
  * cobertura de una obligación vivía dentro de una página, y por eso la
  * corrección llegó a una pantalla y sus dos hermanas siguieron pintando lo
  * contrario sobre las mismas filas.
+ *
+ * MOI-160 (D-G1, decisión de producto, opción a): esto mide MADUREZ de una
+ * medida, no EFECTIVIDAD DE CONTROL de una obligación (`@/lib/grc/obligation-coverage`).
+ * Son dos medidas distintas a propósito — el mismo hecho (p. ej. el art. 4 RIA
+ * de alfabetización) puede acreditar aquí y salir "SIN CONTROL" allí sin que
+ * eso sea una contradicción que arreglar. No importar ese módulo desde aquí,
+ * ni al revés: fundirlos exige una decisión nueva, no un import.
+ * Vigilado por `src/test/grc/criterio-cubierto-aims-vs-grc.test.ts`.
  */
 
 /**
