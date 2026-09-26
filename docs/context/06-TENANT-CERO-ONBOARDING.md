@@ -127,6 +127,7 @@ Valor del ejercicio: es la primera vez que el producto se recorre como lo haría
 - Para los módulos de solo lectura (§3.4): alta por pantalla o kit de arranque genérico. Decidir después de la primera pasada sin kit.
 - Si el pack base LSC sigue siendo copia por tenant (modelo actual) o se introduce herencia de un tenant «sistema» (cambio de modelo: fuera de alcance salvo decisión expresa).
 - Cuándo y cómo se hace el commit (árbol compartido: por rutas específicas), si se despliega, y si se añade la sección correspondiente a `CLAUDE.md`.
+- ~~Si la designación del instructor y de los órganos del canal interno pasa a ser dato de cada grupo~~: decidido el 26-09-2026 en MOI-151, **opción b**, por delegación de Moisés en el agente orquestador (instrucción transcrita en `docs/superpowers/plans/2026-09-26-ledger-cierre-masivo-linear.md` §1). La designación sigue resuelta en el programa (`roles-por-tenant.ts`): el grupo nuevo muestra «Pendiente de designación» y cada grupo nuevo necesitaría un cambio del programa. Se declara como deuda en el contrato de configuración por grupo (MOI-54). Quién puede nombrar al responsable según la Ley 2/2023 no se decide aquí.
 
 ## 6. Estado tras recorrido por pantalla (Cierre de MOI-53, 2026-09-25)
 

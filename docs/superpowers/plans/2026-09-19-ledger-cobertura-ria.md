@@ -292,6 +292,19 @@ Guion del contenido mínimo, como propuesta para el debate y no como criterio:
 ARGA Salud y ARGA Vida ponen en servicio y acumulan los dos roles. La misma pregunta va a su
 órgano de IA (D-U2).
 
+## Decisiones del cierre masivo del 26-09-2026 (por delegación de Moisés)
+
+Tomadas por el agente orquestador con la instrucción de Moisés del 26-09-2026 transcrita en
+`docs/superpowers/plans/2026-09-26-ledger-cierre-masivo-linear.md` §1. No las escribió Moisés: él
+delegó en las recomendaciones del agente. No sustituyen el criterio de ningún comité.
+
+| # | Issue | Decisión | Qué NO cambia |
+|---|---|---|---|
+| D-G2 | MOI-162 | **(a)** Acciones sin hallazgo: `action_plans.finding_id` anulable con CHECK de al menos un origen y enlace directo a la obligación y al sistema de IA (diseño de F5.T7). Motivo: (b) fabrica hallazgos (fiabilidad del dato). | El contenido del plan lo validan el Comité de IA de Garrigues y el CATIT de ARGA al ejecutar F5 (MOI-175); los 8 planes de ARGA no cambian. |
+| D-G3 | MOI-174 | **(a)** El control del art. 4 se evalúa con los registros de formación de F5.T6 (MOI-175); no se añade estado «sin probar» al CHECK de `controls.status`. | La obligación OBL-RIA-ORG-04 sigue apareciendo «sin control», que es un hecho. ARGA no cambia. |
+| D-G4 | MOI-161 | **(b)** Cada módulo conserva su lista de estados; traducción solo en los puntos donde un dato cruza de uno a otro. | No toca rótulos de ARGA. |
+| D-G5 | MOI-215 | Cálculo único de plazos DORA/RGPD con la lectura técnica (b) de MOI-163 (24 h desde el conocimiento, 4 h desde la clasificación), **marcada como provisional**. | La lectura definitiva la da el equipo legal en MOI-163, que sigue abierto. |
+
 ## Reglas de ejecución
 
 - Una fase por vez en la rama; dentro de la fase, cadenas de tareas sobre ficheros disjuntos en

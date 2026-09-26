@@ -73,6 +73,27 @@ ejecutado sobre la spec del equipo legal validada en
 | DA-18 | La jerga retirada de AIMS sobrevive en la pantalla GRC que recibe la derivación: `src/lib/grc/dashboard-readiness.ts:191,200,418` («intake GRC»), `src/pages/grc/Dashboard.tsx:723,777,826` (pinta `contractEvent`), `src/pages/grc/RiskEditor.tsx:212` (chip «legacy_write · risks», fijado por `e2e/10-grc.spec.ts:67`) | Carril GRC | review transversal 2026-09-14 |
 | DA-19 | La pantalla de Secretaría que recibe la derivación de un incidente pinta «Handoff read-only desde AIMS 360» y `e2e/19:42` lo fija por texto; en AIMS el término es «derivación» | Carril Secretaría | review transversal 2026-09-14 |
 
+### Decisiones del cierre masivo del 26-09-2026 (por delegación de Moisés)
+
+Tomadas por el agente orquestador con la instrucción de Moisés del 26-09-2026 transcrita en
+`docs/superpowers/plans/2026-09-26-ledger-cierre-masivo-linear.md` §1. No son decisiones escritas
+por Moisés: son decisiones que él delegó en las recomendaciones del agente.
+
+- **DA-6 → decidida (MOI-187):** no se construye editor de preguntas. Los cambios de texto del
+  cuestionario siguen pasando por el programa (commit, `main`, publicación) con versión nueva del
+  cuestionario cada vez. Motivo técnico: un editor abre una superficie de escritura nueva sin un
+  volumen de cambios que lo justifique. Se reabre si el equipo legal necesita cambiar textos a menudo.
+- **DA-9 → decidida (MOI-186):** las 12 tablas `aims_*` que quedaron sin destino tras la
+  reapertura de 8 por D-U7 (ledger RIA, 20-09) se **conservan en solo lectura**. No se borra
+  ninguna. Medido el 26-09-2026 en solo lectura: las 11 filas de ARGA siguen intactas
+  (`aims_requirement_catalog` 4, `aims_requirement_checks` 4, `aims_control_catalog` 2,
+  `aims_post_market_plans` 1).
+- **DA-12 → decidida (MOI-186):** la «spec de continuidad» (C4→C1→M1→M2) se declara
+  **sustituida por el programa RIA** del 19-09-2026 (`docs/superpowers/specs/2026-09-19-aims-cobertura-ria-experto-design.md`),
+  que cubre el catálogo de medidas y el indicador. No se busca ni se reconstruye.
+- **DA-13 → FK decidida (MOI-185):** la FK `ai_systems.tenant_id → tenants` se añade; el CHECK de
+  estados sigue aplazado mientras cada módulo conserve su lista (MOI-161, opción b).
+
 ## 4. Hitos
 
 ### H-1 · Tareas 1–4: vocabulario, motor puro, migraciones (2026-09-08)
