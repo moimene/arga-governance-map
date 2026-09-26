@@ -7,8 +7,9 @@ import {
 } from "lucide-react";
 import { evaluarConvocatoria, tiposPlantillaConvocatoriaPreferidos } from "@/lib/rules-engine";
 import { segundaConvocatoriaGapIncumplido, gapSegundaConvocatoriaHoras } from "@/lib/secretaria/segunda-convocatoria";
-import type { ConvocatoriaInput, RulePack, RuleParamOverride, RuleResolution, TipoOrgano, TipoSocial } from "@/lib/rules-engine";
+import type { ConvocatoriaInput, RulePack, RuleParamOverride, RuleResolution, TipoOrgano } from "@/lib/rules-engine";
 import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
+import { toTipoSocialAgenda } from "@/lib/secretaria/tipo-social";
 import {
   AGENDA_INFORMATIVE_MATERIAS,
   AGENDA_MATERIAS,
@@ -311,18 +312,6 @@ function isRulePackPayload(payload: unknown): payload is RulePack {
     isRecord(payload.votacion) &&
     isRecord(payload.documentacion)
   );
-}
-
-function toTipoSocial(value: unknown): TipoSocial {
-  const raw = String(value ?? "").toUpperCase();
-  // SLP antes que SL: "SLP".includes("SL") es true y colapsaría la forma
-  // profesional a SL, ocultando las materias soloTipoSocial:["SLP"] del
-  // orden del día (bug cazado en la verificación viva de G3 Task 9).
-  if (raw.includes("SLP")) return "SLP";
-  if (raw.includes("SLU")) return "SLU";
-  if (raw.includes("SAU")) return "SAU";
-  if (raw.includes("SL")) return "SL";
-  return "SA";
 }
 
 function materiaClaseFromTipo(tipo: AgendaItem["tipo"]) {
@@ -638,7 +627,7 @@ export default function ConvocatoriasStepper() {
   if (resolvedOrganoTipo) lastResolvedOrganoTipoRef.current = resolvedOrganoTipo;
   const bodiesPending = Boolean(selectedEntityId && (entitiesLoading || bodiesLoading || bodiesFetching));
   const jurisdiction = selectedEntity?.jurisdiction ?? "ES";
-  const tipoSocial = toTipoSocial(selectedEntity?.tipo_social ?? selectedEntity?.legal_form);
+  const tipoSocial = toTipoSocialAgenda(selectedEntity?.tipo_social ?? selectedEntity?.legal_form);
   const organoTipo = resolvedOrganoTipo ?? (
     selectedBodyId ? lastResolvedOrganoTipoRef.current : "JUNTA_GENERAL"
   );
@@ -3520,7 +3509,7 @@ export default function ConvocatoriasStepper() {
                     if (entity.entity_status !== "Active" || entity.jurisdiction?.toUpperCase() !== "ES") {
                       return false;
                     }
-                    const targetType = toTipoSocial(entity.tipo_social ?? entity.legal_form);
+                    const targetType = toTipoSocialAgenda(entity.tipo_social ?? entity.legal_form);
                     return targetType === "SL" || targetType === "SLU";
                   });
                   const selectedRepresentationCandidate = shareholderRepresentationCandidates.find(

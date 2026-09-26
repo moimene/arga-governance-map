@@ -64,10 +64,10 @@ import {
   type RuleParamOverride,
   type RuleResolution,
   type TipoOrgano,
-  type TipoSocial,
 } from "@/lib/rules-engine";
 import { rulePackMateriaMatches } from "@/lib/rules-engine/rule-resolution";
 import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
+import { toTipoSocialAgenda } from "@/lib/secretaria/tipo-social";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { secretariaErrorMessage } from "@/lib/secretaria/supabase-error-message";
 import {
@@ -235,18 +235,6 @@ function uniqueOverrides(overrides: RuleParamOverride[]): RuleParamOverride[] {
     out.push(override);
   }
   return out;
-}
-
-function toTipoSocial(value: unknown): TipoSocial {
-  const raw = String(value ?? "").toUpperCase();
-  // SLP antes que SL: "SLP".includes("SL") es true y colapsaría la forma
-  // profesional a SL (mismo bug que ConvocatoriasStepper — verificación
-  // viva G3 Task 9; la unificación de normalizadores es deuda post-G3).
-  if (raw.includes("SLP")) return "SLP";
-  if (raw.includes("SLU")) return "SLU";
-  if (raw.includes("SAU")) return "SAU";
-  if (raw.includes("SL")) return "SL";
-  return "SA";
 }
 
 function normalizeMateriaClase(value: unknown): MateriaClase {
@@ -931,7 +919,7 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
   const isJuntaCensus = censusSource === "capital_holdings";
   const isUniversalMeeting = isUniversalMeetingQuorumData(meetingRaw?.quorum_data);
   const entityId = meetingRaw?.governing_bodies?.entity_id ?? null;
-  const tipoSocial = toTipoSocial(
+  const tipoSocial = toTipoSocialAgenda(
     meetingRaw?.governing_bodies?.entities?.tipo_social ??
       meetingRaw?.governing_bodies?.entities?.legal_form
   );
@@ -1430,7 +1418,7 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
         clase: normalizeMateriaClase(debate.tipo),
       }))
   );
-  const tipoSocial = toTipoSocial(
+  const tipoSocial = toTipoSocialAgenda(
     meetingRaw?.governing_bodies?.entities?.tipo_social ??
       meetingRaw?.governing_bodies?.entities?.legal_form
   );
@@ -1901,9 +1889,9 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
     | undefined;
   const organoTipo = resolveOrganoTipo(meetingRaw?.governing_bodies);
   // Fix round 1 G3 Task 4, I-1: mismo patrón que AsistentesStep/QuorumStep
-  // (toTipoSocial sobre governing_bodies.entities) para poder pasarlo al
+  // (toTipoSocialAgenda sobre governing_bodies.entities) para poder pasarlo al
   // filtro fail-closed de materias soloTipoSocial (las 6 SLP).
-  const tipoSocial = toTipoSocial(
+  const tipoSocial = toTipoSocialAgenda(
     meetingRaw?.governing_bodies?.entities?.tipo_social ??
       meetingRaw?.governing_bodies?.entities?.legal_form,
   );
@@ -2708,7 +2696,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
         } | null;
       }
     | null;
-  const tipoSocial = toTipoSocial(
+  const tipoSocial = toTipoSocialAgenda(
     meetingRaw?.governing_bodies?.entities?.tipo_social ??
       meetingRaw?.governing_bodies?.entities?.legal_form
   );

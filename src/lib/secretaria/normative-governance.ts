@@ -316,6 +316,14 @@ export async function publishStatuteVersion(client: RpcClient, input: PublishSta
   return String(data);
 }
 
+// MOI-209: se conserva. El huérfano real era el hook `usePublishNormativeOverride`
+// (retirado), que quedó sin pantalla que lo invocara al retirarse la antigua
+// gestión de reglas y podía reconectarse sin revisión. Esta función de
+// biblioteca es el wrapper fino sobre la RPC (igual que sus hermanas
+// `publishStatuteVersion`/`upsertOrganRule` de este mismo fichero, todas en
+// uso), sigue probada por `normative-governance.test.ts`, y no escribe nada
+// por sí sola fuera de una llamada explícita — retirarla no reduce el riesgo
+// que el issue señala, que estaba en el hook sin pantalla, no en el wrapper.
 export async function publishNormativeOverride(client: RpcClient, input: PublishNormativeOverrideInput) {
   const { data, error } = await client.rpc("fn_secretaria_publish_normative_override", {
     p_payload: buildNormativeOverridePayload(input),
