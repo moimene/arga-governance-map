@@ -530,3 +530,54 @@ tres dejan de afirmar algo que la base no sostenía):
   Excel**: el texto no está en el fichero. OB-48 toma el de d62 del HTML; las otras seis esperan a
   P-08, y el HTML no es un sustituto general (d15 acaba donde `I11`; d53 es más corto que
   `I43`).
+
+## Decisión D-G1 (MOI-160, 2026-09-26) — «cubierto» en AIMS y en GRC son dos medidas
+
+**Origen:** `docs/superpowers/reviews/2026-09-20-overlap-aims-grc.md` §6, fila 2, que planteaba la
+disyuntiva y recomendaba la opción (a) sin decidirla. El issue Linear MOI-160 formalizó la puerta
+humana (decisión de producto de Moisés) y encargó, una vez decidida, anotarla aquí.
+
+**Decisión: opción (a).** AIMS (madurez de una medida, `acreditaConformidad` en
+`src/lib/aims/conformidad.ts`) y GRC (efectividad de control de una obligación,
+`obligationCoverage` en `src/lib/grc/obligation-coverage.ts`) siguen siendo **dos criterios
+distintos, con nombres distintos en pantalla, sin unificar y sin cambio de esquema**. No se fija
+ninguna equivalencia («madurez implantada = control efectivo»): miden hechos distintos y las dos
+pantallas pueden decir cosas distintas del mismo hecho legal (ejemplo medido: OBL-RIA-ORG-04, art.
+4 RIA de alfabetización, sale «SIN CONTROL» en GRC en ARGA y en Garrigues porque no tiene controles
+asociados, mientras AIMS mide las medidas MD_ALF_01..04 por sistema con su propio criterio de
+madurez). Precedente aplicado: `lecturaRiesgo` (`src/lib/grc/assessed-band.ts`, decisión del
+2026-09-07) ya resolvió el mismo tipo de disyuntiva sobre banda-vs-ejes de un riesgo declarando que
+son dos y pintando las dos.
+
+**Procedencia de la decisión, dicha sin adornos:** el issue exige que Moisés decida D-G1 en un
+comentario de Linear antes de dar esto por «Aceptado», y que autorice aparte la incorporación a
+`main`. Esta entrada del ledger y el código de esta rama (`agent/moi-160-cierre`) implementan la
+opción (a) por delegación operativa del orquestador del cierre masivo de issues (instrucción
+explícita de la tarea MOI-160 dentro de ese cierre), **no** por un comentario de Moisés en el propio
+issue — no se ha escrito en Linear (prohibido para este agente) y no hay tal comentario todavía.
+Quedan pendientes, y son responsabilidad de Moisés: (1) el comentario en MOI-160 con D-G1 = (a) para
+que el issue pueda marcarse «Aceptado» según su propio criterio de hecho, y (2) la autorización de
+incorporar esta rama a `main`.
+
+**Qué cambió en el código (sin tocar esquema):**
+- Comentario de cabecera en `src/lib/aims/conformidad.ts` y en `src/lib/grc/obligation-coverage.ts`
+  declarando la frontera D-G1 y remitiendo al test de arista.
+- `src/test/grc/criterio-cubierto-aims-vs-grc.test.ts` (nuevo): (1) unit tests puros de
+  `obligationCoverage`; (2) G-ARISTA — los tres consumidores de GRC (`ObligacionesList.tsx`,
+  `ObligacionDetalle.tsx`, `PoliticaDetalle.tsx`) importan la hoja y la invocan, en vez de
+  reimplementar el criterio; (3) frontera sin import cruzado entre la superficie AIMS
+  (`src/lib/aims`, `src/pages/ai-governance`, `src/components/ai-governance`) y la superficie GRC de
+  obligaciones (`src/lib/grc`, `src/components/grc`, más los tres consumidores). Comprobado con
+  arnés de mutación manual: quitar el import de `obligationCoverage` en `ObligacionDetalle.tsx` pone
+  el test en rojo con el fichero nombrado; inyectar un import cruzado falso en
+  `src/lib/aims/readiness.ts` hacia `@/lib/grc/obligation-coverage` también lo pone en rojo; las dos
+  mutaciones se revirtieron después y el test queda en verde con el árbol intacto (`git status`
+  limpio en ambos ficheros).
+- **Cambio visible en ARGA: ninguno.** Los rótulos de pantalla ya eran distintos antes de esta rama
+  (AIMS dice "Madurez"/niveles L1-L8; GRC dice "CUBIERTA"/"SIN CONTROL"/"EN PROCESO"/"EN
+  REMEDIACIÓN"/"MARCO PROSPECTIVO"; ninguna pantalla de AIMS usa la palabra "cubierta"). La decisión
+  (a) formaliza y vigila con test lo que el código ya hacía; no se ha tocado ningún componente de
+  presentación ni ninguna fila de dato.
+
+**No incorporado a `main` todavía.** Vive solo en la rama `agent/moi-160-cierre` del worktree
+aislado de este agente, a la espera de la puerta humana del punto anterior.

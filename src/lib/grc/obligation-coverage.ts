@@ -13,6 +13,15 @@
 // read-only contra Cloud el 2026-09-07, la tabla tiene 14 columnas y ninguna es
 // `prospectiva`. Eso es deuda Cloud declarada, no elegancia. ARGA no tiene
 // ninguna obligación marcada: cero cambio para ese tenant.
+//
+// MOI-160 (D-G1, decisión de producto, opción a): esto mide EFECTIVIDAD DE
+// CONTROL de una obligación, no MADUREZ de una medida de AIMS
+// (`@/lib/aims/conformidad`). Son dos medidas distintas a propósito — el
+// mismo hecho (p. ej. el art. 4 RIA de alfabetización) puede salir "SIN
+// CONTROL" aquí y acreditar allí sin que eso sea una contradicción que
+// arreglar. No importar ese módulo desde aquí, ni al revés: fundirlos exige
+// una decisión nueva, no un import.
+// Vigilado por `src/test/grc/criterio-cubierto-aims-vs-grc.test.ts`.
 const PROSPECTIVE_TITLE_RE = /^\s*\[Marco Prospectivo\]/i;
 
 export const isProspectiveTitle = (title: string) => PROSPECTIVE_TITLE_RE.test(title);
