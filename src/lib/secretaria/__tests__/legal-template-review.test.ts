@@ -10,10 +10,16 @@ import {
   LEGAL_TEMPLATE_APPROVAL_REPORT_SUMMARY,
 } from "../legal-template-approval-plan";
 
+// MOI-137, D-20: el informe del Comité Legal del 01-05-2026 solo se aplica al
+// tenant de emisión (ARGA). Los tests que no ejercitan tenant explícitamente
+// deben seguir viendo el comportamiento pre-D-20 (informe aplicable), así que
+// el tenant por defecto de la fixture es ARGA.
+const ARGA_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+
 function template(patch: Partial<PlantillaProtegidaRow> & Pick<PlantillaProtegidaRow, "id" | "tipo">) {
   return {
     id: patch.id,
-    tenant_id: patch.tenant_id ?? "tenant",
+    tenant_id: patch.tenant_id ?? ARGA_TENANT_ID,
     tipo: patch.tipo,
     materia: null,
     jurisdiccion: "ES",
@@ -303,6 +309,44 @@ describe("legal-template-review", () => {
     expect(garantia.canClaimLegalApproval).toBe(true);
     expect(garantia.reasons.join(" ")).toContain("Versión provisional");
     expect(matchesLegalTemplateReviewFilter(garantia, "LEGAL_REPORT_APPROVED")).toBe(true);
+  });
+
+  it("MOI-137 D-20: el informe del Comité Legal del 01-05-2026 no acredita nada fuera de ARGA", () => {
+    // Misma plantilla que "garantia" arriba (que en ARGA queda Aprobada
+    // legalmente por el informe pese a versión provisional y sin
+    // aprobada_por), pero clonada a un tenant distinto de ARGA.
+    const [garrigues, grupoNuevo] = buildLegalTemplateReviewRows([
+      template({
+        id: "garantia-garrigues",
+        tenant_id: "00000000-0000-0000-0000-000000000002",
+        tipo: "MODELO_ACUERDO",
+        materia_acuerdo: "AUTORIZACION_GARANTIA",
+        version: "0.1.0",
+        aprobada_por: null,
+        fecha_aprobacion: null,
+        adoption_mode: "MEETING",
+        organo_tipo: "JUNTA_GENERAL",
+      }),
+      template({
+        id: "garantia-grupo-nuevo",
+        tenant_id: "00000000-0000-0000-0000-000000000003",
+        tipo: "MODELO_ACUERDO",
+        materia_acuerdo: "AUTORIZACION_GARANTIA",
+        version: "0.1.0",
+        aprobada_por: null,
+        fecha_aprobacion: null,
+        adoption_mode: "MEETING",
+        organo_tipo: "JUNTA_GENERAL",
+      }),
+    ]);
+
+    for (const row of [garrigues, grupoNuevo]) {
+      expect(row.approvalDecision).toBeNull();
+      expect(row.flags.legalReportApproved).toBe(false);
+      expect(row.canClaimLegalApproval).toBe(false);
+      expect(row.label).not.toBe("Aprobada legalmente");
+      expect(matchesLegalTemplateReviewFilter(row, "LEGAL_REPORT_APPROVED")).toBe(false);
+    }
   });
 
   it("clasifica fixtures locales como puente no persistente", () => {

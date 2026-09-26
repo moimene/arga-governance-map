@@ -72,3 +72,21 @@ export function hasDemoApprovalMarker(aprobadaPor?: string | null): boolean {
   return DEMO_APPROVAL_MARKER_RE.test(aprobadaPor);
 }
 
+/**
+ * MOI-137, D-20: un `aprobada_por` que cita la aprobación de la plantilla de
+ * ORIGEN de un clon ("… clon de la plantilla <id>, aprobada en origen por
+ * «X»") no acredita que ESTA copia haya sido aprobada por nadie — solo
+ * documenta de dónde procede el texto. Medido en Cloud (2026-09-26): 15
+ * plantillas ACTIVA del Grupo Nuevo (…0003) citan «aprobada en origen por
+ * «Garrigues / Comité Legal»», un dictamen de OTRO tenant que nunca evaluó la
+ * copia. Sin este marcador, esas 15 pasarían el resto de los detectores
+ * (referencia legal, órgano, versión no-borrador) y se rotularían «Aprobada
+ * legalmente» solo porque el campo no está vacío.
+ */
+export const CITED_ORIGIN_APPROVAL_RE = /aprobada en origen por/i;
+
+export function hasCitedOriginApproval(aprobadaPor?: string | null): boolean {
+  if (!aprobadaPor) return false;
+  return CITED_ORIGIN_APPROVAL_RE.test(aprobadaPor);
+}
+

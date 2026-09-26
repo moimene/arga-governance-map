@@ -143,6 +143,7 @@ const LEGAL_REVIEW_FILTER_LABELS: Record<LegalTemplateReviewFilter, string> = {
   LEGAL_REPORT_APPROVED_VARIANTS: "Informe: aprobadas con variantes",
   MISSING_APPROVAL: "Sin aprobación formal",
   DEMO_APPROVAL_MARKER: "Con marcador de demostración",
+  CITED_ORIGIN_APPROVAL: "Aprobación citada del origen del clon",
   DRAFT_VERSION: "Versión provisional",
   MISSING_REFERENCE: "Falta referencia legal",
   MISSING_OWNER: "Falta órgano o forma de adopción",

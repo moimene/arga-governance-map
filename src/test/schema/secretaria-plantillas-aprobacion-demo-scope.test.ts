@@ -162,4 +162,39 @@ describe("Sonda viva · No-atribución de aprobación legal a plantillas con mar
     // Control positivo en Grupo Nuevo: al menos 50 plantillas son clones con marcador demo
     expect(countDemo).toBeGreaterThanOrEqual(50);
   });
+
+  it("en Grupo Nuevo (...0003), las 15 plantillas cuya aprobación se atribuye a Garrigues no figuran como aprobadas (MOI-137 D-20 §3)", async () => {
+    // Medido en Cloud el 2026-09-26: exactamente 15 plantillas ACTIVA de
+    // Grupo Nuevo tienen aprobada_por = "Pack base LSC — clon de la plantilla
+    // <uuid> v<version>, aprobada en origen por «Garrigues / Comité Legal»".
+    // Sin marcador demo (no casan con hasDemoApprovalMarker), citan la
+    // aprobación de la plantilla de ORIGEN, no de esta copia — una aprobación
+    // de otro grupo no cuenta en este.
+    const nuevoClient = await sesionDe("NUEVO");
+    const { data, error } = await nuevoClient
+      .from("plantillas_protegidas")
+      .select("*")
+      .eq("tenant_id", NUEVO_TENANT)
+      .eq("estado", "ACTIVA");
+
+    expect(error).toBeNull();
+    const rows = (data ?? []) as PlantillaProtegidaRow[];
+
+    const citedOriginRows = rows.filter(
+      (r) => !hasDemoApprovalMarker(r.aprobada_por) && /aprobada en origen por/i.test(r.aprobada_por ?? ""),
+    );
+    // Control positivo: evita una aserción vacua si el dato cambiara de forma.
+    expect(citedOriginRows.length).toBeGreaterThanOrEqual(15);
+
+    const reviewRows = buildLegalTemplateReviewRows(rows);
+    for (const original of citedOriginRows) {
+      const review = reviewRows.find((r) => r.templateId === original.id);
+      expect(review).toBeDefined();
+      expect(review!.flags.citedOriginApproval).toBe(true);
+      expect(review!.canClaimLegalApproval).toBe(false);
+      expect(review!.status).not.toBe("legally_approved");
+      expect(review!.label).not.toBe("Aprobada legalmente");
+      expect(review!.approvalDecision).toBeNull();
+    }
+  });
 });
