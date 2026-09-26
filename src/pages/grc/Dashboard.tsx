@@ -217,7 +217,7 @@ function ComplianceMonitorPanel({ scope }: { scope: SecretariaScopeController })
             </div>
             <p className="mt-1 max-w-4xl text-sm leading-6 text-[var(--g-text-secondary)]">
               GRC debe vigilar obligaciones, riesgos, controles, incidentes, excepciones,
-              auditoría, privacidad, resiliencia y handoffs. Esta vista separa lo conectado,
+              auditoría, privacidad, resiliencia y derivaciones. Esta vista separa lo conectado,
               lo que requiere foco y los gaps que no deben ocultarse.
             </p>
           </div>
@@ -275,7 +275,7 @@ function ComplianceMonitorPanel({ scope }: { scope: SecretariaScopeController })
             desactualizada: seguía diciendo que TPRM es un gap cuando
             `/grc/tprm` ya lee `grc_third_parties` del tenant. Una afirmación
             duplicada solo puede desmentir a la otra. */}
-        Fuente de verdad: tablas GRC conectadas actuales y contratos locales. Los handoffs a
+        Fuente de verdad: tablas GRC conectadas actuales y contratos locales. Las derivaciones a
         Secretaría/AIMS son rutas de solo lectura, sin escrituras cross-module.
       </div>
     </section>

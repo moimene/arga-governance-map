@@ -4861,7 +4861,7 @@ function ReunionIntake() {
       <div className="mx-auto max-w-5xl space-y-6">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
-            Secretaría · Intake de reunión
+            Secretaría · Preparar reunión
           </p>
           <h1 className="mt-2 text-2xl font-semibold text-[var(--g-text-primary)]">
             Preparar una sesión societaria

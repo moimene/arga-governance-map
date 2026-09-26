@@ -29,6 +29,7 @@ const JERGA_RETIRADA = [
   "Sin handoff",
   "Handoff read-only",
   "legacy_write · risks",
+  "Intake de reunión",
 ];
 
 describe("MOI-157 — la jerga de intake/handoff no sobrevive en las superficies tocadas", () => {
