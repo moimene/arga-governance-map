@@ -190,7 +190,7 @@ export function useBoardPackData(meetingId: string, entityId?: string | null): {
             policy_id: string | null;
             policies: { title: string }[] | null;
           };
-          return ((data ?? []) as Raw[]).map((a) => ({
+          return ((data ?? []) as unknown as Raw[]).map((a) => ({
             id: a.id,
             agreement_kind: a.agreement_kind,
             status: a.status,
@@ -311,7 +311,7 @@ export function useBoardPackData(meetingId: string, entityId?: string | null): {
             delegate: { full_name: string }[] | null;
           };
           const today = new Date();
-          return ((data ?? []) as Raw[]).map((d) => ({
+          return ((data ?? []) as unknown as Raw[]).map((d) => ({
             code: d.code,
             delegation_type: d.delegation_type,
             delegate_name: d.delegate?.[0]?.full_name ?? "—",
@@ -418,7 +418,7 @@ export function useBoardPackData(meetingId: string, entityId?: string | null): {
     president: { full_name: string } | { full_name: string }[] | null;
     secretary: { full_name: string } | { full_name: string }[] | null;
   };
-  const rawMeeting = meetingQ.data as RawMeeting | null;
+  const rawMeeting = meetingQ.data as unknown as RawMeeting | null;
 
   // DL-2: si la entidad es cotizada, añadir advertencias LMV
   const gb = firstJoined(rawMeeting?.governing_bodies);
@@ -471,7 +471,7 @@ export function useBoardPackData(meetingId: string, entityId?: string | null): {
     completed_at: string | null;
     persons: { full_name: string }[] | null;
   };
-  const allAtts = (attestQ.data ?? []) as AttRaw[];
+  const allAtts = (attestQ.data ?? []) as unknown as AttRaw[];
   const latestCampaign = allAtts[0]?.campaign ?? "";
   const campaignAtts = allAtts.filter((a) => a.campaign === latestCampaign);
 

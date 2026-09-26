@@ -107,7 +107,7 @@ export function useAdministradores(entityId: string | undefined, soloVigentes = 
       if (soloVigentes) q = q.eq("estado", "VIGENTE");
       const { data, error } = await q.order("fecha_inicio", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as CargoDetailRow[];
+      return (data ?? []) as unknown as CargoDetailRow[];
     },
   });
 }
@@ -141,7 +141,7 @@ export function useAdministradoresSocietarios(entityId: string | undefined, solo
       const { data, error } = await q.order("fecha_inicio", { ascending: false });
       if (error) throw error;
 
-      return ((data ?? []) as CargoDetailRow[]).filter((cargo) => {
+      return ((data ?? []) as unknown as CargoDetailRow[]).filter((cargo) => {
         if (!cargo.body_id) return CARGOS_ADMIN_NO_COLEGIADO.includes(cargo.tipo_condicion);
         const bodyType = cargo.body?.body_type?.toUpperCase() ?? "";
         return bodyType === "CDA" || bodyType === "CONSEJO" || bodyType === "CONSEJO_ADMIN";
@@ -174,7 +174,7 @@ export function useComposicionOrgano(bodyId: string | undefined, soloVigentes = 
       if (soloVigentes) q = q.eq("estado", "VIGENTE");
       const { data, error } = await q.order("tipo_condicion", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as CargoDetailRow[];
+      return (data ?? []) as unknown as CargoDetailRow[];
     },
   });
 }

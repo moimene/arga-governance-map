@@ -110,7 +110,7 @@ export function useBodiesList() {
         entity?: { common_name?: string | null; slug?: string | null } | null;
         condiciones_persona?: Array<{ id: string; estado: string | null }> | null;
       };
-      return ((data ?? []) as BodyRaw[])
+      return ((data ?? []) as unknown as BodyRaw[])
         .filter(isOperationalSecretariaBody)
         .map((b) => ({
           ...b,
@@ -140,7 +140,7 @@ export function useBodyBySlug(slug: string | undefined) {
         .eq("slug", slug!)
         .maybeSingle();
       if (error) throw error;
-      return (data as BodyRow | null) ?? null;
+      return (data as unknown as BodyRow | null) ?? null;
     },
   });
 }
@@ -208,7 +208,7 @@ export function useBodyMeetings(bodyId: string | undefined) {
         .eq("body_id", bodyId!)
         .order("scheduled_start", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as MeetingRow[];
+      return (data ?? []) as unknown as MeetingRow[];
     },
   });
 }
@@ -232,7 +232,7 @@ export function useMeetingBySlug(meetingSlug: string | undefined) {
         president?: { full_name?: string | null } | null;
         secretary?: { full_name?: string | null } | null;
       };
-      const m = data as MeetingRaw;
+      const m = data as unknown as MeetingRaw;
       return {
         ...m,
         president_name: m.president?.full_name ?? null,
@@ -253,7 +253,7 @@ export function useMeetingAgenda(meetingId: string | undefined) {
         .eq("meeting_id", meetingId!)
         .order("order_number", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as AgendaItemRow[];
+      return (data ?? []) as unknown as AgendaItemRow[];
     },
   });
 }
