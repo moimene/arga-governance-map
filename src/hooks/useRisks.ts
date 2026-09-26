@@ -22,6 +22,12 @@ export type RiskRow = {
   assessment_provenance: Record<string, unknown> | null;
   obligations?: { code?: string | null; title?: string | null } | null;
   findings?: { code?: string | null; title?: string | null } | null;
+  /**
+   * Sistema de IA (`ai_systems.id`) que este riesgo describe, si se ha
+   * podido enlazar con certeza (MOI-164). `null` en la inmensa mayoría de
+   * los riesgos, que no son de IA.
+   */
+  ai_system_id?: string | null;
 };
 
 export type RiskWriteInput = {
@@ -85,6 +91,31 @@ export function useRiskById(id?: string) {
         .maybeSingle();
       if (error) throw error;
       return data as RiskRow | null;
+    },
+  });
+}
+
+/**
+ * Riesgos de GRC enlazados a un sistema de IA (`risks.ai_system_id`, MOI-164).
+ * Solo lectura: la ficha del sistema en AIMS pinta el riesgo, nunca lo edita
+ * ni lo crea — GRC sigue siendo el owner del dato.
+ */
+export function useRisksByAiSystem(aiSystemId?: string) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    queryKey: ["grc", "risks", "by-ai-system", tenantId, aiSystemId],
+    enabled: !!tenantId && !!aiSystemId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("risks")
+        .select(
+          "id, code, title, description, inherent_score, residual_score, status, assessed_band, ai_system_id"
+        )
+        .eq("tenant_id", tenantId!)
+        .eq("ai_system_id", aiSystemId!)
+        .order("code");
+      if (error) throw error;
+      return (data ?? []) as RiskRow[];
     },
   });
 }
