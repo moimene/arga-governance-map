@@ -12,6 +12,24 @@ import { describe, expect, it } from "vitest";
 // migración cambiase el comportamiento), cubierto aquí releyendo ambos
 // ficheros: el de julio para el contrato de Consejo y el de esta migración
 // para el contrato de Junta.
+//
+// AVISO (revisión, P1): este fichero hace SOLO comprobaciones de texto
+// (toContain contra el propio .sql). No ejecuta ni una línea de SQL, así que
+// "pasa" aunque el CASE/ELSIF no compile, aunque una columna referenciada no
+// exista o aunque una CHECK constraint no pueda instalarse — no lo detecta.
+// Su valor es otro: cazar que alguien borre o parafrasee un literal exacto
+// que el contrato exige (un código de error, una cláusula de la CHECK), y
+// que el reemplazo del trigger compartido no pierda la rama de Consejo.
+// La validación EJECUTABLE real (aplicar la migración contra el esquema real
+// de un Postgres desechable y comprobar que compila e instala sin error)
+// vive aparte, en
+// supabase/migrations/proposed/20260926114200_secretaria_convocation_junta_emit_rpc.verify-live.sh
+// — no en bun test, porque necesita Docker y una lectura de esquema (sin
+// datos, sin escritura) contra governance_OS vía el pooler, algo que este
+// runner no hace. Ejecutado a mano en esta revisión: aplica limpio contra el
+// esquema real (BEGIN…COMMIT sin error, DO $verify$ de la propia migración
+// pasa) y el control positivo posterior confirma fn_emit_convocatoria_junta
+// instalada y el CHECK con la ruta de Junta.
 
 const juntaMigration = readFileSync(
   resolve(

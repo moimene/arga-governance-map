@@ -19,10 +19,27 @@
 --   5) confirma que Garrigues (…0002) no se toca: su única convocatoria sigue
 --      en BORRADOR.
 -- Nada de esto persiste: la transacción entera se deshace al final.
+--
+-- CORRECCIÓN (revisión, P0): la migración 20260926114200 trae su propio
+-- BEGIN;/COMMIT; (es una migración normal, pensada para aplicarse sola). Un
+-- `\i` de ese fichero DENTRO de un `begin;` exterior no anida transacciones
+-- -Postgres no las anida de verdad-: el BEGIN; interior es un no-op con aviso
+-- y el COMMIT; interior CIERRA la transacción exterior, dejando el DDL y todo
+-- lo que sigue (la emisión real de la Junta, el smoke test del Consejo)
+-- comprometido en cuanto se ejecuta, con el `rollback;` final deshaciendo
+-- nada. Por eso aquí no se hace `\i` directo del fichero de migración: se
+-- genera antes, con `sed`, una copia local SIN esas dos líneas de control de
+-- transacción (son las únicas líneas `BEGIN;`/`COMMIT;` a nivel de sentencia
+-- en el fichero; los `BEGIN`/`END` de los bloques PL/pgSQL no llevan `;` en
+-- esa posición y no los toca este sed), y es esa copia la que se incluye
+-- dentro del `begin;` exterior. Así el `begin;`/`rollback;` de este ensayo
+-- gobierna de verdad todo el bloque, incluida la migración.
+
+\! sed -e '/^BEGIN;$/d' -e '/^COMMIT;$/d' supabase/migrations/20260926114200_secretaria_convocation_junta_emit_rpc.sql > /tmp/moi142_junta_emit_no_txn.sql
 
 begin;
 
-\i supabase/migrations/20260926114200_secretaria_convocation_junta_emit_rpc.sql
+\i /tmp/moi142_junta_emit_no_txn.sql
 
 create temporary table probe_results (etiqueta text, valor jsonb) on commit drop;
 
