@@ -8,14 +8,19 @@
  *
  * Spec: docs/superpowers/specs/2026-05-11-procedimiento-plantillas-v2-design.md
  *
- * Runtime env: requires VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in .env.local.
- * Without those, hasAdminClient() returns false and every describe block is skipped.
+ * Runtime env: los describes de trigger/CHECK requieren VITE_SUPABASE_URL +
+ * SUPABASE_SERVICE_ROLE_KEY (ausentes en el `.env` de este repo a propósito —
+ * ver comentario de `PUEDE_ESCRIBIR`) y se saltan (skip, no todo) cuando
+ * faltan. El describe de existencia de esquema (MOI-192) es de solo lectura y
+ * solo necesita DEMO_PASSWORD_ARGA.
  */
 
 import { describe, it, expect, afterEach } from "vitest";
 import {
   supabaseAdmin,
   hasAdminClient,
+  hasDemoCredentials,
+  sesionDe,
   DEMO_TENANT,
   DEMO_ENTITY_ARGA,
 } from "../helpers/supabase-test-client";
@@ -23,12 +28,13 @@ import {
 /**
  * DOS PROBLEMAS, DOS GUARDAS.
  *
- * 1. SKIP PERMANENTE. `hasAdminClient()` es SIEMPRE false en este repo
- *    (medido 2026-09-05): el helper lee `SUPABASE_SERVICE_ROLE_KEY` y
- *    `VITE_SUPABASE_URL`, y el `.env` define `SERVICE_ROLE_SECRET` y
- *    `PROJECT_URL`. Los cinco describes de este fichero llevan meses entre los
- *    «skipped» sin que nadie pueda ejecutarlos. Ahora la ausencia de
- *    credenciales aparece como `todo`, no como silencio.
+ * 1. `hasAdminClient()` es SIEMPRE false en este repo (medido 2026-09-05): el
+ *    helper lee `SUPABASE_SERVICE_ROLE_KEY` y `VITE_SUPABASE_URL`, y el `.env`
+ *    define `SERVICE_ROLE_SECRET` y `PROJECT_URL`. Los describes que prueban
+ *    RECHAZOS de INSERT/UPDATE/DELETE (trigger/CHECK) siguen exigiendo
+ *    `service_role` a propósito — no hay forma de forzar un `admin` a
+ *    rechazar una escritura sin intentarla — y se quedan `skip` mientras
+ *    falten esas credenciales. Eso es correcto, no deuda (MOI-192, DA-30).
  *
  * 2. ES DESTRUCTIVO. Hace INSERT y DELETE reales sobre
  *    `entity_settings_catalog` y `entity_settings`. Si algún día alguien
@@ -44,10 +50,41 @@ const TARGET_URL = process.env.VITE_SUPABASE_URL ?? "";
 const APUNTA_A_GOVERNANCE_OS = TARGET_URL.includes(GOVERNANCE_OS_REF);
 const PUEDE_ESCRIBIR = ADMIN_DISPONIBLE && !APUNTA_A_GOVERNANCE_OS;
 
-describe.skipIf(ADMIN_DISPONIBLE)("v2 plantillas overrides — sin credenciales", () => {
-  it.todo(
-    "sondas destructivas no ejecutadas: requieren SUPABASE_SERVICE_ROLE_KEY + VITE_SUPABASE_URL (el .env define SERVICE_ROLE_SECRET/PROJECT_URL)",
-  );
+/**
+ * MOI-192 (2026-09-26), decisión A. Las sondas de trigger/CHECK de más abajo
+ * siguen exigiendo `service_role` a propósito: comprueban RECHAZOS de INSERT/
+ * UPDATE/DELETE, y este proyecto no ejecuta escritura contra `governance_OS`
+ * con esa cuenta (memoria `feedback_no_vitest_admin_cloud.md`). Eso se queda
+ * skip, no todo — es el comportamiento correcto, no deuda.
+ *
+ * El único `it.todo` real de este fichero era el placeholder de "sin
+ * credenciales". Se sustituye por una sonda de SOLO LECTURA con la sesión
+ * demo autenticada: comprueba que las 6 tablas de la migración
+ * `20260511044356_v2_plantillas_overrides.sql` existen en Cloud con sus
+ * columnas (spec §4), vía RLS real (SELECT ... LIMIT 0 no escribe nada). Si
+ * la migración no ha aterrizado o una columna cambió de nombre, PostgREST
+ * devuelve error y la sonda cae — no puede pasar en vacío.
+ */
+const CREDENCIALES_DISPONIBLES = hasDemoCredentials("ARGA");
+const FALTAN_CREDENCIALES_DEMO = "requiere DEMO_PASSWORD_ARGA en .env";
+
+describe.skipIf(!CREDENCIALES_DISPONIBLES)("v2 plantillas overrides — existencia de esquema (solo lectura, sesión demo)", () => {
+  it.each([
+    ["entity_settings_catalog", "key, value_type, allowed_values, default_value, descripcion, categoria, usado_por_plantillas, estado_catalog, created_at"],
+    ["entity_settings", "id, tenant_id, entity_id, key, value, created_at, updated_at, updated_by"],
+    ["plantilla_capa3_overrides_por_entidad", "id, tenant_id, entity_id, plantilla_id, campo, obligatoriedad_override, opciones_override, compatible_with_canonical_version, motivo"],
+    ["bloques_sectoriales", "clave_bloque, version, sector, materia_aplicable, texto_aprobado, estado"],
+    ["bloque_insertions", "id, bloque_clave"],
+    ["plantilla_changelog", "id"],
+  ] as const)("tabla %s existe con las columnas de la spec", async (tabla, columnas) => {
+    const arga = await sesionDe("ARGA");
+    const { error } = await arga.from(tabla).select(columnas).limit(0);
+    expect(error, `${tabla}: la migración v2_plantillas_overrides no aterrizó o cambió de forma`).toBeNull();
+  });
+});
+
+describe.skipIf(CREDENCIALES_DISPONIBLES)("v2 plantillas overrides — sin credenciales demo", () => {
+  it.todo(`sonda de existencia de esquema (solo lectura) no ejecutada: ${FALTAN_CREDENCIALES_DEMO}`);
 });
 
 // Sin skipIf: esta guarda debe correr SIEMPRE. Es la que impide que un día,

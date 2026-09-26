@@ -241,6 +241,13 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
       .toContain("sii");
     // Discriminante: la lista es una lista BLANCA, no «todo». Si dejara de
     // excluir lo que D-5 excluye, la aserción de arriba no probaría nada.
+    // Fuente de D-5: docs/superpowers/specs/2026-08-02-garrigues-tenant-gobernanza-design.md
+    // (resuelta 03-08-2026, implementada íntegra en G4) y
+    // docs/superpowers/specs/2026-08-13-g4-sistema-normativo-garrigues-design.md §8
+    // ("aplicabilidad de módulos por tenant"). Decisión D-11 (MOI-192, 2026-09-26):
+    // esta exclusión es regla de producto, no deuda de la orden "Garrigues se siembra"
+    // — CLAUDE.md ya no la lista en ese inventario. Activar DORA para Garrigues exige
+    // cambiar esta aserción a propósito.
     expect(modules as string[]).not.toContain("dora");
   });
 

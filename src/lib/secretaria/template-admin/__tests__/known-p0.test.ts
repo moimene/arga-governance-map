@@ -1,42 +1,52 @@
 import { describe, it, expect } from "vitest";
-import { supabaseAdmin, hasAdminClient, DEMO_TENANT } from "@/test/helpers/supabase-test-client";
+import { hasDemoCredentials, sesionDe, DEMO_TENANT } from "@/test/helpers/supabase-test-client";
 import { KNOWN_P0_TEMPLATES, isKnownP0 } from "../known-p0";
 
 /**
- * GOTCHA MEDIDO (2026-09-05). `hasAdminClient()` es SIEMPRE false en este repo:
- * el helper lee `SUPABASE_SERVICE_ROLE_KEY` y `VITE_SUPABASE_URL`, y el `.env`
- * define `SERVICE_ROLE_SECRET` y `PROJECT_URL`. Estos bloques llevan meses
- * contándose entre los «skipped» sin que nadie pueda ejecutarlos: un skip
- * permanente no es una sonda, es un hueco con forma de sonda. Con `it.todo` la
- * ausencia de credenciales queda VISIBLE en el recuento, no en silencio.
+ * MOI-192 (2026-09-26). Era `it.todo` por pedir `supabaseAdmin` (service_role,
+ * ausente del `.env` de este repo — GOTCHA medido 2026-09-05) y la regla del
+ * proyecto prohíbe correr tests con service_role contra `governance_OS`
+ * (memoria `feedback_no_vitest_admin_cloud.md`). Decisión A del issue: sonda
+ * de SOLO LECTURA con la sesión demo autenticada, no `service_role`.
+ *
+ * `KNOWN_P0_TEMPLATES` está vacía desde el 2026-05-14 (las dos P0 históricas
+ * se corrigieron), así que iterar sobre ella —como hacía la versión original—
+ * ejecuta CERO aserciones y pasa en vacío. El control positivo real es
+ * comprobar en Cloud que esas dos plantillas siguen existiendo, ACTIVAS, y que
+ * `isKnownP0` sigue diciendo que ya NO se toleran: si alguna desaparece, deja
+ * de estar ACTIVA, o `isKnownP0` regresa a `true`, esta sonda debe caer.
  */
-const ADMIN_DISPONIBLE = hasAdminClient();
-const FALTAN_CREDENCIALES =
-  "requiere SUPABASE_SERVICE_ROLE_KEY + VITE_SUPABASE_URL (el .env define SERVICE_ROLE_SECRET/PROJECT_URL)";
+const CREDENCIALES_DISPONIBLES = hasDemoCredentials("ARGA");
+const FALTAN_CREDENCIALES = "requiere DEMO_PASSWORD_ARGA en .env";
+const P0_HISTORICOS = [
+  { id: "e3697ad9-e0c2-4baf-9144-c80a11808c07", materia: "FUSION_ESCISION" },
+  { id: "edd5c389-0187-476c-9592-c020058fdc69", materia: "RATIFICACION_ACTOS" },
+] as const;
 
-describe.skipIf(ADMIN_DISPONIBLE)("known-p0 Cloud existence — sin credenciales", () => {
+describe.skipIf(CREDENCIALES_DISPONIBLES)("known-p0 Cloud existence — sin credenciales", () => {
   it.todo(`sonda Cloud de plantillas P0 no ejecutada: ${FALTAN_CREDENCIALES}`);
 });
 
-describe.skipIf(!ADMIN_DISPONIBLE)("known-p0 Cloud existence", () => {
-  it("cada ID conocido existe en plantillas_protegidas y está ACTIVA", async () => {
-    for (const p of KNOWN_P0_TEMPLATES) {
-      const { data, error } = await supabaseAdmin!
+describe.skipIf(!CREDENCIALES_DISPONIBLES)("known-p0 Cloud existence (solo lectura, sesión demo)", () => {
+  it("las dos P0 históricas siguen ACTIVA en Cloud y ya no se toleran como P0", async () => {
+    const arga = await sesionDe("ARGA");
+    for (const p of P0_HISTORICOS) {
+      const { data, error } = await arga
         .from("plantillas_protegidas")
-        .select("id, estado, materia, materia_acuerdo, organo_tipo")
+        .select("id, estado, materia, materia_acuerdo")
         .eq("id", p.id)
         .eq("tenant_id", DEMO_TENANT)
         .maybeSingle();
 
       expect(error, `lookup error for ${p.id}`).toBeNull();
-      expect(data, `${p.id} (${p.materia}) no encontrada en Cloud`).not.toBeNull();
+      expect(data, `${p.id} (${p.materia}) ya no existe en Cloud`).not.toBeNull();
       expect(data?.estado, `${p.id} debe estar ACTIVA`).toBe("ACTIVA");
       const materia = (data?.materia_acuerdo ?? data?.materia) as string;
       expect(materia).toBe(p.materia);
-      expect(data?.organo_tipo).toBe(p.organo);
+      expect(isKnownP0(p.id), `${p.id} no debe volver a tolerarse como P0`).toBe(false);
     }
+    expect(KNOWN_P0_TEMPLATES).toHaveLength(0);
   });
-
 });
 
 /**

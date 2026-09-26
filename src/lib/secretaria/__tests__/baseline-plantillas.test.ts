@@ -1,28 +1,33 @@
 // src/lib/secretaria/__tests__/baseline-plantillas.test.ts
 import { describe, it, expect } from "vitest";
-import { supabaseAdmin, hasAdminClient, DEMO_TENANT } from "@/test/helpers/supabase-test-client";
+import { hasDemoCredentials, sesionDe, DEMO_TENANT } from "@/test/helpers/supabase-test-client";
 
 const SNAPSHOT_DATE = "2026-05-12";
 
 /**
- * GOTCHA MEDIDO (2026-09-05). `hasAdminClient()` es SIEMPRE false en este repo:
- * el helper lee `SUPABASE_SERVICE_ROLE_KEY` y `VITE_SUPABASE_URL`, y el `.env`
- * define `SERVICE_ROLE_SECRET` y `PROJECT_URL`. Estos bloques llevan meses
- * contándose entre los «skipped» sin que nadie pueda ejecutarlos: un skip
- * permanente no es una sonda, es un hueco con forma de sonda. Con `it.todo` la
- * ausencia de credenciales queda VISIBLE en el recuento, no en silencio.
+ * MOI-192 (2026-09-26). Este baseline era `it.todo` porque pedía
+ * `supabaseAdmin` (service_role), y el helper lee `SUPABASE_SERVICE_ROLE_KEY`
+ * mientras el `.env` del proyecto solo define `SERVICE_ROLE_SECRET` —GOTCHA
+ * medido el 2026-09-05, nunca se llegó a comprobar si valía la pena arreglarlo
+ * porque la regla del proyecto prohíbe correr tests con service_role contra
+ * `governance_OS` (memoria `feedback_no_vitest_admin_cloud.md`). Decisión A
+ * del issue: sonda de SOLO LECTURA con la sesión demo autenticada
+ * (`sesionDe("ARGA")`, RLS real, el mismo camino que usa la app en
+ * `usePlantillasProtegidas.ts`), no `service_role`. Salta si faltan
+ * credenciales demo (`hasDemoCredentials`); si las hay y el login falla,
+ * `sesionDe` lanza — no hay paso silencioso.
  */
-const ADMIN_DISPONIBLE = hasAdminClient();
-const FALTAN_CREDENCIALES =
-  "requiere SUPABASE_SERVICE_ROLE_KEY + VITE_SUPABASE_URL (el .env define SERVICE_ROLE_SECRET/PROJECT_URL)";
+const CREDENCIALES_DISPONIBLES = hasDemoCredentials("ARGA");
+const FALTAN_CREDENCIALES = "requiere DEMO_PASSWORD_ARGA en .env";
 
-describe.skipIf(ADMIN_DISPONIBLE)("baseline plantillas — sin credenciales", () => {
+describe.skipIf(CREDENCIALES_DISPONIBLES)("baseline plantillas — sin credenciales", () => {
   it.todo(`baseline de plantillas no ejecutado: ${FALTAN_CREDENCIALES}`);
 });
 
-describe.skipIf(!ADMIN_DISPONIBLE)(`baseline plantillas (snapshot ${SNAPSHOT_DATE})`, () => {
+describe.skipIf(!CREDENCIALES_DISPONIBLES)(`baseline plantillas (snapshot ${SNAPSHOT_DATE}, solo lectura)`, () => {
   it("catálogo ARGA mantiene 41+ ACTIVA con metadata", async () => {
-    const { data, error } = await supabaseAdmin!
+    const arga = await sesionDe("ARGA");
+    const { data, error } = await arga
       .from("plantillas_protegidas")
       .select("id, estado, organo_tipo, aprobada_por, referencia_legal, fecha_aprobacion")
       .eq("tenant_id", DEMO_TENANT);
@@ -45,7 +50,8 @@ describe.skipIf(!ADMIN_DISPONIBLE)(`baseline plantillas (snapshot ${SNAPSHOT_DAT
   });
 
   it("no hay duplicados funcionales activos", async () => {
-    const { data } = await supabaseAdmin!
+    const arga = await sesionDe("ARGA");
+    const { data } = await arga
       .from("plantillas_protegidas")
       .select("tipo, jurisdiccion, materia, materia_acuerdo, organo_tipo, adoption_mode")
       .eq("tenant_id", DEMO_TENANT)
