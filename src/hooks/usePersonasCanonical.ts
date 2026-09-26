@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { isProductionPerson } from "@/lib/secretaria/persona-filters";
+import type { Json } from "@/integrations/supabase/types";
 
 type MaybeJoin<T> = T | T[] | null | undefined;
 
@@ -676,7 +677,7 @@ export function useCreatePersonaCompleta() {
 
       const { data, error } = await supabase.rpc("fn_create_persona_completa", {
         p_tenant_id: tenantId,
-        p_payload: payload,
+        p_payload: payload as unknown as Json,
         p_idempotency_key: [
           "create-persona-completa",
           tenantId,

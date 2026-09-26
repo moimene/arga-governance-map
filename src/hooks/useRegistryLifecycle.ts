@@ -39,7 +39,7 @@ async function invokeRegistryRpc(
     | "fn_registry_record_publication",
   params: Record<string, unknown>,
 ): Promise<RegistryRpcResult> {
-  const { data, error } = await supabase.rpc(name, params);
+  const { data, error } = await supabase.rpc(name, params as unknown as never);
   if (error) throw error;
   return assertRegistryRpcResult(data);
 }

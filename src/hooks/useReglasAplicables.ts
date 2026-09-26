@@ -114,7 +114,7 @@ export function useReglasAplicables(entityId: string | undefined) {
         // si la tabla o columnas fallan por versión de schema, caemos silenciosamente
         // (la UI mostrará lo que haya)
       } else {
-        for (const p of (rps ?? []) as RulePackRow[]) {
+        for (const p of (rps ?? []) as unknown as RulePackRow[]) {
           const active = (p.rule_pack_versions ?? []).find((v) => v.is_active);
           if (!active) continue;
           out.push({

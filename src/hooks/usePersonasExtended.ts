@@ -160,7 +160,7 @@ export function useAsistentesConCapital(meetingId: string | undefined) {
           full_name?: string | null;
         } | null;
       };
-      return ((data ?? []) as AttendeeRaw[]).map((a) => ({
+      return ((data ?? []) as unknown as AttendeeRaw[]).map((a) => ({
         ...a,
         person_type: a.persons?.person_type ?? null,
         full_name: a.persons?.full_name ?? null,

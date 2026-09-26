@@ -73,7 +73,7 @@ export function useRepresentaciones(
       if (scope) q = q.eq("scope", scope);
       const { data, error } = await q.order("effective_from", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as RepresentacionDetailRow[];
+      return (data ?? []) as unknown as RepresentacionDetailRow[];
     },
   });
 }
@@ -97,7 +97,7 @@ export function useRepresentacionesHistoriaByPerson(personId: string | undefined
         .or(`represented_person_id.eq.${personId},representative_person_id.eq.${personId}`)
         .order("effective_from", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as RepresentacionDetailRow[];
+      return (data ?? []) as unknown as RepresentacionDetailRow[];
     },
   });
 }
