@@ -111,7 +111,7 @@ export function useAcuerdoSinSesionById(id: string | undefined) {
         .eq("tenant_id", tenantId!)
         .maybeSingle();
       if (error) throw error;
-      return data as NoSessionResolutionDetailRow | null;
+      return data as unknown as NoSessionResolutionDetailRow | null;
     },
   });
 }

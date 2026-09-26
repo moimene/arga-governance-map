@@ -13,6 +13,7 @@ import {
   type AgreementOrigin,
 } from "@/lib/secretaria/agreement-360";
 import type { MeetingAdoptionSnapshot } from "@/lib/rules-engine";
+import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { secretariaOperationError } from "@/lib/secretaria/supabase-error-message";
 import type {
   AuthoritativeEadEvidence,
@@ -420,7 +421,7 @@ export function useAprobarActa(minuteId: string | undefined) {
       if (error) {
         throw secretariaOperationError(error, "No se pudo aprobar el acta con evidencia EAD.");
       }
-      return data as AprobarActaResult;
+      return data as unknown as AprobarActaResult;
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["actas", tenantId] });
@@ -536,7 +537,7 @@ export function useFirmarCertificacionAutoritativa(
           "No se pudo validar la evidencia EAD de la certificación.",
         );
       }
-      return data as FirmarCertificacionAutoritativaResult;
+      return data as unknown as FirmarCertificacionAutoritativaResult;
     },
     onSuccess: async () => {
       await Promise.all([
@@ -614,7 +615,7 @@ export function useUpdateActaBorrador(minuteId: string | undefined) {
         p_content: content,
       });
       if (error) throw error;
-      return data as UpdateActaBorradorResult;
+      return data as unknown as UpdateActaBorradorResult;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["actas", tenantId] });
@@ -719,14 +720,14 @@ export function useMaterializeMeetingPointAgreement(minuteId: string | undefined
       if (agreementId) {
         const { error: updateError } = await supabase
           .from("agreements")
-          .update(payload)
+          .update(payload as unknown as TablesUpdate<"agreements">)
           .eq("tenant_id", tenantId)
           .eq("id", agreementId);
         if (updateError) throw updateError;
       } else {
         const { data: insertedAgreement, error: insertError } = await supabase
           .from("agreements")
-          .insert(payload)
+          .insert(payload as unknown as TablesInsert<"agreements">)
           .select("id")
           .single();
         if (insertError) throw insertError;
