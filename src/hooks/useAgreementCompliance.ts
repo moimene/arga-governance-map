@@ -4,7 +4,7 @@ import { useTenantContext } from "@/context/TenantContext";
 import { extractMeetingSourceLinks } from "@/lib/secretaria/meeting-links";
 import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
 import { resolveOrganoTipoStrict } from "@/lib/secretaria/organo-resolver";
-import { deriveTipoSocial } from "@/lib/secretaria/tipo-social";
+import { deriveTipoSocial, toTipoSocialMotorValidez } from "@/lib/secretaria/tipo-social";
 import { rulePackMateriaMatches } from "@/lib/rules-engine/rule-resolution";
 import {
   selectRulePackForOrgano,
@@ -21,7 +21,6 @@ import {
   type AdoptionMode,
   type AgendaItemEvaluationResult,
   type AgendaReportAcceptanceVote,
-  type TipoSocial,
   type TipoOrgano,
   type FormaAdministracion,
   type MateriaClase,
@@ -410,26 +409,6 @@ export function useAgreement(agreementId?: string) {
   });
 }
 
-/** Mapea legal_form normalizado a TipoSocial del motor V2. */
-function toTipoSocial(companyForm: string | null): TipoSocial {
-  if (companyForm === "SA" || companyForm === "SA_CV") return "SA";
-  // SLP reutiliza primitivos SL; la identidad visible vive en
-  // labels/deriveTipoSocial, no aquí. Colapso deliberado: "SLP" ya caía en
-  // el "return 'SL'" genérico de abajo (como cualquier valor que no sea
-  // SA/SA_CV), así que esta rama explícita NO cambia el comportamiento
-  // observable — solo documenta la intención en vez de dejarla accidental.
-  //
-  // NO delegar en deriveTipoSocial: esta función es una tercera
-  // normalización paralela (junto a tipo-social.ts y normative-framework.ts)
-  // que hoy manda SAU/SLU de ARGA por la misma rama "SL" del motor de
-  // validez vía este fallback catch-all. deriveTipoSocial les daría
-  // identidad propia y cambiaría ese comportamiento — prohibido (cero
-  // cambio ARGA). Unificar las 3 normalizaciones es deuda pre-G3 que afecta
-  // la semántica SAU/SLU de ARGA; decisión fuera de este alcance.
-  if (companyForm === "SLP") return "SL";
-  return "SL";
-}
-
 /** Mapea matter_class del agreement al MateriaClase del motor V2. */
 function toMateriaClase(mc: string): MateriaClase {
   if (mc === "ESTATUTARIA") return "ESTATUTARIA";
@@ -498,7 +477,7 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
   }
 
   const companyForm = normalizeCompanyForm(a.entities?.legal_form);
-  const tipoSocial = toTipoSocial(companyForm);
+  const tipoSocial = toTipoSocialMotorValidez(companyForm);
   const organoTipo = resolveAgreementOrganoTipo(a);
   const adoptionMode = a.adoption_mode as AdoptionMode;
   const materiaClase = toMateriaClase(a.matter_class);

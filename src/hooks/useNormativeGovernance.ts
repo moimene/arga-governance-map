@@ -4,7 +4,6 @@ import { useTenantContext } from "@/context/TenantContext";
 import {
   assignTemplateBinding,
   materializeEffectiveRuleMatrix,
-  publishNormativeOverride,
   publishStatuteVersion,
   upsertOrganProfile,
   upsertOrganRule,
@@ -12,7 +11,6 @@ import {
   type EffectiveRuleMatrixRow,
   type NormativeOverrideRow,
   type OrganRuleRow,
-  type PublishNormativeOverrideInput,
   type PublishStatuteVersionInput,
   type StatuteClauseMappingRow,
   type StatuteVersionRow,
@@ -191,18 +189,6 @@ export function usePublishStatuteVersion() {
     mutationFn: async (input: Omit<PublishStatuteVersionInput, "tenantId">) => {
       if (!tenantId) throw new Error("tenantId requerido");
       return publishStatuteVersion(supabase, { ...input, tenantId });
-    },
-    onSuccess: () => invalidateNormativeQueries(queryClient),
-  });
-}
-
-export function usePublishNormativeOverride() {
-  const { tenantId } = useTenantContext();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: Omit<PublishNormativeOverrideInput, "tenantId">) => {
-      if (!tenantId) throw new Error("tenantId requerido");
-      return publishNormativeOverride(supabase, { ...input, tenantId });
     },
     onSuccess: () => invalidateNormativeQueries(queryClient),
   });
