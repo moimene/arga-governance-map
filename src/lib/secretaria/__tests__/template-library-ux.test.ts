@@ -16,10 +16,14 @@ import {
   templateAvailabilityPresentation,
 } from "../template-library-ux";
 
+// MOI-137, D-20: resolveLegalTemplateApprovalPlan (informe del Comité Legal
+// del 01-05-2026) solo acredita aprobación para el tenant de emisión (ARGA).
+const ARGA_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+
 function template(patch: Partial<PlantillaProtegidaRow> = {}): PlantillaProtegidaRow {
   return {
     id: "template",
-    tenant_id: "tenant",
+    tenant_id: ARGA_TENANT_ID,
     tipo: "MODELO_ACUERDO",
     materia: null,
     jurisdiccion: "ES",
