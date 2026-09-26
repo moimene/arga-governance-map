@@ -19,6 +19,7 @@ import { useAiSystemById } from "@/hooks/useAiSystems";
 import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 import { useAssessmentsBySystem } from "@/hooks/useAiAssessments";
 import { useAiIncidentsBySystem } from "@/hooks/useAiIncidents";
+import { useRisksByAiSystem } from "@/hooks/useRisks";
 import {
   useAimsTechnicalFileSections,
   useAimsSystemVersions,
@@ -33,8 +34,9 @@ import TabEvaluaciones from "@/components/ai-governance/sistema/TabEvaluaciones"
 import TabExpedienteTecnico from "@/components/ai-governance/sistema/TabExpedienteTecnico";
 import TabIncidentes from "@/components/ai-governance/sistema/TabIncidentes";
 import TabVigilancia from "@/components/ai-governance/sistema/TabVigilancia";
+import TabRiesgosGrc from "@/components/ai-governance/sistema/TabRiesgosGrc";
 
-type Pestana = "TECHNICAL_FILE" | "EVALUATIONS" | "INCIDENTS" | "POST_MARKET";
+type Pestana = "TECHNICAL_FILE" | "EVALUATIONS" | "INCIDENTS" | "POST_MARKET" | "GRC_RISKS";
 type Modal = null | "EDITAR" | "DECLARACION" | "ESCALADO";
 
 export default function SistemaDetalle() {
@@ -49,6 +51,7 @@ export default function SistemaDetalle() {
   const { data: technicalSections = [], error: errSections } = useAimsTechnicalFileSections(id);
   const { data: versions = [], error: errVersions } = useAimsSystemVersions(id);
   const { data: indicators = [], error: errIndicators } = useAimsMonitoringIndicators(id);
+  const { data: riesgosGrc = [], error: errRiesgosGrc } = useRisksByAiSystem(id);
   const cuenta = (n: number, err: unknown) => (err ? "no medido" : n);
 
   const [activeTab, setActiveTab] = useState<Pestana>("TECHNICAL_FILE");
@@ -91,6 +94,7 @@ export default function SistemaDetalle() {
     { id: "EVALUATIONS", label: `Autodiagnósticos (${cuenta(assessments.length, errAssessments)})`, icon: ClipboardCheck },
     { id: "INCIDENTS", label: `Incidentes (${cuenta(incidents.length, errIncidents)})`, icon: AlertTriangle },
     { id: "POST_MARKET", label: `Vigilancia Poscomercialización (${cuenta(indicators.length, errIndicators)})`, icon: Activity },
+    { id: "GRC_RISKS", label: `Riesgos GRC (${cuenta(riesgosGrc.length, errRiesgosGrc)})`, icon: AlertTriangle },
   ] as const;
 
   return (
@@ -162,6 +166,8 @@ export default function SistemaDetalle() {
       )}
 
       {activeTab === "POST_MARKET" && <TabVigilancia systemId={id} indicators={indicators} error={errIndicators} />}
+
+      {activeTab === "GRC_RISKS" && <TabRiesgosGrc riesgos={riesgosGrc} error={errRiesgosGrc} />}
 
       {modal === "EDITAR" && <EditarSistemaModal system={system} onClose={() => setModal(null)} />}
 
