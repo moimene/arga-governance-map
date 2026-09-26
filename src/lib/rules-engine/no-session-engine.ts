@@ -605,6 +605,21 @@ export function evaluarCirculacionConsejo(input: NoSessionInput): {
     return { ok: false, severity: 'BLOCKING', explain };
   }
 
+  // total_members ausente (MOI-208): sin denominador conocido, JS coacciona
+  // null a 0 en la división y da Infinity >= 0.5 — el gate pasaría de forma
+  // vacua. Si no se sabe cuántos consejeros tiene el órgano, el requisito es
+  // NO MEDIDO, no cumplido.
+  if (input.totalDestinatarios === null) {
+    explain.push({
+      regla: 'Participación de consejeros (≥50%)',
+      fuente: 'LEY',
+      referencia: 'art. 248.2 LSC / art. 100 RRM',
+      resultado: 'BLOCKING',
+      mensaje: 'No medido: falta el número de miembros del órgano; no puede acreditarse el quórum de participación.',
+    });
+    return { ok: false, severity: 'BLOCKING', explain };
+  }
+
   // ITEM-057 (1): la participación inferior al 50% de los consejeros BLOQUEA la
   // adopción (antes solo emitía WARNING). El cómputo de participación usa los
   // concurrentes al procedimiento (respuestas expresas), no los silencios.

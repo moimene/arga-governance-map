@@ -662,6 +662,32 @@ describe('Gate 4: Circulación Consejo', () => {
     expect(result.ok).toBe(false);
     expect(result.severity).toBe('BLOCKING');
   });
+
+  it('MOI-208: totalDestinatarios null no da participación por cumplida vía Infinity', () => {
+    // Regresión hermana del gate de notificación: `concurrentes / null` se
+    // coacciona a `concurrentes / 0` = Infinity, y `Infinity >= 0.5` es true.
+    // Sin saber cuántos consejeros tiene el órgano, la participación es NO
+    // MEDIDA, no cumplida.
+    const input = createBaseInput({
+      organoTipo: 'CONSEJO',
+      condicionAdopcion: 'MAYORIA_CONSEJEROS_ESCRITA',
+      totalDestinatarios: null,
+      respuestas: [
+        {
+          person_id: '1',
+          capital_participacion: 0,
+          porcentaje_capital: 0,
+          es_consejero: true,
+          sentido: 'CONSENTIMIENTO',
+        },
+      ],
+    });
+
+    const result = evaluarCirculacionConsejo(input);
+    expect(result.ok).toBe(false);
+    expect(result.severity).toBe('BLOCKING');
+    expect(result.explain[0].mensaje).toMatch(/No medido/i);
+  });
 });
 
 // ============================================================
