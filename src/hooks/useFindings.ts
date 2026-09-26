@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 
@@ -214,6 +214,73 @@ export function useActionPlansByFinding(findingId: string | null | undefined) {
         ...r,
         responsible_name: r.responsible?.full_name ?? null,
       }));
+    },
+  });
+}
+
+// MOI-149 (D-23, alta por pantalla): alta de hallazgos. `entity_id`/`obligation_id`
+// se dejan a decisión del formulario (nullable en schema); el tenant SIEMPRE va
+// explícito porque `findings.tenant_id` no tiene DEFAULT — un olvido no puede
+// aterrizar en ARGA en silencio.
+export type FindingWriteInput = {
+  code: string;
+  title: string;
+  severity: string;
+  status?: string;
+  origin?: string | null;
+  entity_id?: string | null;
+  obligation_id?: string | null;
+  owner_id?: string | null;
+  due_date?: string | null;
+};
+
+export function useCreateFinding() {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: FindingWriteInput) => {
+      if (!tenantId) throw new Error("Sin tenant de sesión: no se puede dar de alta el hallazgo.");
+      const { data, error } = await supabase
+        .from("findings")
+        .insert({ ...input, tenant_id: tenantId })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as FindingRow;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["findings", "list", tenantId] });
+    },
+  });
+}
+
+// MOI-149 (D-23): alta de planes de acción. `action_plans` exige `finding_id`
+// (NOT NULL) y desde 2026-09-06 `tenant_id` tampoco tiene DEFAULT (antes caía
+// en ARGA en silencio): igual que arriba, se nombra siempre.
+export type ActionPlanWriteInput = {
+  finding_id: string;
+  title: string;
+  responsible_id?: string | null;
+  due_date?: string | null;
+  status?: string;
+};
+
+export function useCreateActionPlan() {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ActionPlanWriteInput) => {
+      if (!tenantId) throw new Error("Sin tenant de sesión: no se puede dar de alta el plan de acción.");
+      const { data, error } = await supabase
+        .from("action_plans")
+        .insert({ ...input, tenant_id: tenantId })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ActionPlanRow;
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["actionPlans", "byFinding", variables.finding_id] });
     },
   });
 }

@@ -101,7 +101,8 @@ Medido sobre las escrituras reales de `src` (INSERT/UPSERT directos y RPC invoca
 | **AIMS 360** | **Sí.** Alta de sistema por cuestionario (`fn_aims_registrar_sistema`), evaluaciones con congelación y revisión a cuatro ojos, incidentes, versiones, expediente técnico, indicadores. | El órgano de gobierno de la IA se resuelve por mapa estático por tenant (`lib/aims/governing-body.ts`): un tenant nuevo no lo tendrá hasta añadirlo. |
 | **GRC Compass** | **Parcial.** Riesgos (`/grc/risk-360/nuevo`), incidentes, excepciones y terceros (TPRM) tienen alta. | Obligaciones, controles y módulos GRC se leen de dato sembrado. |
 | **SII** | **Sí.** Alta de comunicaciones por el portal; persistencia en `sii.reports` por tenant. | Roles del canal: «Pendiente de designación» hasta declararlos en `lib/sii/roles-por-tenant.ts`. El catálogo inicial de un tenant desconocido es vacío (no hereda los casos de ARGA). |
-| **Consola TGMS: políticas, obligaciones, controles, hallazgos, planes de acción, delegaciones, conflictos, notificaciones regulatorias** | **No.** Cero inserts desde la UI: son superficies de solo lectura sobre dato sembrado por script. | En un tenant en blanco quedarán vacías y sin forma de poblarlas por pantalla. |
+| **Consola TGMS: hallazgos y planes de acción** | **Sí, desde MOI-149 (2026-09-27, D-23 por delegación de Moisés: alta por pantalla).** `/hallazgos/nuevo` y el formulario inline de la pestaña «Planes de acción» de `/hallazgos/:id` (`useCreateFinding`/`useCreateActionPlan`, tenant explícito porque ninguna de las dos columnas tiene ya `DEFAULT` de tenant). | Primera alta real verificada en `…0003` (sonda `src/test/schema/tenant-cero-findings-action-plan-alta.test.ts`). |
+| **Consola TGMS: políticas, obligaciones, controles, delegaciones, conflictos, notificaciones regulatorias** | **No.** Cero inserts desde la UI: son superficies de solo lectura sobre dato sembrado por script. | En un tenant en blanco quedarán vacías y sin forma de poblarlas por pantalla. Decisión tabla por tabla pendiente en MOI-147. |
 | **Órganos (post-alta) y estructura de grupo** | **Parcial → en cierre.** Órganos sí se pueden crear post-alta por pantalla en `/secretaria/catalogo-organos`; matriz y % del Hueco 2 tienen RPC autoritativa lista (`fn_secretaria_actualizar_estructura_grupo`, Decisión D-21) pendiente de autorización para aplicar en Cloud y publicar (MOI-148). | Hueco 1 resuelto; Hueco 2 diseñado y construido, en espera de autorización de Cloud/publicación. |
 | **ESG, notificaciones, actividad reciente** | **No aplica.** Son fixtures estáticos de ARGA en `src/data/*`. | Hay que gatearlos o vaciarlos para el tenant nuevo. |
 | **Board Pack, Governance Map, Dashboard** | **Derivados.** Se componen de lo anterior: serán tan ricos como el dato que exista. | — |
@@ -204,6 +205,25 @@ El recorrido de los bloques 3 (Marco normativo) y 4 (Ciclo societario completo) 
     - Bandeja de comunicaciones neutral honesta (0 envíos simulados).
     - Calendario agregador calcula vencimientos en ventana de 90 días sin alertas espurias.
     - Board Pack genera informe ejecutivo dinámico para el Consejo de Administración de `Corporación Nueva, S.A.` (Presidente Carlos Mendoza, Secretaria Elena Gómez, orden del día de presupuesto 2026), exportable e impermeable entre tenants.
+
+### 6.6 MOI-149 — alta por pantalla de hallazgos y planes de acción (2026-09-27)
+
+Decisión D-23 (por delegación de Moisés en el agente orquestador): de los ocho
+tipos de registro de la consola sin alta que listaba MOI-149, **hallazgos y
+planes de acción** se resuelven por **alta por pantalla**; los seis restantes
+(políticas, obligaciones, controles, delegaciones, conflictos, notificaciones
+regulatorias) quedan sin decidir — siguen bloqueados por la puerta humana de
+MOI-147, que este issue no supera.
+
+- `useCreateFinding`/`useCreateActionPlan` (`src/hooks/useFindings.ts`): tenant
+  siempre explícito (ninguna de las dos columnas tiene ya `DEFAULT` de tenant
+  desde `20260906072910`). `/hallazgos/nuevo` (formulario propio) y el alta
+  inline de plan de acción en la pestaña «Planes de acción» de
+  `/hallazgos/:id`.
+- Primera alta real verificada en `…0003`: `GRPN-ALTA-001` (hallazgo) + su
+  plan de acción, con recuentos de ARGA (findings 5, action_plans 8) y
+  Garrigues (findings 8) idénticos antes y después. Sonda de arista:
+  `src/test/schema/tenant-cero-findings-action-plan-alta.test.ts`.
 
 ## 7. Referencias
 

@@ -28,6 +28,7 @@ import ObligacionDetalle from "@/pages/ObligacionDetalle";
 import DelegacionesList from "@/pages/DelegacionesList";
 import DelegacionDetalle from "@/pages/DelegacionDetalle";
 import HallazgosList from "@/pages/HallazgosList";
+import HallazgoNuevo from "@/pages/HallazgoNuevo";
 import HallazgoDetalle from "@/pages/HallazgoDetalle";
 import ControlDetalle from "@/pages/ControlDetalle";
 import Conflictos from "@/pages/Conflictos";
@@ -197,6 +198,7 @@ const App = () => (
                   <Route path="/delegaciones" element={<DelegacionesList />} />
                   <Route path="/delegaciones/:slug" element={<DelegacionDetalle />} />
                   <Route path="/hallazgos" element={<HallazgosList />} />
+                  <Route path="/hallazgos/nuevo" element={<HallazgoNuevo />} />
                   <Route path="/hallazgos/:id" element={<HallazgoDetalle />} />
                   <Route path="/conflictos" element={<Conflictos />} />
                   <Route path="/esg" element={<SoloConFixturesDemo titulo="ESG — Sostenibilidad e Impacto"><Esg /></SoloConFixturesDemo>} />
