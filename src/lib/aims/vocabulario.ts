@@ -118,14 +118,20 @@ export function normalizeAimsStatus(status: string | null | undefined): string {
 const CHIP_NEUTRO =
   "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
 
-const CHIP_ESTADO_SISTEMA: Record<string, string> = {
+// Exportados (no solo las funciones) para que el gate transversal MOI-161
+// (src/test/vocabulario-chip-neutro.test.ts) pueda comprobar pertenencia
+// EXPLÍCITA en el mapa, no solo el resultado — un valor caído al fallback y
+// uno mapeado a propósito a CHIP_NEUTRO producen la misma clase, y solo la
+// pertenencia al mapa distingue "declarado" de "olvidado".
+export const CHIP_ESTADO_SISTEMA: Record<string, string> = {
   ACTIVO: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
   EN_EVALUACION: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  // PLANIFICADO sin entrada a propósito: un plan no desplegado cae al neutro.
+  // A propósito, igual que RETIRADO: un plan no desplegado cae al neutro.
+  PLANIFICADO: CHIP_NEUTRO,
   RETIRADO: CHIP_NEUTRO,
 };
 
-const CLASE_NIVEL_RIESGO: Record<string, string> = {
+export const CLASE_NIVEL_RIESGO: Record<string, string> = {
   Inaceptable: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
   Alto: "bg-[var(--status-error)]/80 text-[var(--g-text-inverse)]",
   Limitado: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
@@ -138,7 +144,7 @@ const CLASE_NIVEL_RIESGO: Record<string, string> = {
  * lista sólo teñía los tres legados: una evaluación con brechas se pintaba
  * igual que una conforme, en gris, y la lista no las distinguía.
  */
-const CHIP_ESTADO_EVALUACION: Record<string, string> = {
+export const CHIP_ESTADO_EVALUACION: Record<string, string> = {
   CONFORME: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
   CON_GAPS: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
   BORRADOR: CHIP_NEUTRO,
@@ -147,14 +153,14 @@ const CHIP_ESTADO_EVALUACION: Record<string, string> = {
   EN_REVISION: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
 };
 
-const CHIP_SEVERIDAD: Record<string, string> = {
+export const CHIP_SEVERIDAD: Record<string, string> = {
   CRITICO: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
   ALTO: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
   MEDIO: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
   BAJO: "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
 };
 
-const CHIP_ESTADO_INCIDENTE: Record<string, string> = {
+export const CHIP_ESTADO_INCIDENTE: Record<string, string> = {
   ABIERTO: "bg-[var(--status-error)]/10 text-[var(--status-error)] border border-[var(--status-error)]/30",
   EN_INVESTIGACION:
     "bg-[var(--status-warning)]/10 text-[var(--g-text-secondary)] border border-[var(--status-warning)]/30",
