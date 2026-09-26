@@ -18,7 +18,7 @@
 // sin declararse pone el gate en rojo, que es lo que no pasó la primera vez.
 import { beforeAll, describe, expect, it } from "bun:test";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DEMO_TENANT, GARRIGUES_TENANT, sesionDe, type CuentaDemo } from "../helpers/supabase-test-client";
+import { DEMO_TENANT, GARRIGUES_TENANT, NUEVO_TENANT, sesionDe, type CuentaDemo } from "../helpers/supabase-test-client";
 
 type Fila = { id: string; module_id: string; reference: string | null };
 
@@ -83,21 +83,43 @@ async function leer(cliente: SupabaseClient, tenant: string) {
 const TENANTS: Array<[CuentaDemo, string]> = [
   ["ARGA", DEMO_TENANT],
   ["GARRIGUES", GARRIGUES_TENANT],
+  ["NUEVO", NUEVO_TENANT],
 ];
+
+/**
+ * MOI-152 (decisión D-13, por delegación): el grupo nuevo nace con el módulo
+ * `ai`, pero SIN ninguna obligación `OBL-RIA-*` todavía — eso es MOI-176
+ * (F6.T2), que no ha empezado. Los tenants con obligaciones reales no pueden
+ * declarar aquí: si NUEVO deja de estar vacío sin tocar este fichero, el gate
+ * de control positivo de abajo cae y obliga a decidir qué se hace con el
+ * art. 4 (ver el "if" de más abajo).
+ */
+const TENANTS_CON_OBLIGACIONES: ReadonlyArray<CuentaDemo> = ["ARGA", "GARRIGUES"];
 
 describe("G-SYNC — el espejo de obligaciones respeta el criterio del código", () => {
   const dato = new Map<CuentaDemo, Awaited<ReturnType<typeof leer>>>();
 
   beforeAll(async () => {
+    // 3 logins secuenciales (MOI-152 añade NUEVO): 30s se quedaba corto, mismo
+    // ajuste que ya usa tenant-cero-isolation.test.ts para el tercer tenant.
     for (const [cuenta, tenant] of TENANTS) dato.set(cuenta, await leer(await sesionDe(cuenta), tenant));
-  }, 30_000);
+  }, 120_000);
 
-  it("control positivo: los dos tenants tienen obligaciones y espejo, o el gate sería vacuo", () => {
-    for (const [cuenta] of TENANTS) {
+  it("control positivo: ARGA y Garrigues tienen obligaciones y espejo, o el gate sería vacuo", () => {
+    for (const cuenta of TENANTS_CON_OBLIGACIONES) {
       const d = dato.get(cuenta)!;
       expect(d.obligaciones.length, `${cuenta} sin obligaciones`).toBeGreaterThan(0);
       expect(d.espejo.length, `${cuenta} sin espejo`).toBeGreaterThan(0);
     }
+  });
+
+  it("NUEVO: el módulo ai existe (MOI-152) y sigue sin obligaciones del RIA (MOI-176 pendiente)", () => {
+    const d = dato.get("NUEVO")!;
+    expect(d.modulos.has("ai"), "NUEVO sin módulo 'ai' en grc_modules").toBe(true);
+    expect(
+      d.obligaciones.length,
+      "NUEVO ya tiene obligaciones: actualiza TENANTS_CON_OBLIGACIONES y el gate del art. 4 de abajo",
+    ).toBe(0);
   });
 
   it("control positivo del criterio: un OBL-PBC-* resuelve a aml y un OBL-RIA-* a ai", () => {
@@ -150,13 +172,21 @@ describe("G-SYNC — el espejo de obligaciones respeta el criterio del código",
       ).toBe(NATIVAS_ESPERADAS[cuenta]);
     });
 
-    it(`${cuenta}: el módulo 'ai' existe y el art. 4 está dentro`, () => {
+    it(`${cuenta}: el módulo 'ai' existe`, () => {
       const d = dato.get(cuenta)!;
       expect(d.modulos.has("ai"), `${cuenta} sin módulo 'ai' en grc_modules`).toBe(true);
-      const art4 = d.obligaciones.find((o) => o.code === "OBL-RIA-ORG-04");
-      expect(art4, `${cuenta} sin la obligación del art. 4`).toBeTruthy();
-      expect(d.espejo.find((e) => e.id === art4!.id)?.module_id).toBe("ai");
     });
+
+    // NUEVO (MOI-152) tiene el módulo pero, a propósito, ninguna obligación
+    // todavía: ver TENANTS_CON_OBLIGACIONES.
+    if (TENANTS_CON_OBLIGACIONES.includes(cuenta)) {
+      it(`${cuenta}: el art. 4 del RIA está dentro del módulo ai`, () => {
+        const d = dato.get(cuenta)!;
+        const art4 = d.obligaciones.find((o) => o.code === "OBL-RIA-ORG-04");
+        expect(art4, `${cuenta} sin la obligación del art. 4`).toBeTruthy();
+        expect(d.espejo.find((e) => e.id === art4!.id)?.module_id).toBe("ai");
+      });
+    }
   }
 
   it("Garrigues: las 21 de PBC/FT están en aml y ninguna quedó en risk", () => {

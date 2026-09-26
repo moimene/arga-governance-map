@@ -92,6 +92,11 @@ const GRC_MODULES_GENERICOS: GrcModuleSpec[] = [
   { id: "gdpr", name: "Protección de datos", description: "Cumplimiento del RGPD y la LOPDGDD: registro de actividades, brechas y derechos.", owner: OWNER_PENDIENTE },
   { id: "ethics", name: "Ética y canal interno", description: "Código ético y Sistema Interno de Información (Ley 2/2023).", owner: OWNER_PENDIENTE },
   { id: "audit", name: "Auditoría interna", description: "Plan de auditoría, hallazgos y seguimiento de recomendaciones.", owner: OWNER_PENDIENTE },
+  // MOI-152 (decisión D-13, por delegación): el grupo nace con el módulo de IA
+  // desde el arranque, mismo patrón que ARGA/Garrigues (migración
+  // 20260926115200_grc_modulo_ia_grupo_nuevo.sql). Sin ella no hay dónde
+  // clasificar las obligaciones de organización del RIA (OBL-RIA-*).
+  { id: "ai", name: "Gobernanza de la IA", description: "Obligaciones de organización del Reglamento (UE) 2024/1689 (RIA): alfabetización, gestión de la calidad y protocolos de uso. El inventario de sistemas y su clasificación viven en el módulo de IA.", owner: OWNER_PENDIENTE },
 ];
 
 export const TENANT_SPECS: Record<string, TenantSpec> = {
