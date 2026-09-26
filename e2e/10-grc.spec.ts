@@ -64,7 +64,10 @@ test.describe('GRC Compass', () => {
     await page.goto('/grc/risk-360/nuevo');
     await expect(page).not.toHaveURL('/login');
     await expect(page.getByText('Nuevo riesgo').first()).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('legacy_write · risks')).toBeVisible();
+    // MOI-157: el chip con el código de postura en crudo se retiró; la garantía
+    // real (owner-write sin crear actos en otro módulo) sigue en pantalla, sin jerga.
+    await expect(page.getByText(/Registro owner de GRC sobre risks/i)).toBeVisible();
+    await expect(page.getByText('legacy_write')).toHaveCount(0);
   });
 
   test('Penal / Anticorrupción renderiza como vista conectada', async ({ page }) => {

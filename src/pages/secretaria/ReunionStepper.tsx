@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { readMeetingHandoff } from "@/lib/secretaria/cross-module-handoff";
+import { handoffEventLabel } from "@/lib/handoff-event-labels";
 // B7 Lote 3: los datos legacy de agenda pueden traer alias de materia; el
 // select solo ofrece códigos canónicos, así que hay que resolverlos al leer.
 import {
@@ -4860,7 +4861,7 @@ function ReunionIntake() {
       <div className="mx-auto max-w-5xl space-y-6">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
-            Secretaría · Intake de reunión
+            Secretaría · Preparar reunión
           </p>
           <h1 className="mt-2 text-2xl font-semibold text-[var(--g-text-primary)]">
             Preparar una sesión societaria
@@ -4882,18 +4883,18 @@ function ReunionIntake() {
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[var(--status-warning)]" />
               <div>
                 <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
-                  Handoff read-only desde {sourceLabel}
+                  Derivación desde {sourceLabel}
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-[var(--g-text-secondary)]">
-                  Evento propuesto: <span className="font-medium text-[var(--g-text-primary)]">{event ?? "sin evento"}</span>
+                  Evento propuesto: <span className="font-medium text-[var(--g-text-primary)]">{handoffEventLabel(event)}</span>
                   {sourceId ? (
                     <>
                       {" "}
                       · Referencia: <span className="font-medium text-[var(--g-text-primary)]">{sourceId}</span>
                     </>
                   ) : null}
-                  . Secretaría decide si lo incorpora a una convocatoria, orden del día o expediente. No se escriben
-                  `governance_module_events`, `governance_module_links`, reuniones, acuerdos ni actas desde este intake.
+                  . Secretaría decide si lo incorpora a una convocatoria, orden del día o expediente. No se crean
+                  reuniones, acuerdos ni actas desde esta derivación.
                 </p>
                 {(organ || matter || rationale) ? (
                   <dl className="mt-3 space-y-1.5 border-t border-[var(--g-border-subtle)] pt-3 text-sm">

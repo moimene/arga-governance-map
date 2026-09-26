@@ -6,6 +6,7 @@ import { useSecretariaScope } from "@/components/secretaria/shell";
 import type { SecretariaScopeController } from "@/components/secretaria/shell";
 import { useTenantBranding } from "@/context/TenantBrandContext";
 import { groupFullLabel } from "@/lib/tenant-brand-labels";
+import { handoffEventLabel } from "@/lib/handoff-event-labels";
 import {
   ORDEN_BANDAS, COLOR_BANDA, ETIQUETA_BANDA, NOTA_ESCALA, tieneEjes,
   riskScore, matchesScoreFilter, countSeverity, lecturaRiesgo,
@@ -67,17 +68,6 @@ function scoreLabel(score: number | null, risk?: RiskRow) {
 function moduleLabel(value?: string | null) {
   if (!value) return "Sin módulo";
   if (MODULE_LABEL[value]) return MODULE_LABEL[value];
-  return value
-    .toLowerCase()
-    .split(/[_\s-]+/)
-    .filter(Boolean)
-    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
-    .join(" ");
-}
-
-function handoffLabel(value: string | null) {
-  if (!value) return "Señal recibida";
-  if (value === "AIMS_TECHNICAL_FILE_GAP") return "brecha en expediente técnico";
   return value
     .toLowerCase()
     .split(/[_\s-]+/)
@@ -358,7 +348,7 @@ export default function Risk360() {
                   Entrada desde AIMS
                 </h2>
                 <p className="text-sm leading-6 text-[var(--g-text-secondary)]">
-                  Se recibe la señal de {handoffLabel(handoff)} para decidir si procede abrir riesgo, control o plan de acción en GRC.
+                  Se recibe la señal de {handoffEventLabel(handoff)} para decidir si procede abrir riesgo, control o plan de acción en GRC.
                 </p>
               </div>
             </div>

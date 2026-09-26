@@ -17,6 +17,7 @@ import {
   getGrcScreenPostureSummary,
 } from "@/lib/grc/dashboard-readiness";
 import { grcRouteModuleKey } from "@/lib/grc/route-module-key";
+import { handoffEventLabel } from "@/lib/handoff-event-labels";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import type { SecretariaScopeController } from "@/components/secretaria/shell";
 import { Link } from "react-router-dom";
@@ -115,9 +116,9 @@ const READINESS_ICON: Record<GrcP0Domain["readiness"], React.ElementType> = {
 };
 
 const SOURCE_POSTURE_LABEL = {
-  legacy_read: "Legacy read",
-  legacy_write: "Legacy write",
-  tgms_handoff: "Handoff plataforma",
+  legacy_read: "Lectura heredada",
+  legacy_write: "Escritura heredada",
+  tgms_handoff: "Derivación de plataforma",
   local_demo_read: "Demo local",
   backlog_placeholder: "Backlog",
 };
@@ -138,7 +139,8 @@ function ComplianceMonitorRow({
   const StatusIcon = READINESS_ICON[monitor.readiness];
   const handoffLabels = monitor.handoffCandidateIds
     .map((id) => getGrcHandoffCandidate(id)?.contractEvent)
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((event) => handoffEventLabel(event));
 
   return (
     <Link
@@ -183,7 +185,7 @@ function ComplianceMonitorRow({
                 className="inline-flex items-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-secondary)]"
                 style={{ borderRadius: "var(--g-radius-full)" }}
               >
-                Handoff: {handoffLabels.join(", ")}
+                Derivación: {handoffLabels.join(", ")}
               </span>
             )}
           </div>
@@ -215,7 +217,7 @@ function ComplianceMonitorPanel({ scope }: { scope: SecretariaScopeController })
             </div>
             <p className="mt-1 max-w-4xl text-sm leading-6 text-[var(--g-text-secondary)]">
               GRC debe vigilar obligaciones, riesgos, controles, incidentes, excepciones,
-              auditoría, privacidad, resiliencia y handoffs. Esta vista separa lo conectado,
+              auditoría, privacidad, resiliencia y derivaciones. Esta vista separa lo conectado,
               lo que requiere foco y los gaps que no deben ocultarse.
             </p>
           </div>
@@ -273,7 +275,7 @@ function ComplianceMonitorPanel({ scope }: { scope: SecretariaScopeController })
             desactualizada: seguía diciendo que TPRM es un gap cuando
             `/grc/tprm` ya lee `grc_third_parties` del tenant. Una afirmación
             duplicada solo puede desmentir a la otra. */}
-        Fuente de verdad: tablas GRC conectadas actuales y contratos locales. Los handoffs a
+        Fuente de verdad: tablas GRC conectadas actuales y contratos locales. Las derivaciones a
         Secretaría/AIMS son rutas de solo lectura, sin escrituras cross-module.
       </div>
     </section>
@@ -674,7 +676,7 @@ export default function GrcDashboard() {
                 </h2>
               </div>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
-                Inventario plegado para auditoría: fuentes, modo de operación y handoffs de solo lectura.
+                Inventario plegado para auditoría: fuentes, modo de operación y derivaciones de solo lectura.
               </p>
             </div>
 
@@ -720,7 +722,7 @@ export default function GrcDashboard() {
                   </span>
                 </div>
                 <p className="mt-3 text-xs leading-5 text-[var(--g-text-secondary)]">
-                  {handoffs.length > 0 ? handoffs.map((handoff) => handoff?.contractEvent).join(", ") : "Sin handoff"}
+                  {handoffs.length > 0 ? handoffs.map((handoff) => handoffEventLabel(handoff?.contractEvent)).join(", ") : "Sin derivación"}
                 </p>
               </div>
             );
@@ -774,7 +776,7 @@ export default function GrcDashboard() {
                       <div className="mt-1">{screen.hooks.length ? screen.hooks.join(", ") : "Sin hook"}</div>
                     </td>
                     <td className="px-4 py-3 text-xs text-[var(--g-text-secondary)]">
-                      {handoffs.length > 0 ? handoffs.map((handoff) => handoff?.contractEvent).join(", ") : "Sin handoff"}
+                      {handoffs.length > 0 ? handoffs.map((handoff) => handoffEventLabel(handoff?.contractEvent)).join(", ") : "Sin derivación"}
                     </td>
                   </tr>
                 );
@@ -811,7 +813,7 @@ export default function GrcDashboard() {
           </div>
           <div>
             <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">
-              Handoffs de solo lectura
+              Derivaciones de solo lectura
             </h3>
             <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
               {GRC_HANDOFF_CANDIDATES.map((handoff) => (
@@ -823,7 +825,7 @@ export default function GrcDashboard() {
                 >
                   <Route className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--g-brand-3308)]" />
                   <span>
-                    <span className="font-semibold text-[var(--g-text-primary)]">{handoff.contractEvent}</span>
+                    <span className="font-semibold text-[var(--g-text-primary)]">{handoffEventLabel(handoff.contractEvent)}</span>
                     <span className="block">{handoff.sourceOwner} → {handoff.targetOwner}</span>
                   </span>
                 </Link>
