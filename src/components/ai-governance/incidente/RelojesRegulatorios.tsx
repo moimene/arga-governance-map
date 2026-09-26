@@ -143,6 +143,10 @@ export default function RelojesRegulatorios({ clocks, doraVisible }: RelojesRegu
                 su envío real: son los últimos permisibles si cada informe se presenta justo en plazo.
               </p>
             )}
+            <p className="text-[11px] text-[var(--status-warning)] leading-relaxed">
+              Vencimiento inicial: lectura PROVISIONAL (tope 24h desde el conocimiento; 4h desde la
+              clasificación si consta), pendiente de confirmación del equipo legal — MOI-163.
+            </p>
             <div className="pt-2 border-t border-[var(--g-border-subtle)] flex justify-between items-center text-xs">
               <span className="text-[var(--g-text-secondary)]">
                 {clocks.dora?.initialRule === "24H_CAP_FROM_KNOWLEDGE"

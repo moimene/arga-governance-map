@@ -10,7 +10,18 @@
  * 6. TPRM Matriz de Concentración y Sustituibilidad (Escala 1-5 & CTPP DORA Art. 31).
  * 7. Criterios de clasificación de incidentes graves: DORA art. 18 y Reglamento
  *    Delegado (UE) 2024/1772 (el art. 19 y el RD 2025/301 son los PLAZOS, punto 1).
+ *
+ * MOI-215: `computeDoraDeadlines` y `computeGdprBreachDeadlines` (punto 1 y la
+ * mitad "72h" del punto 2) delegan su aritmética en
+ * `src/lib/regulatory-deadlines.ts`, único cálculo compartido con AIMS
+ * (`src/lib/aims/incident-clocks.ts`). El resto de este fichero (NIS2, DSAR,
+ * perímetro, TPRM, clasificación de incidente grave) sigue igual: no está en
+ * el alcance de MOI-215.
  */
+import {
+  computeDoraDeadlineMilestones,
+  computeGdprAuthorityDeadline,
+} from "@/lib/regulatory-deadlines";
 
 /**
  * Suma meses calendario de forma segura sin overflow al siguiente mes
@@ -54,27 +65,13 @@ export function computeDoraDeadlines(
   const knowledgeDate = new Date(knowledgeDateInput);
   const classificationDate = classificationDateInput ? new Date(classificationDateInput) : null;
 
-  // Límite 24h desde conocimiento
-  const max24hFromKnowledge = new Date(knowledgeDate.getTime() + 24 * 3600 * 1000);
-
-  // Límite 4h desde clasificación (si fue clasificado)
-  let initialDeadline: Date;
-  if (classificationDate) {
-    const max4hFromClassification = new Date(classificationDate.getTime() + 4 * 3600 * 1000);
-    // Debe presentarse lo antes posible: la fecha más restrictiva entre 4h tras clasificar o 24h tras conocer
-    initialDeadline = max4hFromClassification < max24hFromKnowledge 
-      ? max4hFromClassification 
-      : max24hFromKnowledge;
-  } else {
-    // Si aún no se ha clasificado formalmente, el tope máximo absoluto son 24h desde el conocimiento
-    initialDeadline = max24hFromKnowledge;
-  }
-
-  // Informe intermedio: 72h desde notificación inicial
-  const intermediateDeadline = new Date(initialDeadline.getTime() + 72 * 3600 * 1000);
-
-  // Informe final: 1 mes calendario exacto desde informe intermedio
-  const finalDeadline = addCalendarMonths(intermediateDeadline, 1);
+  // MOI-215: aritmética delegada en el cálculo único (lectura del vencimiento
+  // inicial sin clasificar PROVISIONAL, pendiente de MOI-163). El informe
+  // final se suma en UTC ahí (antes `addCalendarMonths` lo sumaba en hora
+  // local: dos usuarios en husos distintos veían vencimientos distintos del
+  // mismo incidente). `addCalendarMonths` sigue igual para NIS2 y DSAR.
+  const { initialDeadline, intermediateDeadline, finalDeadline } =
+    computeDoraDeadlineMilestones(knowledgeDate, classificationDate);
 
   return {
     knowledgeDate,
@@ -126,7 +123,7 @@ export function computeGdprBreachDeadlines(
   isHighRiskToRights: boolean
 ): GdprBreachDeadlines {
   const knowledgeDate = new Date(knowledgeDateInput);
-  const authorityDeadline = new Date(knowledgeDate.getTime() + 72 * 3600 * 1000);
+  const authorityDeadline = computeGdprAuthorityDeadline(knowledgeDate);
 
   return {
     knowledgeDate,
