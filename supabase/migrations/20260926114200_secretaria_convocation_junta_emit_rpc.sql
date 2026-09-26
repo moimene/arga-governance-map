@@ -25,6 +25,47 @@
 -- leyenda DEMO de cierre de la propia plantilla CONVOCATORIA_JUNTA. Si en el
 -- futuro se necesita el mismo nivel de paranoia textual que en CDA (orden de
 -- secciones, líneas exactas de agenda), añadirlo aquí siguiendo ese patrón.
+--
+-- MEDIDO (26-09-2026, ensayo revertido): con la RPC hermana ya instalada, el
+-- INSERT en convocatorias emite bien, pero el trigger COMPARTIDO
+-- `fn_convocation_manifest_enrich_recipients` (migración 20260720142000)
+-- lanza `CONVOCATION_MANIFEST_RECIPIENTS_CDA_ONLY` al congelar el manifiesto:
+-- solo sabía derivar destinatarios del censo político de un Consejo
+-- (`condiciones_persona` con `body_id` = el propio órgano). Una Junta nunca
+-- tiene ese tipo de asiento por-órgano — la condición SOCIO de
+-- `condiciones_persona` es de ENTIDAD, no de órgano (`body_id IS NULL` en las
+-- 346 filas de Garrigues, medido) — así que esta migración amplía ese mismo
+-- trigger con una rama JUNTA, en vez de tocar `fn_emit_convocatoria_junta`.
+--
+-- Fuente elegida para "socios con participación vigente": `capital_holdings`
+-- por entidad (no por órgano), filtrando `voting_rights` y excluyendo
+-- autocartera (`is_treasury`), a la fecha efectiva de la sesión. Es la MISMA
+-- tabla que ya usa el gate de representación de socio único de esta misma
+-- migración (líneas ~560-600) y el branch SOCIO_UNICO de
+-- `secretaria_ead_interposition_system_policy.sql` para el mismo propósito.
+-- Se descartan las otras dos fuentes que baraja el issue: `censo_snapshot`
+-- exige `meeting_id`, que todavía no existe a la fecha de emisión de la
+-- convocatoria (la reunión nace después, desde la convocatoria emitida); y
+-- `parte_votante_current` es una PROYECCIÓN regenerable que exige refresco
+-- manual (`fn_refresh_parte_votante_current`) — capital_holdings es la fuente
+-- viva, no su derivado. `condiciones_persona` con `tipo_condicion = 'SOCIO'`
+-- sirve de contraste (346 filas en Garrigues, frente a 346 holdings con voto
+-- y sin autocartera de 347 totales): coinciden, pero no está indexado por
+-- órgano/fecha del modo que este trigger necesita, así que no se usa como
+-- fuente directa.
+--
+-- Modo de convocatoria: "individual a los socios con participación vigente"
+-- (criterio del propio issue cuando no hay decisión previa del Comité
+-- Legal). No implementa el modo "anuncio" (BORME/web) del art. 173 LSC para
+-- juntas con muchos socios de paradero desconocido.
+--
+-- Declarado, no corregido aquí: igual que en CDA, se exige email no vacío
+-- por destinatario (mismo criterio de fallo cerrado). Medido en Garrigues:
+-- sus 346 socios no tienen email en `persons` — su Junta real seguiría sin
+-- poder emitirse hasta que se complete ese dato o se acuerde un canal
+-- alternativo. No es un defecto de esta migración: es la razón por la que
+-- MOI-142 recomienda probar con la Junta del grupo nuevo, cuyos 2 socios sí
+-- tienen email.
 
 BEGIN;
 
@@ -733,6 +774,591 @@ REVOKE ALL ON FUNCTION secretaria_private.fn_convocatoria_authority_representati
   FROM PUBLIC;
 
 -- ---------------------------------------------------------------------------
+-- 2.5. Manifiesto: fn_convocation_manifest_enrich_recipients gana rama JUNTA
+-- ---------------------------------------------------------------------------
+-- CREATE OR REPLACE reemplaza toda la función (definida en la migración
+-- 20260720142000). El cuerpo es el vigente en producción (verificado con
+-- pg_get_functiondef el 2026-09-26) más una rama JUNTA insertada donde antes
+-- solo había un rechazo explícito, y con las dos comprobaciones que dependían
+-- de esa rama (exclusiones fuera del censo, campos obligatorios) igualmente
+-- bifurcadas. El resto —resolución de fecha efectiva, gate de cuentas
+-- anuales, resolución de canal, comprobación de counts contra el trace del
+-- cliente, hash del manifiesto— es byte-a-byte el mismo, y aplica igual a
+-- las dos ramas.
+
+CREATE OR REPLACE FUNCTION secretaria_private.fn_convocation_manifest_enrich_recipients()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog
+SET timezone = 'Europe/Madrid'
+AS $function$
+DECLARE
+  v_convocatoria public.convocatorias%ROWTYPE;
+  v_effective_date date;
+  v_body_type text;
+  v_entity_id uuid;
+  v_excluded_json jsonb;
+  v_excluded_ids uuid[] := ARRAY[]::uuid[];
+  v_source_count integer;
+  v_distinct_count integer;
+  v_selected_count integer;
+  v_trace_total integer;
+  v_trace_selected integer;
+  v_recipients jsonb;
+  v_recipient_channel text;
+  v_ead_requested boolean;
+  v_email_requested boolean;
+  v_agenda_item jsonb;
+  v_accounts_year_count integer;
+  v_accounts_year integer;
+  v_accounts_deadline date;
+  v_accounts_proposal_normalized text;
+BEGIN
+  IF TG_OP <> 'INSERT' THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.data_class <> 'DEMO'
+     OR NEW.legal_effect <> 'DEMO_SIMULATION_NO_LEGAL_EFFECT'
+     OR NEW.manifest_json ->> 'schema_version'
+          <> 'secretaria.convocation-manifest.v2' THEN
+    RAISE EXCEPTION 'CONVOCATION_MANIFEST_RECIPIENTS_REQUIRE_DEMO_V2'
+      USING ERRCODE = '23514';
+  END IF;
+
+  SELECT convocatoria.*
+    INTO v_convocatoria
+    FROM public.convocatorias convocatoria
+   WHERE convocatoria.id = NEW.convocatoria_id
+     AND convocatoria.tenant_id = NEW.tenant_id
+     AND convocatoria.body_id IS NOT NULL;
+  IF NOT FOUND OR v_convocatoria.fecha_1 IS NULL THEN
+    RAISE EXCEPTION 'CONVOCATION_MANIFEST_RECIPIENTS_SOURCE_MISSING'
+      USING ERRCODE = '23514';
+  END IF;
+
+  SELECT pg_catalog.upper(COALESCE(body.body_type, '')), body.entity_id
+    INTO v_body_type, v_entity_id
+    FROM public.governing_bodies body
+   WHERE body.id = v_convocatoria.body_id
+     AND body.tenant_id = NEW.tenant_id;
+  -- El emisor canónico de Consejo (migración 138) admite CDA; la RPC hermana
+  -- de Junta (migración 20260926114200) admite JUNTA. Una Junta no tiene
+  -- censo político por-órgano (condiciones_persona SOCIO es de entidad, no
+  -- de body_id): su rama deriva de capital_holdings más abajo, no de
+  -- fn_secretaria_is_eligible_board_member_at.
+  IF NOT FOUND OR v_body_type NOT IN ('CDA', 'JUNTA') THEN
+    RAISE EXCEPTION 'CONVOCATION_MANIFEST_RECIPIENTS_CDA_ONLY'
+      USING ERRCODE = '23514';
+  END IF;
+
+  v_effective_date :=
+    (v_convocatoria.fecha_1 AT TIME ZONE 'Europe/Madrid')::date;
+
+  -- El gate cliente orienta, pero el registro WORM decide. Una formulación
+  -- posterior al 31 de marzo solo puede registrarse como regularización
+  -- extemporánea expresa y sin pretensión de convalidar el incumplimiento.
+  FOR v_agenda_item IN
+    SELECT item.value
+      FROM pg_catalog.jsonb_array_elements(v_convocatoria.agenda_items) item(value)
+  LOOP
+    IF v_agenda_item ->> 'materia' = 'FORMULACION_CUENTAS' THEN
+      SELECT
+        count(DISTINCT matched.parts[1])::integer,
+        min((matched.parts[1])::integer)
+        INTO v_accounts_year_count, v_accounts_year
+        FROM pg_catalog.regexp_matches(
+          concat_ws(
+            ' ',
+            v_agenda_item ->> 'titulo',
+            v_agenda_item ->> 'propuesta_acuerdo'
+          ),
+          '(20[0-9]{2})',
+          'g'
+        ) AS matched(parts);
+      IF v_accounts_year_count = 0 THEN
+        RAISE EXCEPTION 'CONVOCATION_ACCOUNTS_FINANCIAL_YEAR_REQUIRED'
+          USING ERRCODE = '23514';
+      END IF;
+      IF v_accounts_year_count <> 1 THEN
+        RAISE EXCEPTION 'CONVOCATION_ACCOUNTS_FINANCIAL_YEAR_AMBIGUOUS'
+          USING ERRCODE = '23514';
+      END IF;
+      IF v_accounts_year >= EXTRACT(year FROM v_effective_date)::integer THEN
+        RAISE EXCEPTION 'CONVOCATION_ACCOUNTS_FINANCIAL_YEAR_NOT_CLOSED'
+          USING ERRCODE = '23514';
+      END IF;
+      v_accounts_deadline := pg_catalog.make_date(v_accounts_year + 1, 3, 31);
+      v_accounts_proposal_normalized := pg_catalog.translate(
+        pg_catalog.lower(COALESCE(v_agenda_item ->> 'propuesta_acuerdo', '')),
+        'áéíóúüñ',
+        'aeiouun'
+      );
+      IF v_effective_date > v_accounts_deadline
+         AND (
+           v_accounts_proposal_normalized NOT LIKE '%extemporan%'
+           OR v_accounts_proposal_normalized NOT LIKE '%regulariza%'
+           OR v_accounts_proposal_normalized NOT LIKE '%sin convalidar%'
+         ) THEN
+        RAISE EXCEPTION
+          'CONVOCATION_ACCOUNTS_LATE_REGULARIZATION_REQUIRED: deadline=%',
+          v_accounts_deadline
+          USING ERRCODE = '23514';
+      END IF;
+    END IF;
+  END LOOP;
+
+  v_excluded_json := CASE
+    WHEN pg_catalog.jsonb_typeof(
+      v_convocatoria.reminders_trace #> '{recipients,excluded_person_ids}'
+    ) = 'array'
+      THEN v_convocatoria.reminders_trace #> '{recipients,excluded_person_ids}'
+    ELSE '[]'::jsonb
+  END;
+
+  IF EXISTS (
+    SELECT 1
+      FROM pg_catalog.jsonb_array_elements(v_excluded_json) excluded(value)
+     WHERE pg_catalog.jsonb_typeof(excluded.value) <> 'string'
+        OR (excluded.value #>> '{}')
+             !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$'
+  ) THEN
+    RAISE EXCEPTION 'CONVOCATION_MANIFEST_EXCLUDED_RECIPIENT_INVALID'
+      USING ERRCODE = '23514';
+  END IF;
+
+  SELECT COALESCE(
+           pg_catalog.array_agg(
+             (excluded.value #>> '{}')::uuid
+             ORDER BY excluded.value #>> '{}'
+           ),
+           ARRAY[]::uuid[]
+         )
+    INTO v_excluded_ids
+    FROM pg_catalog.jsonb_array_elements(v_excluded_json) excluded(value);
+
+  IF pg_catalog.cardinality(v_excluded_ids)
+       <> (
+         SELECT count(DISTINCT excluded_id)
+           FROM pg_catalog.unnest(v_excluded_ids) AS excluded(excluded_id)
+       ) THEN
+    RAISE EXCEPTION 'CONVOCATION_MANIFEST_EXCLUDED_RECIPIENT_DUPLICATE'
+      USING ERRCODE = '23514';
+  END IF;
+
+  IF v_body_type = 'CDA' THEN
+    IF EXISTS (
+      SELECT 1
+        FROM pg_catalog.unnest(v_excluded_ids) AS excluded(excluded_id)
+       WHERE NOT EXISTS (
+         SELECT 1
+           FROM public.condiciones_persona membership
+          WHERE membership.tenant_id = NEW.tenant_id
+            AND membership.body_id = v_convocatoria.body_id
+           AND membership.person_id = excluded_id
+            AND membership.fecha_inicio <= v_effective_date
+            AND (membership.fecha_fin IS NULL OR membership.fecha_fin >= v_effective_date)
+            AND (
+              membership.estado = 'VIGENTE'
+              OR (
+                membership.estado = 'PROGRAMADO'
+                AND v_effective_date > CURRENT_DATE
+              )
+              OR (
+                membership.estado = 'CESADO'
+                AND membership.fecha_fin IS NOT NULL
+                AND v_effective_date < CURRENT_DATE
+              )
+            )
+            AND membership.tipo_condicion IN (
+              'CONSEJERO','PRESIDENTE','VICEPRESIDENTE','CONSEJERO_COORDINADOR'
+            )
+            AND COALESCE(membership.metadata ->> 'seat_semantics', 'PRIMARY') <> 'ACCESSORY'
+            AND public.fn_secretaria_is_eligible_board_member_at(
+              v_convocatoria.body_id,
+              membership.person_id,
+              v_effective_date
+            )
+       )
+    ) THEN
+      RAISE EXCEPTION 'CONVOCATION_MANIFEST_EXCLUDED_RECIPIENT_NOT_IN_CENSUS'
+        USING ERRCODE = '23514';
+    END IF;
+  ELSE -- JUNTA: el censo es de socios con participación vigente, por entidad.
+    IF EXISTS (
+      SELECT 1
+        FROM pg_catalog.unnest(v_excluded_ids) AS excluded(excluded_id)
+       WHERE NOT EXISTS (
+         SELECT 1
+           FROM public.capital_holdings holding
+          WHERE holding.tenant_id = NEW.tenant_id
+            AND holding.entity_id = v_entity_id
+            AND holding.holder_person_id = excluded_id
+            AND holding.voting_rights IS TRUE
+            AND NOT holding.is_treasury
+            AND holding.effective_from <= v_effective_date
+            AND (holding.effective_to IS NULL OR holding.effective_to >= v_effective_date)
+       )
+    ) THEN
+      RAISE EXCEPTION 'CONVOCATION_MANIFEST_EXCLUDED_RECIPIENT_NOT_IN_CENSUS'
+        USING ERRCODE = '23514';
+    END IF;
+  END IF;
+
+  v_ead_requested := EXISTS (
+    SELECT 1
+      FROM pg_catalog.jsonb_array_elements_text(
+        CASE
+          WHEN pg_catalog.jsonb_typeof(
+            NEW.manifest_json #> '{publication,requested_channels}'
+          ) = 'array'
+            THEN NEW.manifest_json #> '{publication,requested_channels}'
+          ELSE '[]'::jsonb
+        END
+      ) requested(channel)
+     WHERE pg_catalog.regexp_replace(
+       pg_catalog.upper(pg_catalog.btrim(requested.channel)),
+       '^SANDBOX_',
+       ''
+     ) = 'EAD_INTERPOSITION'
+  ) OR EXISTS (
+    SELECT 1
+      FROM pg_catalog.jsonb_array_elements_text(
+        CASE
+          WHEN pg_catalog.jsonb_typeof(
+            NEW.manifest_json #> '{publication,sandbox_channels}'
+          ) = 'array'
+            THEN NEW.manifest_json #> '{publication,sandbox_channels}'
+          ELSE '[]'::jsonb
+        END
+      ) sandbox(channel)
+     WHERE pg_catalog.regexp_replace(
+       pg_catalog.upper(pg_catalog.btrim(sandbox.channel)),
+       '^SANDBOX_',
+       ''
+     ) = 'EAD_INTERPOSITION'
+  );
+
+  v_email_requested := EXISTS (
+    SELECT 1
+      FROM pg_catalog.jsonb_array_elements_text(
+        CASE
+          WHEN pg_catalog.jsonb_typeof(
+            NEW.manifest_json #> '{publication,requested_channels}'
+          ) = 'array'
+            THEN NEW.manifest_json #> '{publication,requested_channels}'
+          ELSE '[]'::jsonb
+        END
+      ) requested(channel)
+     WHERE pg_catalog.regexp_replace(
+       pg_catalog.upper(pg_catalog.btrim(requested.channel)),
+       '^SANDBOX_',
+       ''
+     ) = 'EMAIL_SIMPLE'
+  ) OR EXISTS (
+    SELECT 1
+      FROM pg_catalog.jsonb_array_elements_text(
+        CASE
+          WHEN pg_catalog.jsonb_typeof(
+            NEW.manifest_json #> '{publication,sandbox_channels}'
+          ) = 'array'
+            THEN NEW.manifest_json #> '{publication,sandbox_channels}'
+          ELSE '[]'::jsonb
+        END
+      ) sandbox(channel)
+     WHERE pg_catalog.regexp_replace(
+       pg_catalog.upper(pg_catalog.btrim(sandbox.channel)),
+       '^SANDBOX_',
+       ''
+     ) = 'EMAIL_SIMPLE'
+  );
+
+  IF NOT v_ead_requested AND NOT v_email_requested THEN
+    RAISE EXCEPTION 'CONVOCATION_MANIFEST_DIRECT_RECIPIENT_CHANNEL_REQUIRED'
+      USING ERRCODE = '23514';
+  END IF;
+  v_recipient_channel := CASE
+    WHEN v_ead_requested THEN 'EAD_INTERPOSITION'
+    ELSE 'EMAIL_SIMPLE'
+  END;
+
+  IF v_body_type = 'CDA' THEN
+    WITH source_rows AS (
+      SELECT
+        membership.person_id,
+        person.full_name AS name,
+        membership.tipo_condicion AS office,
+        person.email,
+        membership.id AS condition_id
+      FROM public.condiciones_persona membership
+      JOIN public.persons person
+        ON person.id = membership.person_id
+       AND person.tenant_id = membership.tenant_id
+      WHERE membership.tenant_id = NEW.tenant_id
+        AND membership.body_id = v_convocatoria.body_id
+        AND membership.fecha_inicio <= v_effective_date
+        AND (membership.fecha_fin IS NULL OR membership.fecha_fin >= v_effective_date)
+        AND (
+          membership.estado = 'VIGENTE'
+          OR (
+            membership.estado = 'PROGRAMADO'
+            AND v_effective_date > CURRENT_DATE
+          )
+          OR (
+            membership.estado = 'CESADO'
+            AND membership.fecha_fin IS NOT NULL
+            AND v_effective_date < CURRENT_DATE
+          )
+        )
+        AND membership.tipo_condicion IN (
+          'CONSEJERO','PRESIDENTE','VICEPRESIDENTE','CONSEJERO_COORDINADOR'
+        )
+        AND COALESCE(membership.metadata ->> 'seat_semantics', 'PRIMARY') <> 'ACCESSORY'
+        AND public.fn_secretaria_is_eligible_board_member_at(
+          v_convocatoria.body_id,
+          membership.person_id,
+          v_effective_date
+        )
+    )
+    SELECT
+      count(*)::integer,
+      count(DISTINCT source.person_id)::integer,
+      count(*) FILTER (
+        WHERE NOT (source.person_id = ANY(v_excluded_ids))
+      )::integer,
+      COALESCE(
+        pg_catalog.jsonb_agg(
+          pg_catalog.jsonb_build_object(
+            'person_id', source.person_id,
+            'condition_id', source.condition_id,
+            'name', source.name,
+            'office', source.office,
+            'email', source.email,
+            'channel', v_recipient_channel
+          )
+          ORDER BY
+            CASE source.office
+              WHEN 'PRESIDENTE' THEN 1
+              WHEN 'VICEPRESIDENTE' THEN 2
+              WHEN 'CONSEJERO_COORDINADOR' THEN 3
+              WHEN 'SECRETARIO' THEN 4
+              WHEN 'VICESECRETARIO' THEN 5
+              ELSE 10
+            END,
+            source.name,
+            source.person_id
+        ) FILTER (WHERE NOT (source.person_id = ANY(v_excluded_ids))),
+        '[]'::jsonb
+      )
+      INTO
+        v_source_count,
+        v_distinct_count,
+        v_selected_count,
+        v_recipients
+      FROM source_rows source;
+  ELSE -- JUNTA
+    WITH source_rows AS (
+      SELECT
+        holding.holder_person_id AS person_id,
+        person.full_name AS name,
+        'SOCIO'::text AS office,
+        person.email,
+        holding.id AS condition_id,
+        holding.porcentaje_capital AS capital_pct
+      FROM public.capital_holdings holding
+      JOIN public.persons person
+        ON person.id = holding.holder_person_id
+       AND person.tenant_id = holding.tenant_id
+      WHERE holding.tenant_id = NEW.tenant_id
+        AND holding.entity_id = v_entity_id
+        AND holding.voting_rights IS TRUE
+        AND NOT holding.is_treasury
+        AND holding.effective_from <= v_effective_date
+        AND (holding.effective_to IS NULL OR holding.effective_to >= v_effective_date)
+    )
+    SELECT
+      count(*)::integer,
+      count(DISTINCT source.person_id)::integer,
+      count(*) FILTER (
+        WHERE NOT (source.person_id = ANY(v_excluded_ids))
+      )::integer,
+      COALESCE(
+        pg_catalog.jsonb_agg(
+          pg_catalog.jsonb_build_object(
+            'person_id', source.person_id,
+            'condition_id', source.condition_id,
+            'name', source.name,
+            'office', source.office,
+            'email', source.email,
+            'channel', v_recipient_channel
+          )
+          ORDER BY source.capital_pct DESC NULLS LAST, source.name, source.person_id
+        ) FILTER (WHERE NOT (source.person_id = ANY(v_excluded_ids))),
+        '[]'::jsonb
+      )
+      INTO
+        v_source_count,
+        v_distinct_count,
+        v_selected_count,
+        v_recipients
+      FROM source_rows source;
+  END IF;
+
+  IF v_source_count = 0 OR v_selected_count = 0 THEN
+    RAISE EXCEPTION 'CONVOCATION_MANIFEST_RECIPIENT_CARDINALITY_ZERO'
+      USING ERRCODE = '23514';
+  END IF;
+  IF v_source_count <> v_distinct_count THEN
+    RAISE EXCEPTION 'CONVOCATION_MANIFEST_RECIPIENT_DUPLICATE_PERSON'
+      USING ERRCODE = '23514';
+  END IF;
+
+  IF v_body_type = 'CDA' THEN
+    IF EXISTS (
+      SELECT 1
+        FROM public.condiciones_persona membership
+        JOIN public.persons person
+          ON person.id = membership.person_id
+         AND person.tenant_id = membership.tenant_id
+       WHERE membership.tenant_id = NEW.tenant_id
+         AND membership.body_id = v_convocatoria.body_id
+         AND membership.fecha_inicio <= v_effective_date
+         AND (membership.fecha_fin IS NULL OR membership.fecha_fin >= v_effective_date)
+         AND (
+           membership.estado = 'VIGENTE'
+           OR (
+             membership.estado = 'PROGRAMADO'
+             AND v_effective_date > CURRENT_DATE
+           )
+           OR (
+             membership.estado = 'CESADO'
+             AND membership.fecha_fin IS NOT NULL
+             AND v_effective_date < CURRENT_DATE
+           )
+         )
+         AND membership.tipo_condicion IN (
+           'CONSEJERO','PRESIDENTE','VICEPRESIDENTE','CONSEJERO_COORDINADOR'
+         )
+         AND COALESCE(membership.metadata ->> 'seat_semantics', 'PRIMARY') <> 'ACCESSORY'
+         AND public.fn_secretaria_is_eligible_board_member_at(
+           v_convocatoria.body_id,
+           membership.person_id,
+           v_effective_date
+         )
+         AND (
+           membership.person_id IS NULL
+           OR pg_catalog.length(pg_catalog.btrim(COALESCE(person.full_name, ''))) = 0
+           OR pg_catalog.length(pg_catalog.btrim(COALESCE(membership.tipo_condicion, ''))) = 0
+           OR pg_catalog.length(pg_catalog.btrim(COALESCE(person.email, ''))) = 0
+         )
+    ) THEN
+      RAISE EXCEPTION 'CONVOCATION_MANIFEST_RECIPIENT_REQUIRED_FIELD_MISSING'
+        USING ERRCODE = '23514';
+    END IF;
+  ELSE -- JUNTA
+    IF EXISTS (
+      SELECT 1
+        FROM public.capital_holdings holding
+        JOIN public.persons person
+          ON person.id = holding.holder_person_id
+         AND person.tenant_id = holding.tenant_id
+       WHERE holding.tenant_id = NEW.tenant_id
+         AND holding.entity_id = v_entity_id
+         AND holding.voting_rights IS TRUE
+         AND NOT holding.is_treasury
+         AND holding.effective_from <= v_effective_date
+         AND (holding.effective_to IS NULL OR holding.effective_to >= v_effective_date)
+         AND (
+           holding.holder_person_id IS NULL
+           OR pg_catalog.length(pg_catalog.btrim(COALESCE(person.full_name, ''))) = 0
+           OR pg_catalog.length(pg_catalog.btrim(COALESCE(person.email, ''))) = 0
+         )
+    ) THEN
+      RAISE EXCEPTION 'CONVOCATION_MANIFEST_RECIPIENT_REQUIRED_FIELD_MISSING'
+        USING ERRCODE = '23514';
+    END IF;
+  END IF;
+
+  IF COALESCE(v_convocatoria.reminders_trace #>> '{recipients,total_active}', '')
+       !~ '^[0-9]+$'
+     OR COALESCE(v_convocatoria.reminders_trace #>> '{recipients,selected_count}', '')
+       !~ '^[0-9]+$' THEN
+    RAISE EXCEPTION 'CONVOCATION_MANIFEST_RECIPIENT_TRACE_COUNTS_REQUIRED'
+      USING ERRCODE = '23514';
+  END IF;
+  v_trace_total :=
+    (v_convocatoria.reminders_trace #>> '{recipients,total_active}')::integer;
+  v_trace_selected :=
+    (v_convocatoria.reminders_trace #>> '{recipients,selected_count}')::integer;
+  IF v_trace_total <> v_source_count
+     OR v_trace_selected <> v_selected_count
+     OR pg_catalog.jsonb_array_length(v_recipients) <> v_selected_count THEN
+    RAISE EXCEPTION 'CONVOCATION_MANIFEST_RECIPIENT_CENSUS_MISMATCH'
+      USING ERRCODE = '23514';
+  END IF;
+
+  NEW.manifest_json := pg_catalog.jsonb_set(
+    pg_catalog.jsonb_set(
+      pg_catalog.jsonb_set(
+        NEW.manifest_json,
+        '{renderer_contract_version}',
+        pg_catalog.to_jsonb('2026-07-20.3'::text),
+        true
+      ),
+      '{recipient_selection}',
+      CASE
+        WHEN v_body_type = 'CDA' THEN pg_catalog.jsonb_build_object(
+          'schema_version', 'secretaria.convocation-recipient-selection.v1',
+          'source', 'condiciones_persona',
+          'body_id', v_convocatoria.body_id,
+          'effective_date', v_effective_date,
+          'total_active', v_source_count,
+          'selected_count', v_selected_count,
+          'excluded_count', pg_catalog.cardinality(v_excluded_ids),
+          'excluded_person_ids', pg_catalog.to_jsonb(v_excluded_ids),
+          'seat_roles', pg_catalog.jsonb_build_array(
+            'CONSEJERO','PRESIDENTE','VICEPRESIDENTE','CONSEJERO_COORDINADOR'
+          ),
+          'seat_semantics', 'PRIMARY_ONLY',
+          'temporal_semantics', 'EFFECTIVE_AT_MEETING_DATE'
+        )
+        ELSE pg_catalog.jsonb_build_object(
+          'schema_version', 'secretaria.convocation-recipient-selection.v1',
+          'source', 'capital_holdings',
+          'body_id', v_convocatoria.body_id,
+          'entity_id', v_entity_id,
+          'effective_date', v_effective_date,
+          'total_active', v_source_count,
+          'selected_count', v_selected_count,
+          'excluded_count', pg_catalog.cardinality(v_excluded_ids),
+          'excluded_person_ids', pg_catalog.to_jsonb(v_excluded_ids),
+          'seat_roles', pg_catalog.jsonb_build_array('SOCIO'),
+          'seat_semantics', 'VOTING_NON_TREASURY',
+          'temporal_semantics', 'EFFECTIVE_AT_MEETING_DATE'
+        )
+      END,
+      true
+    ),
+    '{recipients}',
+    v_recipients,
+    true
+  );
+  NEW.manifest_hash_sha512 := pg_catalog.encode(
+    extensions.digest(
+      pg_catalog.convert_to(NEW.manifest_json::text, 'UTF8'),
+      'sha512'
+    ),
+    'hex'
+  );
+  RETURN NEW;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION secretaria_private.fn_convocation_manifest_enrich_recipients()
+  FROM PUBLIC, anon, authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
 -- 3. RPC hermana: fn_emit_convocatoria_junta
 -- ---------------------------------------------------------------------------
 
@@ -1388,6 +2014,24 @@ BEGIN
   -- perdido código al reemplazarla).
   IF v_def NOT LIKE '%CONVOCATION_PRESIDENT_AUTHORITY_NOT_EXACT%' THEN
     RAISE EXCEPTION 'CONVOCATION_CDA_AUTHORITY_BRANCH_LOST_ON_REPLACE';
+  END IF;
+
+  -- fn_convocation_manifest_enrich_recipients (migración 20260720142000) gana
+  -- rama JUNTA aquí mismo. Control positivo: la rama CDA (condiciones_persona
+  -- por body_id) sigue viva en la MISMA función junto a la rama nueva
+  -- (capital_holdings por entity_id).
+  SELECT pg_get_functiondef(
+    'secretaria_private.fn_convocation_manifest_enrich_recipients()'::regprocedure
+  ) INTO v_def;
+  IF v_def IS NULL
+     OR v_def NOT LIKE '%v_body_type NOT IN (''CDA'', ''JUNTA'')%'
+     OR v_def NOT LIKE '%FROM public.capital_holdings holding%'
+     OR v_def NOT LIKE '%NOT holding.is_treasury%' THEN
+    RAISE EXCEPTION 'CONVOCATION_MANIFEST_RECIPIENTS_JUNTA_BRANCH_INSTALL_FAILED';
+  END IF;
+  IF v_def NOT LIKE '%FROM public.condiciones_persona membership%'
+     OR v_def NOT LIKE '%fn_secretaria_is_eligible_board_member_at%' THEN
+    RAISE EXCEPTION 'CONVOCATION_MANIFEST_RECIPIENTS_CDA_BRANCH_LOST_ON_REPLACE';
   END IF;
 END
 $verify$;

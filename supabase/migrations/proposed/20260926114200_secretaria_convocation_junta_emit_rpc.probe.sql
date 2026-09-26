@@ -5,13 +5,18 @@
 --   1) emite la convocatoria de la Junta futura de prueba del grupo nuevo
 --      (tenant …0003, "Junta General de Accionistas" de Corporación Nueva,
 --      S.A.) por la vía gobernada (fn_emit_convocatoria_junta), con sesión
---      simulada del SECRETARIO de ese tenant;
+--      simulada del SECRETARIO de ese tenant, y comprueba que el manifiesto
+--      congelado trae como destinatarios a sus 2 socios con participación
+--      vigente (capital_holdings, no condiciones_persona) — la rama JUNTA
+--      nueva de fn_convocation_manifest_enrich_recipients;
 --   2) comprueba que para (tenant …0003, ese órgano, esa fecha_1) queda
 --      exactamente una fila;
 --   3) reemite — solo como smoke test, no es el cambio real — un Consejo de
---      ARGA reutilizando el texto y la agenda YA VALIDADOS de una convocatoria
---      CDA existente, para probar que fn_emit_convocatoria (Consejo) sigue
---      funcionando exactamente igual;
+--      ARGA reutilizando el texto, la agenda y el reminders_trace YA
+--      VALIDADOS de una convocatoria CDA existente, para probar que
+--      fn_emit_convocatoria (Consejo) Y la rama CDA del mismo trigger de
+--      destinatarios siguen funcionando exactamente igual (mismo origen
+--      condiciones_persona, mismo recuento);
 --   4) cuenta convocatorias de ARGA (…0001) antes de tocar nada y después de
 --      la emisión de la Junta (deben coincidir: la Junta es de otro tenant) y
 --      por separado tras el smoke test del Consejo (ahí sí sube +1, y es lo
@@ -97,6 +102,10 @@ BEGIN
     'Documento demo/operativo. No constituye evidencia final productiva.'
   );
 
+  -- 2 socios con voto y sin autocartera en capital_holdings para esta entidad
+  -- (Carlos Mendoza Ruiz 60%, Elena Gómez Blanco 40%; medido 2026-09-26): el
+  -- trace declarado por el cliente debe coincidir con lo que la rama JUNTA
+  -- del trigger va a recalcular, o falla CENSUS_MISMATCH a propósito.
   v_payload := jsonb_build_object(
     'body_id', v_junta_body_id,
     'fecha_1', v_fecha_1,
@@ -106,9 +115,17 @@ BEGIN
     'agenda_items', jsonb_build_array(
       jsonb_build_object('titulo', v_titulo, 'kind', 'DECISORIO')
     ),
-    'publication_channels', jsonb_build_array('EMAIL_CERTIFICADO'),
+    'publication_channels', jsonb_build_array('EMAIL_SIMPLE'),
     'convocatoria_text', v_texto,
-    'statutory_basis', 'Arts. 166, 173 y 176.1 LSC'
+    'statutory_basis', 'Arts. 166, 173 y 176.1 LSC',
+    'reminders_trace', jsonb_build_object(
+      'recipients', jsonb_build_object(
+        'source', 'capital_holdings',
+        'total_active', 2,
+        'selected_count', 2,
+        'excluded_person_ids', '[]'::jsonb
+      )
+    )
   );
 
   SELECT count(*) INTO v_arga_count_antes
@@ -125,6 +142,24 @@ BEGIN
 
   v_result := public.fn_emit_convocatoria_junta(v_payload);
   INSERT INTO probe_results VALUES ('JUNTA_GRUPO_NUEVO_RESULT', v_result);
+
+  -- (1) La Junta emite con destinatarios SOCIOS (rama nueva del trigger
+  -- compartido): fuente capital_holdings, 2 de 2 seleccionados, y los dos
+  -- holders reales de Corporación Nueva presentes por email.
+  INSERT INTO probe_results VALUES (
+    'JUNTA_RECIPIENTS_CHECK',
+    jsonb_build_object(
+      'source', v_result -> 'manifest' -> 'manifest_json' -> 'recipient_selection' ->> 'source',
+      'seat_roles', v_result -> 'manifest' -> 'manifest_json' -> 'recipient_selection' -> 'seat_roles',
+      'total_active', v_result -> 'manifest' -> 'manifest_json' -> 'recipient_selection' ->> 'total_active',
+      'selected_count', v_result -> 'manifest' -> 'manifest_json' -> 'recipient_selection' ->> 'selected_count',
+      'recipients_count', jsonb_array_length(v_result -> 'manifest' -> 'manifest_json' -> 'recipients'),
+      'recipient_emails', (
+        SELECT jsonb_agg(recipient ->> 'email' ORDER BY recipient ->> 'email')
+          FROM jsonb_array_elements(v_result -> 'manifest' -> 'manifest_json' -> 'recipients') recipient
+      )
+    )
+  );
 
   RESET ROLE;
 
@@ -153,7 +188,12 @@ BEGIN
     'agenda_items', v_cda_row.agenda_items,
     'publication_channels', to_jsonb(v_cda_row.publication_channels),
     'convocatoria_text', v_cda_row.convocatoria_text,
-    'statutory_basis', v_cda_row.statutory_basis
+    'statutory_basis', v_cda_row.statutory_basis,
+    -- Mismo trace ya validado de la convocatoria CDA original: el recuento
+    -- de condiciones_persona vigentes para este órgano no ha cambiado desde
+    -- que se emitió (16/16, sin exclusiones); si hubiera cambiado, la rama
+    -- CDA (sin tocar) lo detectaría con CENSUS_MISMATCH, que es lo correcto.
+    'reminders_trace', v_cda_row.reminders_trace
   );
 
   PERFORM set_config(
@@ -165,6 +205,19 @@ BEGIN
 
   v_cda_result := public.fn_emit_convocatoria(v_cda_payload);
   INSERT INTO probe_results VALUES ('CDA_ARGA_REPLAY_SMOKE_TEST_RESULT', v_cda_result);
+
+  -- (2) El Consejo de ARGA sigue enriqueciéndose EXACTAMENTE igual (rama CDA
+  -- sin tocar): misma fuente condiciones_persona, mismo recuento que el
+  -- reminders_trace ya validado que se reutilizó (16/16).
+  INSERT INTO probe_results VALUES (
+    'CDA_RECIPIENTS_CHECK',
+    jsonb_build_object(
+      'source', v_cda_result -> 'manifest' -> 'manifest_json' -> 'recipient_selection' ->> 'source',
+      'total_active', v_cda_result -> 'manifest' -> 'manifest_json' -> 'recipient_selection' ->> 'total_active',
+      'selected_count', v_cda_result -> 'manifest' -> 'manifest_json' -> 'recipient_selection' ->> 'selected_count',
+      'recipients_count', jsonb_array_length(v_cda_result -> 'manifest' -> 'manifest_json' -> 'recipients')
+    )
+  );
 
   RESET ROLE;
 
@@ -201,6 +254,11 @@ where etiqueta in ('JUNTA_GRUPO_NUEVO_RESULT', 'CDA_ARGA_REPLAY_SMOKE_TEST_RESUL
 
 -- Recuentos de ARGA (antes / tras Junta / tras smoke test de Consejo).
 select etiqueta, valor from probe_results where etiqueta = 'ARGA_CONVOCATORIAS_COUNT';
+
+-- (1) y (2): destinatarios derivados por la rama JUNTA nueva vs. la rama CDA
+-- sin tocar, en el MISMO trigger compartido.
+select etiqueta, valor from probe_results
+where etiqueta in ('JUNTA_RECIPIENTS_CHECK', 'CDA_RECIPIENTS_CHECK');
 
 -- Debe ser exactamente 1: (tenant …0003, ese órgano, esa fecha_1) — no se
 -- duplica ninguna fila sembrada (no había ninguna previa para esta Junta).

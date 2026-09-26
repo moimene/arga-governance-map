@@ -47,6 +47,18 @@ const authorityTrigger =
   juntaExecutableSql.match(
     /CREATE OR REPLACE FUNCTION secretaria_private\.fn_convocatoria_authority_representation_guard\(\)[\s\S]*?\n\$function\$;/i,
   )?.[0] ?? "";
+// La guarda de destinatarios (secretaria_private.fn_convocation_manifest_
+// enrich_recipients) nació en la migración de julio (20260720142000) con un
+// rechazo explícito CONVOCATION_MANIFEST_RECIPIENTS_CDA_ONLY para cualquier
+// órgano que no fuera CDA — la propia Junta incluida (medido en vivo el
+// 2026-09-26). Esta migración la reemplaza (CREATE OR REPLACE) con una rama
+// JUNTA nueva SIN tocar el fichero de julio, así que el mismo "GOTCHA de
+// verificación" que ya cubre este fichero para la autoridad aplica aquí: hay
+// que leer la definición VIGENTE (esta migración), no la de julio.
+const enrichRecipientsTrigger =
+  juntaExecutableSql.match(
+    /CREATE OR REPLACE FUNCTION secretaria_private\.fn_convocation_manifest_enrich_recipients\(\)[\s\S]*?\n\$function\$;/i,
+  )?.[0] ?? "";
 
 const cdaMigration = readFileSync(
   resolve(
@@ -168,5 +180,77 @@ describe("convocatoria de Junta — RPC hermana gobernada (MOI-142)", () => {
     expect(juntaExecutableSql).toContain("CONVOCATION_CDA_RPC_MUST_REMAIN_UNCHANGED");
     expect(juntaExecutableSql).toContain("CONVOCATION_CDA_AUTHORITY_BRANCH_LOST_ON_REPLACE");
     expect(juntaExecutableSql).toContain("CONVOCATION_JUNTA_AUTHORITY_TRIGGER_INSTALL_FAILED");
+  });
+});
+
+describe("manifiesto de Junta — destinatarios por socios con participación vigente (MOI-142)", () => {
+  it("existe y sigue aceptando CDA además de JUNTA (ya no rechaza toda Junta)", () => {
+    expect(juntaExecutableSql).toContain(
+      "CREATE OR REPLACE FUNCTION secretaria_private.fn_convocation_manifest_enrich_recipients",
+    );
+    expect(enrichRecipientsTrigger).toContain(
+      "v_body_type NOT IN ('CDA', 'JUNTA')",
+    );
+    expect(enrichRecipientsTrigger).toContain("CONVOCATION_MANIFEST_RECIPIENTS_CDA_ONLY");
+  });
+
+  it("deriva destinatarios de Junta de capital_holdings por entidad, no de condiciones_persona por órgano", () => {
+    expect(enrichRecipientsTrigger).toContain("FROM public.capital_holdings holding");
+    expect(enrichRecipientsTrigger).toContain("holding.entity_id = v_entity_id");
+    expect(enrichRecipientsTrigger).toContain("holding.voting_rights IS TRUE");
+    expect(enrichRecipientsTrigger).toContain("NOT holding.is_treasury");
+    expect(enrichRecipientsTrigger).toContain("holding.effective_from <= v_effective_date");
+    expect(enrichRecipientsTrigger).toContain(
+      "holding.effective_to IS NULL OR holding.effective_to >= v_effective_date",
+    );
+    expect(enrichRecipientsTrigger).toContain("'SOCIO'::text AS office");
+  });
+
+  it("conserva intacta la rama CDA (condiciones_persona por body_id) en la MISMA función", () => {
+    expect(enrichRecipientsTrigger).toContain("FROM public.condiciones_persona membership");
+    expect(enrichRecipientsTrigger).toContain("membership.body_id = v_convocatoria.body_id");
+    expect(enrichRecipientsTrigger).toContain("fn_secretaria_is_eligible_board_member_at");
+    expect(enrichRecipientsTrigger).toContain(
+      "'CONSEJERO','PRESIDENTE','VICEPRESIDENTE','CONSEJERO_COORDINADOR'",
+    );
+  });
+
+  it("exige email y nombre por socio, igual que exige email y nombre por consejero", () => {
+    // Declarado en el issue: los 346 socios de Garrigues no tienen email en
+    // `persons` (medido 2026-09-26) — este mismo gate se lo impedirá hasta
+    // que se complete ese dato. No se relaja el requisito para la Junta.
+    expect(enrichRecipientsTrigger).toContain(
+      "pg_catalog.length(pg_catalog.btrim(COALESCE(person.full_name, ''))) = 0",
+    );
+    expect(enrichRecipientsTrigger).toContain(
+      "pg_catalog.length(pg_catalog.btrim(COALESCE(person.email, ''))) = 0",
+    );
+    expect(enrichRecipientsTrigger).toContain("CONVOCATION_MANIFEST_RECIPIENT_REQUIRED_FIELD_MISSING");
+  });
+
+  it("valida exclusiones de Junta contra el censo de capital, no contra el de consejeros", () => {
+    expect(enrichRecipientsTrigger).toContain("CONVOCATION_MANIFEST_EXCLUDED_RECIPIENT_NOT_IN_CENSUS");
+    // Debe aparecer la comprobación de exclusión CONTRA capital_holdings (no
+    // solo la de condiciones_persona ya cubierta arriba).
+    expect(
+      enrichRecipientsTrigger.match(/FROM public\.capital_holdings holding/g)?.length ?? 0,
+    ).toBeGreaterThanOrEqual(2);
+  });
+
+  it("recalcula el hash del manifiesto sobre el JSON final en ambas ramas (sin bifurcar el cierre)", () => {
+    expect(enrichRecipientsTrigger).toContain("NEW.manifest_json :=");
+    expect(enrichRecipientsTrigger).toContain("NEW.manifest_hash_sha512 :=");
+    expect(enrichRecipientsTrigger).toContain("'source', 'capital_holdings'");
+    expect(enrichRecipientsTrigger).toContain("'source', 'condiciones_persona'");
+    expect(enrichRecipientsTrigger).toContain("'seat_roles', pg_catalog.jsonb_build_array('SOCIO')");
+  });
+
+  it("verifica al final de la transacción que ninguna rama se pierde al reemplazar el trigger de destinatarios", () => {
+    expect(juntaExecutableSql).toContain(
+      "CONVOCATION_MANIFEST_RECIPIENTS_JUNTA_BRANCH_INSTALL_FAILED",
+    );
+    expect(juntaExecutableSql).toContain(
+      "CONVOCATION_MANIFEST_RECIPIENTS_CDA_BRANCH_LOST_ON_REPLACE",
+    );
   });
 });
