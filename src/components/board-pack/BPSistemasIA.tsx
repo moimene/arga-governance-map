@@ -1,5 +1,6 @@
 import { BPSection } from "./BPSection";
 import { BoardPackAISystem } from "@/hooks/useBoardPackData";
+import { tituloVigenteCheck } from "@/lib/aims/legado";
 
 interface BPSistemasIAProps {
   aiSystems: BoardPackAISystem[];
@@ -125,6 +126,7 @@ export function BPSistemasIA({ aiSystems }: BPSistemasIAProps) {
               <div className="divide-y divide-[var(--g-border-subtle)]">
                 {sortedChecks.map((c, i) => {
                   const normalized = normalizeCheckStatus(c.status);
+                  const { titulo, aviso } = tituloVigenteCheck(c);
                   return (
                     <div key={i} className="flex items-center justify-between gap-3 px-4 py-2">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -132,7 +134,12 @@ export function BPSistemasIA({ aiSystems }: BPSistemasIAProps) {
                           {c.requirement_code}
                         </span>
                         <p className="text-xs text-[var(--g-text-primary)] truncate">
-                          {c.requirement_title}
+                          {titulo}
+                          {aviso && (
+                            <span className="ml-1.5 text-[10px] font-normal text-[var(--status-warning)]">
+                              ({aviso})
+                            </span>
+                          )}
                         </p>
                       </div>
                       <span

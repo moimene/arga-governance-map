@@ -465,14 +465,26 @@ tres dejan de afirmar algo que la base no sostenía):
   cuestionarios → 6 chips rojos que afirman una clasificación sin medir. Tarea pendiente: chip
   neutro «nivel declarado en ficha, sin cuestionario», como el resto del módulo, con gate de arista.
   Cambio visible en ARGA (declararlo).
-- **Títulos persistidos con la numeración o el destinatario anteriores (corrector D-catalogo).**
+- **[DECIDIDO y HECHO — MOI-184, 2026-09-26: opción a), resolver en la presentación]**
+  **Títulos persistidos con la numeración o el destinatario anteriores (corrector D-catalogo).**
   `ai_compliance_checks.requirement_title` guarda el título del día de la evaluación y el Board Pack
-  (`BPSistemasIA.tsx:135`) lo pinta tal cual: ARGA conserva «Política de IA (A.5)», «Organización
+  (`BPSistemasIA.tsx:135`) lo pintaba tal cual: ARGA conservaba «Política de IA (A.5)», «Organización
   interna (A.6)», «Recursos de IA (A.7)», «Evaluación de impacto… (A.8)», «(A.9)» y «Gestión de datos
   para IA (A.10)» (códigos `ISO-05`…`ISO-10`, numeración desplazada ya antes de esta rama), y el
-  check `TRANSPARENCY` de Harvey dice «Transparencia e información a usuarios». No se corrige sin
-  escribir en Cloud o sin resolver el título en la presentación. Dueño: producto (presentación) o
-  usuario (corrección de dato).
+  check `TRANSPARENCY` de Harvey decía «Transparencia e información a usuarios». Decisión delegada
+  por Moisés al orquestador (MOI-184, opción a de la descripción: "corregir el título al mostrarlo,
+  a partir del código del catálogo vigente. No toca el dato y es lo más barato"): no se escribe en
+  Cloud, ni en ARGA ni en Garrigues. `src/lib/aims/legado.ts` gana `tituloVigenteCheck()` (hoja: solo
+  añade el import `./catalog-aesia`, que no cierra ciclo — no importa `legado.ts` ni sus hermanas),
+  que reutiliza `LEGADO_A_VIGENTE`/`traducirLegado` ya existentes: si el código legado tiene
+  equivalente vigente (`ISO-05`, `ISO-06`, `ISO-08`, `ISO-09`), pinta el título del catálogo actual
+  (`ISO_42001_REQUIREMENTS`); si no lo tiene (`ISO-07`, `ISO-10`), pinta el guardado con el aviso
+  "Numeración antigua, sin requisito vigente equivalente" — no se inventa un título. `BPSistemasIA.tsx`
+  pasa cada check por `tituloVigenteCheck()` en vez de pintar `requirement_title` a secas. Gate de
+  arista: `src/test/aims/board-pack-titulos-legado.test.ts` (falla si el Board Pack vuelve a pintar
+  «Política de IA (A.5)» sin traducir ni avisar; control positivo con `TRANSPARENCY`, ya vigente, que
+  no lleva aviso). Dependencia técnica (MOI-125, incorporar el trabajo RIA a `main`) ya satisfecha:
+  `legado.ts` y `catalog-aesia.ts` estaban en `main` antes de esta corrección.
 - **Monitores de readiness: dos criterios por código, uno queda (integración de F1).** Las cadenas A
   (`mapa-monitores.ts`, un monitor por requisito) y D (`MONITORES_POR_REQUISITO`, que congelaba el
   reparto que salía de las palabras clave, con sus artefactos: «rol» casaba con «control»,
