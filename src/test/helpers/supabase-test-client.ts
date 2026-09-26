@@ -101,6 +101,22 @@ export function demoPassword(cuenta: CuentaDemo, env: Record<string, string | un
   return p;
 }
 
+/**
+ * MOI-192: check booleano (no lanza) para gatear con `describe.skipIf` sondas
+ * de solo lectura que usan la sesión demo autenticada (`sesionDe`) en vez del
+ * cliente service-role. `sesionDe`/`demoPassword` LANZAN a propósito cuando sí
+ * hay credenciales pero el login falla (ver comentario de `sesionDe`); esto
+ * solo cubre el caso "no hay credenciales que probar todavía".
+ */
+export function hasDemoCredentials(cuenta: CuentaDemo): boolean {
+  try {
+    demoPassword(cuenta);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const EMAIL_DE: Record<CuentaDemo, string> = {
   ARGA: process.env.DEMO_EMAIL || "demo@arga-seguros.com",
   GARRIGUES: GARRIGUES_DEMO_EMAIL,
