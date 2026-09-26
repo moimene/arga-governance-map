@@ -12,6 +12,7 @@
  * evaluaciones, la pestaña del sistema, el informe y la consola TGMS. Módulo hoja: sólo importa
  * hojas.
  */
+import { AESIA_RIA_REQUIREMENTS, ISO_42001_REQUIREMENTS } from "./catalog-aesia";
 import { evaluacionesVigentes } from "./checks-vigentes";
 import { normalizarEstadoSeccion } from "./expediente-tecnico";
 import { ESTADOS_EVALUACION_LEGADO, chipClaseEstadoEvaluacion, normalizeAimsStatus } from "./vocabulario";
@@ -154,4 +155,40 @@ export function traducirLegado<T extends { requirement_code?: string | null }>(
   const code = check.requirement_code ?? "";
   if (!Object.prototype.hasOwnProperty.call(LEGADO_A_VIGENTE, code)) return check;
   return { ...check, requirement_code: LEGADO_A_VIGENTE[code] ?? code, codigo_legado: code };
+}
+
+/** Título por código, en los dos catálogos vigentes (RIA y ISO 42001). */
+const TITULO_POR_CODIGO_VIGENTE = new Map(
+  [...AESIA_RIA_REQUIREMENTS, ...ISO_42001_REQUIREMENTS].map((r) => [r.code, r.title]),
+);
+
+/** MOI-184: código legado leído sin equivalente vigente (p.ej. ISO-07, ISO-10). */
+export const AVISO_NUMERACION_ANTIGUA = "Numeración antigua, sin requisito vigente equivalente";
+
+/**
+ * Título a pintar de una fila de `ai_compliance_checks` (MOI-184): nunca el
+ * guardado si el catálogo vigente ya tiene el código o su equivalente, porque
+ * el guardado puede arrastrar numeración O DESTINATARIO desplazados del seed
+ * («Política de IA (A.5)»; «Transparencia e información a usuarios» cuando el
+ * art. 13 vigente dice «a los responsables del despliegue»). Primero se busca
+ * el propio código en el catálogo vigente —cubre TRANSPARENCY, que ya es
+ * código vigente pero cuyo guardado desfasó de destinatario—; sólo si no está
+ * ahí se mira si es legado (`LEGADO_A_VIGENTE`) para traducir o avisar. Si no
+ * es ni vigente ni legado, el guardado. No reescribe la fila: es lectura,
+ * igual que `traducirLegado`.
+ */
+export function tituloVigenteCheck(check: {
+  requirement_code?: string | null;
+  requirement_title?: string | null;
+}): { titulo: string; aviso: string | null } {
+  const guardado = check.requirement_title ?? "";
+  const codigoOriginal = check.requirement_code ?? "";
+  const tituloPropioVigente = TITULO_POR_CODIGO_VIGENTE.get(codigoOriginal);
+  if (tituloPropioVigente) return { titulo: tituloPropioVigente, aviso: null };
+  if (!Object.prototype.hasOwnProperty.call(LEGADO_A_VIGENTE, codigoOriginal)) {
+    return { titulo: guardado, aviso: null };
+  }
+  const codigoVigente = LEGADO_A_VIGENTE[codigoOriginal];
+  if (!codigoVigente) return { titulo: guardado, aviso: AVISO_NUMERACION_ANTIGUA };
+  return { titulo: TITULO_POR_CODIGO_VIGENTE.get(codigoVigente) ?? guardado, aviso: null };
 }

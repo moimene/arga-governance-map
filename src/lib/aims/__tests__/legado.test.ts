@@ -257,6 +257,6 @@ describe("G-ARISTA — readiness, informe y Dashboard importan `legado.ts` y no 
   it("la hoja no importa nada que pueda cerrar un ciclo", () => {
     const src = sinComentarios(readFileSync("src/lib/aims/legado.ts", "utf8"));
     const imports = [...src.matchAll(/^\s*import\s.+from\s+"([^"]+)"/gm)].map((m) => m[1]);
-    expect(imports.every((i) => ["./vocabulario", "./checks-vigentes", "./expediente-tecnico"].includes(i)), imports.join(", ")).toBe(true);
+    expect(imports.every((i) => ["./vocabulario", "./checks-vigentes", "./expediente-tecnico", "./catalog-aesia"].includes(i)), imports.join(", ")).toBe(true);
   });
 });
