@@ -1,0 +1,7 @@
+       set_config        
+-------------------------
+ {"role":"service_role"}
+(1 row)
+
+psql:supabase/tests/moi219_promover_sociedad_check_violation_probe.sql:109: NOTICE:  MOI-219 ensayo OK: check_violation esperado — sociedad a1219000-0000-4000-8000-000000000003 con forma ADMINISTRADOR_UNICO requiere al menos 1 Administrador Único vigente
+psql:supabase/tests/moi219_promover_sociedad_check_violation_probe.sql:123: NOTICE:  MOI-219 ensayo OK: la entidad fixture sigue INCOMPLETA_CARGOS (sin escritura indebida)

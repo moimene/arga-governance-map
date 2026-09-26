@@ -1,0 +1,1 @@
+psql:/tmp/apply_20260926115200.sql:109: NOTICE:  MOI-152 OK: módulo ai en …0003 (7 módulos), ARGA/Garrigues intactos, OBL-RIA-% -> ai verificado y revertido

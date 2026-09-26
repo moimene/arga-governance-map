@@ -1,0 +1,2 @@
+psql:docs/superpowers/plans/2026-09-26-moi-210-sonda-revertida-post-restrict.sql:40: NOTICE:  MOI-210 OK: el borrado de un sistema con versión se rechaza (RESTRICT)
+psql:docs/superpowers/plans/2026-09-26-moi-210-sonda-revertida-post-restrict.sql:40: NOTICE:  MOI-210 OK: sin dependientes el borrado pasa (control positivo)
