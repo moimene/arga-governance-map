@@ -39,8 +39,16 @@ test.describe('Cross-module handoffs read-only', () => {
     await page.goto('/secretaria/reuniones/nueva?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=e2e-ai-incident');
 
     await expect(page).not.toHaveURL('/login');
-    await expect(page.getByText('Handoff read-only desde AIMS 360')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/No se escriben.*governance_module_events.*governance_module_links/i)).toBeVisible();
+    // MOI-157: se llama «derivación», no «handoff», y el evento se lee con nombre
+    // legible, no con el código crudo del contrato. La garantía real (nada se
+    // materializa desde aquí) ya la vigila el intercept de arriba; el texto solo
+    // debe declararla sin nombrar tablas.
+    await expect(page.getByText('Derivación desde AIMS 360')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/incidente de IA material/i)).toBeVisible();
+    await expect(page.getByText(/No se crean.*reuniones.*acuerdos.*actas/i)).toBeVisible();
+    await expect(page.getByText('Handoff read-only')).toHaveCount(0);
+    await expect(page.getByText('AIMS_INCIDENT_MATERIAL')).toHaveCount(0);
+    await expect(page.getByText('governance_module_events')).toHaveCount(0);
     await expect(page.getByRole('link', { name: /Crear convocatoria/i })).toBeVisible();
   });
 
@@ -48,8 +56,11 @@ test.describe('Cross-module handoffs read-only', () => {
     await page.goto('/secretaria/reuniones/nueva?source=grc&event=GRC_INCIDENT_MATERIAL&source_id=e2e-grc-incident');
 
     await expect(page).not.toHaveURL('/login');
-    await expect(page.getByText('Handoff read-only desde GRC Compass')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Derivación desde GRC Compass')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/incidente material/i)).toBeVisible();
     await expect(page.getByText(/Secretaría decide si lo incorpora/i)).toBeVisible();
-    await expect(page.getByText(/No se escriben.*reuniones.*acuerdos.*actas/i)).toBeVisible();
+    await expect(page.getByText(/No se crean.*reuniones.*acuerdos.*actas/i)).toBeVisible();
+    await expect(page.getByText('Handoff read-only')).toHaveCount(0);
+    await expect(page.getByText('GRC_INCIDENT_MATERIAL')).toHaveCount(0);
   });
 });

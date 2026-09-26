@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Activity, ChevronLeft, Save, ShieldCheck } from "lucide-react";
+import { Activity, ChevronLeft, Save } from "lucide-react";
 import { toast } from "sonner";
 import { useCreateRisk, useRiskById, useUpdateRisk, type RiskWriteInput } from "@/hooks/useRisks";
 import { useGrcModules } from "@/hooks/useGrcDashboard";
@@ -200,16 +200,13 @@ export default function RiskEditor() {
               {isEdit ? "Editar riesgo" : "Nuevo riesgo"}
             </h1>
           </div>
+          {/* MOI-157: se retiró el chip que mostraba el código de postura de dato en
+              crudo — era jerga interna sin valor para quien usa la pantalla; la
+              frase de abajo ya dice, en lenguaje llano, que este es el registro
+              owner de GRC. */}
           <p className="text-sm text-[var(--g-text-secondary)]">
             Registro owner de GRC sobre risks; no crea actos Secretaría ni registros AIMS.
           </p>
-        </div>
-        <div
-          className="inline-flex items-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-2 text-xs font-semibold text-[var(--g-text-primary)]"
-          style={{ borderRadius: "var(--g-radius-md)" }}
-        >
-          <ShieldCheck className="h-4 w-4 text-[var(--g-brand-3308)]" />
-          legacy_write · risks
         </div>
       </header>
 
