@@ -22,6 +22,7 @@ import { usaFixturesDemo } from "@/lib/tenant-fixtures";
 import { getRegulationById } from "@/data/regulations";
 import { resolverReglamentoOrgano } from "@/pages/OrganoDetalle";
 import { debeMostrarOpvDemo } from "@/pages/Conflictos";
+import { resolverSaludoDashboard, resolverEtiquetaMinimapa } from "@/pages/Dashboard";
 
 describe("MOI-54 — Contrato de desacoplamiento de branding, fixtures y módulos", () => {
   describe("1. Un grupo sin configuración propia (distinto de ARGA) no muestra datos de ARGA", () => {
@@ -235,6 +236,46 @@ describe("MOI-54 — Contrato de desacoplamiento de branding, fixtures y módulo
           expect(m).toBeNull();
         }
       }
+    });
+  });
+
+  describe("6. Dashboard no pinta valores transitorios de ARGA mientras carga la marca (reapertura, motivo #3)", () => {
+    it("resolverSaludoDashboard: ARGA muestra el mismo saludo con las dos esperas en curso, en solo una, o en ninguna", () => {
+      // Estado final de ARGA: sin ninguna espera en curso.
+      expect(resolverSaludoDashboard(null, false, false)).toBe("Buen día, Lucía");
+      // Antes del fix, pasar solo `brandingLoading` (ignorando `tenantLoading`)
+      // dejaba este frame -tenantId todavía sin resolver- pintando el saludo
+      // final de ARGA por accidente. Con las dos esperas combinadas el saludo
+      // se mantiene neutro mientras CUALQUIERA de las dos siga en curso, y solo
+      // vuelve a "Buen día, Lucía" cuando ambas han terminado.
+      expect(resolverSaludoDashboard(null, true, false)).toBe("Buen día");
+      expect(resolverSaludoDashboard(null, false, true)).toBe("Buen día");
+      expect(resolverSaludoDashboard(null, true, true)).toBe("Buen día");
+    });
+
+    it("resolverSaludoDashboard: Garrigues no cambia de rótulo por las esperas", () => {
+      const garrigues = { nombre: "Garrigues" };
+      expect(resolverSaludoDashboard(garrigues, false, false)).toBe("Buen día");
+      expect(resolverSaludoDashboard(garrigues, true, false)).toBe("Buen día");
+    });
+
+    it("resolverEtiquetaMinimapa: ARGA muestra 'ARGA Seguros' solo cuando las dos esperas han terminado, nunca 'Grupo' a medio camino", () => {
+      // Estado final de ARGA.
+      expect(resolverEtiquetaMinimapa(null, false, false)).toBe("ARGA Seguros");
+      // Mientras cualquiera de las dos esperas sigue en curso, el rótulo se
+      // queda en el neutro "Grupo": nunca "ARGA Seguros" a medias (eso sería
+      // afirmar la marca antes de saberla) ni el "Grupo" transitorio que se
+      // cuela y desaparece si solo se mira `brandingLoading`.
+      expect(resolverEtiquetaMinimapa(null, true, false)).toBe("Grupo");
+      expect(resolverEtiquetaMinimapa(null, false, true)).toBe("Grupo");
+      expect(resolverEtiquetaMinimapa(null, true, true)).toBe("Grupo");
+    });
+
+    it("resolverEtiquetaMinimapa: un tenant con nombre propio (Garrigues, Grupo Nuevo) muestra su nombre desde que branding resuelve, sin pasar por 'Grupo'", () => {
+      const garrigues = { nombre: "Garrigues" };
+      expect(resolverEtiquetaMinimapa(garrigues, false, false)).toBe("Garrigues");
+      // Con branding ya resuelto, el resultado no depende de las esperas.
+      expect(resolverEtiquetaMinimapa(garrigues, true, false)).toBe("Garrigues");
     });
   });
 });

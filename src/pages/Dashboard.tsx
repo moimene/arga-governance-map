@@ -46,6 +46,34 @@ import { Leaf } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { consoleJourneys } from "@/lib/arga-console/contracts";
+import type { TenantBranding } from "@/context/TenantBrandContext";
+
+/**
+ * Saludo del dashboard. Combina las DOS esperas (tenant + branding), mismo
+ * criterio que `RequireModule` en module-guards.tsx: `branding` vale NULL
+ * tanto para ARGA resuelta como mientras `TenantProvider` todavía busca el
+ * tenantId, así que decidir solo con `brandingLoading` pinta el saludo de
+ * ARGA, lo cambia al genérico de carga y vuelve a ARGA: parpadeo no declarado
+ * (MOI-54, motivo #3 de reapertura).
+ */
+export function resolverSaludoDashboard(
+  branding: TenantBranding | null,
+  tenantLoading: boolean,
+  brandingLoading: boolean,
+): string {
+  return dashboardGreeting(branding, { isLoading: tenantLoading || brandingLoading });
+}
+
+/** Mismo criterio que `resolverSaludoDashboard`, para el rótulo del nodo raíz
+ *  del minimapa de Governance Map. */
+export function resolverEtiquetaMinimapa(
+  branding: TenantBranding | null,
+  tenantLoading: boolean,
+  brandingLoading: boolean,
+): string {
+  if (branding) return brandName(branding);
+  return tenantLoading || brandingLoading ? "Grupo" : "ARGA Seguros";
+}
 
 export default function Dashboard() {
   const { start, step, completed } = useTour();
@@ -59,11 +87,13 @@ export default function Dashboard() {
   const { data: meetings = [] } = useUpcomingMeetings();
   const { tenantId, isLoading: tenantLoading } = useTenantContext();
   // Actividad reciente y ESG son fixtures estáticos de demo, no dato del tenant.
-  // Mientras el perfil o el branding están en vuelo, `branding` vale null igual
-  // que para ARGA: decidir entonces pintaría el fixture un frame justo al tenant
-  // que declaró no verlo. Hasta saberlo no se pinta ni el fixture ni el vacío.
-  const fixturesPendiente = tenantLoading || brandingLoading;
-  const fixturesDemo = !fixturesPendiente && usaFixturesDemo(branding);
+  // Mismas DOS esperas que `resolverSaludoDashboard`/`resolverEtiquetaMinimapa`
+  // arriba: mientras el perfil o el branding están en vuelo, `branding` vale
+  // null igual que para ARGA, y decidir entonces pintaría el fixture un frame
+  // justo al tenant que declaró no verlo. Hasta saberlo no se pinta ni el
+  // fixture ni el vacío.
+  const brandPendiente = tenantLoading || brandingLoading;
+  const fixturesDemo = !brandPendiente && usaFixturesDemo(branding);
   // Un error de refetch invalida también los datos retenidos en caché.
   const kpis = tenantId && kpisQuery.isSuccess ? kpisQuery.data : undefined;
   const kpisLoading = !!tenantId && kpisQuery.isLoading;
@@ -196,7 +226,7 @@ export default function Dashboard() {
     <div className="mx-auto max-w-screen-2xl p-4 sm:p-6">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{dashboardGreeting(branding, { isLoading: brandingLoading })}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{resolverSaludoDashboard(branding, tenantLoading, brandingLoading)}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Vista de <span className="font-medium text-foreground">{scope}</span> — operación al {new Date().toLocaleDateString("es-ES")}.
           </p>
@@ -449,7 +479,7 @@ export default function Dashboard() {
               <g>
                 <rect x="70" y="20" width="100" height="36" rx="6" fill="hsl(var(--primary))" />
                 <text x="120" y="42" textAnchor="middle" fontSize="11" fontWeight="600" fill="white">
-                  {branding ? brandName(branding) : (brandingLoading ? "Grupo" : "ARGA Seguros")}
+                  {resolverEtiquetaMinimapa(branding, tenantLoading, brandingLoading)}
                 </text>
               </g>
               <g>
@@ -484,7 +514,7 @@ export default function Dashboard() {
             <Activity className="h-4 w-4 text-primary" />
             <h2 className="text-sm font-semibold">Actividad reciente</h2>
           </div>
-          {!fixturesDemo && !fixturesPendiente && (
+          {!fixturesDemo && !brandPendiente && (
             <p className="px-5 py-6 text-xs text-muted-foreground">
               Sin actividad que mostrar: esta tarjeta todavía no se alimenta de datos del entorno.
             </p>
