@@ -9,6 +9,18 @@
 
 ---
 
+## Nota de rectificación (2026-09-26, MOI-16)
+
+Tras la reapertura del issue MOI-16 (Comentario 4, 2026-09-25T10:01, "discrepancias fácticas en la tabla de operaciones"), se remidieron en solo lectura contra Cloud (`SELECT`, proyecto `hzqwefkwsxopwrmtksbg`) los tres puntos señalados. Resultado:
+
+1. **Recuento de tipos de certificación en Grupo Nuevo (`…0003`):** medido 2026-09-26 con `SELECT tenant_id, count(*), count(*) FILTER (WHERE is_active) FROM standalone_certification_kinds GROUP BY tenant_id`. Resultado: `…0001` (ARGA) 41 filas / 38 activas; `…0002` (Garrigues) **0 filas**; `…0003` (Grupo Nuevo) **38 filas, las 38 activas**. La redacción original (25-09) decía que Grupo Nuevo ofrecía "38 tipos legítimos; 3 desestimados" — mismo total ofrecido, pero el mecanismo era incorrecto: no hay 3 filas desactivadas en este tenant, porque los 3 tipos que afirman entrega/firma nunca se sembraron ahí (el commit `7c31594b` "feat(bootstrap): support standalone_certification_kinds in tenant bootstrap with EAD Trust filter (MOI-233)", posterior a la redacción original, cambió el bootstrap del tenant). El comentario de reapertura decía "el tenant tiene 0": eso era cierto en el momento de la reapertura (antes de MOI-233) y ya no lo es hoy — el propio issue advertía "puede haber cambiado por MOI-233". Corregido en §2.8, §3 y §5.3.
+2. **Fecha real de la reunión `ffd71122…`:** medido 2026-09-26 con `SELECT id, tenant_id, status, scheduled_start, scheduled_end FROM meetings WHERE id='ffd71122-0dfa-43d0-8238-ddd8e78dec73'`. Resultado: `scheduled_start = 2026-09-25 08:00 UTC`, `scheduled_end = 2026-09-25 10:00 UTC`, `status = 'CONVOCADA'`. La redacción original decía "15 de octubre de 2026", que no coincide con el dato en Cloud. Corregido en §3 y §5.1.
+3. **Acción `evidence` de `qtsp-proxy`:** releída contra el código actual (`supabase/functions/qtsp-proxy/index.ts:425-436`, función `handleEvidence`). Resultado: la acción devuelve HTTP 410 `GENERIC_PROVIDER_ACTION_RETIRED` de forma incondicional, igual que `sign`, `status` y `artifacts` — no comprueba credenciales de Suite ni sube ningún fichero. La redacción original decía "Sube fichero a EAD Evidence Manager únicamente si las credenciales de Suite están configuradas", que no corresponde al código vigente (la función `createEadEvidence()` que sí sube ficheros existe, pero solo la invocan las acciones source-bound de custodia, nunca la acción genérica `evidence`). Corregido en §2.2.
+
+Ninguna de las tres correcciones cambia el dictamen de fondo del informe: en ninguno de los tres casos hay firma, envío o entrega real de EAD Trust, y la acción `evidence` pasa de "condicionalmente activa" a "también retirada con 410" — un cierre más estricto, no una apertura. No se ha realizado ninguna llamada real al proveedor ni escritura en Cloud para esta rectificación; toda la medición es `SELECT` de solo lectura y lectura de código.
+
+---
+
 ## 1. Resumen Ejecutivo y Marco de Gobernanza
 
 El presente informe acredita de forma empírica y exhaustiva el estado real de todas las piezas de comunicación, interposición y custodia del ecosistema **Governance OS / TGMS Platform**, verificando su estricta alineación con la **política de EAD Trust de 21 de julio de 2026**.
@@ -53,7 +65,7 @@ Se han auditado las 7 funciones de servidor en `supabase/functions/` y los compo
   8. `record_annual_accounts_missing_signature_cause`: Persiste causa motivada de ausencia de firma (art. 253.2 LSC) vía RPC `fn_secretaria_record_annual_accounts_missing_signature_cause`.
   9. `reconcile_verified_signature`: Reconciliación de filas source-bound preexistentes ligadas a hash exacto.
   10. `reconcile_annual_accounts_signature`: Idem para cuentas anuales.
-  11. `evidence`: Sube fichero a EAD Evidence Manager únicamente si las credenciales de Suite están configuradas.
+  11. `evidence` **[RECTIFICADO 2026-09-26, ver Nota de rectificación]**: devuelve HTTP 410 `GENERIC_PROVIDER_ACTION_RETIRED` de forma incondicional (`handleEvidence`, `supabase/functions/qtsp-proxy/index.ts:425-436`) — está retirada exactamente igual que `sign`, `status` y `artifacts`. No comprueba credenciales de Suite ni sube ningún fichero a EAD Evidence Manager: la función `createEadEvidence()` que sí hace esa subida existe en el fichero pero solo la invocan las acciones source-bound de custodia (`archive_final_legal_artifact` y las dos de cuentas anuales), nunca la acción genérica `evidence`.
 * **Control de configuración:** `readConfig()` requiere `EAD_SUITE_AUTH_EMAIL` y `EAD_SUITE_AUTH_PASSWORD`. Si faltan, devuelve HTTP 503 `QTSP_PROXY_NOT_CONFIGURED`.
 * **Estado empírico en Cloud DB:**
   * 0 actas con `final_legal_artifact_id` (13 actas en ARGA, todas sin artefacto final; 0 en Garrigues; 0 en Grupo Nuevo).
@@ -113,7 +125,7 @@ Se han auditado las 7 funciones de servidor en `supabase/functions/` y los compo
   * `CONTROLLED_MESSAGE`: *"La mensajería genérica está retirada. Use la comunicación source-bound, que reserva destinatarios y registra sus resultados."*
 * **`src/lib/qtsp/ead-trust-client.ts`:** En el bundle de cliente, `clientSecret` es cadena vacía. Cualquier llamada a `getOktaToken()` lanza inmediatamente excepción `QTSP_SERVER_PROXY_REQUIRED`.
 * **`src/components/secretaria/EADInterpositionControl.tsx`:** Control visual con botón permanentemente deshabilitado (`disabled`, `aria-disabled="true"`), badge *"Pendiente de renderer autoritativo"* y mensaje de bloqueo explícito (*"Custodia final bloqueada: falta un binario generado y registrado de forma autoritativa en servidor"*).
-* **`src/lib/secretaria/certification-kind-scope.ts`:** Filtra en cliente cualquier tipo que afirme ERDS, entrega o firma cualificada. En Cloud DB, los 3 tipos identificados (`CERT_ERDS_ENTREGA`, `CERT_COMUNICACIONES_REGULATORIAS`, `CERT_ENVIO_CONVOCATORIA`) fueron desactivados (`is_active = false`) en la migración `20260925100000` (MOI-145).
+* **`src/lib/secretaria/certification-kind-scope.ts`:** Filtra en cliente cualquier tipo que afirme ERDS, entrega o firma cualificada. En Cloud DB, los 3 tipos identificados (`CERT_ERDS_ENTREGA`, `CERT_COMUNICACIONES_REGULATORIAS`, `CERT_ENVIO_CONVOCATORIA`) fueron desactivados (`is_active = false`) en la migración `20260925100000` (MOI-145) **para las filas que ya existían en ese momento (ARGA)**. **[RECTIFICADO 2026-09-26]**: el tenant Grupo Nuevo (`…0003`), sembrado después vía el bootstrap de MOI-233, nunca creó filas para esos 3 tipos — no tiene nada que desactivar y hoy tiene 0 filas inactivas en `standalone_certification_kinds`. Ver Nota de rectificación.
 
 ---
 
@@ -122,10 +134,10 @@ Se han auditado las 7 funciones de servidor en `supabase/functions/` y los compo
 | Operación | Parámetro / Objeto | Entorno ARGA (`…0001`) | Entorno Garrigues (`…0002`) | Entorno Grupo Nuevo (`…0003`) | Justificante Empírico |
 |---|---|---|---|---|---|
 | **Convocatoria DOCX final** | Render autoritativo server-side | Convocatoria canónica UAT `ef574517…` renderizada (13 págs) | 0 convocatorias | Convocatoria canónica `28bc0b69…` renderizada (28.125 B) | `convocation_manifests` (7 filas, todas `DEMO` y `NO_LEGAL_EFFECT`) |
-| **Custodia de Actas** | `final_legal_artifact_id` | 0 de 13 actas en custodia final (todas `NULL`) | 0 actas | 0 actas (reunión `CONVOCADA` para 2026-10-15) | SQL `SELECT count(final_legal_artifact_id) FROM minutes` = 0 |
+| **Custodia de Actas** | `final_legal_artifact_id` | 0 de 13 actas en custodia final (todas `NULL`) | 0 actas | 0 actas (reunión `ffd71122…` en estado `CONVOCADA`, `scheduled_start` **2026-09-25 08:00 UTC** — **[RECTIFICADO 2026-09-26]**: ver Nota de rectificación) | SQL `SELECT count(final_legal_artifact_id) FROM minutes` = 0; `SELECT status, scheduled_start FROM meetings WHERE id='ffd71122-0dfa-43d0-8238-ddd8e78dec73'` |
 | **Atribución de Firma en Actas** | `approval_signature_claim` | 0 de 13 actas con firma atribuida (todas `false`) | N/A | N/A | SQL `SELECT count(*) FROM minutes WHERE approval_signature_claim = true` = 0 |
 | **Certificaciones autónomas** | Emisión y custodia | 2 certificaciones históricas emitidas (`DEMO_ARCHIVED`) | 0 certificaciones | 0 certificaciones | SQL `standalone_certifications` (2 en ARGA, 0 en Garrigues/GN) |
-| **Catálogo de certificaciones** | Tipos activos en UI | 38 tipos legítimos ofrecidos; 3 tipos desestimados | 0 tipos propios (hereda catálogo general) | 38 tipos legítimos ofrecidos; 3 tipos desestimados | SQL `standalone_certification_kinds` + `secretaria-certificaciones-activas-scope.test.ts` (6 pass) |
+| **Catálogo de certificaciones** | Tipos activos en UI | 41 filas propias, 38 activas / 3 desactivadas (los 3 tipos que afirman entrega/firma) | 0 filas propias → 0 tipos ofrecidos (sin herencia: `useStandaloneCertificationKinds` filtra estrictamente `.eq("tenant_id", tenantId)`, `src/hooks/useStandaloneCertifications.ts:91`) | 38 filas propias, **38 activas / 0 desactivadas** — los 3 tipos que afirman entrega/firma no existen como fila en este tenant (excluidos en el seed del bootstrap MOI-233, no desactivados como en ARGA) — **[RECTIFICADO 2026-09-26, medido tras MOI-233]**: ver Nota de rectificación | SQL `SELECT tenant_id, count(*), count(*) FILTER (WHERE is_active) FROM standalone_certification_kinds GROUP BY tenant_id` (medido 2026-09-26: `…0001`→41/38, `…0002`→sin filas, `…0003`→38/38); `secretaria-certificaciones-activas-scope.test.ts` (6 pass) |
 | **Cola de comunicaciones** | Despacho automático de envíos | 4 filas (3 `CANCELADA`, 1 `BORRADOR`); 0 efectivas | 0 comunicaciones | 0 comunicaciones (bandeja neutral vacía) | SQL `communications` (0 en `SCHEDULED`, 0 en `fecha_envio_efectiva`) |
 | **Trabajo programado (cron)** | Invocación periódica de dispatcher | Tarea `jobid: 1` **DESACTIVADA** | Tarea `jobid: 1` **DESACTIVADA** | Tarea `jobid: 1` **DESACTIVADA** | SQL `SELECT jobid, active FROM cron.job` -> `active = false` |
 | **Eventos de entrega** | Callbacks o webhooks de entrega | 0 eventos | 0 eventos | 0 eventos | SQL `SELECT count(*) FROM communication_delivery_events` = 0 |
@@ -165,8 +177,8 @@ Se han auditado las 7 funciones de servidor en `supabase/functions/` y los compo
 ## 5. Verificación Empírica sobre el Expediente de Grupo Nuevo
 
 Sobre el grupo nuevo (`tenant_id = 00000000-0000-0000-0000-000000000003`), creado y recorrido en MOI-53 y MOI-15:
-1. **Reunión convocada del Consejo (`ffd71122…`):**
-   * Estado: `CONVOCADA` para el 15 de octubre de 2026.
+1. **Reunión convocada del Consejo (`ffd71122-0dfa-43d0-8238-ddd8e78dec73`):**
+   * Estado: `CONVOCADA`. `scheduled_start` = **2026-09-25 08:00 UTC**, `scheduled_end` = 2026-09-25 10:00 UTC (medido 2026-09-26 vía `SELECT id, tenant_id, status, scheduled_start, scheduled_end FROM meetings WHERE id='ffd71122-0dfa-43d0-8238-ddd8e78dec73'`) — **[RECTIFICADO 2026-09-26]**: la redacción original de este informe atribuía la fecha "15 de octubre de 2026", que no coincide con el dato en Cloud. Ver Nota de rectificación.
    * La UI y el motor de base de datos impiden su apertura anticipada (`MEETING_OPEN_TOO_EARLY`, SQLSTATE 22023).
    * No existe acta redactada ni firmada; 0 afirmaciones de firma.
 2. **Convocatoria emitida (`28bc0b69…`):**
@@ -174,8 +186,7 @@ Sobre el grupo nuevo (`tenant_id = 00000000-0000-0000-0000-000000000003`), cread
    * Manifiesto etiquetado con `data_class = 'DEMO'` y `legal_effect = 'DEMO_SIMULATION_NO_LEGAL_EFFECT'`.
    * Ninguna pantalla afirma entrega certificada ni firma por QTSP.
 3. **Certificaciones autónomas (`/secretaria/certificaciones`):**
-   * El selector de tipos presenta los 38 tipos legales válidos y omite los 3 tipos desestimados.
-   * Rótulo visible en la cabecera del selector: *"3 tipos configurados no se ofrecen: su enunciado atribuye a un tercero capacidades de firma, envío o entrega que no están disponibles en el alcance vigente"*.
+   * El selector de tipos presenta los 38 tipos activos propios del tenant (`standalone_certification_kinds`, medido 2026-09-26: 38 filas, las 38 activas). **[RECTIFICADO 2026-09-26]**: a diferencia de ARGA, el tenant Grupo Nuevo no tiene ninguna fila desactivada — los 3 tipos que afirman entrega/firma cualificada nunca se sembraron en su catálogo (filtro de bootstrap MOI-233), en vez de sembrarse y desactivarse como en ARGA. El resultado visible para el usuario es el mismo (los 3 tipos no se ofrecen), pero el mecanismo de fondo difiere del descrito en la redacción original de este informe. Ver Nota de rectificación.
    * El componente `EADInterpositionControl` muestra el botón de custodia en estado deshabilitado (`disabled`, `aria-disabled="true"`) con la leyenda: *"Custodia final no disponible: falta un binario generado y registrado de forma autoritativa en servidor"*.
 4. **Comunicaciones y Calendario (`/secretaria/comunicaciones`):**
    * Bandeja completamente limpia (0 comunicaciones registradas).
