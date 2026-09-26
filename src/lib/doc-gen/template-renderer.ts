@@ -55,6 +55,36 @@ function formatFechaES(date: unknown): string {
 
 // ── Register helpers ─────────────────────────────────────────────────────────
 
+const YES_LITERALS = new Set(["si", "sí", "yes", "true"]);
+const NO_LITERALS = new Set(["no", "false"]);
+
+function yesNoToken(value: string): boolean | undefined {
+  const token = value.trim().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  if (YES_LITERALS.has(token)) return true;
+  if (NO_LITERALS.has(token)) return false;
+  return undefined;
+}
+
+/**
+ * MOI-206: algunas plantillas comparan un campo Capa 3 `boolean` con el
+ * literal "SÍ"/"NO" (p.ej. `{{#if (eq es_parte_vinculada "SÍ")}}`), mientras
+ * que otras usan el mismo campo con `{{#if campo}}` directo. Desde MOI-206
+ * los campos boolean guardan su tipo real (`true`/`false`), así que `eq`
+ * debe reconocer esa comparación cruzada booleano↔texto sin cambiar el
+ * comportamiento para cualquier otra comparación (texto/número), que sigue
+ * siendo `===` estricta.
+ */
+function crossTypeBooleanEq(a: unknown, b: unknown): boolean | undefined {
+  if (typeof a === "boolean" && typeof b === "string") {
+    const token = yesNoToken(b);
+    return token === undefined ? undefined : a === token;
+  }
+  if (typeof b === "boolean" && typeof a === "string") {
+    return crossTypeBooleanEq(b, a);
+  }
+  return undefined;
+}
+
 function registerCustomHelpers(hbs: typeof Handlebars): void {
   hbs.registerHelper("fechaES", (date: string | Date) => formatFechaES(date));
 
@@ -66,7 +96,10 @@ function registerCustomHelpers(hbs: typeof Handlebars): void {
     typeof text === "string" ? text.toLowerCase() : ""
   );
 
-  hbs.registerHelper("eq", (a: unknown, b: unknown) => a === b);
+  hbs.registerHelper("eq", (a: unknown, b: unknown) => {
+    const crossType = crossTypeBooleanEq(a, b);
+    return crossType !== undefined ? crossType : a === b;
+  });
   hbs.registerHelper("or", (a: unknown, b: unknown) => a || b);
   hbs.registerHelper("and", (a: unknown, b: unknown) => a && b);
   hbs.registerHelper("gt", (a: number, b: number) => a > b);

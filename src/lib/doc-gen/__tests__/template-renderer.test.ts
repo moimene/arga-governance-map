@@ -168,4 +168,48 @@ describe("template-renderer", () => {
       expect(rendered.text).toContain("Convocatoria de Junta General Ordinaria");
     });
   });
+
+  // MOI-206: los campos Capa 3 boolean guardan ahora un booleano real (no
+  // "SÍ"/"No" como texto). Algunas plantillas ACTIVA de ARGA comparan ese
+  // mismo campo con el literal "SÍ"/"NO" vía `eq` (p.ej. la cláusula de
+  // operación con parte vinculada), mientras otras lo comprueban con
+  // `{{#if campo}}` directo. `eq` debe seguir sirviendo a ambas sin que se
+  // toquen las plantillas.
+  describe("eq — compatibilidad booleano real vs literal SÍ/NO (MOI-206)", () => {
+    const template = [
+      "{{#if (eq es_parte_vinculada \"SÍ\")}}CLAUSULA_VINCULADA{{/if}}",
+      "{{#if (eq es_parte_vinculada \"NO\")}}CLAUSULA_NO_VINCULADA{{/if}}",
+      "{{#if entidad_cotizada}}CLAUSULA_COTIZADA_DIRECTA{{/if}}",
+    ].join("\n");
+
+    it("true real dispara la cláusula 'SÍ' y no la 'NO', y el if directo también se muestra", () => {
+      const rendered = renderTemplate({
+        template,
+        variables: { es_parte_vinculada: true, entidad_cotizada: true },
+      });
+      expect(rendered.ok).toBe(true);
+      expect(rendered.text).toContain("CLAUSULA_VINCULADA");
+      expect(rendered.text).not.toContain("CLAUSULA_NO_VINCULADA");
+      expect(rendered.text).toContain("CLAUSULA_COTIZADA_DIRECTA");
+    });
+
+    it("false real dispara la cláusula 'NO' y no la 'SÍ', y el if directo se oculta (el defecto que describe MOI-206)", () => {
+      const rendered = renderTemplate({
+        template,
+        variables: { es_parte_vinculada: false, entidad_cotizada: false },
+      });
+      expect(rendered.ok).toBe(true);
+      expect(rendered.text).not.toContain("CLAUSULA_VINCULADA");
+      expect(rendered.text).toContain("CLAUSULA_NO_VINCULADA");
+      expect(rendered.text).not.toContain("CLAUSULA_COTIZADA_DIRECTA");
+    });
+
+    it("no altera la comparación eq entre dos strings normales (regresión)", () => {
+      const rendered = renderTemplate({
+        template: '{{#if (eq tipo_junta "ORDINARIA")}}ES_ORDINARIA{{/if}}',
+        variables: { tipo_junta: "EXTRAORDINARIA" },
+      });
+      expect(rendered.text).not.toContain("ES_ORDINARIA");
+    });
+  });
 });

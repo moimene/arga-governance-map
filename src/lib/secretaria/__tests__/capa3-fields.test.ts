@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { buildInitialCapa3Values, normalizeCapa3Draft, normalizeCapa3Fields } from "../capa3-fields";
+import {
+  buildInitialCapa3Values,
+  capa3ValueHasContent,
+  capa3ValueToText,
+  isBooleanCapa3Field,
+  isNumberCapa3Field,
+  normalizeBooleanDraftValue,
+  normalizeCapa3Draft,
+  normalizeCapa3Fields,
+  normalizeNumberDraftValue,
+  resolveNumberDraftInput,
+} from "../capa3-fields";
 
 describe("capa3-fields", () => {
   it("normaliza campos Cloud y modelos legacy con label/tipo", () => {
@@ -373,5 +384,171 @@ describe("Codex adversarial 2ª pasada: la poda parcial de un array también se 
   it("un texto que no es un array se reporta literal", () => {
     const draft = normalizeCapa3Draft(fields, { asistentes: "Ana, Pedro" });
     expect(draft.discardedValues.asistentes).toBe("Ana, Pedro");
+  });
+});
+
+// MOI-206: campos boolean/booleano y number/numero guardan su tipo real en
+// vez de String(value). Handlebars trata cualquier texto no vacío ("No"
+// incluido) como verdadero — sin esta conversión el documento puede imprimir
+// la cláusula contraria a la contestada.
+describe("MOI-206 — campos boolean/booleano y number/numero con tipo real", () => {
+  describe("isBooleanCapa3Field / isNumberCapa3Field", () => {
+    it("reconoce las dos grafías (inglés y castellano), sin distinguir mayúsculas", () => {
+      expect(isBooleanCapa3Field({ tipo: "boolean" })).toBe(true);
+      expect(isBooleanCapa3Field({ tipo: "Booleano" })).toBe(true);
+      expect(isBooleanCapa3Field({ tipo: "BOOLEAN" })).toBe(true);
+      expect(isBooleanCapa3Field({ tipo: "number" })).toBe(false);
+      expect(isBooleanCapa3Field({ tipo: undefined })).toBe(false);
+
+      expect(isNumberCapa3Field({ tipo: "number" })).toBe(true);
+      expect(isNumberCapa3Field({ tipo: "Numero" })).toBe(true);
+      expect(isNumberCapa3Field({ tipo: "NUMBER" })).toBe(true);
+      expect(isNumberCapa3Field({ tipo: "boolean" })).toBe(false);
+    });
+  });
+
+  describe("normalizeBooleanDraftValue — lectura de texto legacy", () => {
+    it("lee 'No' y 'false' como falso, exactamente el defecto que describe el issue", () => {
+      expect(normalizeBooleanDraftValue("No")).toBe(false);
+      expect(normalizeBooleanDraftValue("no")).toBe(false);
+      expect(normalizeBooleanDraftValue("NO")).toBe(false);
+      expect(normalizeBooleanDraftValue("false")).toBe(false);
+    });
+
+    it("lee las variantes de 'sí' como verdadero", () => {
+      expect(normalizeBooleanDraftValue("Sí")).toBe(true);
+      expect(normalizeBooleanDraftValue("SI")).toBe(true);
+      expect(normalizeBooleanDraftValue("sí")).toBe(true);
+      expect(normalizeBooleanDraftValue("true")).toBe(true);
+    });
+
+    it("un booleano real pasa sin cambios", () => {
+      expect(normalizeBooleanDraftValue(true)).toBe(true);
+      expect(normalizeBooleanDraftValue(false)).toBe(false);
+    });
+
+    it("texto irreconocible o vacío es 'sin contestar', nunca 'no'", () => {
+      expect(normalizeBooleanDraftValue("")).toBeUndefined();
+      expect(normalizeBooleanDraftValue("tal vez")).toBeUndefined();
+      expect(normalizeBooleanDraftValue(null)).toBeUndefined();
+      expect(normalizeBooleanDraftValue(undefined)).toBeUndefined();
+    });
+  });
+
+  describe("normalizeNumberDraftValue — lectura de texto legacy", () => {
+    it("parsea texto legacy, incluida coma decimal española", () => {
+      expect(normalizeNumberDraftValue("42")).toBe(42);
+      expect(normalizeNumberDraftValue("3,5")).toBe(3.5);
+      expect(normalizeNumberDraftValue("-10")).toBe(-10);
+    });
+
+    it("un número real pasa sin cambios", () => {
+      expect(normalizeNumberDraftValue(0)).toBe(0);
+      expect(normalizeNumberDraftValue(1234.5)).toBe(1234.5);
+    });
+
+    it("texto no numérico o vacío es 'sin contestar'", () => {
+      expect(normalizeNumberDraftValue("")).toBeUndefined();
+      expect(normalizeNumberDraftValue("no aplica")).toBeUndefined();
+      expect(normalizeNumberDraftValue(null)).toBeUndefined();
+    });
+  });
+
+  describe("resolveNumberDraftInput — MOI-206 (revisión): tecleo intermedio no se descarta", () => {
+    it("conserva el '-' inicial de un negativo en vez de descartarlo", () => {
+      // Regresión: handleNumberChange comprobaba Number.isFinite(Number(raw))
+      // antes de guardar, así que un "-" (Number("-") es NaN) no actualizaba
+      // el borrador y el <input> controlado revertía al valor anterior en
+      // cada pulsación — imposible teclear un negativo pese a que field.min
+      // puede ser negativo (p.ej. un importe).
+      expect(resolveNumberDraftInput("-")).toBe("-");
+    });
+
+    it("conserva un decimal a medio escribir ('3.')", () => {
+      expect(resolveNumberDraftInput("3.")).toBe("3.");
+      expect(resolveNumberDraftInput("-5.")).toBe("-5.");
+    });
+
+    it("un número completo, positivo o negativo, pasa igual", () => {
+      expect(resolveNumberDraftInput("-5")).toBe("-5");
+      expect(resolveNumberDraftInput("42")).toBe("42");
+    });
+
+    it("solo el texto vacío (o solo espacios) se trata como 'sin contestar'", () => {
+      expect(resolveNumberDraftInput("")).toBeUndefined();
+      expect(resolveNumberDraftInput("   ")).toBeUndefined();
+    });
+  });
+
+  describe("normalizeCapa3Draft — conversión end-to-end por tipo", () => {
+    const fields = normalizeCapa3Fields([
+      { campo: "entidad_cotizada", tipo: "boolean", obligatoriedad: "OBLIGATORIO", descripcion: "Cotizada" },
+      { campo: "es_parte_vinculada", tipo: "booleano", obligatoriedad: "OPCIONAL", descripcion: "Vinculada" },
+      { campo: "importe_operacion", tipo: "number", obligatoriedad: "OBLIGATORIO", descripcion: "Importe", min: 0, max: 1000000 },
+      { campo: "plazo_mandato", tipo: "numero", obligatoriedad: "OPCIONAL", descripcion: "Plazo" },
+    ]);
+
+    it("añade min/max al contrato del campo number", () => {
+      expect(fields.find((f) => f.campo === "importe_operacion")).toMatchObject({
+        tipo: "number",
+        min: 0,
+        max: 1000000,
+      });
+    });
+
+    it("un borrador legacy con 'No' se lee como booleano false, no como texto", () => {
+      const draft = normalizeCapa3Draft(fields, { entidad_cotizada: "No" });
+      expect(draft.values.entidad_cotizada).toBe(false);
+      expect(typeof draft.values.entidad_cotizada).toBe("boolean");
+    });
+
+    it("un borrador legacy con 'false' (texto) también se lee como false", () => {
+      const draft = normalizeCapa3Draft(fields, { entidad_cotizada: "false" });
+      expect(draft.values.entidad_cotizada).toBe(false);
+    });
+
+    it("un borrador legacy con 'SÍ' se lee como true", () => {
+      const draft = normalizeCapa3Draft(fields, { es_parte_vinculada: "SÍ" });
+      expect(draft.values.es_parte_vinculada).toBe(true);
+    });
+
+    it("el nuevo control tri-estado ya guarda un booleano real, sin conversión con pérdida", () => {
+      const draft = normalizeCapa3Draft(fields, { entidad_cotizada: false, es_parte_vinculada: true });
+      expect(draft.values).toEqual({ entidad_cotizada: false, es_parte_vinculada: true });
+    });
+
+    it("un número legacy en texto se lee como number real", () => {
+      const draft = normalizeCapa3Draft(fields, { importe_operacion: "150000" });
+      expect(draft.values.importe_operacion).toBe(150000);
+      expect(typeof draft.values.importe_operacion).toBe("number");
+    });
+
+    it("0 es una respuesta válida (has content), no 'sin contestar'", () => {
+      const draft = normalizeCapa3Draft(fields, { plazo_mandato: 0 });
+      expect(draft.values.plazo_mandato).toBe(0);
+      expect(draft.emptyKeys).not.toContain("plazo_mandato");
+    });
+
+    it("texto irreconocible en un booleano no se guarda como 'no'; queda sin contestar", () => {
+      const draft = normalizeCapa3Draft(fields, { entidad_cotizada: "quizás" });
+      expect(draft.values.entidad_cotizada).toBeUndefined();
+      expect(draft.emptyKeys).toContain("entidad_cotizada");
+    });
+  });
+
+  describe("capa3ValueHasContent / capa3ValueToText con el tipo real", () => {
+    it("una respuesta 'No' (false) cuenta como contestada, no como campo vacío", () => {
+      expect(capa3ValueHasContent(false)).toBe(true);
+      expect(capa3ValueHasContent(true)).toBe(true);
+    });
+
+    it("una respuesta numérica 0 cuenta como contestada", () => {
+      expect(capa3ValueHasContent(0)).toBe(true);
+    });
+
+    it("capa3ValueToText muestra Sí/No en castellano para lectura humana", () => {
+      expect(capa3ValueToText(true)).toBe("Sí");
+      expect(capa3ValueToText(false)).toBe("No");
+    });
   });
 });
