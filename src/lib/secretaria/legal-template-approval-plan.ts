@@ -427,9 +427,18 @@ function valueMatches(actual: string, expected?: string | string[], normalize = 
   return expectedValues.some((value) => normalize(actual) === normalize(value));
 }
 
+// MOI-137, D-20 (decisión por delegación 2026-09-26): el informe del Comité
+// Legal Corporativo del 01-05-2026 es un dictamen emitido para ARGA Seguros,
+// S.A. y no acredita nada para otro tenant. Sin este límite, una plantilla
+// clonada a Garrigues (…0002) o al Grupo Nuevo (…0003) que coincidiera por
+// tipo/materia/adopción/órgano con el matcher heredaría automáticamente una
+// aprobación jurídica de un dictamen que nunca las evaluó.
+export const LEGAL_TEMPLATE_APPROVAL_REPORT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+
 export function resolveLegalTemplateApprovalPlan(
   template: PlantillaProtegidaRow,
 ): LegalTemplateApprovalPlanItem | null {
+  if (template.tenant_id !== LEGAL_TEMPLATE_APPROVAL_REPORT_TENANT_ID) return null;
   const tipo = normalizeCode(template.tipo);
   const materia = normalizeCode(template.materia_acuerdo ?? template.materia);
   const adoptionMode = normalizeCode(template.adoption_mode);

@@ -75,12 +75,16 @@ function sha256Text(value: string) {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
+// MOI-137, D-20: resolveLegalTemplateApprovalPlan (informe del Comité Legal
+// del 01-05-2026) solo acredita aprobación para el tenant de emisión (ARGA).
+const ARGA_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+
 function template(
   patch: Partial<PlantillaProtegidaRow> & Pick<PlantillaProtegidaRow, "id" | "tipo" | "estado">,
 ): PlantillaProtegidaRow {
   return {
     id: patch.id,
-    tenant_id: "tenant",
+    tenant_id: patch.tenant_id ?? ARGA_TENANT_ID,
     tipo: patch.tipo,
     materia: null,
     jurisdiccion: "ES",
