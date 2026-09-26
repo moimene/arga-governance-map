@@ -42,7 +42,7 @@ export const MODULO_RIESGO_EQUIVALENCIA: Record<string, EquivalenciaModulo> = {
   penal: {
     equivalente: "abc",
     motivo:
-      "El módulo declarado para riesgo penal en ARGA es 'abc' (Anticorrupción); 'penal' es el nombre legacy con el que se sembraron 18 riesgos antes de declarar el módulo (DA-15, ledger 2026-09-05).",
+      "El módulo declarado para riesgo penal en el grupo de demostración (tenant …0001) es 'abc' (Anticorrupción); 'penal' es el nombre legacy con el que se sembraron 18 riesgos antes de declarar el módulo (DA-15, ledger 2026-09-05).",
   },
   tech: {
     equivalente: "cyber",

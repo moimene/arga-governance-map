@@ -62,7 +62,16 @@ let listaRiesgos: Array<Record<string, unknown>> = [];
 let riesgoFicha: Record<string, unknown> | null = null;
 let kpisGrc: Record<string, unknown> | undefined;
 
+// Risk360 lee la evaluación de AIMS que llega por derivación (MOI-158); esta
+// prueba no monta TenantProvider, así que ese hook se sustituye y el resto del
+// módulo se conserva tal cual.
+const aiAssessmentsReal = (await import("@/hooks/useAiAssessments")) as Record<string, unknown>;
+
 const restaurar = await mockearModulos([
+  ["@/hooks/useAiAssessments", () => ({
+    ...aiAssessmentsReal,
+    useAssessmentHandoffReference: () => ({ data: null, isLoading: false, error: null }),
+  })],
   ["@/hooks/useRisks", () => ({
     useRisks: () => ({ data: listaRiesgos, isLoading: false, error: null }),
     useRiskById: () => ({ data: riesgoFicha, isLoading: false, error: null }),

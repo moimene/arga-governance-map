@@ -86,7 +86,8 @@ describe("MOI-148 — fn_secretaria_actualizar_estructura_grupo", () => {
       "cannot be its own parent",
       "would create a cycle",
       "between 0 and 100",
-      "not allowed for this Secretaria action",
+      "role is required",
+      "set local role authenticated",
       "tenant access denied",
     ]) {
       expect(probe, `falta la sonda negativa de "${marca}"`).toContain(marca);

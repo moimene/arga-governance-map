@@ -43,8 +43,11 @@ describe("MOI-204 — actor en audit_log + cobertura minutes/registry_filings", 
   it("fn_audit_worm escribe actor_id desde el sub del JWT de sesión", () => {
     expect(migration).toMatch(/CREATE OR REPLACE FUNCTION public\.fn_audit_worm\(\)/);
     expect(migration).toMatch(
-      /current_setting\('request\.jwt\.claims', true\)::jsonb ->> 'sub'/,
+      /NULLIF\(current_setting\('request\.jwt\.claims', true\), ''\)::jsonb ->> 'sub'/,
     );
+    // Una conexión que ya usó set_config local deja la clave en '' (no NULL):
+    // el cast directo a jsonb tumbaría toda escritura auditada.
+    expect(migration).toMatch(/NULLIF\(current_setting\('request\.jwt\.claims', true\), ''\)::jsonb->>'email'/);
     expect(migration).toMatch(
       /INSERT INTO public\.audit_log \(\s*tenant_id, table_name, record_id, action,\s*actor_email, actor_id, delta, hash_sha512, created_at\s*\)/,
     );
