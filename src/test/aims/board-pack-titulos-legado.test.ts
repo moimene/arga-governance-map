@@ -53,7 +53,19 @@ describe("Board Pack: título de requisitos con numeración legado (MOI-184)", (
     expect(screen.getByText(/numeración antigua/i)).toBeTruthy();
   });
 
-  it("control positivo: un código ya vigente se pinta tal cual, sin aviso", () => {
+  it("control positivo: un código ya vigente cuyo guardado coincide con el catálogo se pinta tal cual, sin aviso", () => {
+    render(
+      createElement(BPSistemasIA, {
+        aiSystems: sistema([
+          { requirement_code: "RISK_MGMT", requirement_title: "Sistema de gestión de riesgos", status: "Conforme" },
+        ]),
+      }),
+    );
+    expect(screen.getByText("Sistema de gestión de riesgos")).toBeTruthy();
+    expect(screen.queryByText(/numeración antigua/i)).toBeNull();
+  });
+
+  it("TRANSPARENCY: código ya vigente cuyo guardado desfasó de DESTINATARIO se resuelve contra el catálogo actual", () => {
     render(
       createElement(BPSistemasIA, {
         aiSystems: sistema([
@@ -61,7 +73,11 @@ describe("Board Pack: título de requisitos con numeración legado (MOI-184)", (
         ]),
       }),
     );
-    expect(screen.getByText("Transparencia e información a usuarios")).toBeTruthy();
+    // El defecto que este test vigila: el guardado desfasado de destinatario ya NO se pinta tal cual.
+    expect(screen.queryByText("Transparencia e información a usuarios")).toBeNull();
+    expect(
+      screen.getByText("Transparencia y comunicación de información a los responsables del despliegue"),
+    ).toBeTruthy();
     expect(screen.queryByText(/numeración antigua/i)).toBeNull();
   });
 });

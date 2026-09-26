@@ -166,12 +166,16 @@ const TITULO_POR_CODIGO_VIGENTE = new Map(
 export const AVISO_NUMERACION_ANTIGUA = "Numeración antigua, sin requisito vigente equivalente";
 
 /**
- * Título a pintar de una fila de `ai_compliance_checks` (MOI-184): si su
- * código es legado con equivalente vigente, el título del catálogo actual —
- * nunca el guardado, que arrastra la numeración desplazada del seed («Política
- * de IA (A.5)»). Si es legado sin equivalente (ISO-07, ISO-10, 6.1), el
- * guardado con aviso: no hay dónde resolverlo. Si ya es vigente, el guardado.
- * No reescribe la fila: es lectura, igual que `traducirLegado`.
+ * Título a pintar de una fila de `ai_compliance_checks` (MOI-184): nunca el
+ * guardado si el catálogo vigente ya tiene el código o su equivalente, porque
+ * el guardado puede arrastrar numeración O DESTINATARIO desplazados del seed
+ * («Política de IA (A.5)»; «Transparencia e información a usuarios» cuando el
+ * art. 13 vigente dice «a los responsables del despliegue»). Primero se busca
+ * el propio código en el catálogo vigente —cubre TRANSPARENCY, que ya es
+ * código vigente pero cuyo guardado desfasó de destinatario—; sólo si no está
+ * ahí se mira si es legado (`LEGADO_A_VIGENTE`) para traducir o avisar. Si no
+ * es ni vigente ni legado, el guardado. No reescribe la fila: es lectura,
+ * igual que `traducirLegado`.
  */
 export function tituloVigenteCheck(check: {
   requirement_code?: string | null;
@@ -179,6 +183,8 @@ export function tituloVigenteCheck(check: {
 }): { titulo: string; aviso: string | null } {
   const guardado = check.requirement_title ?? "";
   const codigoOriginal = check.requirement_code ?? "";
+  const tituloPropioVigente = TITULO_POR_CODIGO_VIGENTE.get(codigoOriginal);
+  if (tituloPropioVigente) return { titulo: tituloPropioVigente, aviso: null };
   if (!Object.prototype.hasOwnProperty.call(LEGADO_A_VIGENTE, codigoOriginal)) {
     return { titulo: guardado, aviso: null };
   }

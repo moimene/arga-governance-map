@@ -476,15 +476,25 @@ tres dejan de afirmar algo que la base no sostenía):
   a partir del código del catálogo vigente. No toca el dato y es lo más barato"): no se escribe en
   Cloud, ni en ARGA ni en Garrigues. `src/lib/aims/legado.ts` gana `tituloVigenteCheck()` (hoja: solo
   añade el import `./catalog-aesia`, que no cierra ciclo — no importa `legado.ts` ni sus hermanas),
-  que reutiliza `LEGADO_A_VIGENTE`/`traducirLegado` ya existentes: si el código legado tiene
-  equivalente vigente (`ISO-05`, `ISO-06`, `ISO-08`, `ISO-09`), pinta el título del catálogo actual
-  (`ISO_42001_REQUIREMENTS`); si no lo tiene (`ISO-07`, `ISO-10`), pinta el guardado con el aviso
-  "Numeración antigua, sin requisito vigente equivalente" — no se inventa un título. `BPSistemasIA.tsx`
-  pasa cada check por `tituloVigenteCheck()` en vez de pintar `requirement_title` a secas. Gate de
-  arista: `src/test/aims/board-pack-titulos-legado.test.ts` (falla si el Board Pack vuelve a pintar
-  «Política de IA (A.5)» sin traducir ni avisar; control positivo con `TRANSPARENCY`, ya vigente, que
-  no lleva aviso). Dependencia técnica (MOI-125, incorporar el trabajo RIA a `main`) ya satisfecha:
-  `legado.ts` y `catalog-aesia.ts` estaban en `main` antes de esta corrección.
+  que reutiliza `LEGADO_A_VIGENTE`/`traducirLegado` ya existentes, pero primero busca el propio
+  código en el catálogo vigente (`TITULO_POR_CODIGO_VIGENTE`) antes de mirar si es legado: eso cierra
+  también el caso del DESTINATARIO, no sólo el de la numeración — `TRANSPARENCY` ya es código vigente
+  (no está en `LEGADO_A_VIGENTE`), así que la primera versión de `tituloVigenteCheck()` lo trataba
+  como "ya vigente" y pintaba el guardado tal cual, dejando el check de Harvey con «Transparencia e
+  información a usuarios» pese al cierre. Corregido: ahora resuelve directamente contra el catálogo
+  y pinta «Transparencia y comunicación de información a los responsables del despliegue» (art. 13
+  vigente). Para un código legado con equivalente vigente (`ISO-05`, `ISO-06`, `ISO-08`, `ISO-09`),
+  pinta el título del catálogo actual (`ISO_42001_REQUIREMENTS`); si no lo tiene (`ISO-07`, `ISO-10`),
+  pinta el guardado con el aviso "Numeración antigua, sin requisito vigente equivalente" — no se
+  inventa un título. `BPSistemasIA.tsx` pasa cada check por `tituloVigenteCheck()` en vez de pintar
+  `requirement_title` a secas. Gate de arista: `src/test/aims/board-pack-titulos-legado.test.ts`
+  (falla si el Board Pack vuelve a pintar «Política de IA (A.5)» sin traducir ni avisar; control
+  positivo con `RISK_MGMT`, ya vigente y sin drift de título, que no lleva aviso; caso explícito de
+  `TRANSPARENCY` que exige el título resuelto contra el catálogo, no el guardado). Dependencia
+  técnica (MOI-125, incorporar el trabajo RIA a `main`) ya satisfecha: `legado.ts` y
+  `catalog-aesia.ts` estaban en `main` antes de esta corrección. Con esta corrección, tanto el caso
+  de la numeración (ISO) como el del destinatario (TRANSPARENCY/Harvey) quedan resueltos por el
+  mismo camino.
 - **Monitores de readiness: dos criterios por código, uno queda (integración de F1).** Las cadenas A
   (`mapa-monitores.ts`, un monitor por requisito) y D (`MONITORES_POR_REQUISITO`, que congelaba el
   reparto que salía de las palabras clave, con sus artefactos: «rol» casaba con «control»,
