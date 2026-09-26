@@ -68,6 +68,40 @@ export function useAiIncidentById(id: string | undefined) {
   });
 }
 
+// MOI-158: forma de UUID sin exigir versión/variante RFC — igual que
+// UUID_SHAPE_RE en document-draft-persistence.ts. Un id de handoff que no
+// tiene forma de UUID (fixture de test, id de otro dominio) no debe ni
+// disparar la consulta: PostgREST devolvería 400 "invalid input syntax for
+// type uuid", que es un error, no un "no aparece nada".
+const UUID_SHAPE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Referencia de solo lectura para el aviso de handoff (GRC/Secretaría, MOI-158).
+ * A diferencia de `useAiIncidentById`, nunca lanza por 0 filas: un id
+ * inexistente o de OTRO tenant (la RLS lo filtra sin error) devuelve `data:
+ * null`, que el llamador interpreta como "no mostrar nada". Incluye el
+ * sistema (F2.T13 de la spec RIA: "sistema resuelto desde el incidente" — la
+ * parte que no depende de las columnas `entity_id`/`subject_id` pendientes de
+ * F2.T2/F2.T3).
+ */
+export function useAiIncidentHandoffReference(id: string | null | undefined) {
+  const { tenantId } = useTenantContext();
+  const validId = id && UUID_SHAPE_RE.test(id) ? id : undefined;
+  return useQuery({
+    queryKey: ["ai_incidents", tenantId, "handoff-ref", validId ?? null],
+    queryFn: tenantId && validId ? async () => {
+      const { data, error } = await supabase
+        .from("ai_incidents")
+        .select("*, ai_systems(name)")
+        .eq("tenant_id", tenantId!)
+        .eq("id", validId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { id: string; title: string; ai_systems: { name: string } | null } | null;
+    } : skipToken,
+  });
+}
+
 export function useAiIncidentsBySystem(systemId: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({

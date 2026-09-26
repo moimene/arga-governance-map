@@ -8,6 +8,7 @@ import type { SecretariaScopeController } from "@/components/secretaria/shell";
 import { useTenantBranding } from "@/context/TenantBrandContext";
 import { groupFullLabel } from "@/lib/tenant-brand-labels";
 import { SEVERITY_OPTIONS, incidentStatusChip, severityChip } from "@/lib/grc/status-labels";
+import { useAiIncidentHandoffReference } from "@/hooks/useAiIncidents";
 
 const FILTER_ALL = "Todas";
 
@@ -205,6 +206,11 @@ export default function IncidentesList() {
   const { data: incidents = [], isLoading } = useIncidents(undefined, { entityId: scopedEntityId });
   const handoff = params.get("handoff");
   const handoffSource = params.get("source");
+  const handoffIncidentId = params.get("ai_incident");
+  // MOI-158: solo lectura, acotada al tenant de la sesión (el hook filtra por
+  // tenant_id); un id inexistente o de otro tenant resuelve `data: null` y no
+  // se pinta nada, no un error.
+  const { data: handoffIncident } = useAiIncidentHandoffReference(handoffIncidentId);
   const [severityFilter, setSeverityFilter] = useState(FILTER_ALL);
   const [statusFilter, setStatusFilter] = useState(FILTER_ALL);
   const [typeFilter, setTypeFilter] = useState(FILTER_ALL);
@@ -275,6 +281,18 @@ export default function IncidentesList() {
               <p className="text-sm leading-6 text-[var(--g-text-secondary)]">
                 La señal se recibe como contexto de preparación. GRC decide si registra un incidente y conserva la trazabilidad de la decisión.
               </p>
+              {handoffIncident && (
+                <p className="mt-1 text-sm leading-6 text-[var(--g-text-primary)]">
+                  Incidente de origen:{" "}
+                  <span className="font-mono text-xs text-[var(--g-text-secondary)]">
+                    EXP-INC-{handoffIncident.id.slice(0, 8).toUpperCase()}
+                  </span>{" "}
+                  · <span className="font-medium">{handoffIncident.title}</span>
+                  {handoffIncident.ai_systems?.name && (
+                    <> · Sistema: <span className="font-medium">{handoffIncident.ai_systems.name}</span></>
+                  )}
+                </p>
+              )}
             </div>
           </div>
           <button

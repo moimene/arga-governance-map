@@ -3,6 +3,8 @@ import { ArrowLeft, Calendar, ExternalLink, Save, ShieldAlert } from "lucide-rea
 import { formatIncidentDate } from "@/lib/aims/incident-clocks";
 import { etiqueta, normalizeAimsStatus } from "@/lib/aims/vocabulario";
 import type { AiIncident } from "@/hooks/useAiIncidents";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { isModuleEnabled } from "@/lib/tenant-modules";
 
 export interface CabeceraIncidenteProps {
   incident: AiIncident;
@@ -33,6 +35,12 @@ export default function CabeceraIncidente({
   onSave,
 }: CabeceraIncidenteProps) {
   const navigate = useNavigate();
+  const branding = useTenantBranding();
+  // MOI-158/F2.T13: no ofrecer un handoff hacia un módulo que el tenant no
+  // tiene activado. `isModuleEnabled` falla ABIERTO (branding NULL de ARGA
+  // no cambia).
+  const grcEnabled = isModuleEnabled(branding, "grc");
+  const secretariaEnabled = isModuleEnabled(branding, "secretaria");
 
   return (
     <>
@@ -165,22 +173,26 @@ export default function CabeceraIncidente({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Link
-                to={`/grc/incidentes?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${incident.id}`}
-                className="px-3 py-1.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-xs font-medium transition-colors inline-flex items-center gap-1.5"
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                <span>Derivar a GRC</span>
-                <ExternalLink className="w-3 h-3" />
-              </Link>
-              <Link
-                to={`/secretaria/reuniones/nueva?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${incident.id}`}
-                className="px-3 py-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] text-xs font-medium transition-colors inline-flex items-center gap-1.5"
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                <span>Punto Orden del Día</span>
-                <ExternalLink className="w-3 h-3" />
-              </Link>
+              {grcEnabled && (
+                <Link
+                  to={`/grc/incidentes?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${incident.id}`}
+                  className="px-3 py-1.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-xs font-medium transition-colors inline-flex items-center gap-1.5"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <span>Derivar a GRC</span>
+                  <ExternalLink className="w-3 h-3" />
+                </Link>
+              )}
+              {secretariaEnabled && (
+                <Link
+                  to={`/secretaria/reuniones/nueva?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${incident.id}`}
+                  className="px-3 py-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] text-xs font-medium transition-colors inline-flex items-center gap-1.5"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <span>Punto Orden del Día</span>
+                  <ExternalLink className="w-3 h-3" />
+                </Link>
+              )}
             </div>
           </div>
         )}

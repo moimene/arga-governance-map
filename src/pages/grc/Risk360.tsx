@@ -10,8 +10,15 @@ import {
   ORDEN_BANDAS, COLOR_BANDA, ETIQUETA_BANDA, NOTA_ESCALA, tieneEjes,
   riskScore, matchesScoreFilter, countSeverity, lecturaRiesgo,
 } from "@/lib/grc/assessed-band";
+import { useAssessmentHandoffReference } from "@/hooks/useAiAssessments";
 
 const FILTER_ALL = "Todos";
+
+const HANDOFF_DATE_FORMATTER = new Intl.DateTimeFormat("es-ES", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+});
 
 const SCORE_BG = (score: number | null, band?: string | null) => {
   if (score !== null) {
@@ -243,6 +250,10 @@ export default function Risk360() {
   const findingFilter = params.get("finding");
   const handoff = params.get("handoff");
   const handoffSource = params.get("source");
+  const handoffAssessmentId = params.get("assessment");
+  // MOI-158: solo lectura, acotada al tenant vía el join a ai_systems; un id
+  // inexistente o de otro tenant resuelve `data: null` y no se pinta nada.
+  const { data: handoffAssessment } = useAssessmentHandoffReference(handoffAssessmentId);
   const { data: allRisks = [], isLoading } = useRisks({ entityId: scopedEntityId });
   const [moduleFilter, setModuleFilter] = useState(FILTER_ALL);
   const [scoreFilter, setScoreFilter] = useState(FILTER_ALL);
@@ -360,6 +371,14 @@ export default function Risk360() {
                 <p className="text-sm leading-6 text-[var(--g-text-secondary)]">
                   Se recibe la señal de {handoffLabel(handoff)} para decidir si procede abrir riesgo, control o plan de acción en GRC.
                 </p>
+                {handoffAssessment && (
+                  <p className="mt-1 text-sm leading-6 text-[var(--g-text-primary)]">
+                    Evaluación de origen: <span className="font-medium">{handoffAssessment.ai_systems?.name ?? "Sistema sin nombre"}</span>
+                    {handoffAssessment.assessment_date && (
+                      <> · {HANDOFF_DATE_FORMATTER.format(new Date(handoffAssessment.assessment_date))}</>
+                    )}
+                  </p>
+                )}
               </div>
             </div>
           </div>

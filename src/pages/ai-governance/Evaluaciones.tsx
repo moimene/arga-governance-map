@@ -6,6 +6,8 @@ import { isAimsTechnicalFileGapCandidate } from "@/lib/aims/readiness";
 import { chipClaseEvaluacion, evaluacionAcredita, rotuloEvaluacion } from "@/lib/aims/legado";
 import { etiqueta, opcionesFiltro } from "@/lib/aims/vocabulario";
 import FilterGroup from "@/components/ai-governance/FilterGroup";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { isModuleEnabled } from "@/lib/tenant-modules";
 
 // El marco no es vocabulario de estado/severidad/nivel: su badge se queda aquí.
 const FRAMEWORK_BADGE: Record<string, string> = {
@@ -50,6 +52,9 @@ export default function Evaluaciones() {
   const [frameworkFilter, setFrameworkFilter] = useState("Todos");
   const [actionFilter, setActionFilter] = useState("Todos");
   const { data: assessments = [], isLoading, error } = useAllAssessments();
+  const branding = useTenantBranding();
+  // MOI-158/F2.T13: no ofrecer handoff a un módulo desactivado (falla ABIERTO).
+  const grcEnabled = isModuleEnabled(branding, "grc");
 
   const approvedCount = assessments.filter(evaluacionAcredita).length;
   const gapCount = assessments.filter(isAimsTechnicalFileGapCandidate).length;
@@ -225,7 +230,7 @@ export default function Evaluaciones() {
                   {filtered.map((ass) => {
                     const statusCls = chipClaseEvaluacion(ass);
                     const frameCls = FRAMEWORK_BADGE[ass.framework ?? ""] ?? "bg-[var(--g-surface-subtle)] text-[var(--g-text-secondary)]";
-                    const hasGrcHandoff = isAimsTechnicalFileGapCandidate(ass);
+                    const hasGrcHandoff = grcEnabled && isAimsTechnicalFileGapCandidate(ass);
                     return (
                       <tr
                         key={ass.id}
@@ -306,7 +311,7 @@ export default function Evaluaciones() {
               {filtered.map((ass) => {
                 const statusCls = chipClaseEvaluacion(ass);
                 const frameCls = FRAMEWORK_BADGE[ass.framework ?? ""] ?? "bg-[var(--g-surface-subtle)] text-[var(--g-text-secondary)]";
-                const hasGrcHandoff = isAimsTechnicalFileGapCandidate(ass);
+                const hasGrcHandoff = grcEnabled && isAimsTechnicalFileGapCandidate(ass);
                 return (
                   <article key={ass.id} role="listitem" className="p-4">
                     <button
