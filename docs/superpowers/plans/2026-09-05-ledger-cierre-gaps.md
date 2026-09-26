@@ -269,8 +269,61 @@ El gateo por módulo falla ABIERTO con `branding` NULL, así que ARGA conserva m
 | DA-12 | `findings.opened_at = 2026-08-29` en los 8 `FND-GARR-PEN-*` (el script ya no lo fabrica; el dato sembrado sigue). | `UPDATE findings SET opened_at = NULL` sobre esas 8 filas. |
 | DA-13 | `risks.description` de `RSK-GARR-PEN-069` dice «Artículos del Código Penal: Ley de represión del contrabando» (el contrabando es LO 12/1995). Es el **único riesgo ROJO** del tenant. | Re-ejecutar `seed-garrigues-penal.ts --apply`. |
 | DA-14 | `grc_modules` de Garrigues sin fila `esg`; `/grc/sostenibilidad` sigue siendo ruta huérfana. | Migración. |
-| DA-15 | ARGA tiene 18 riesgos con `module_id='penal'` pero `penal` no está en su `grc_modules`. El selector lo marca «no declarado para este grupo» en vez de perderlo. | Migración o limpieza de dato. |
+| DA-15 | ARGA tiene 18 riesgos con `module_id='penal'` pero `penal` no está en su `grc_modules`. El selector lo marca «no declarado para este grupo» en vez de perderlo. **Ampliada 2026-09-26 (MOI-189): son 122 de 167, once valores, ver decisión D-10 abajo.** | Tabla de equivalencias en código (D-10.b), sin migración. |
 | DA-16 | `controls.code` sin índice único por tenant (el hook ya filtra; el índice no existe). | Migración. |
+
+### 6.6 D-10 (MOI-189, 2026-09-26) — dos vocabularios de módulo GRC en ARGA, decisión delegada
+
+**Contexto medido en vivo el 2026-09-26** (SELECT, sin escritura, contra `governance_OS`): 122 de los
+167 riesgos de ARGA (`tenant_id='…0001'`) usan un `risks.module_id` que no existe en su
+`grc_modules` — no hay FK que lo impida. Garrigues: 0. Además, `grc_obligations` (el espejo de
+`obligations` que ordena por módulo GRC) tiene 8 de sus 14 filas de ARGA sin `obligations.id`
+correspondiente: se sembraron a mano y el trigger de sincronización no las gobierna.
+
+**Decisión (delegada por Moisés al agente orquestador para MOI-189):**
+
+- **Riesgos → opción (b).** Tabla de equivalencias EN EL CÓDIGO
+  (`src/lib/grc/risk-module-equivalencia.ts`, `MODULO_RIESGO_EQUIVALENCIA`), sin tocar
+  `risks.module_id` en Cloud. ARGA no cambia de dato; siguen dos vocabularios. Mapa completo, cada
+  valor con su motivo:
+
+  | `module_id` (legacy) | riesgos | equivalente declarado | motivo |
+  |---|---:|---|---|
+  | `solvency2` | 25 | `risk` | Solvencia II sin módulo propio (mismo motivo que `OBL-ORSA-001`/`OBL-SII-001` en el espejo de obligaciones); catch-all. |
+  | `penal` | 18 | `abc` | Módulo declarado para riesgo penal en ARGA; `penal` es el nombre legacy de siembra (DA-15 original). |
+  | `tech` | 14 | `cyber` | Riesgo tecnológico, sin módulo de TI propio; se agrupa con Ciberseguridad. |
+  | `idd` | 10 | `risk` | Directiva de Distribución de Seguros, sin módulo propio; catch-all. |
+  | `labor` | 10 | `hs` | Riesgo laboral, sin módulo de derecho laboral propio; se agrupa con SST y PRL. |
+  | `compliance` | 10 | `audit` | Cumplimiento normativo genérico; se agrupa con Auditoría interna. |
+  | `reporting` | 7 | `audit` | Riesgo de reporting/información financiera; se agrupa con Auditoría interna. |
+  | `reputational` | 7 | `risk` | Sin módulo propio; catch-all. |
+  | `fraud` | 7 | `abc` | Se agrupa con Anticorrupción. |
+  | `strategic` | 7 | `risk` | Sin módulo propio; catch-all. |
+  | `governance` | 7 | `risk` | Sin módulo propio; catch-all. |
+
+  Vigilado por `src/test/schema/grc-riesgos-modulo-equivalencia.test.ts` (login real, solo lectura):
+  falla si aparece un `module_id` no declarado en el mapa, si un destino deja de existir en
+  `grc_modules`, o si el recuento (122 en ARGA, 0 en Garrigues) cambia sin que se actualice el test —
+  y comprueba que ARGA no pierde ningún riesgo (total ≥ 167). Unitario sin red:
+  `src/lib/grc/__tests__/risk-module-equivalencia.test.ts`. La opción (c) —reclasificar de verdad los
+  122 riesgos— queda descartada por ahora: cambiaría dato de ARGA y exige criterio de negocio.
+
+- **Obligaciones → opción (a).** Las 8 filas de `grc_obligations` de ARGA sin `obligations.id`
+  detrás se declaran históricas: no se crean sus obligaciones de origen (b) ni se borran (c, perdería
+  dato). **Ya vigilado desde antes de este issue** por
+  `src/test/schema/grc-sync-modulos.test.ts` (`NATIVAS_ESPERADAS.ARGA = 8`, prueba
+  "las filas propias del espejo siguen siendo las declaradas"), que MOI-189 verificó que sigue en
+  verde (11/11 en ese fichero, 2026-09-26) — no hizo falta código nuevo en este lado.
+
+**Dueño de la conciliación de módulos de GRC de ARGA: PENDIENTE de designar por Moisés.** El issue
+MOI-189 delega las dos decisiones técnicas de arriba, pero la puerta humana (designar a la persona
+que concilia los dos vocabularios, y autorizar cualquier escritura futura en Cloud sobre dato de
+ARGA — incluida una eventual opción (c)) sigue abierta. No se inventa aquí un nombre.
+
+**D-G4** (`docs/superpowers/reviews/2026-09-20-overlap-aims-grc.md:182`) queda marcada resuelta con
+esta misma decisión — MOI-125 (vehículo declarado por el propio MOI-189) ya está en `main` (Done,
+completado 2026-09-24), así que el análisis de solapamiento con D-G4 vive en este repo desde antes de
+este cambio.
 
 ---
 
