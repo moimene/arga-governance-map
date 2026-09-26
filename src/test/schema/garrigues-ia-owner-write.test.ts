@@ -10,16 +10,23 @@
 // en `src/test/garrigues/aislamiento-declarado.ts` — pero declarada o no, una
 // aserción vacua no prueba aislamiento.
 //
-// Y el módulo AI Governance ESCRIBE. Desde el refactor del 2026-09-08 el alta
-// de un sistema por un usuario autenticado va SÓLO por
-// `fn_aims_registrar_sistema` (sistema + cuestionario guiado en una
-// transacción, tenant de la sesión): el INSERT directo lo rechaza el trigger.
-// Este gate ejercita ese camino REAL, comprueba que lo que escribe queda fuera
-// del alcance del otro tenant, y lo borra.
-//
-// ROJO hasta que se aplique `20260908120000` (la RPC no existe antes). Se dice
-// a propósito: un gate que se autodesactivara cuando falta la RPC sería un
-// verde que no asierta.
+// MOI-210 (decisión D-12, `20260926121000_aims_ai_systems_fk_restrict.sql`):
+// las 4 FK con valor probatorio hacia `ai_systems` pasaron de CASCADE a
+// RESTRICT. Un sistema con cuestionario, versión, expediente o indicador ya
+// no se puede borrar desde la aplicación. Este fichero creaba un sistema real
+// por RPC y lo borraba al final confiando en el CASCADE (líneas 70-107 antes
+// de esta reescritura); con RESTRICT ese borrado ya no es posible y dejaría
+// residuo permanente. Se reescribe según DS-31/E-04
+// (docs/superpowers/specs/2026-09-19-aims-cobertura-ria-experto-design.md):
+//   * G-VIVO-NEG (aquí, permanente): el INSERT directo se rechaza (no crea
+//     nada), y el aislamiento se comprueba con FILAS YA EXISTENTES de cada
+//     tenant, no con una fila creada para la ocasión — sin residuo por
+//     construcción.
+//   * G-VIVO-REV (archivada, no en `bun test`): el alta positiva por RPC y el
+//     rechazo del tenant forjado por el cliente, en
+//     `docs/superpowers/plans/2026-09-26-moi-210-sonda-revertida-post-restrict.sql`
+//     (BEGIN … ROLLBACK), ejecutada por quien tiene permiso de escribir en
+//     Cloud y archivada en el ledger.
 //
 // GOTCHAs del repo que aplican aquí:
 //  * Un write cross-tenant filtrado por RLS en UPDATE/DELETE devuelve 0 filas
@@ -27,56 +34,38 @@
 //    que importa —que no aterrice— y se acepta cualquiera de las dos formas.
 //  * Toda sonda con más de un cliente necesita `persistSession: false` y
 //    `storageKey` propia. `sesionDe` ya lo hace.
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+//  * Mutar/borrar una fila EXISTENTE desde el tenant ajeno es seguro contra
+//    dato real: RLS garantiza 0 filas afectadas, así que no hay escritura
+//    efectiva que revertir.
+import { beforeAll, describe, expect, it } from "bun:test";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEMO_TENANT, GARRIGUES_TENANT, sesionDe } from "../helpers/supabase-test-client";
-import { resultadoProvisional, type Respuestas } from "../../lib/aims/cuestionario-calificacion";
 
-/** Marca única por ejecución: dos corridas simultáneas no se pisan. */
 const MARCA = `PROBE-OWNER-WRITE-G-${crypto.randomUUID()}`;
-const MARCA_FORJADA = `${MARCA}-FORJADO`;
-
-const DESPLIEGUE_LIMITADO: Respuestas = {
-  Q1_1: false, Q1_2: false, Q1_3: false, Q1_4: true,
-  Q2_1: false, Q2_2: false, Q2_4: true, Q2_5: true,
-};
-
-function cuestionario(r: Respuestas) {
-  const res = resultadoProvisional(r);
-  return {
-    questionnaire_version: "1.1",
-    phase1_responses: Object.fromEntries(Object.entries(r).filter(([k]) => k.startsWith("Q1"))),
-    phase2_responses: Object.fromEntries(Object.entries(r).filter(([k]) => k.startsWith("Q2"))),
-    phase2_art63_justification: null,
-    computed_role: res.rol,
-    computed_risk_level: res.nivel,
-    gpai_dependency: res.gpai,
-    applicable_frameworks: res.marcos,
-    catalog_profile: res.perfil,
-  };
-}
 
 describe("n=1002 — Garrigues escribe su inventario de IA y sólo lo ve él", () => {
   let arga: SupabaseClient;
   let garr: SupabaseClient;
-  let creado: string | null = null;
+  let filaArga: string;
+  let filaGarr: string;
 
   beforeAll(async () => {
     // Sin graceful-skip: `sesionDe` lanza y el gate se pone rojo. Una sonda que
     // se autodesactiva cuando no puede autenticar es un verde que no asierta.
     [arga, garr] = await Promise.all([sesionDe("ARGA"), sesionDe("GARRIGUES")]);
-  }, 30_000);
 
-  afterAll(async () => {
-    // Limpieza SIEMPRE, aunque una aserción haya fallado. El cascade arrastra el
-    // cuestionario. Si el borrado no se pudiera hacer, se dice en voz alta.
-    if (!creado || !garr) return;
-    const { error } = await garr.from("ai_systems").delete().eq("id", creado);
-    if (error) throw new Error(`la sonda dejó la fila ${creado} sin borrar: ${error.message}`);
-    const { data } = await garr.from("ai_systems").select("id").eq("id", creado);
-    if ((data ?? []).length > 0) throw new Error(`la fila ${creado} sigue viva tras el DELETE`);
-    const { data: q } = await garr.from("aims_classification_questionnaires").select("id").eq("system_id", creado);
-    if ((q ?? []).length > 0) throw new Error(`el cascade no arrastró el cuestionario de ${creado}`);
+    // Filas EXISTENTES de cada tenant (sembradas: ARGA 8, Garrigues 6 a
+    // 2026-09-24). Ninguna se crea ni se borra en este fichero.
+    const [{ data: propiasArga, error: eArga }, { data: propiasGarr, error: eGarr }] = await Promise.all([
+      arga.from("ai_systems").select("id").limit(1),
+      garr.from("ai_systems").select("id").limit(1),
+    ]);
+    if (eArga) throw new Error(`ARGA no pudo leer su propio inventario: ${eArga.message}`);
+    if (eGarr) throw new Error(`Garrigues no pudo leer su propio inventario: ${eGarr.message}`);
+    if ((propiasArga ?? []).length === 0) throw new Error("ARGA no tiene ningún sistema de IA que usar como fila real");
+    if ((propiasGarr ?? []).length === 0) throw new Error("Garrigues no tiene ningún sistema de IA que usar como fila real");
+    filaArga = propiasArga![0].id;
+    filaGarr = propiasGarr![0].id;
   }, 30_000);
 
   it("el INSERT directo ya no es el camino: lo rechaza el trigger", async () => {
@@ -91,33 +80,20 @@ describe("n=1002 — Garrigues escribe su inventario de IA y sólo lo ve él", (
     expect(data ?? []).toEqual([]);
   });
 
-  it("el owner-write del tenant nuevo funciona por la RPC, sobre su propia tabla", async () => {
-    const { data, error } = await garr.rpc("fn_aims_registrar_sistema", {
-      p_sistema: { name: MARCA, status: "ACTIVO" },
-      p_cuestionario: cuestionario(DESPLIEGUE_LIMITADO),
-    });
-    expect(error, `Garrigues no puede dar de alta un sistema de IA propio: ${error?.message}`).toBeNull();
-    const fila = (data ?? [])[0] as { system_id: string; content_hash: string } | undefined;
-    expect(fila, "la RPC no devolvió la fila").toBeDefined();
-    creado = fila!.system_id;
-    expect(fila!.content_hash).toMatch(/^[0-9a-f]{128}$/);
-
-    const { data: sys } = await garr.from("ai_systems").select("id, tenant_id, name").eq("id", creado);
-    expect((sys ?? []).map((r) => r.tenant_id)).toEqual([GARRIGUES_TENANT]);
-  });
-
-  it("Garrigues ve su fila (control positivo del instrumento)", async () => {
-    // Sin esto, «ARGA no la ve» podría pasar porque la fila no existe, no
+  it("cada tenant ve su propia fila (control positivo del instrumento)", async () => {
+    // Sin esto, «el otro no la ve» podría pasar porque la fila no existe, no
     // porque el aislamiento funcione.
-    expect(creado, "no hay fila que aislar: el alta falló").not.toBeNull();
-    const { data, error } = await garr.from("ai_systems").select("id, name").eq("id", creado!);
-    expect(error).toBeNull();
-    expect((data ?? []).map((r) => r.name)).toEqual([MARCA]);
+    const { data: dGarr, error: eGarr } = await garr.from("ai_systems").select("id, tenant_id").eq("id", filaGarr);
+    expect(eGarr).toBeNull();
+    expect((dGarr ?? []).map((r) => r.tenant_id)).toEqual([GARRIGUES_TENANT]);
+
+    const { data: dArga, error: eArga } = await arga.from("ai_systems").select("id, tenant_id").eq("id", filaArga);
+    expect(eArga).toBeNull();
+    expect((dArga ?? []).map((r) => r.tenant_id)).toEqual([DEMO_TENANT]);
   });
 
-  it("ARGA no ve la fila de Garrigues, y sí ve las suyas", async () => {
-    expect(creado, "no hay fila que aislar: el alta falló").not.toBeNull();
-    const porId = await arga.from("ai_systems").select("id").eq("id", creado!);
+  it("ARGA no ve la fila real de Garrigues, y sí ve las suyas", async () => {
+    const porId = await arga.from("ai_systems").select("id").eq("id", filaGarr);
     expect(porId.error).toBeNull();
     expect(porId.data ?? [], "la sesión de ARGA alcanza una fila del otro tenant").toEqual([]);
 
@@ -129,52 +105,35 @@ describe("n=1002 — Garrigues escribe su inventario de IA y sólo lo ve él", (
     expect((suyas.data ?? []).every((r) => r.tenant_id === DEMO_TENANT)).toBe(true);
   });
 
-  it("ARGA no puede mutar ni borrar la fila del otro tenant", async () => {
-    expect(creado, "no hay fila que aislar: el alta falló").not.toBeNull();
-    // GOTCHA: RLS filtra las filas → 0 afectadas y SIN 42501. Se muta una
-    // columna que el trigger de clasificación NO vigila, para que lo que se
-    // mida aquí sea el aislamiento y no el trigger.
+  it("Garrigues no ve la fila real de ARGA, y sí ve las suyas", async () => {
+    const porId = await garr.from("ai_systems").select("id").eq("id", filaArga);
+    expect(porId.error).toBeNull();
+    expect(porId.data ?? [], "la sesión de Garrigues alcanza una fila de ARGA").toEqual([]);
+
+    const suyas = await garr.from("ai_systems").select("id, tenant_id").limit(500);
+    expect(suyas.error).toBeNull();
+    expect((suyas.data ?? []).length, "Garrigues no ve ni su propio inventario").toBeGreaterThan(0);
+    expect((suyas.data ?? []).every((r) => r.tenant_id === GARRIGUES_TENANT)).toBe(true);
+  });
+
+  it("ARGA no puede mutar ni borrar la fila real de Garrigues (0 filas, sin dato tocado)", async () => {
+    // GOTCHA: RLS filtra las filas → 0 afectadas y SIN 42501. Se lee la
+    // descripción ANTES para probar, después de intentar la mutación, que no
+    // cambió — sin tocar una columna que el trigger de clasificación vigile.
+    const { data: antes } = await garr.from("ai_systems").select("description").eq("id", filaGarr).single();
+
     const mutacion = await arga
-      .from("ai_systems").update({ description: "PROBE-DENY-CROSS" }).eq("id", creado!).select();
+      .from("ai_systems").update({ description: "PROBE-DENY-CROSS-MOI-210" }).eq("id", filaGarr).select();
     expect(mutacion.error).toBeNull();
     expect(mutacion.data ?? []).toEqual([]);
 
-    const borrado = await arga.from("ai_systems").delete().eq("id", creado!).select();
+    const borrado = await arga.from("ai_systems").delete().eq("id", filaGarr).select();
     expect(borrado.error).toBeNull();
     expect(borrado.data ?? []).toEqual([]);
 
-    // Y la fila sigue intacta para su dueño.
-    const { data } = await garr.from("ai_systems").select("name, description").eq("id", creado!);
-    expect((data ?? []).map((r) => r.name)).toEqual([MARCA]);
-    expect((data ?? [])[0]?.description ?? null).toBeNull();
-  });
-
-  it("la RPC no acepta un tenant del cliente: el sistema nace en el tenant de la sesión", async () => {
-    // Antes el INSERT forjado con el tenant del otro lo paraba el WITH CHECK.
-    // Ahora el cliente ni siquiera manda tenant: la RPC lo toma de la sesión.
-    // Si alguien lo colara en `p_sistema`, se ignora.
-    const forjado = await garr.rpc("fn_aims_registrar_sistema", {
-      p_sistema: { name: MARCA_FORJADA, status: "ACTIVO", tenant_id: DEMO_TENANT },
-      p_cuestionario: cuestionario(DESPLIEGUE_LIMITADO),
-    });
-    // Control positivo: la RPC existe y registra. Sin esto, con la migración
-    // sin aplicar el test pasaría por vacuidad (nada aterriza en ningún sitio).
-    expect(forjado.error, `la RPC falló: ${forjado.error?.message}`).toBeNull();
-    const fila = (forjado.data ?? [])[0] as { system_id: string } | undefined;
-    expect(fila, "la RPC no devolvió fila").toBeDefined();
-    try {
-      const enArga = await arga.from("ai_systems").select("id").eq("name", MARCA_FORJADA);
-      expect(enArga.error).toBeNull();
-      expect(
-        enArga.data ?? [],
-        "una sesión de Garrigues ha escrito una fila en el inventario de IA de ARGA",
-      ).toEqual([]);
-      if (fila) {
-        const { data: donde } = await garr.from("ai_systems").select("tenant_id").eq("id", fila.system_id);
-        expect((donde ?? []).map((r) => r.tenant_id)).toEqual([GARRIGUES_TENANT]);
-      }
-    } finally {
-      if (fila) await garr.from("ai_systems").delete().eq("id", fila.system_id);
-    }
+    // Y la fila real de Garrigues sigue exactamente igual.
+    const { data: despues } = await garr.from("ai_systems").select("id, description").eq("id", filaGarr).single();
+    expect(despues?.id).toBe(filaGarr);
+    expect(despues?.description ?? null).toBe(antes?.description ?? null);
   });
 });
