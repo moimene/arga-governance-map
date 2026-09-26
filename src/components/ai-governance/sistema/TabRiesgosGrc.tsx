@@ -1,5 +1,6 @@
 import { AlertOctagon } from "lucide-react";
 import { mensajeUsuario } from "@/lib/aims/errores-rpc";
+import { COLOR_BANDA, ETIQUETA_BANDA } from "@/lib/grc/assessed-band";
 import type { RiskRow } from "@/hooks/useRisks";
 
 /**
@@ -16,15 +17,6 @@ export interface TabRiesgosGrcProps {
   /** Error de la consulta: «no se pudo leer» no es «no hay». */
   error?: unknown;
 }
-
-const CHIP_BANDA: Record<string, string> = {
-  ROJO: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  NARANJA: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  AMARILLO: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  VERDE: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-};
-const CHIP_NEUTRO =
-  "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
 
 export default function TabRiesgosGrc({ riesgos, error }: TabRiesgosGrcProps) {
   return (
@@ -66,10 +58,15 @@ export default function TabRiesgosGrc({ riesgos, error }: TabRiesgosGrcProps) {
                 </div>
                 {riesgo.assessed_band && (
                   <span
-                    className={`px-2 py-0.5 font-semibold text-[10px] ${CHIP_BANDA[riesgo.assessed_band] ?? CHIP_NEUTRO}`}
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 font-semibold text-[10px] bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
                     style={{ borderRadius: "var(--g-radius-full)" }}
                   >
-                    {riesgo.assessed_band}
+                    <span
+                      aria-hidden="true"
+                      className="inline-block h-2 w-2 border border-[var(--g-border-subtle)]"
+                      style={{ backgroundColor: COLOR_BANDA[riesgo.assessed_band], borderRadius: "var(--g-radius-sm)" }}
+                    />
+                    {ETIQUETA_BANDA[riesgo.assessed_band]}
                   </span>
                 )}
               </div>

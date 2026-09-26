@@ -50,7 +50,7 @@ describe("MOI-164 — TabRiesgosGrc pinta el enlace risks.ai_system_id en solo l
     expect(div.querySelector('[data-riesgo-enlazado="RSK-TECH-011"]')).not.toBeNull();
     expect(div.innerHTML).toContain("RSK-TECH-011");
     expect(div.innerHTML).toContain("Supply chain attack librerías OSS");
-    expect(div.innerHTML).toContain("ROJO");
+    expect(div.innerHTML).toContain("Banda roja");
     expect(div.innerHTML).toContain("Abierto");
   });
 
@@ -87,6 +87,17 @@ describe("MOI-164 — TabRiesgosGrc pinta el enlace risks.ai_system_id en solo l
     expect(cuerpo).toContain('.eq("ai_system_id"');
     expect(cuerpo).toContain('.eq("tenant_id"');
     expect(/\.(insert|update|delete)\(/.test(cuerpo)).toBe(false);
+  });
+
+  it("la banda se pinta con el criterio único de GRC, no con un mapa de color propio", () => {
+    const src = fuente(TAB);
+    expect(src).toContain('from "@/lib/grc/assessed-band"');
+    expect(src).toContain("COLOR_BANDA");
+    expect(src).toContain("ETIQUETA_BANDA");
+    // No debe reimplementar su propio mapa NARANJA/AMARILLO->color: eso es lo
+    // que hacía que la ficha de AIMS pintara ambas bandas idénticas mientras
+    // Risk360 las distingue.
+    expect(src).not.toContain("CHIP_BANDA");
   });
 
   it("la ficha del sistema monta la pestaña con lo que el hook lee (arista, no solo el rótulo)", () => {
