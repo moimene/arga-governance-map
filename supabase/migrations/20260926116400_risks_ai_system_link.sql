@@ -179,11 +179,18 @@ BEGIN
   END IF;
 
   -- Control positivo simétrico: el mismo tenant SÍ debe poder enlazar.
-  INSERT INTO public.risks (id, tenant_id, code, title, ai_system_id)
-  VALUES (v_probe_id, v_arga_tenant, '__PROBE_MOI164__', 'Sonda temporal MOI-164', v_arga_system)
-  RETURNING ai_system_id INTO v_tras_ok;
-
-  DELETE FROM public.risks WHERE id = v_probe_id;
+  -- Corregido por el orquestador (26-09-2026): la fila de prueba se inserta
+  -- dentro de una subtransacción que se deshace a propósito, para que ni la
+  -- fila ni sus entradas de auditoría (trg_audit_worm) sobrevivan en ARGA.
+  BEGIN
+    INSERT INTO public.risks (id, tenant_id, code, title, ai_system_id)
+    VALUES (v_probe_id, v_arga_tenant, '__PROBE_MOI164__', 'Sonda temporal MOI-164', v_arga_system)
+    RETURNING ai_system_id INTO v_tras_ok;
+    RAISE EXCEPTION USING ERRCODE = 'P0164', MESSAGE = 'deshacer sonda MOI-164';
+  EXCEPTION
+    WHEN SQLSTATE 'P0164' THEN
+      NULL; -- subtransacción deshecha: ni fila ni auditoría
+  END;
 
   IF v_tras_ok IS DISTINCT FROM v_arga_system THEN
     RAISE EXCEPTION 'VERIFICACION MOI-164: un enlace del mismo tenant no se aceptó como se esperaba';

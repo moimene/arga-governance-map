@@ -10,11 +10,11 @@
 -- comprueba comparando cada hash_sha512 antes/después de la migración.
 --
 -- Alcance:
---   1) audit_log.hash_recipe_version (smallint, CHECK IN (1,2)): 1 para todo
---      lo insertado hasta hoy (backfill de METADATO, no de hash), 2 en
+--   1) audit_log.hash_recipe_version (smallint, CHECK IN (1,2), NULL = 1):
+--      NULL para todo lo insertado hasta hoy (sin backfill), 2 en
 --      adelante (DEFAULT). Es el "corte de seq" del issue expresado como
 --      versión por fila en vez de una constante de corte aparte: toda fila
---      con seq <= al máximo actual queda en 1; toda fila nueva nace en 2.
+--      ya escrita queda en NULL (= receta 1); toda fila nueva nace en 2.
 --   2) fn_audit_worm (escritor, BEFORE INSERT/UPDATE/DELETE en las tablas de
 --      dominio) añade actor_id = (request.jwt.claims->>'sub')::uuid. Queda
 --      NULL en escrituras sin sesión de usuario (service_role, seeds, Edge
@@ -47,14 +47,12 @@ SELECT id, hash_sha512 FROM public.audit_log;
 ALTER TABLE public.audit_log
   ADD COLUMN IF NOT EXISTS hash_recipe_version smallint;
 
--- Backfill: metadato de qué receta produjo cada huella ya escrita (v1, sin
--- actor). No toca hash_sha512 ni ninguna otra columna auditada.
-UPDATE public.audit_log
-  SET hash_recipe_version = 1
-  WHERE hash_recipe_version IS NULL;
-
+-- Sin backfill: las filas ya escritas quedan con hash_recipe_version NULL,
+-- que significa receta v1 (sin actor). Así no se ejecuta ningún UPDATE sobre
+-- audit_log, que es de solo anexión (decisión del orquestador al revisar la
+-- migración, 26-09-2026). El CHECK admite NULL; el verificador trata NULL
+-- como 1 y el trigger de encadenado pone 2 en toda fila nueva.
 ALTER TABLE public.audit_log ALTER COLUMN hash_recipe_version SET DEFAULT 2;
-ALTER TABLE public.audit_log ALTER COLUMN hash_recipe_version SET NOT NULL;
 
 DO $$
 BEGIN
@@ -99,7 +97,7 @@ BEGIN
   -- 'sub' que no sea un uuid válido: no debe tumbar la escritura auditada.
   BEGIN
     v_actor_id := NULLIF(
-      current_setting('request.jwt.claims', true)::jsonb ->> 'sub',
+      NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub',
       ''
     )::uuid;
   EXCEPTION WHEN OTHERS THEN
@@ -138,7 +136,7 @@ BEGIN
     TG_TABLE_NAME,
     COALESCE(NEW.id, OLD.id),
     v_action,
-    current_setting('request.jwt.claims', true)::jsonb->>'email',
+    NULLIF(current_setting('request.jwt.claims', true), '')::jsonb->>'email',
     v_actor_id,
     v_payload,
     v_new_hash,

@@ -21,12 +21,11 @@ const migration = readFileSync(
 describe("MOI-204 — actor en audit_log + cobertura minutes/registry_filings", () => {
   it("versiona la receta del hash en vez de reescribir huellas históricas", () => {
     expect(migration).toMatch(/ADD COLUMN IF NOT EXISTS hash_recipe_version smallint/i);
-    // Backfill de METADATO (qué receta produjo cada huella ya escrita), nunca
-    // de la huella en sí: no debe tocar hash_sha512 en el UPDATE de backfill.
-    expect(migration).toMatch(
-      /UPDATE public\.audit_log\s+SET hash_recipe_version = 1\s+WHERE hash_recipe_version IS NULL/i,
-    );
-    expect(migration).not.toMatch(/UPDATE public\.audit_log\s+SET hash_sha512/i);
+    // audit_log es de solo anexión: la migración no hace NINGÚN UPDATE sobre
+    // ella. Las filas ya escritas quedan con hash_recipe_version NULL, que el
+    // verificador lee como receta 1.
+    expect(migration).not.toMatch(/UPDATE public\.audit_log/i);
+    expect(migration).not.toMatch(/ALTER COLUMN hash_recipe_version SET NOT NULL/i);
     expect(migration).toMatch(/CHECK \(hash_recipe_version IN \(1, 2\)\)/);
     expect(migration).toMatch(/ALTER COLUMN hash_recipe_version SET DEFAULT 2/i);
   });

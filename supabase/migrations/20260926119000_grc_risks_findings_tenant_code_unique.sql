@@ -64,7 +64,7 @@ BEGIN
   END IF;
 
   SELECT i.indisunique
-    AND array_agg(a.attname ORDER BY k.ord) = ARRAY['tenant_id','code']
+    AND array_agg(a.attname::text ORDER BY k.ord) = ARRAY['tenant_id','code']
     INTO v_risks_idx_ok
     FROM pg_index i
     JOIN pg_class c ON c.oid = i.indexrelid
@@ -77,7 +77,7 @@ BEGIN
   END IF;
 
   SELECT i.indisunique
-    AND array_agg(a.attname ORDER BY k.ord) = ARRAY['tenant_id','code']
+    AND array_agg(a.attname::text ORDER BY k.ord) = ARRAY['tenant_id','code']
     INTO v_findings_idx_ok
     FROM pg_index i
     JOIN pg_class c ON c.oid = i.indexrelid

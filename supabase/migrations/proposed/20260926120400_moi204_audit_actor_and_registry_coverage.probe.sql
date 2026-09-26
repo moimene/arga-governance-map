@@ -48,12 +48,8 @@ SELECT id, hash_sha512 FROM public.audit_log;
 ALTER TABLE public.audit_log
   ADD COLUMN IF NOT EXISTS hash_recipe_version smallint;
 
-UPDATE public.audit_log
-  SET hash_recipe_version = 1
-  WHERE hash_recipe_version IS NULL;
-
+-- Sin backfill: NULL = receta v1 (ningún UPDATE sobre audit_log).
 ALTER TABLE public.audit_log ALTER COLUMN hash_recipe_version SET DEFAULT 2;
-ALTER TABLE public.audit_log ALTER COLUMN hash_recipe_version SET NOT NULL;
 
 DO $$
 BEGIN
@@ -95,7 +91,7 @@ BEGIN
 
   BEGIN
     v_actor_id := NULLIF(
-      current_setting('request.jwt.claims', true)::jsonb ->> 'sub',
+      NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub',
       ''
     )::uuid;
   EXCEPTION WHEN OTHERS THEN
@@ -129,7 +125,7 @@ BEGIN
     TG_TABLE_NAME,
     COALESCE(NEW.id, OLD.id),
     v_action,
-    current_setting('request.jwt.claims', true)::jsonb->>'email',
+    NULLIF(current_setting('request.jwt.claims', true), '')::jsonb->>'email',
     v_actor_id,
     v_payload,
     v_new_hash,

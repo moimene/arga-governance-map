@@ -235,11 +235,16 @@ rollback to savepoint sp_rango;
 
 -- 8) Negativo: un rol sin permiso (CONSEJERO) no puede editar la estructura.
 savepoint sp_rol;
+-- Corregido por el orquestador (26-09-2026): como `postgres`,
+-- fn_secretaria_is_service_role() es verdadero y el control de rol se salta,
+-- así que la sonda no probaba nada. Se ejecuta como `authenticated` con un
+-- `sub` sin perfil ni rol en el grupo: debe rechazarse (42501).
 select set_config(
   'request.jwt.claims',
-  json_build_object('tenant_id', '00000000-0000-0000-0000-000000000003', 'role_code', 'CONSEJERO')::text,
+  json_build_object('sub', '00000000-0000-0000-0000-0000000dead1', 'role', 'authenticated', 'tenant_id', '00000000-0000-0000-0000-000000000003', 'role_code', 'CONSEJERO')::text,
   true
 );
+set local role authenticated;
 do $sonda_rol$
 begin
   perform fn_secretaria_actualizar_estructura_grupo(
@@ -251,8 +256,11 @@ begin
   raise exception 'PROBE: CONSEJERO debería haber sido rechazado y no lo fue';
 exception
   when others then
-    if sqlerrm not like '%not allowed for this Secretaria action%' then
-      raise exception 'PROBE: rechazo inesperado por rol: %', sqlerrm;
+    if sqlerrm like 'PROBE:%' then
+      raise exception '%', sqlerrm;
+    end if;
+    if sqlstate <> '42501' and sqlerrm not like '%role is required%' and sqlerrm not like '%tenant%' then
+      raise exception 'PROBE: rechazo inesperado por rol: % (%)', sqlerrm, sqlstate;
     end if;
     raise notice 'PROBE OK: rol sin permiso rechazado (%)', sqlerrm;
 end;
