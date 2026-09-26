@@ -102,7 +102,7 @@ Medido sobre las escrituras reales de `src` (INSERT/UPSERT directos y RPC invoca
 | **GRC Compass** | **Parcial.** Riesgos (`/grc/risk-360/nuevo`), incidentes, excepciones y terceros (TPRM) tienen alta. | Obligaciones, controles y módulos GRC se leen de dato sembrado. |
 | **SII** | **Sí.** Alta de comunicaciones por el portal; persistencia en `sii.reports` por tenant. | Roles del canal: «Pendiente de designación» hasta declararlos en `lib/sii/roles-por-tenant.ts`. El catálogo inicial de un tenant desconocido es vacío (no hereda los casos de ARGA). |
 | **Consola TGMS: políticas, obligaciones, controles, hallazgos, planes de acción, delegaciones, conflictos, notificaciones regulatorias** | **No.** Cero inserts desde la UI: son superficies de solo lectura sobre dato sembrado por script. | En un tenant en blanco quedarán vacías y sin forma de poblarlas por pantalla. |
-| **Órganos (post-alta) y estructura de grupo** | **Parcial.** Órganos sí se pueden crear post-alta por pantalla en `/secretaria/catalogo-organos`; matriz y % solo se fijan en el alta (Hueco 2 confirmado, trazado en MOI-148). | Hueco 1 resuelto; Hueco 2 en MOI-148. |
+| **Órganos (post-alta) y estructura de grupo** | **Parcial → en cierre.** Órganos sí se pueden crear post-alta por pantalla en `/secretaria/catalogo-organos`; matriz y % del Hueco 2 tienen RPC autoritativa lista (`fn_secretaria_actualizar_estructura_grupo`, Decisión D-21) pendiente de autorización para aplicar en Cloud y publicar (MOI-148). | Hueco 1 resuelto; Hueco 2 diseñado y construido, en espera de autorización de Cloud/publicación. |
 | **ESG, notificaciones, actividad reciente** | **No aplica.** Son fixtures estáticos de ARGA en `src/data/*`. | Hay que gatearlos o vaciarlos para el tenant nuevo. |
 | **Board Pack, Governance Map, Dashboard** | **Derivados.** Se componen de lo anterior: serán tan ricos como el dato que exista. | — |
 
@@ -127,6 +127,7 @@ Valor del ejercicio: es la primera vez que el producto se recorre como lo haría
 - Para los módulos de solo lectura (§3.4): alta por pantalla o kit de arranque genérico. Decidir después de la primera pasada sin kit.
 - Si el pack base LSC sigue siendo copia por tenant (modelo actual) o se introduce herencia de un tenant «sistema» (cambio de modelo: fuera de alcance salvo decisión expresa).
 - Cuándo y cómo se hace el commit (árbol compartido: por rutas específicas), si se despliega, y si se añade la sección correspondiente a `CLAUDE.md`.
+- ~~Hueco 2 de MOI-148 (matriz/% tras el alta)~~: **resuelto por Decisión D-21 (por delegación, 2026-09-26)** — sí entra en el trabajo pendiente. Edición autoritativa por pantalla (`/secretaria/sociedades/:id`, pestaña Perfil), RPC `fn_secretaria_actualizar_estructura_grupo` (tenant y rol de la sesión, valida rango 0-100/auto-referencia/ciclos), sin escritura directa a `entities`. El histórico no crea tabla nueva: se apoya en el trigger WORM ya existente (`trg_audit_worm_entities` → `audit_log`). Migración `20260926114800_secretaria_editar_estructura_grupo.sql` preparada y ensayada revertida (`supabase/migrations/proposed/*.probe.sql`, 1 positivo + 5 rechazos sobre dato real del tenant Grupo Nuevo); pendiente autorización escrita de Moisés para aplicar en Cloud (issue, paso 6) y para incorporar a `main` (paso 8).
 
 ## 6. Estado tras recorrido por pantalla (Cierre de MOI-53, 2026-09-25)
 
