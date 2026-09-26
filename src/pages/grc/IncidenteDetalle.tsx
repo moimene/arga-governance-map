@@ -186,9 +186,20 @@ export default function IncidenteDetalle() {
   // `gdprClocks` se calculaban y no se usaban, así que un incidente NIS2 mostraba
   // plazos DORA bajo un rótulo NIS2. El bloque solo se pinta para DORA, que es
   // el único régimen cuyos tres hitos sabe calcular esta pantalla.
+  //
+  // MOI-215: usaba `containment_date` (contención) como si fuera la fecha de
+  // CLASIFICACIÓN — dos momentos distintos del incidente. `incidents` no tiene
+  // columna de clasificación; el alta (`IncidenteStepper.tsx`) la guarda solo
+  // dentro de `payload.classification_date`. Se lee de ahí; si no consta, el
+  // incidente se trata como no clasificado todavía (tope de 24h, ver
+  // `src/lib/regulatory-deadlines.ts`), en vez de fingir una clasificación que
+  // no ha ocurrido.
+  const payloadClassificationDate = incident.payload?.classification_date;
+  const classificationDate =
+    typeof payloadClassificationDate === "string" ? payloadClassificationDate : undefined;
   const doraClocks = computeDoraDeadlines(
     incident.detection_date || new Date(),
-    incident.containment_date || incident.detection_date || new Date()
+    classificationDate
   );
 
   const initialDeadline = doraClocks.initialNotificationDeadline.toISOString();
@@ -331,6 +342,10 @@ export default function IncidenteDetalle() {
               </h2>
               <p className="text-xs text-[var(--g-text-secondary)] mt-0.5">
                 Plazos perentorios de comunicación con la autoridad supervisora competente.
+              </p>
+              <p className="text-[10px] text-[var(--status-warning)] mt-1">
+                Vencimiento inicial: lectura PROVISIONAL (tope 24h desde el conocimiento; 4h desde la
+                clasificación si consta), pendiente de confirmación del equipo legal — MOI-163.
               </p>
             </div>
             <button
@@ -564,7 +579,14 @@ export default function IncidenteDetalle() {
             </div>
             <form onSubmit={handleSendDelayedNotification} className="p-6 space-y-4 text-xs">
               <p className="text-[var(--g-text-secondary)]">
-                Conforme al Reglamento Delegado (UE) 2025/301, si la entidad no puede remitir el informe intermedio o final en plazo, debe presentar una notificación motivada antes del vencimiento explicando las razones operativas y la fecha estimada de remisión.
+                Si la entidad no puede remitir el informe intermedio o final en plazo, se recomienda
+                dejar constancia de una justificación antes del vencimiento, con las razones operativas
+                y la fecha estimada de remisión.
+              </p>
+              <p className="text-[var(--g-text-secondary)] text-[11px] italic">
+                Cita normativa exacta de esta obligación (artículo y apartado del Reglamento Delegado
+                (UE) 2025/301, o constancia de que no la contiene) pendiente de cotejo por el equipo
+                legal — MOI-163. No se afirma aquí como norma verificada.
               </p>
 
               <div>

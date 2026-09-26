@@ -36,10 +36,22 @@ describe("A6 — RGPD: el reloj de 72 h es del art. 33", () => {
 });
 
 describe("A6 — DORA: las horas se derivan de la fecha, no son un literal", () => {
-  it("sin clasificación, el plazo inicial son 4 h desde el conocimiento", () => {
+  it("sin clasificación, el tope son 24 h desde el conocimiento (MOI-215, lectura provisional pendiente de MOI-163)", () => {
+    // Antes de MOI-215 esta función trataba el conocimiento como si fuera la
+    // clasificación y daba k+4h: era el defecto (AIMS y GRC no daban lo mismo).
+    // Unificada con GRC (`src/lib/regulatory-deadlines.ts`): sin clasificar,
+    // manda el tope de 24h.
     const r = calculateDoraDeadlines(K);
+    expect(h(r.initialDeadlineDate)).toBe(24);
+    expect(r.initialDeadlineHours).toBe(24);
+    expect(r.initialRule).toBe("24H_CAP_FROM_KNOWLEDGE");
+  });
+
+  it("clasificado de inmediato, el plazo inicial son 4 h desde la clasificación", () => {
+    const r = calculateDoraDeadlines(K, K);
     expect(h(r.initialDeadlineDate)).toBe(4);
     expect(r.initialDeadlineHours).toBe(4);
+    expect(r.initialRule).toBe("4H_FROM_CLASSIFICATION");
   });
 
   it("con clasificación tardía, el tope de 24 h manda y las horas lo dicen", () => {
@@ -129,9 +141,11 @@ describe("A6 — citas del art. 73 RIA", () => {
 describe("A6 — aritmética del mes natural", () => {
   it("no desborda de enero a marzo", () => {
     // `setMonth(+1)` sobre el 31 de enero daba 3 de marzo: TRES DÍAS DESPUÉS
-    // del mes natural, y en la dirección peligrosa.
+    // del mes natural, y en la dirección peligrosa. Se clasifica de inmediato
+    // (inicial = k+4h) para aislar la aritmética del mes natural del tope de
+    // 24h sin clasificar, que es un eje distinto (MOI-215).
     const enero = new Date("2026-01-28T10:00:00.000Z");
-    const fin = new Date(calculateDoraDeadlines(enero).finalDeadlineDate);
+    const fin = new Date(calculateDoraDeadlines(enero, enero).finalDeadlineDate);
     expect(fin.getUTCMonth(), `desbordó a ${fin.toISOString()}`).toBe(1); // febrero
   });
 

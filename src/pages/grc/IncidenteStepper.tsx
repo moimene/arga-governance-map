@@ -414,6 +414,10 @@ export default function IncidenteStepper() {
                       <div className="font-semibold mt-0.5">{doraClocks.finalReportDeadline.toLocaleDateString("es-ES")}</div>
                       <div className="text-[9px] text-[var(--g-text-secondary)]">Max 1 mes tras informe intermedio</div>
                     </div>
+                    <div className="sm:col-span-3 text-[10px] text-[var(--status-warning)]">
+                      Notificación inicial sin clasificar: lectura PROVISIONAL (tope 24h desde
+                      conocimiento), pendiente de confirmación del equipo legal — MOI-163.
+                    </div>
                   </>
                 ) : isNis2 ? (
                   <>

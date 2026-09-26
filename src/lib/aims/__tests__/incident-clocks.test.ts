@@ -53,18 +53,24 @@ describe("Multiregime Incident Clocks & Coordination Engine", () => {
   it("calcula las FECHAS de los tres hitos DORA, no sólo sus horas", () => {
     // A6: este test sólo asertaba literales del objeto de retorno — se podía
     // borrar el cálculo de fechas entero y seguía verde.
+    //
+    // MOI-215: sin clasificación, la inicial ya NO es k+4h (ese era el defecto:
+    // esta función trataba el conocimiento como si fuera la clasificación).
+    // Unificada con GRC, manda el tope de 24h desde el conocimiento — lectura
+    // PROVISIONAL, pendiente de MOI-163 (ver `src/lib/regulatory-deadlines.ts`).
     const res = calculateDoraDeadlines(baseDate);
     const k = new Date(baseDate).getTime();
     const horas = (iso: string) => (new Date(iso).getTime() - k) / 3_600_000;
     expect(res.regime).toBe("DORA");
-    expect(horas(res.initialDeadlineDate)).toBe(4);
-    expect(res.initialDeadlineHours).toBe(4);
-    expect(horas(res.intermediateDeadlineDate)).toBe(4 + 72);
+    expect(horas(res.initialDeadlineDate)).toBe(24);
+    expect(res.initialDeadlineHours).toBe(24);
+    expect(res.initialRule).toBe("24H_CAP_FROM_KNOWLEDGE");
+    expect(horas(res.intermediateDeadlineDate)).toBe(24 + 72);
     // Literal, no recalculado con la misma función: conocimiento 28/08 10:00Z
-    // → inicial +4 h = 14:00Z → intermedio +72 h = 31/08 14:00Z → final un mes
-    // natural = 30/09 14:00Z (septiembre tiene 30 días, así que se recorta).
-    expect(res.intermediateDeadlineDate).toBe("2026-08-31T14:00:00.000Z");
-    expect(res.finalDeadlineDate).toBe("2026-09-30T14:00:00.000Z");
+    // → inicial +24 h = 29/08 10:00Z → intermedio +72 h = 01/09 10:00Z → final
+    // un mes natural = 01/10 10:00Z.
+    expect(res.intermediateDeadlineDate).toBe("2026-09-01T10:00:00.000Z");
+    expect(res.finalDeadlineDate).toBe("2026-10-01T10:00:00.000Z");
   });
 
   it("evaluates a compound multiregime incident affecting AI, PII and critical ICT infrastructure", () => {

@@ -4,7 +4,18 @@
  * Delegado (UE) 2025/301 — NO es un Real Decreto español, como decía esta
  * cabecera hasta 2026-09-05 contradiciendo al propio `DoraClockResult`.)
  * Conforme al dictamen de auditoría regulatoria de Harvey AI.
+ *
+ * MOI-215: la aritmética de los plazos DORA y RGPD (art. 33) ya NO se calcula
+ * aquí — vive en `src/lib/regulatory-deadlines.ts`, único cálculo compartido
+ * con GRC (`src/lib/grc/regulatory-clocks.ts`). Antes de esto, sin fecha de
+ * clasificación esta función devolvía la inicial a k+4h (trataba el
+ * conocimiento como si fuera la clasificación); GRC la devolvía a k+24h. Ver
+ * la lectura PROVISIONAL documentada en ese módulo, pendiente de MOI-163.
  */
+import {
+  computeDoraDeadlineMilestones,
+  computeGdprAuthorityDeadline,
+} from "@/lib/regulatory-deadlines";
 
 export type RiaIncidentSeverity = "ORDINARY_SERIOUS" | "WIDESPREAD_INFRINGEMENT" | "DEATH_INCIDENT";
 
@@ -145,8 +156,7 @@ export function calculateGdprDeadline(
   knowledgeDate: Date | string,
   highRiskToIndividuals: boolean = false
 ): GdprClockResult {
-  const base = new Date(knowledgeDate);
-  const deadline = new Date(base.getTime() + 72 * 60 * 60 * 1000);
+  const deadline = computeGdprAuthorityDeadline(knowledgeDate);
 
   return {
     regime: "GDPR",
@@ -165,53 +175,25 @@ export function calculateGdprDeadline(
   };
 }
 
-/** Suma un mes natural en UTC, recortando al último día del mes destino. */
-function addOneMonthUtc(from: Date): Date {
-  const y = from.getUTCFullYear();
-  const m = from.getUTCMonth();
-  const d = from.getUTCDate();
-  const ultimoDiaDestino = new Date(Date.UTC(y, m + 2, 0)).getUTCDate();
-  return new Date(
-    Date.UTC(y, m + 1, Math.min(d, ultimoDiaDestino),
-      from.getUTCHours(), from.getUTCMinutes(), from.getUTCSeconds(), from.getUTCMilliseconds()),
-  );
-}
-
 /**
- * Calcula los tres hitos DORA según el Reglamento Delegado (UE) 2025/301:
- * 1. Inicial: 4h desde clasificación grave (máx. 24h desde conocimiento)
- * 2. Intermedio: 72h desde notificación inicial
- * 3. Final: 1 mes tras informe intermedio
+ * Calcula los tres hitos DORA (art. 19 + Reglamento Delegado (UE) 2025/301)
+ * delegando la aritmética en `computeDoraDeadlineMilestones` (MOI-215): un
+ * solo cálculo, compartido con GRC. Lectura del vencimiento inicial sin
+ * clasificar PROVISIONAL, pendiente de MOI-163 (ver ese módulo).
  */
 export function calculateDoraDeadlines(
   knowledgeDate: Date | string,
   classificationDate?: Date | string
 ): DoraClockResult {
   const kDate = new Date(knowledgeDate);
-  const cDate = classificationDate ? new Date(classificationDate) : kDate;
-
-  // 4h desde clasificación o máx 24h desde conocimiento (lo que ocurra antes)
-  const deadline4h = new Date(cDate.getTime() + 4 * 60 * 60 * 1000);
-  const deadline24h = new Date(kDate.getTime() + 24 * 60 * 60 * 1000);
-  const initialDeadline = deadline4h < deadline24h ? deadline4h : deadline24h;
-
-  const intermediateDeadline = new Date(initialDeadline.getTime() + 72 * 60 * 60 * 1000);
-  // Un mes natural, no 30 días. `setMonth(+1)` a secas NO sirve: desborda hacia
-  // adelante (31 ene → 3 mar, tres días DESPUÉS del mes natural) y opera en hora
-  // local, de modo que dos usuarios en husos distintos verían vencimientos
-  // distintos del mismo incidente. Se hace en UTC y se recorta al último día
-  // del mes destino.
-  const finalDeadline = addOneMonthUtc(intermediateDeadline);
+  const { initialRule, initialDeadline, intermediateDeadline, finalDeadline } =
+    computeDoraDeadlineMilestones(knowledgeDate, classificationDate);
 
   // Horas EFECTIVAS desde el conocimiento hasta el vencimiento elegido. No es
   // el plazo legal (4 h desde clasificación / tope 24 h): con una clasificación
-  // a k+30 min el vencimiento cae a k+4,5 h. Antes era el literal 4 aunque la
-  // fecha fuera k+24 h, y los dos campos se contradecían.
+  // a k+30 min el vencimiento cae a k+4,5 h.
   const initialHoursFromKnowledge =
     (initialDeadline.getTime() - kDate.getTime()) / 3_600_000;
-  // Qué regla ha mandado, que es lo que el usuario necesita saber.
-  const initialRule: "4H_FROM_CLASSIFICATION" | "24H_CAP_FROM_KNOWLEDGE" =
-    deadline4h < deadline24h ? "4H_FROM_CLASSIFICATION" : "24H_CAP_FROM_KNOWLEDGE";
 
   return {
     regime: "DORA",
@@ -228,7 +210,8 @@ export function calculateDoraDeadlines(
     // justo en plazo; con envíos anteriores, los reales son antes.
     assumesPriorReportsAtDeadline: true,
     ruleDescription:
-      "Notificación inicial en 4 h desde la clasificación (tope 24 h desde el conocimiento), " +
+      "Notificación inicial en 4 h desde la clasificación (tope 24 h desde el conocimiento; " +
+      "lectura provisional pendiente de confirmación del equipo legal — MOI-163), " +
       "informe intermedio en 72 h e informe final en un mes.",
     articleRef: "Art. 19 DORA + Rgto. Delegado (UE) 2025/301",
   };
