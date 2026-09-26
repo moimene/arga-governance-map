@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { applyVisibleDataClass } from "@/lib/secretaria/data-class";
@@ -134,6 +134,41 @@ export function useSociedadBySlug(slug: string | undefined) {
         .maybeSingle();
       if (error) throw error;
       return (data as SociedadDetailRow) ?? null;
+    },
+  });
+}
+
+/**
+ * MOI-148 (D-21): edición autoritativa post-alta de la matriz y el
+ * porcentaje de participación. Hasta esta RPC, `parent_entity_id` y
+ * `ownership_percentage` sólo se escribían una vez, en el alta
+ * (`fn_crear_sociedad_legal_y_capital`). El histórico queda cubierto por el
+ * trigger WORM ya existente sobre `entities` (audit_log), no una tabla nueva.
+ */
+export function useActualizarEstructuraGrupo(entityId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { parentEntityId: string | null; ownershipPercentage: number | null }) => {
+      if (!entityId || !tenantId) {
+        throw new Error("No se puede editar la estructura de grupo sin sociedad y tenant activos.");
+      }
+      const { data, error } = await supabase.rpc("fn_secretaria_actualizar_estructura_grupo", {
+        p_tenant_id: tenantId,
+        p_entity_id: entityId,
+        p_parent_entity_id: input.parentEntityId,
+        p_ownership_percentage: input.ownershipPercentage,
+      });
+      if (error) {
+        throw new Error(`No se pudo actualizar la estructura de grupo: ${error.message}`);
+      }
+      return data as { status?: string } | null;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sociedades", tenantId] });
+      qc.invalidateQueries({ queryKey: ["entities", tenantId] });
+      qc.invalidateQueries({ queryKey: ["governance_map", tenantId] });
+      qc.invalidateQueries({ queryKey: ["filial_entities", tenantId] });
     },
   });
 }

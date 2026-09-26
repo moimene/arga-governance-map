@@ -8,10 +8,12 @@ import {
   ShieldCheck, Scroll, UserPlus, ArrowRightLeft, BookOpen,
   Bell, CalendarDays, CheckCircle2, ClipboardList, FileText,
   Landmark, Route, ScrollText, Scale, GitBranch, HelpCircle, FileCheck2,
-  AlertTriangle,
+  AlertTriangle, Pencil, Save, X,
 } from "lucide-react";
 import { useSecretariaScope } from "@/components/secretaria/shell";
-import { useSociedad } from "@/hooks/useSociedades";
+import { useSociedad, useSociedades, useActualizarEstructuraGrupo } from "@/hooks/useSociedades";
+import { SelectField } from "./sociedad-nueva/shared/SelectField";
+import { Field } from "./sociedad-nueva/shared/Field";
 import { useCapitalProfile, useShareClasses } from "@/hooks/useCapitalProfile";
 import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
 import { useAdministradoresSocietarios, CARGO_LABELS } from "@/hooks/useCargos";
@@ -876,6 +878,126 @@ function technicalValue(value: React.ReactNode) {
   return <code className="text-xs text-[var(--g-text-secondary)]">{value}</code>;
 }
 
+/**
+ * MOI-148 (D-21): única pantalla que permite corregir la matriz o el
+ * porcentaje de participación de una sociedad después del alta. Escribe por
+ * `fn_secretaria_actualizar_estructura_grupo` (tenant de la sesión, sin
+ * escritura directa a `entities`); el valor anterior queda en `audit_log`
+ * vía el trigger WORM ya existente, no en una tabla nueva.
+ */
+function EstructuraGrupoEditor({ s }: { s: NonNullable<ReturnType<typeof useSociedad>["data"]> }) {
+  const { data: sociedades = [] } = useSociedades();
+  const mutation = useActualizarEstructuraGrupo(s.id);
+  const [editing, setEditing] = useState(false);
+  const [parentId, setParentId] = useState("");
+  const [porcentaje, setPorcentaje] = useState("");
+
+  const parentOptions = sociedades
+    .filter((sociedad) => sociedad.id !== s.id)
+    .map((sociedad) => ({ value: sociedad.id, label: sociedad.common_name ?? sociedad.legal_name }));
+
+  const startEditing = () => {
+    setParentId(s.parent_entity_id ?? "");
+    setPorcentaje(s.ownership_percentage != null ? String(s.ownership_percentage) : "");
+    setEditing(true);
+  };
+
+  const handleSave = () => {
+    const pct = porcentaje.trim() === "" ? null : Number(porcentaje);
+    if (pct != null && (Number.isNaN(pct) || pct < 0 || pct > 100)) {
+      toast.error("El porcentaje de participación debe estar entre 0 y 100.");
+      return;
+    }
+    mutation.mutate(
+      { parentEntityId: parentId || null, ownershipPercentage: pct },
+      {
+        onSuccess: () => {
+          toast.success("Estructura de grupo actualizada. El cambio ya se refleja en el mapa de gobierno.");
+          setEditing(false);
+        },
+        onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo actualizar la estructura de grupo."),
+      },
+    );
+  };
+
+  if (!editing) {
+    return (
+      <div className="mt-4 flex items-start justify-between gap-3 border-t border-[var(--g-border-subtle)] pt-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="flex flex-col gap-0.5">
+            <dt className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
+              Matriz
+              <FieldHint text="Sociedad matriz directa si está modelada en entities. Editable tras el alta." />
+            </dt>
+            <dd className="text-sm text-[var(--g-text-primary)]">{s.parent?.common_name ?? s.parent?.legal_name ?? "—"}</dd>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <dt className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
+              % Propiedad matriz
+              <FieldHint text="Porcentaje de control directo desde la matriz en el modelo de grupo." />
+            </dt>
+            <dd className="text-sm text-[var(--g-text-primary)]">{s.ownership_percentage != null ? `${s.ownership_percentage}%` : "—"}</dd>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={startEditing}
+          className="flex shrink-0 items-center gap-1.5 border border-[var(--g-border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          Editar estructura de grupo
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 border-t border-[var(--g-border-subtle)] pt-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <SelectField
+          label="Matriz"
+          value={parentId}
+          options={[{ value: "", label: "Sin matriz declarada" }, ...parentOptions]}
+          onChange={setParentId}
+        />
+        <Field
+          label="Porcentaje de participación"
+          type="number"
+          min={0}
+          max={100}
+          step="0.01"
+          value={porcentaje}
+          onChange={setPorcentaje}
+          help="Entre 0 y 100. Déjalo vacío si no hay matriz."
+        />
+      </div>
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={mutation.isPending}
+          className="flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-60"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <Save className="h-3.5 w-3.5" />
+          {mutation.isPending ? "Guardando…" : "Guardar"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          disabled={mutation.isPending}
+          className="flex items-center gap-1.5 border border-[var(--g-border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <X className="h-3.5 w-3.5" />
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function TabPerfil({ id, s }: { id: string; s: NonNullable<ReturnType<typeof useSociedad>["data"]> }) {
   const fields: Array<{ label: string; value: React.ReactNode; help: string; technical?: boolean }> = [
     {
@@ -1004,16 +1126,6 @@ function TabPerfil({ id, s }: { id: string; s: NonNullable<ReturnType<typeof use
       help: "Objeto social persistido para plantillas y expedientes.",
     },
     {
-      label: "Matriz",
-      value: s.parent?.common_name ?? s.parent?.legal_name ?? "—",
-      help: "Sociedad matriz directa si está modelada en entities.",
-    },
-    {
-      label: "% Propiedad matriz",
-      value: s.ownership_percentage != null ? `${s.ownership_percentage}%` : "—",
-      help: "Porcentaje de control directo desde la matriz en el modelo de grupo.",
-    },
-    {
       label: "PJ canónica",
       value: s.person ? `${s.person.full_name} · ${s.person.tax_id ?? "sin NIF"}` : "—",
       help: "Vínculo técnico a la fila persons que representa la persona jurídica de la sociedad.",
@@ -1056,6 +1168,7 @@ function TabPerfil({ id, s }: { id: string; s: NonNullable<ReturnType<typeof use
           </div>
         ))}
       </dl>
+      <EstructuraGrupoEditor s={s} />
     </div>
   );
 }
