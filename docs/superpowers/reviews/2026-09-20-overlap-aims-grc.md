@@ -183,6 +183,13 @@ El orden es el del experto (§7). Lo que aquí se añade es la precondición med
   apuntando a módulos inexistentes. Conciliarlas no es del programa RIA, pero meter `ai` sin saberlo
   sería añadir una fila a un solar.
 
+  **Resuelta 2026-09-26 (MOI-189, decisión D-10 delegada por Moisés).** Opción **(b)**: tabla de
+  equivalencias en código, sin tocar `risks.module_id` en Cloud — ARGA no cambia de dato, sigue
+  habiendo dos vocabularios. Detalle, mapa completo con motivo por valor y prueba viva:
+  `docs/superpowers/plans/2026-09-05-ledger-cierre-gaps.md` DA-15. Reclasificar de verdad los 122
+  riesgos (opción c) queda fuera, pendiente de designar a quien concilia los módulos de GRC de ARGA
+  (puerta humana de MOI-189, no ejecutada por este cambio).
+
 ---
 
 ## 7. Límites de este análisis
