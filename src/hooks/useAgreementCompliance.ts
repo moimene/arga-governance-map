@@ -3,8 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { extractMeetingSourceLinks } from "@/lib/secretaria/meeting-links";
 import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
+import { resolveOrganoTipoStrict } from "@/lib/secretaria/organo-resolver";
 import { deriveTipoSocial } from "@/lib/secretaria/tipo-social";
 import { rulePackMateriaMatches } from "@/lib/rules-engine/rule-resolution";
+import {
+  selectRulePackForOrgano,
+  type RulePackSelectionReason,
+} from "@/lib/secretaria/rule-pack-selection";
 import {
   evaluarAcuerdoCompleto,
   evaluarPuntoOrdenDia,
@@ -87,6 +92,16 @@ export interface ComplianceResult {
   can_advance?: boolean;
   next_actions?: string[];
   status: string;
+  /**
+   * MOI-207: por qué se eligió el rule pack de esta materia. `null` cuando no
+   * hay ningún pack (V1 legacy, o materia sin ningún pack activo). Ver
+   * `rule-pack-selection.ts` — misma semántica que en el Tramitador.
+   */
+  rule_pack_selection_reason?: RulePackSelectionReason | null;
+  /** Órgano del pack efectivamente aplicado, tal cual viene del dato. */
+  rule_pack_organo?: string | null;
+  /** Órgano acreditado del acuerdo (variante estricta, sin fallback a Junta). */
+  agreement_organo_tipo?: string | null;
 }
 
 /**
@@ -422,6 +437,38 @@ export function resolveAgreementOrganoTipo(
 }
 
 /**
+ * Filtra las filas de `rule_pack_versions` por materia y elige la del órgano
+ * del acuerdo, con el mismo criterio que el Tramitador (`selectRulePackForOrgano`).
+ *
+ * Extraída como función pura y exportada — mismo patrón que
+ * `resolveAgreementOrganoTipo` (D1) — para poder fijarla en un test con
+ * fixtures, sin montar el hook completo ni mockear Supabase.
+ *
+ * MOI-207: antes `evaluateV2` hacía `rpRows.find(v => rulePackMateriaMatches(...))`,
+ * sin órgano y sin orden determinista. Si dos packs activos compartían materia
+ * (p.ej. uno de Junta y otro de Consejo), el resultado dependía del orden en
+ * que respondiera PostgREST. Ahora se filtra por materia y se elige con el
+ * mismo criterio que el Tramitador, declarando el motivo para que la UI pueda
+ * advertir cuando la regla servida no es la del órgano que adopta.
+ */
+export function selectAgreementRulePackVersion(
+  rpRows: RulePackJoinRow[],
+  agreementKind: string,
+  agreementOrganoTipoStrict: string | null,
+) {
+  const matchingRows = rpRows.filter((v) =>
+    rulePackMateriaMatches(firstJoin(v.rule_packs)?.materia, agreementKind),
+  );
+  return selectRulePackForOrgano(
+    matchingRows.map((row) => ({
+      organo_tipo: firstJoin(row.rule_packs)?.organo_tipo ?? null,
+      row,
+    })),
+    agreementOrganoTipoStrict,
+  );
+}
+
+/**
  * Ejecuta el motor V2 y mapea el resultado a ComplianceResult V1.
  * Carga rule packs + overrides desde Supabase, ejecuta evaluarAcuerdoCompleto().
  */
@@ -458,12 +505,15 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
     firmasPresentes = adminVigentes;
   }
 
-  // Cargar rule packs activos
+  // Cargar rule packs activos. Orden determinista por pack_id: dos packs
+  // activos de la misma materia (Junta vs Consejo) no deben depender del
+  // orden en que responda PostgREST (MOI-207).
   const { data: rpVersions } = await supabase
     .from("rule_pack_versions")
     .select("id, pack_id, version, payload, is_active, rule_packs!inner(materia, organo_tipo)")
     .eq("rule_packs.tenant_id", tenantId)
-    .eq("is_active", true);
+    .eq("is_active", true)
+    .order("pack_id", { ascending: true });
 
   // Cargar overrides para la entidad
   const { data: overridesRaw } = a.entity_id
@@ -474,15 +524,20 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
         .eq("entity_id", a.entity_id)
     : { data: [] };
 
-  // Buscar el rule pack de la materia del acuerdo.
-  // Alias-aware (remediación W5): un agreement_kind con grafía legacy
-  // (p.ej. MOD_ESTATUTOS) resuelve contra el pack canónico
-  // (MODIFICACION_ESTATUTOS). Antes era match exacto, lo que dejaba sin reglas
-  // a cualquier acuerdo con grafía aliased.
+  // Buscar el rule pack de la materia del acuerdo, con preferencia por el
+  // órgano que adopta. Alias-aware (remediación W5): un agreement_kind con
+  // grafía legacy (p.ej. MOD_ESTATUTOS) resuelve contra el pack canónico
+  // (MODIFICACION_ESTATUTOS) via `rulePackMateriaMatches` dentro de
+  // `selectAgreementRulePackVersion`. La variante estricta del resolver evita
+  // afirmar "Junta" de un órgano no acreditado solo para elegir un pack.
   const rpRows = (rpVersions ?? []) as unknown as RulePackJoinRow[];
-  const matchingVersion = rpRows.find((v) =>
-    rulePackMateriaMatches(firstJoin(v.rule_packs)?.materia, a.agreement_kind),
+  const agreementOrganoTipoStrict = resolveOrganoTipoStrict(a.governing_bodies);
+  const rulePackSelection = selectAgreementRulePackVersion(
+    rpRows,
+    a.agreement_kind,
+    agreementOrganoTipoStrict,
   );
+  const matchingVersion = rulePackSelection.pack?.row ?? null;
 
   const packs: RulePack[] = matchingVersion
     ? [matchingVersion.payload as RulePack]
@@ -684,6 +739,9 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
     can_advance: panel.can_advance,
     next_actions: panel.next_actions,
     status: a.status,
+    rule_pack_selection_reason: rulePackSelection.reason,
+    rule_pack_organo: rulePackSelection.packOrgano,
+    agreement_organo_tipo: agreementOrganoTipoStrict,
   };
 }
 

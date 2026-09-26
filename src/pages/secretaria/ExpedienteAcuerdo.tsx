@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useAgreement, useAgreementCompliance, type ComplianceResult } from "@/hooks/useAgreementCompliance";
 import { ActaAcreditadaNotice } from "@/components/secretaria/ActaAcreditadaNotice";
+import { AgreementRulePackProvenanceNotice } from "@/components/secretaria/AgreementRulePackProvenanceNotice";
 import { lecturaDeSelloMotivo } from "@/lib/secretaria/sello-motivo-lectura";
 import { useAgreementSignedDocumentUrl } from "@/hooks/useEvidenceBundleSignedUrl";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
@@ -1020,6 +1021,11 @@ function LegalControlPanel({
         </p>
       </div>
       <div className="space-y-4 p-5">
+        <AgreementRulePackProvenanceNotice
+          reason={compliance?.rule_pack_selection_reason}
+          packOrgano={compliance?.rule_pack_organo}
+          agreementOrgano={compliance?.agreement_organo_tipo}
+        />
         <ControlList title="Qué puedo hacer" items={canDo} icon={CheckCircle2} />
         <ControlList title="Qué falta" items={missing.length ? missing : ["Sin pendientes relevantes."]} icon={ClipboardCheck} />
         <ControlList title="Qué bloquea" items={blocking.length ? blocking : ["Sin bloqueos societarios."]} icon={AlertTriangle} tone={blocking.length ? "error" : "ok"} />
