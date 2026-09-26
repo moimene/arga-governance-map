@@ -277,6 +277,25 @@ function evaluarNotificacion(input: NoSessionInput): NoSessionOutput['gates'][0]
   // y el gate proclamaba «Todas (0) notificaciones ENTREGADAS fehacientemente»
   // citando el art. 100 RRM. Un gate que no puede fallar por falta de dato no
   // acredita nada: sin constancia, no hay notificación fehaciente acreditada.
+  //
+  // total_members ausente (MOI-208): antes se fabricaba un denominador
+  // sintético (votos emitidos, mínimo 1), con lo que un solo voto y una sola
+  // constancia bastaban para dar la notificación por completa. Si no se sabe
+  // cuántos miembros tiene el órgano, el requisito es NO MEDIDO, no cumplido.
+  if (input.totalDestinatarios === null) {
+    return {
+      gate: 'notificacion',
+      ok: false,
+      severity: 'BLOCKING',
+      explain: [{
+        regla: 'Constancia de recepción',
+        fuente: 'LEY',
+        referencia: 'art. 100 RRM (constancia de la recepción por cada destinatario)',
+        resultado: 'BLOCKING',
+        mensaje: 'No medido: falta el número de miembros del órgano; no puede acreditarse el total de destinatarios de la notificación.',
+      }],
+    };
+  }
   const destinatarios = Math.max(Number(input.totalDestinatarios ?? 0), 0);
   if (notificaciones.length === 0 || notificaciones.length < destinatarios) {
     return {

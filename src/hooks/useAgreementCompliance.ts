@@ -103,6 +103,25 @@ export function resolveAgreementInscribable(
   return explicit.valor === 1 || String(explicit.valor).toLocaleLowerCase("es") === "true";
 }
 
+/**
+ * Total de destinatarios de la notificación de un acuerdo sin sesión.
+ *
+ * MOI-208: con `total_members` nulo (no se sabe cuántos miembros tiene el
+ * órgano) NO se fabrica un denominador sintético a partir de los votos
+ * emitidos (antes: mínimo 1, con lo que un solo voto bastaba para dar la
+ * notificación por completa). Se devuelve `null` — «no medido» — y el motor
+ * (`evaluarNotificacion`) es quien decide que el requisito no está cumplido.
+ */
+export function resolveNoSessionTotalDestinatarios(
+  totalMembers: number | null | undefined,
+  votesFor: number,
+  votesAgainst: number,
+  abstentions: number,
+): number | null {
+  if (totalMembers == null) return null;
+  return Math.max(Number(totalMembers), votesFor + votesAgainst + abstentions);
+}
+
 export interface AgreementFull {
   id: string;
   tenant_id: string;
@@ -523,7 +542,7 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
       const votesFor = Number(n.votes_for ?? 0);
       const votesAgainst = Number(n.votes_against ?? 0);
       const abstentions = Number(n.abstentions ?? 0);
-      const totalMembers = Math.max(Number(n.total_members ?? 0), votesFor + votesAgainst + abstentions, 1);
+      const totalMembers = resolveNoSessionTotalDestinatarios(n.total_members, votesFor, votesAgainst, abstentions);
       const consentCapitalShare = votesFor > 0 ? 100 / votesFor : 0;
       const respuestas = [
         ...Array.from({ length: votesFor }, (_, index) => ({

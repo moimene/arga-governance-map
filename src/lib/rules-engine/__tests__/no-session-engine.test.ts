@@ -828,6 +828,22 @@ describe('notificación fehaciente — sin constancia no hay gate cumplido', () 
     expect(gate?.explain.some((n) => /ENTREGADAS fehacientemente/i.test(n.mensaje))).toBe(false);
   });
 
+  it('MOI-208: totalDestinatarios null (número de miembros desconocido) es "No medido", no un total de 1', () => {
+    // Regresión: un denominador sintético (mínimo 1) hacía que un solo voto y
+    // una sola constancia ENTREGADA dieran la notificación por completa,
+    // aunque el órgano tuviera más miembros de los que constan.
+    const input = createBaseInput({
+      totalDestinatarios: null,
+      notificaciones: [{ person_id: '1', canal: 'EMAIL', estado: 'ENTREGADA' }],
+    });
+    const result = evaluarProcesoSinSesion(input, createBasePack());
+    const gate = result.gates.find((g) => g.gate === 'notificacion');
+    expect(gate?.ok).toBe(false);
+    expect(gate?.severity).toBe('BLOCKING');
+    expect(gate?.explain[0].mensaje).toMatch(/No medido/i);
+    expect(result.ok).toBe(false);
+  });
+
   it('constancias incompletas BLOQUEAN aunque las registradas estén ENTREGADAS', () => {
     const input = createBaseInput({
       totalDestinatarios: 3,

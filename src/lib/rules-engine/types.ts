@@ -527,7 +527,8 @@ export interface NoSessionInput {
   tipoSocial: TipoSocial;
   respuestas: NoSessionRespuesta[];
   notificaciones: NoSessionNotificacion[];
-  totalDestinatarios: number;
+  /** null = no medido (falta el número de miembros del órgano; no se fabrica un total sintético). */
+  totalDestinatarios: number | null;
   totalCapitalSocial: number;
   ventana: {
     inicio: string;
