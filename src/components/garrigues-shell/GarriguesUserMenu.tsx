@@ -13,7 +13,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useTenantContext } from "@/context/TenantContext";
 import { useTenantBranding } from "@/context/TenantBrandContext";
 import { brandName } from "@/lib/tenant-brand-labels";
-import { loginPathFor, resolveLoginBrand } from "@/lib/login-brands";
+import { ENTORNOS_BASE, brandForTenant, loginPathFor, resolveLoginBrand } from "@/lib/login-brands";
 import { toast } from "sonner";
 
 function getInitials(nameOrEmail: string): string {
@@ -36,8 +36,12 @@ const ROLE_LABELS: Record<string, string> = {
 
 export const GarriguesUserMenu = forwardRef<HTMLButtonElement>((_props, ref) => {
   const { user, logout } = useAuth();
-  const { roleCode } = useTenantContext();
+  const { roleCode, tenantId } = useTenantContext();
   const branding = useTenantBranding();
+  // Igual que en UserMenu (shell TGMS): el cambio de entorno solo tiene
+  // sentido entre ARGA y Garrigues (MOI-134).
+  const currentBrand = brandForTenant(tenantId);
+  const showEnvSwitch = !!currentBrand && ENTORNOS_BASE.includes(currentBrand.key);
 
   const fullName =
     (user?.user_metadata?.full_name as string) ||
@@ -105,22 +109,26 @@ export const GarriguesUserMenu = forwardRef<HTMLButtonElement>((_props, ref) => 
           <span>Configuración</span>
         </DropdownMenuItem>
 
-        <DropdownMenuSeparator className="my-1 bg-[var(--g-border-subtle)]" />
+        {showEnvSwitch && (
+          <>
+            <DropdownMenuSeparator className="my-1 bg-[var(--g-border-subtle)]" />
 
-        <DropdownMenuItem
-          onClick={async () => {
-            // Sin credenciales embebidas: se cierra la sesión y se vuelve al login
-            // con el entorno preseleccionado. Recarga completa = caché limpia.
-            const target = resolveLoginBrand(""); // entorno corporativo por defecto
-            await logout();
-            window.location.href = loginPathFor(target.key);
-          }}
-          className="flex cursor-pointer items-center gap-2 px-2.5 py-2 text-[13px] text-[var(--g-text-primary)] font-medium transition-colors hover:bg-[var(--g-surface-subtle)] focus:bg-[var(--g-surface-subtle)]"
-          style={{ borderRadius: "var(--g-radius-md)" }}
-        >
-          <span className="h-2.5 w-2.5 rounded-full bg-[#E8112D]" />
-          <span>Cambiar a Entorno Corporativo</span>
-        </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={async () => {
+                // Sin credenciales embebidas: se cierra la sesión y se vuelve al login
+                // con el entorno preseleccionado. Recarga completa = caché limpia.
+                const target = resolveLoginBrand(""); // entorno corporativo por defecto
+                await logout();
+                window.location.href = loginPathFor(target.key);
+              }}
+              className="flex cursor-pointer items-center gap-2 px-2.5 py-2 text-[13px] text-[var(--g-text-primary)] font-medium transition-colors hover:bg-[var(--g-surface-subtle)] focus:bg-[var(--g-surface-subtle)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <span className="h-2.5 w-2.5 rounded-full bg-[#E8112D]" />
+              <span>Cambiar a Entorno Corporativo</span>
+            </DropdownMenuItem>
+          </>
+        )}
 
         <DropdownMenuSeparator className="my-1 bg-[var(--g-border-subtle)]" />
 

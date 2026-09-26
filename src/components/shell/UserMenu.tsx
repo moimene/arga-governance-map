@@ -15,9 +15,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/AuthContext";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
+import { useTenantContext } from "@/context/TenantContext";
 import { useTenantBranding } from "@/context/TenantBrandContext";
 import { brandName } from "@/lib/tenant-brand-labels";
-import { loginPathFor } from "@/lib/login-brands";
+import { ENTORNOS_BASE, brandForTenant, loginPathFor } from "@/lib/login-brands";
 import { toast } from "sonner";
 
 function getInitials(nameOrEmail: string): string {
@@ -49,8 +50,14 @@ const DEMO_ROLES = [
 export function UserMenu() {
   const { user, logout } = useAuth();
   const { primaryRole, displayName } = useCurrentUserRole();
+  const { tenantId } = useTenantContext();
   const branding = useTenantBranding();
   const [simulatedRole, setSimulatedRole] = useState<string | null>(null);
+  // El cambio de entorno solo tiene sentido entre ARGA y Garrigues: un
+  // tenant fuera de esos dos (p.ej. un grupo nuevo por su propio enlace) no
+  // tiene a dónde volver desde aquí, así que la entrada se oculta (MOI-134).
+  const currentBrand = brandForTenant(tenantId);
+  const showEnvSwitch = !!currentBrand && ENTORNOS_BASE.includes(currentBrand.key);
 
   const activeRoleCode = simulatedRole ?? primaryRole ?? "SECRETARIO";
   const roleLabel = ROLE_LABELS[activeRoleCode] ?? activeRoleCode;
@@ -145,19 +152,23 @@ export function UserMenu() {
           <Settings className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
           <span>Configuración</span>
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={async () => {
-            // Sin credenciales embebidas: se cierra la sesión y se vuelve al login
-            // con el entorno preseleccionado. Recarga completa = caché limpia.
-            await logout();
-            window.location.href = loginPathFor("garrigues");
-          }}
-          className="cursor-pointer text-xs text-[var(--g-brand-3308, #004438)] font-medium hover:bg-muted"
-        >
-          <span className="mr-2 h-2.5 w-2.5 rounded-full bg-[#004438]" />
-          <span>Cambiar a Entorno Garrigues</span>
-        </DropdownMenuItem>
+        {showEnvSwitch && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={async () => {
+                // Sin credenciales embebidas: se cierra la sesión y se vuelve al login
+                // con el entorno preseleccionado. Recarga completa = caché limpia.
+                await logout();
+                window.location.href = loginPathFor("garrigues");
+              }}
+              className="cursor-pointer text-xs text-[var(--g-brand-3308, #004438)] font-medium hover:bg-muted"
+            >
+              <span className="mr-2 h-2.5 w-2.5 rounded-full bg-[#004438]" />
+              <span>Cambiar a Entorno Garrigues</span>
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={handleLogout}
