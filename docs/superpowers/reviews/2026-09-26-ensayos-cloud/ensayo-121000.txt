@@ -1,0 +1,9 @@
+                      conname                      |               tabla                | confdeltype 
+---------------------------------------------------+------------------------------------+-------------
+ aims_classification_questionnaires_system_id_fkey | aims_classification_questionnaires | r
+ aims_evidence_packs_system_id_fkey                | aims_evidence_packs                | c
+ aims_monitoring_indicators_system_id_fkey         | aims_monitoring_indicators         | r
+ aims_system_versions_system_id_fkey               | aims_system_versions               | r
+ aims_technical_file_sections_system_id_fkey       | aims_technical_file_sections       | r
+(5 rows)
+

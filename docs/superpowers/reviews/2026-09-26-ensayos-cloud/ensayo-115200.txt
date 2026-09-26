@@ -1,0 +1,5 @@
+ ai_en_nuevo | total_modulos_nuevo | ai_en_arga_garrigues | modulo_resuelto 
+-------------+---------------------+----------------------+-----------------
+           1 |                   7 |                    2 | ai
+(1 row)
+

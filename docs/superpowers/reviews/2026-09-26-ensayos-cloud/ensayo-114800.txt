@@ -1,0 +1,23 @@
+psql:supabase/migrations/proposed/20260926114800_secretaria_editar_estructura_grupo.probe.sql:112: NOTICE:  PROBE OK: dato de partida coincide con lo medido (matriz=Corporación Nueva, 70%)
+                                     set_config                                     
+------------------------------------------------------------------------------------
+ {"tenant_id" : "00000000-0000-0000-0000-000000000003", "role_code" : "SECRETARIO"}
+(1 row)
+
+psql:supabase/migrations/proposed/20260926114800_secretaria_editar_estructura_grupo.probe.sql:169: NOTICE:  PROBE OK: filial 2.3 reaparentada (45%%->%, 70->45) e histórico WORM con el valor anterior intacto
+psql:supabase/migrations/proposed/20260926114800_secretaria_editar_estructura_grupo.probe.sql:189: NOTICE:  PROBE OK: auto-referencia rechazada (an entity cannot be its own parent)
+psql:supabase/migrations/proposed/20260926114800_secretaria_editar_estructura_grupo.probe.sql:212: NOTICE:  PROBE OK: ciclo rechazado (assigning parent 9d209ef6-ca87-44d4-a12c-86f12a0ea368 would create a cycle in the group structure)
+psql:supabase/migrations/proposed/20260926114800_secretaria_editar_estructura_grupo.probe.sql:233: NOTICE:  PROBE OK: porcentaje fuera de rango rechazado (p_ownership_percentage must be between 0 and 100)
+                                                                         set_config                                                                          
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"sub" : "00000000-0000-0000-0000-0000000dead1", "role" : "authenticated", "tenant_id" : "00000000-0000-0000-0000-000000000003", "role_code" : "CONSEJERO"}
+(1 row)
+
+psql:supabase/migrations/proposed/20260926114800_secretaria_editar_estructura_grupo.probe.sql:267: NOTICE:  PROBE OK: rol sin permiso rechazado (an active, unexpired role is required for this Secretaria action)
+                                     set_config                                     
+------------------------------------------------------------------------------------
+ {"tenant_id" : "00000000-0000-0000-0000-000000000003", "role_code" : "SECRETARIO"}
+(1 row)
+
+psql:supabase/migrations/proposed/20260926114800_secretaria_editar_estructura_grupo.probe.sql:294: NOTICE:  PROBE OK: tenant cruzado rechazado (tenant access denied for 00000000-0000-0000-0000-000000000001)
+psql:supabase/migrations/proposed/20260926114800_secretaria_editar_estructura_grupo.probe.sql:311: NOTICE:  PROBE OK: ARGA Seguros S.A. conserva parent_entity_id/ownership_percentage a NULL (cadena de capital vive fuera de entities)

@@ -1,0 +1,18 @@
+ findings_code_key_restante 
+----------------------------
+                          0
+(1 row)
+
+ tablename |        indexname        |                                           indexdef                                           
+-----------+-------------------------+----------------------------------------------------------------------------------------------
+ findings  | ux_findings_tenant_code | CREATE UNIQUE INDEX ux_findings_tenant_code ON public.findings USING btree (tenant_id, code)
+ risks     | ux_risks_tenant_code    | CREATE UNIQUE INDEX ux_risks_tenant_code ON public.risks USING btree (tenant_id, code)
+(2 rows)
+
+ debe_ser_2 
+------------
+          2
+(1 row)
+
+psql:supabase/migrations/proposed/20260926119000_grc_risks_findings_tenant_code_unique.probe.sql:108: ERROR:  duplicate key value violates unique constraint "ux_risks_tenant_code"
+DETAIL:  Key (tenant_id, code)=(00000000-0000-0000-0000-000000000001, PROBE-MOI-190) already exists.

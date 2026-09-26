@@ -1,0 +1,12 @@
+psql:supabase/migrations/proposed/20260926119300_garrigues_branding_scopes_reales.probe.sql:72: NOTICE:  VERIFICACION OK: Garrigues tiene 13 ámbitos reales en branding.scopes, las otras 6 claves de branding intactas, ARGA sigue con branding NULL
+                  id                  |                                                                           scopes_propuestos                                                                            | claves_branding 
+--------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------
+ 00000000-0000-0000-0000-000000000002 | ["Grupo Garrigues (Global)", "España", "México", "Chile", "Portugal", "Colombia", "Reino Unido", "Estados Unidos", "Marruecos", "Polonia", "Perú", "Bélgica", "China"] | nombre
+ 00000000-0000-0000-0000-000000000002 | ["Grupo Garrigues (Global)", "España", "México", "Chile", "Portugal", "Colombia", "Reino Unido", "Estados Unidos", "Marruecos", "Polonia", "Perú", "Bélgica", "China"] | scopes
+ 00000000-0000-0000-0000-000000000002 | ["Grupo Garrigues (Global)", "España", "México", "Chile", "Portugal", "Colombia", "Reino Unido", "Estados Unidos", "Marruecos", "Polonia", "Perú", "Bélgica", "China"] | tokens
+ 00000000-0000-0000-0000-000000000002 | ["Grupo Garrigues (Global)", "España", "México", "Chile", "Portugal", "Colombia", "Reino Unido", "Estados Unidos", "Marruecos", "Polonia", "Perú", "Bélgica", "China"] | modules
+ 00000000-0000-0000-0000-000000000002 | ["Grupo Garrigues (Global)", "España", "México", "Chile", "Portugal", "Colombia", "Reino Unido", "Estados Unidos", "Marruecos", "Polonia", "Perú", "Bélgica", "China"] | scope_label
+ 00000000-0000-0000-0000-000000000002 | ["Grupo Garrigues (Global)", "España", "México", "Chile", "Portugal", "Colombia", "Reino Unido", "Estados Unidos", "Marruecos", "Polonia", "Perú", "Bélgica", "China"] | shell_label
+ 00000000-0000-0000-0000-000000000002 | ["Grupo Garrigues (Global)", "España", "México", "Chile", "Portugal", "Colombia", "Reino Unido", "Estados Unidos", "Marruecos", "Polonia", "Perú", "Bélgica", "China"] | sii_org_label
+(7 rows)
+

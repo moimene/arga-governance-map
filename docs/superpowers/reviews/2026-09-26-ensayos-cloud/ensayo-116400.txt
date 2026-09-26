@@ -1,0 +1,18 @@
+psql:supabase/migrations/proposed/20260926116400_risks_ai_system_link.probe.sql:83: NOTICE:  trigger "trg_risks_ai_system_tenant_guard" for relation "public.risks" does not exist, skipping
+ column_name  | data_type 
+--------------+-----------
+ ai_system_id | uuid
+(1 row)
+
+ fk_count 
+----------
+        1
+(1 row)
+
+     code     | ai_system_id 
+--------------+--------------
+ RSK-STRA-005 | 
+ RSK-TECH-005 | 
+ RSK-TECH-006 | 
+(3 rows)
+

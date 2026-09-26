@@ -1,0 +1,3 @@
+psql:supabase/migrations/proposed/20260926118500_ai_systems_tenant_fk.probe.sql:38: NOTICE:  PROBE OK: ai_systems_tenant_id_fkey presente y correcta
+psql:supabase/migrations/proposed/20260926118500_ai_systems_tenant_fk.probe.sql:55: NOTICE:  PROBE OK: INSERT con tenant_id inexistente rechazado por FK (foreign_key_violation)
+psql:supabase/migrations/proposed/20260926118500_ai_systems_tenant_fk.probe.sql:79: NOTICE:  PROBE OK: 14 filas totales, ARGA conserva sus 8 sistemas

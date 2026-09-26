@@ -1,0 +1,5 @@
+ guard_presente | sin_residuo_de_prueba 
+----------------+-----------------------
+ t              | t
+(1 row)
+

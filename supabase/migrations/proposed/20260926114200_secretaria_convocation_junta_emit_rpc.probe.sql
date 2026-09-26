@@ -47,13 +47,15 @@ begin;
 \i /tmp/moi142_junta_emit_no_txn.sql
 
 create temporary table probe_results (etiqueta text, valor jsonb) on commit drop;
+-- El bloque de ensayo corre como authenticated: necesita poder escribir aquí.
+grant all on probe_results to authenticated;
 
 do $probe$
 DECLARE
   v_secretario_nuevo uuid := '6452252f-3214-4c9a-857b-b439626d215e'; -- SECRETARIO activo de …0003
-  v_secretario_arga uuid := '1c05411b-6984-4b6d-a792-a828e6561961'; -- SECRETARIO activo de …0001
+  v_secretario_arga uuid := '85e24c66-02c7-4175-b260-1330930ad49f'; -- demo@ de …0001 (perfil SECRETARIO; el 1c05411b tiene rol pero no perfil)
   v_junta_body_id uuid := 'ceee9767-0bbf-4bf7-a2a9-6a812414e4bb'; -- Junta General de Accionistas, Corporación Nueva, S.A. (…0003)
-  v_cda_reference_convocatoria_id uuid := 'cce1d2ae-863f-4a19-98a8-0f30a8d20640'; -- convocatoria CDA ya EMITIDA de ARGA (texto/agenda ya validados)
+  v_cda_reference_convocatoria_id uuid := '28bc0b69-200c-4616-97ea-393a629050fa'; -- convocatoria de Consejo ya EMITIDA del grupo nuevo, sin anexos ni materias heredadas (orquestador, 26-09: la de ARGA cce1d2ae trae una materia legacy que el motor actual rechaza con REPRESENTATION_LEGACY_MATTER_FORBIDDEN)
   v_fecha_1 timestamptz;
   v_meses text[] := ARRAY[
     'enero','febrero','marzo','abril','mayo','junio',
@@ -124,7 +126,10 @@ BEGIN
         'total_active', 2,
         'selected_count', 2,
         'excluded_person_ids', '[]'::jsonb
-      )
+      ),
+      -- Sin anexos: la lista de intenciones de anexo debe existir aunque esté
+      -- vacía (trg_01_convocation_manifest_enrich_supporting_intents).
+      'documents', jsonb_build_object('uploaded_references', '[]'::jsonb)
     )
   );
 
@@ -198,7 +203,7 @@ BEGIN
 
   PERFORM set_config(
     'request.jwt.claims',
-    json_build_object('sub', v_secretario_arga, 'role', 'authenticated')::text,
+    json_build_object('sub', v_secretario_nuevo, 'role', 'authenticated')::text,
     true
   );
   SET LOCAL ROLE authenticated;
@@ -233,7 +238,7 @@ BEGIN
       'tras_emitir_junta_grupo_nuevo', v_arga_count_tras_junta,
       'tras_smoke_test_cda', v_arga_count_tras_cda,
       'junta_no_afecta_arga', v_arga_count_antes = v_arga_count_tras_junta,
-      'smoke_test_cda_incrementa_en_uno', v_arga_count_tras_cda = v_arga_count_tras_junta + 1
+      'smoke_test_cda_no_afecta_arga', v_arga_count_tras_cda = v_arga_count_tras_junta
     )
   );
 END
