@@ -80,43 +80,50 @@ BEGIN
   --    demo es RECHAZADO por la RPC real, no solo por el texto de la función.
   --    Todo dentro de esta misma transacción (revertida al final): no deja
   --    residuo.
-  PERFORM set_config('app.secretaria_template_state_transition', v_setup_op::text, true);
-  INSERT INTO public.plantillas_protegidas (
-    id, tenant_id, tipo, jurisdiccion, version, estado,
-    capa1_inmutable, snapshot_rule_pack_required, referencia_legal,
-    adoption_mode, organo_tipo
-  ) VALUES (
-    v_test_id, '00000000-0000-0000-0000-000000000001', 'MODELO_ACUERDO', 'ES', '1.0.0', 'REVISADA',
-    repeat('x', 120), false, 'Art. 160 LSC',
-    'MEETING', 'JUNTA_GENERAL'
-  );
-  -- El GUC de la RPC se limpia entre llamadas: solo debe estar activo dentro
-  -- de la propia función, así que se resetea antes de invocarla como llamador
-  -- externo (igual que haría PostgREST).
-  PERFORM set_config('app.secretaria_template_state_transition', '', true);
-
-  -- fn_secretaria_is_service_role() lee el claim de rol, no la identidad real
-  -- de conexión: sin él, fn_current_tenant_id()/fn_secretaria_assert_active_template_admin
-  -- fallarían por falta de sesión humana en una migración.
-  PERFORM set_config('request.jwt.claim.role', 'service_role', true);
-
+  -- Corregido por el orquestador (26-09-2026): el control positivo corre
+  -- dentro de una subtransacción que se deshace a propósito, para que ni la
+  -- fila de usar y tirar ni lo que escriban sus triggers (historial de
+  -- versiones) sobrevivan en ARGA.
   BEGIN
-    PERFORM public.fn_secretaria_transition_template_state(
-      v_test_id, 'REVISADA', 'APROBADA',
-      'Verificación MOI-137 D-20 (control positivo, fila de usar y tirar)',
-      v_call_op, NULL,
-      'Comité Legal (demo-operativo)', now(), false
+    PERFORM set_config('app.secretaria_template_state_transition', v_setup_op::text, true);
+    INSERT INTO public.plantillas_protegidas (
+      id, tenant_id, tipo, jurisdiccion, version, estado,
+      capa1_inmutable, snapshot_rule_pack_required, referencia_legal,
+      adoption_mode, organo_tipo
+    ) VALUES (
+      v_test_id, '00000000-0000-0000-0000-000000000001', 'MODELO_ACUERDO', 'ES', '1.0.0', 'REVISADA',
+      repeat('x', 120), false, 'Art. 160 LSC',
+      'MEETING', 'JUNTA_GENERAL'
     );
-  EXCEPTION WHEN OTHERS THEN
-    IF SQLSTATE = '23514' AND SQLERRM ILIKE '%MISSING_APPROVAL_DATA%' THEN
-      v_caught := true;
-    ELSE
-      DELETE FROM public.plantillas_protegidas WHERE id = v_test_id;
-      RAISE EXCEPTION 'MOI-137 D-20 verify: error inesperado en el control positivo: % (%)', SQLERRM, SQLSTATE;
-    END IF;
-  END;
+    -- El GUC de la RPC se limpia entre llamadas: solo debe estar activo dentro
+    -- de la propia función, así que se resetea antes de invocarla como llamador
+    -- externo (igual que haría PostgREST).
+    PERFORM set_config('app.secretaria_template_state_transition', '', true);
 
-  DELETE FROM public.plantillas_protegidas WHERE id = v_test_id;
+    -- fn_secretaria_is_service_role() lee el claim de rol, no la identidad real
+    -- de conexión: sin él, fn_current_tenant_id()/fn_secretaria_assert_active_template_admin
+    -- fallarían por falta de sesión humana en una migración.
+    PERFORM set_config('request.jwt.claim.role', 'service_role', true);
+
+    BEGIN
+      PERFORM public.fn_secretaria_transition_template_state(
+        v_test_id, 'REVISADA', 'APROBADA',
+        'Verificación MOI-137 D-20 (control positivo, fila de usar y tirar)',
+        v_call_op, NULL,
+        'Comité Legal (demo-operativo)', now(), false
+      );
+    EXCEPTION WHEN OTHERS THEN
+      IF SQLSTATE = '23514' AND SQLERRM ILIKE '%MISSING_APPROVAL_DATA%' THEN
+        v_caught := true;
+      ELSE
+        RAISE EXCEPTION 'MOI-137 D-20 verify: error inesperado en el control positivo: % (%)', SQLERRM, SQLSTATE;
+      END IF;
+    END;
+    RAISE EXCEPTION USING ERRCODE = 'P0137', MESSAGE = 'deshacer control positivo MOI-137';
+  EXCEPTION
+    WHEN SQLSTATE 'P0137' THEN
+      NULL; -- subtransacción deshecha
+  END;
 
   IF NOT v_caught THEN
     RAISE EXCEPTION 'MOI-137 D-20 verify: la RPC aceptó un marcador de demostración como aprobación formal nueva';
