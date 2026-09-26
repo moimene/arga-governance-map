@@ -16,6 +16,8 @@ export interface AgreementListRow {
   decision_date: string | null;
   status: string;
   created_at: string;
+  /** MOI-197: nombre del órgano (join a governing_bodies), null si no hay body_id. */
+  body_name?: string | null;
 }
 
 /**
@@ -31,9 +33,12 @@ export function useAgreementsList(statusFilter?: string[]) {
     queryKey: ["agreements", tenantId, "list", statusFilter ? statusFilter.join(",") : "all"],
     enabled: !!tenantId,
     queryFn: async () => {
+      // MOI-197: join a governing_bodies(name) para el filtro por órgano del
+      // índice, y count:"exact" para que la respuesta lleve content-range
+      // (lo que el e2e de solo lectura contrasta contra las filas pintadas).
       let query = supabase
         .from("agreements")
-        .select("*")
+        .select("*, governing_bodies(name)", { count: "exact" })
         .eq("tenant_id", tenantId!)
         .order("created_at", { ascending: false });
 
@@ -43,7 +48,13 @@ export function useAgreementsList(statusFilter?: string[]) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as AgreementListRow[];
+      type Raw = Omit<AgreementListRow, "body_name"> & {
+        governing_bodies?: { name?: string | null } | null;
+      };
+      return ((data ?? []) as Raw[]).map((row) => ({
+        ...row,
+        body_name: row.governing_bodies?.name ?? null,
+      })) as AgreementListRow[];
     },
   });
 }

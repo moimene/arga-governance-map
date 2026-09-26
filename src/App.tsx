@@ -75,6 +75,7 @@ const Comunicaciones = lazy(() => import("@/pages/secretaria/Comunicaciones"));
 const ComunicacionDetalle = lazy(() => import("@/pages/secretaria/ComunicacionDetalle"));
 const ProcesosGrupo = lazy(() => import("@/pages/secretaria/ProcesosGrupo"));
 const ExpedienteAcuerdo = lazy(() => import("@/pages/secretaria/ExpedienteAcuerdo"));
+const ExpedientesAcuerdoLista = lazy(() => import("@/pages/secretaria/ExpedientesAcuerdoLista"));
 const GenerarDocumentoStepper = lazy(() => import("@/pages/secretaria/GenerarDocumentoStepper"));
 const DocumentosPendientesRevision = lazy(() => import("@/pages/secretaria/DocumentosPendientesRevision"));
 const InformesPreceptivos = lazy(() => import("@/pages/secretaria/InformesPreceptivos"));
@@ -258,6 +259,7 @@ const App = () => (
                   <Route path="/secretaria/comunicaciones" element={<Suspense fallback={<ModuleFallback />}><Comunicaciones /></Suspense>} />
                   <Route path="/secretaria/comunicaciones/:id" element={<Suspense fallback={<ModuleFallback />}><ComunicacionDetalle /></Suspense>} />
                   <Route path="/secretaria/procesos-grupo" element={<Suspense fallback={<ModuleFallback />}><ProcesosGrupo /></Suspense>} />
+                  <Route path="/secretaria/acuerdos" element={<Suspense fallback={<ModuleFallback />}><ExpedientesAcuerdoLista /></Suspense>} />
                   <Route path="/secretaria/acuerdos/:id" element={<Suspense fallback={<ModuleFallback />}><ExpedienteAcuerdo /></Suspense>} />
                   <Route path="/secretaria/acuerdos/:id/generar" element={<Suspense fallback={<ModuleFallback />}><GenerarDocumentoStepper /></Suspense>} />
                   <Route path="/secretaria/informes" element={<Suspense fallback={<ModuleFallback />}><InformesPreceptivos /></Suspense>} />
