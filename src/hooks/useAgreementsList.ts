@@ -16,26 +16,45 @@ export interface AgreementListRow {
   decision_date: string | null;
   status: string;
   created_at: string;
+  /** MOI-197: nombre del órgano (join a governing_bodies), null si no hay body_id. */
+  body_name?: string | null;
 }
 
 /**
  * useAgreementsList — Fetches all agreements for the demo tenant,
- * optionally filtered by status (e.g., "CERTIFIED", "ADOPTED")
+ * optionally filtered by status (e.g., "CERTIFIED", "ADOPTED") and by
+ * entity (scoping en modo sociedad, mismo patrón que useConvocatoriasList /
+ * useReunionesList — MOI-197 review P1).
  *
  * Usage:
- *   const { data: agreements } = useAgreementsList(["CERTIFIED", "ADOPTED"]);
+ *   const { data: agreements } = useAgreementsList(["CERTIFIED", "ADOPTED"], entityId);
  */
-export function useAgreementsList(statusFilter?: string[]) {
+export function useAgreementsList(statusFilter?: string[], entityId?: string | null) {
   const { tenantId } = useTenantContext();
   return useQuery<AgreementListRow[], Error>({
-    queryKey: ["agreements", tenantId, "list", statusFilter ? statusFilter.join(",") : "all"],
+    queryKey: [
+      "agreements",
+      tenantId,
+      "list",
+      statusFilter ? statusFilter.join(",") : "all",
+      entityId ?? "all",
+    ],
     enabled: !!tenantId,
     queryFn: async () => {
+      // MOI-197: join a governing_bodies(name) para el filtro por órgano del
+      // índice, y count:"exact" para que la respuesta lleve content-range
+      // (lo que el e2e de solo lectura contrasta contra las filas pintadas).
+      // agreements tiene entity_id propio (no hace falta pasar por
+      // governing_bodies como en convocatorias/meetings).
       let query = supabase
         .from("agreements")
-        .select("*")
+        .select("*, governing_bodies(name)", { count: "exact" })
         .eq("tenant_id", tenantId!)
         .order("created_at", { ascending: false });
+
+      if (entityId) {
+        query = query.eq("entity_id", entityId);
+      }
 
       if (statusFilter && statusFilter.length > 0) {
         query = query.in("status", statusFilter);
@@ -43,7 +62,13 @@ export function useAgreementsList(statusFilter?: string[]) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as AgreementListRow[];
+      type Raw = Omit<AgreementListRow, "body_name"> & {
+        governing_bodies?: { name?: string | null } | null;
+      };
+      return ((data ?? []) as Raw[]).map((row) => ({
+        ...row,
+        body_name: row.governing_bodies?.name ?? null,
+      })) as AgreementListRow[];
     },
   });
 }

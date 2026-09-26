@@ -1,4 +1,5 @@
 import {
+  Archive,
   Bell,
   BookOpen,
   Briefcase,
@@ -50,6 +51,9 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
       { label: "Reuniones", to: "/secretaria/reuniones", icon: Users },
       { label: "Acuerdos sin sesión", to: "/secretaria/acuerdos-sin-sesion", icon: ScrollText },
       { label: "Decisiones unipersonales", to: "/secretaria/decisiones-unipersonales", icon: Building2 },
+      // MOI-197: índice navegable de expedientes de acuerdo (agreements),
+      // hasta ahora solo alcanzables desde reunión/acta/tramitador.
+      { label: "Expedientes de acuerdo", to: "/secretaria/acuerdos", icon: Archive },
     ],
   },
   {
@@ -185,6 +189,15 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
           requiresAdoptionMode: ["NO_SESSION", "CO_APROBACION", "SOLIDARIO"],
           excludesIfReferenceOnly: true,
         },
+      },
+      // MOI-197: índice navegable de expedientes de acuerdo (agreements),
+      // hasta ahora solo alcanzables desde reunión/acta/tramitador.
+      {
+        label: "Expedientes de acuerdo",
+        to: "/secretaria/acuerdos",
+        icon: Archive,
+        requiresEntity: true,
+        visibility: { requiresEntity: true },
       },
     ],
   },
