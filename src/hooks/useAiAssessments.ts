@@ -127,6 +127,36 @@ export function useAllAssessments() {
   });
 }
 
+// MOI-158: misma forma que UUID_SHAPE_RE en useAiIncidents.ts — evita que un
+// id de handoff sin forma de UUID (fixture de test) dispare un 400 de
+// PostgREST en vez de "no aparece nada".
+const UUID_SHAPE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Referencia de solo lectura para el aviso de handoff de Risk360 (MOI-158):
+ * sistema y fecha de la evaluación, nunca la evaluación completa. Igual que
+ * `useAiIncidentHandoffReference`, nunca lanza por 0 filas — un id inexistente
+ * o de otro tenant (el join `ai_systems!inner` lo filtra sin error) devuelve
+ * `data: null`.
+ */
+export function useAssessmentHandoffReference(id: string | null | undefined) {
+  const { tenantId } = useTenantContext();
+  const validId = id && UUID_SHAPE_RE.test(id) ? id : undefined;
+  return useQuery({
+    queryKey: ["ai_risk_assessments", tenantId, "handoff-ref", validId ?? null],
+    queryFn: tenantId && validId ? async () => {
+      const { data, error } = await supabase
+        .from("ai_risk_assessments")
+        .select("*, ai_systems!inner(tenant_id, name)")
+        .eq("ai_systems.tenant_id", tenantId!)
+        .eq("id", validId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { id: string; assessment_date: string | null; ai_systems: { name: string } | null } | null;
+    } : skipToken,
+  });
+}
+
 export function useComplianceChecksBySystem(systemId: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({

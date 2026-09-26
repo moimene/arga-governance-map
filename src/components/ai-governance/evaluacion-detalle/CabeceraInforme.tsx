@@ -20,6 +20,8 @@ import { etiqueta, normalizeAimsStatus } from "@/lib/aims/vocabulario";
 import { chipClaseEvaluacion, rotuloEvaluacion } from "@/lib/aims/legado";
 import { pendientesDeEvidencia } from "@/lib/aims/conformidad";
 import type { AiRiskAssessment } from "@/hooks/useAiAssessments";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { isModuleEnabled } from "@/lib/tenant-modules";
 
 export interface CabeceraInformeProps {
   assessment: AiRiskAssessment & {
@@ -56,6 +58,11 @@ export default function CabeceraInforme({
 }: CabeceraInformeProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const branding = useTenantBranding();
+  // MOI-158/F2.T13: no ofrecer un handoff hacia un módulo que el tenant no
+  // tiene activado. `isModuleEnabled` falla ABIERTO (branding NULL de ARGA
+  // no cambia).
+  const grcEnabled = isModuleEnabled(branding, "grc");
   // La RPC rechaza que revise quien congeló (MISMO_EVALUADOR); se dice antes
   // de pulsar en vez de después.
   const mismaCuenta = !!user?.id && assessment.frozen_by_id === user.id;
@@ -182,16 +189,18 @@ export default function CabeceraInforme({
                 </p>
               </div>
             </div>
-            <Link
-              // Risk 360 pinta la entrada desde AIMS con `source` + `handoff`
-              // (Risk360.tsx); con el contrato anterior el enlace llegaba mudo.
-              to={`/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP&assessment=${assessment.id}`}
-              className="px-3 py-1.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-xs font-medium transition-colors inline-flex items-center gap-1.5"
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              <span>Escalar a Risk 360</span>
-              <ExternalLink className="w-3 h-3" />
-            </Link>
+            {grcEnabled && (
+              <Link
+                // Risk 360 pinta la entrada desde AIMS con `source` + `handoff`
+                // (Risk360.tsx); con el contrato anterior el enlace llegaba mudo.
+                to={`/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP&assessment=${assessment.id}`}
+                className="px-3 py-1.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-xs font-medium transition-colors inline-flex items-center gap-1.5"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <span>Escalar a Risk 360</span>
+                <ExternalLink className="w-3 h-3" />
+              </Link>
+            )}
           </div>
         )}
       </div>

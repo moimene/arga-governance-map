@@ -12,6 +12,8 @@ import {
 } from "@/lib/aims/vocabulario";
 import FilterGroup from "@/components/ai-governance/FilterGroup";
 import { mensajeUsuario } from "@/lib/aims/errores-rpc";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { isModuleEnabled } from "@/lib/tenant-modules";
 
 function formatDate(value: string | null) {
   if (!value) return "Sin fecha";
@@ -36,6 +38,12 @@ export default function AiIncidentes() {
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [severityFilter, setSeverityFilter] = useState("Todos");
   const { data: incidents = [], isLoading, isError, error } = useAiIncidentsList();
+  const branding = useTenantBranding();
+  // MOI-158/F2.T13: no ofrecer un handoff hacia un módulo que el tenant no
+  // tiene activado. `isModuleEnabled` falla ABIERTO (branding NULL de ARGA
+  // no cambia).
+  const grcEnabled = isModuleEnabled(branding, "grc");
+  const secretariaEnabled = isModuleEnabled(branding, "secretaria");
 
   const abiertos = incidents.filter(
     (i) => ["ABIERTO", "EN_INVESTIGACION"].includes(normalizeAimsStatus(i.status)),
@@ -252,26 +260,30 @@ export default function AiIncidentes() {
                           {formatDate(inc.reported_at)}
                         </td>
                         <td className="px-6 py-4">
-                          {isMaterial ? (
+                          {isMaterial && (grcEnabled || secretariaEnabled) ? (
                             <div className="flex flex-wrap gap-2">
-                              <Link
-                                to={`/grc/incidentes?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${inc.id}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-2 py-1 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)]"
-                                style={{ borderRadius: "var(--g-radius-md)" }}
-                              >
-                                <Route className="h-3.5 w-3.5 text-[var(--g-brand-3308)]" />
-                                GRC
-                              </Link>
-                              <Link
-                                to={`/secretaria/reuniones/nueva?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${inc.id}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)]"
-                                style={{ borderRadius: "var(--g-radius-md)" }}
-                              >
-                                <Route className="h-3.5 w-3.5 text-[var(--g-brand-3308)]" />
-                                Secretaría
-                              </Link>
+                              {grcEnabled && (
+                                <Link
+                                  to={`/grc/incidentes?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${inc.id}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-2 py-1 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)]"
+                                  style={{ borderRadius: "var(--g-radius-md)" }}
+                                >
+                                  <Route className="h-3.5 w-3.5 text-[var(--g-brand-3308)]" />
+                                  GRC
+                                </Link>
+                              )}
+                              {secretariaEnabled && (
+                                <Link
+                                  to={`/secretaria/reuniones/nueva?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${inc.id}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)]"
+                                  style={{ borderRadius: "var(--g-radius-md)" }}
+                                >
+                                  <Route className="h-3.5 w-3.5 text-[var(--g-brand-3308)]" />
+                                  Secretaría
+                                </Link>
+                              )}
                             </div>
                           ) : (
                             <span className="text-xs text-[var(--g-text-secondary)]">Seguimiento interno</span>
@@ -324,24 +336,28 @@ export default function AiIncidentes() {
                       </span>
                     </div>
                     <div className="mt-3">
-                      {isMaterial ? (
+                      {isMaterial && (grcEnabled || secretariaEnabled) ? (
                         <div className="flex flex-wrap gap-2">
-                          <Link
-                            to={`/grc/incidentes?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${inc.id}`}
-                            className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-2 py-1 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)]"
-                            style={{ borderRadius: "var(--g-radius-md)" }}
-                          >
-                            <Route className="h-3.5 w-3.5 text-[var(--g-brand-3308)]" />
-                            Enviar a GRC
-                          </Link>
-                          <Link
-                            to={`/secretaria/reuniones/nueva?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${inc.id}`}
-                            className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)]"
-                            style={{ borderRadius: "var(--g-radius-md)" }}
-                          >
-                            <Route className="h-3.5 w-3.5 text-[var(--g-brand-3308)]" />
-                            Preparar reunión
-                          </Link>
+                          {grcEnabled && (
+                            <Link
+                              to={`/grc/incidentes?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${inc.id}`}
+                              className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-2 py-1 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)]"
+                              style={{ borderRadius: "var(--g-radius-md)" }}
+                            >
+                              <Route className="h-3.5 w-3.5 text-[var(--g-brand-3308)]" />
+                              Enviar a GRC
+                            </Link>
+                          )}
+                          {secretariaEnabled && (
+                            <Link
+                              to={`/secretaria/reuniones/nueva?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${inc.id}`}
+                              className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)]"
+                              style={{ borderRadius: "var(--g-radius-md)" }}
+                            >
+                              <Route className="h-3.5 w-3.5 text-[var(--g-brand-3308)]" />
+                              Preparar reunión
+                            </Link>
+                          )}
                         </div>
                       ) : (
                         <span className="text-xs text-[var(--g-text-secondary)]">Seguimiento interno AIMS</span>

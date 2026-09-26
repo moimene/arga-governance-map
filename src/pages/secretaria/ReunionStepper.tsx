@@ -15,6 +15,7 @@ import {
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { readMeetingHandoff } from "@/lib/secretaria/cross-module-handoff";
 import { handoffEventLabel } from "@/lib/handoff-event-labels";
+import { useAiIncidentHandoffReference } from "@/hooks/useAiIncidents";
 // B7 Lote 3: los datos legacy de agenda pueden traer alias de materia; el
 // select solo ofrece códigos canónicos, así que hay que resolverlos al leer.
 import {
@@ -4840,6 +4841,13 @@ function ReunionIntake() {
   const { source, event, sourceId, organ, matter, rationale, isCrossModule } = readMeetingHandoff(
     (key) => searchParams.get(key),
   );
+  // MOI-158: el sourceId de un handoff `source=aims` es un id de `ai_incidents`.
+  // Se resuelve a referencia+título, solo lectura y acotado al tenant de la
+  // sesión (el hook filtra por tenant_id); un id inexistente o de otro tenant
+  // resuelve `data: null` y no se pinta nada — nunca el id crudo.
+  const { data: aimsIncidentRef } = useAiIncidentHandoffReference(
+    source === "aims" ? sourceId : null,
+  );
   const scopedEntityId =
     searchParams.get("scope") === "sociedad" ? searchParams.get("entity") : null;
   const scopedConvocatoriasPath = scopedEntityId
@@ -4887,7 +4895,24 @@ function ReunionIntake() {
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-[var(--g-text-secondary)]">
                   Evento propuesto: <span className="font-medium text-[var(--g-text-primary)]">{handoffEventLabel(event)}</span>
-                  {sourceId ? (
+                  {source === "aims" ? (
+                    aimsIncidentRef ? (
+                      <>
+                        {" "}
+                        · Referencia:{" "}
+                        <span className="font-mono text-xs text-[var(--g-text-secondary)]">
+                          EXP-INC-{aimsIncidentRef.id.slice(0, 8).toUpperCase()}
+                        </span>{" "}
+                        · <span className="font-medium text-[var(--g-text-primary)]">{aimsIncidentRef.title}</span>
+                        {aimsIncidentRef.ai_systems?.name ? (
+                          <>
+                            {" "}
+                            · Sistema: <span className="font-medium text-[var(--g-text-primary)]">{aimsIncidentRef.ai_systems.name}</span>
+                          </>
+                        ) : null}
+                      </>
+                    ) : null
+                  ) : sourceId ? (
                     <>
                       {" "}
                       · Referencia: <span className="font-medium text-[var(--g-text-primary)]">{sourceId}</span>
