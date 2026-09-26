@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { resolveSandboxSafeEvidencePersistence } from "@/lib/secretaria/evidence-sandbox-gate";
+import type { Json } from "@/integrations/supabase/types";
 
 export interface EvidenceBundle {
   id: string;
@@ -102,7 +103,7 @@ export function useCreateEvidenceBundle() {
         p_source_object_type: payload.sourceObjectType,
         p_source_object_id: payload.sourceObjectId,
         p_reference_code: payload.referenceCode,
-        p_manifest: effectiveManifest,
+        p_manifest: effectiveManifest as unknown as Json,
         p_document_url: payload.documentUrl ?? null,
         p_legal_hold: payload.legalHold ?? false,
         p_status: effectiveStatus,

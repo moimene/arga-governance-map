@@ -7,6 +7,7 @@ import {
   registerSupportingConvocationArtifact,
 } from "@/lib/secretaria/convocation-supporting-artifact-registration";
 import { secretariaOperationError } from "@/lib/secretaria/supabase-error-message";
+import type { Json } from "@/integrations/supabase/types";
 
 export interface ConvocatoriaRow {
   id: string;
@@ -346,7 +347,7 @@ export function useCreateConvocatoria() {
             rule_trace: input.rule_trace ?? null,
             reminders_trace: input.reminders_trace ?? null,
             accepted_warnings: input.accepted_warnings ?? [],
-          },
+          } as unknown as Json,
         });
       if (error) throw error;
       const result = data as {
