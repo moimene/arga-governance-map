@@ -14,6 +14,7 @@ import {
 import { isActaBorradorEditable } from "@/lib/secretaria/acta-edicion";
 import { AprobarActaButton } from "@/components/secretaria/AprobarActaButton";
 import { EmitirCertificacionButton } from "@/components/secretaria/EmitirCertificacionButton";
+import { StandaloneCertificationActions } from "@/components/secretaria/StandaloneCertificationActions";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
 import { ProcessDocxButton } from "@/components/secretaria/ProcessDocxButton";
@@ -1274,6 +1275,21 @@ export default function ActaDetalle() {
                     }
                     legalEmissionDateISO={new Date().toISOString()}
                     disabledReason={certificationGateReason}
+                  />
+                ) : null}
+                {acta.entity_id ? (
+                  <StandaloneCertificationActions
+                    compact
+                    title="Certificación autónoma desde esta acta"
+                    actions={[
+                      {
+                        kindCode: "CERT_ACUERDO_360",
+                        label: "Preparar certificación",
+                        entityId: acta.entity_id,
+                        bodyId: acta.body_id,
+                        agreementId: certificationAgreementRefs[0] ?? null,
+                      },
+                    ]}
                   />
                 ) : null}
               </div>

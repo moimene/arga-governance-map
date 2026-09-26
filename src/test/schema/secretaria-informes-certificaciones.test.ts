@@ -126,4 +126,11 @@ describe("secretaria informes y certificaciones migration", () => {
     expect(standalonePage).toContain("Tu rol puede consultar esta información, pero no ejecutar esta acción.");
     expect(documentReviewPage).toContain("Tu rol puede consultar esta información, pero no ejecutar esta acción.");
   });
+
+  // MOI-195: las siete referencias (órgano, persona, cargo, libro, movimiento,
+  // acuerdo, decisión) se eligen de una lista del propio grupo; ningún campo
+  // invita a escribir un identificador interno a mano.
+  it("no pide identificadores UUID a mano: nada invita a escribirlos", () => {
+    expect(standalonePage).not.toMatch(/UUID/i);
+  });
 });

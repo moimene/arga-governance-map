@@ -7,6 +7,14 @@ import { useEntitiesList } from "@/hooks/useEntities";
 import { usePresidenteVigente } from "@/hooks/useAuthorityEvidence";
 import { useHasCapability } from "@/hooks/useCapabilityMatrix";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
+import { useBodiesByEntity } from "@/hooks/useBodies";
+import { usePersonasCanonical } from "@/hooks/usePersonasCanonical";
+import { CARGO_LABELS, useCargosPersona } from "@/hooks/useCargos";
+import { useLibrosList } from "@/hooks/useLibros";
+import { persistedBookIdForActions } from "@/lib/secretaria/libros-societarios";
+import { useCapitalMovements } from "@/hooks/useCapitalMovements";
+import { useAgreementsList } from "@/hooks/useAgreementsList";
+import { useDecisionesUnipersList } from "@/hooks/useDecisionesUnipers";
 import {
   useCreateStandaloneCertification,
   useEmitStandaloneCertification,
@@ -89,6 +97,60 @@ function metadataString(metadata: Record<string, unknown> | undefined, key: stri
 function shortHash(value?: string | null) {
   if (!value) return "Pendiente";
   return value.length > 22 ? `${value.slice(0, 12)}...${value.slice(-8)}` : value;
+}
+
+interface ReferenceOption {
+  value: string;
+  label: string;
+}
+
+/**
+ * Selector de referencia (órgano, persona, cargo, libro, movimiento, acuerdo,
+ * decisión) que sustituye a los antiguos inputs de texto libre (MOI-195).
+ * Nunca pintar un placeholder que invite a escribir a mano un identificador
+ * interno de la base de datos: `src/test/schema/secretaria-informes-certificaciones.test.ts`
+ * falla si reaparece.
+ */
+function ReferenceSelect({
+  label,
+  value,
+  onChange,
+  options,
+  loading,
+  emptyMessage,
+  disabled,
+  placeholder = "Sin seleccionar",
+}: {
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+  options: ReferenceOption[];
+  loading?: boolean;
+  emptyMessage?: string;
+  disabled?: boolean;
+  placeholder?: string;
+}) {
+  const blankLabel = loading ? "Cargando…" : options.length === 0 && emptyMessage ? emptyMessage : placeholder;
+  return (
+    <label className="space-y-1 text-sm">
+      <span className="font-medium text-[var(--g-text-primary)]">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled || loading}
+        aria-busy={loading}
+        className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:ring-2 focus:ring-[var(--g-border-focus)] disabled:opacity-60"
+        style={{ borderRadius: "var(--g-radius-md)" }}
+      >
+        <option value="">{blankLabel}</option>
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 }
 
 export default function CertificacionesAutonomas() {
@@ -190,6 +252,89 @@ export default function CertificacionesAutonomas() {
   const createCert = useCreateStandaloneCertification();
   const generateCertDocument = useGenerateStandaloneCertificationDocument();
   const emitCert = useEmitStandaloneCertification();
+
+  // MOI-195: cada referencia se elige de una lista del propio grupo, nunca se
+  // escribe a mano. Todas se filtran por el tenant de la sesión (vía los
+  // hooks) y, cuando aplica, por la sociedad seleccionada.
+  const { data: bodies = [], isLoading: bodiesLoading } = useBodiesByEntity(effectiveEntityId || undefined);
+  const { data: personas = [], isLoading: personasLoading } = usePersonasCanonical();
+  const { data: cargosPersona = [], isLoading: cargosLoading } = useCargosPersona(personId || undefined);
+  const { data: librosRaw = [], isLoading: librosLoading } = useLibrosList(effectiveEntityId || null);
+  const { data: movimientos = [], isLoading: movimientosLoading } = useCapitalMovements(effectiveEntityId || undefined);
+  const { data: agreementsAll = [], isLoading: agreementsLoading } = useAgreementsList();
+  const { data: decisiones = [], isLoading: decisionesLoading } = useDecisionesUnipersList(effectiveEntityId || null);
+
+  const bodyOptions: ReferenceOption[] = useMemo(
+    () => bodies.map((b) => ({ value: b.id, label: b.name })),
+    [bodies],
+  );
+  const personaOptions: ReferenceOption[] = useMemo(
+    () => personas.map((p) => ({ value: p.id, label: p.tax_id ? `${p.full_name} (${p.tax_id})` : p.full_name })),
+    [personas],
+  );
+  const cargoOptions: ReferenceOption[] = useMemo(
+    () =>
+      cargosPersona
+        .filter((c) => c.estado === "VIGENTE" && c.entity_id === effectiveEntityId)
+        .map((c) => ({
+          value: c.id,
+          label: `${CARGO_LABELS[c.tipo_condicion] ?? c.tipo_condicion}${c.body?.name ? ` · ${c.body.name}` : ""}`,
+        })),
+    [cargosPersona, effectiveEntityId],
+  );
+  const libroOptions: ReferenceOption[] = useMemo(
+    () =>
+      librosRaw
+        .map((b) => ({ id: persistedBookIdForActions(b), label: `${b.display_label} · vol. ${b.volume_number}/${b.period}` }))
+        .filter((o): o is { id: string; label: string } => !!o.id)
+        .map((o) => ({ value: o.id, label: o.label })),
+    [librosRaw],
+  );
+  const movimientoOptions: ReferenceOption[] = useMemo(
+    () =>
+      movimientos.map((m) => ({
+        value: m.id,
+        label: `${new Date(m.effective_date).toLocaleDateString("es-ES")} · ${m.movement_type}${
+          m.persons?.full_name ? ` · ${m.persons.full_name}` : ""
+        }`,
+      })),
+    [movimientos],
+  );
+  const agreementOptions: ReferenceOption[] = useMemo(
+    () =>
+      agreementsAll
+        .filter((a) => !effectiveEntityId || a.entity_id === effectiveEntityId)
+        .map((a) => ({
+          value: a.id,
+          label: `${a.agreement_kind}${a.decision_date ? ` · ${new Date(a.decision_date).toLocaleDateString("es-ES")}` : ""} · ${statusLabel(a.status)}`,
+        })),
+    [agreementsAll, effectiveEntityId],
+  );
+  const decisionOptions: ReferenceOption[] = useMemo(
+    () =>
+      decisiones.map((d) => ({
+        value: d.id,
+        label: `${d.title}${d.decision_date ? ` · ${new Date(d.decision_date).toLocaleDateString("es-ES")}` : ""}`,
+      })),
+    [decisiones],
+  );
+
+  function handleEntityChange(nextEntityId: string) {
+    setEntityId(nextEntityId);
+    setBodyId("");
+    setPersonId("");
+    setConditionId("");
+    setBookId("");
+    setMovementId("");
+    setAgreementId("");
+    setDecisionId("");
+    setPrepared(null);
+  }
+
+  function handlePersonChange(nextPersonId: string) {
+    setPersonId(nextPersonId);
+    setConditionId("");
+  }
 
   async function handlePrepare() {
     if (!effectiveKindCode || !effectiveEntityId) return;
@@ -296,7 +441,7 @@ export default function CertificacionesAutonomas() {
             <span className="font-medium text-[var(--g-text-primary)]">Sociedad</span>
             <select
               value={effectiveEntityId}
-              onChange={(e) => setEntityId(e.target.value)}
+              onChange={(e) => handleEntityChange(e.target.value)}
               className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:ring-2 focus:ring-[var(--g-border-focus)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
@@ -358,38 +503,66 @@ export default function CertificacionesAutonomas() {
               style={{ borderRadius: "var(--g-radius-md)" }}
             />
           </label>
-          <label className="space-y-1 text-sm">
-            <span className="font-medium text-[var(--g-text-primary)]">Órgano</span>
-            <input
-              value={bodyId}
-              onChange={(e) => setBodyId(e.target.value)}
-              placeholder="UUID opcional"
-              className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:ring-2 focus:ring-[var(--g-border-focus)]"
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            />
-          </label>
+          <ReferenceSelect
+            label="Órgano"
+            value={bodyId}
+            onChange={setBodyId}
+            options={bodyOptions}
+            loading={bodiesLoading}
+            emptyMessage="Esta sociedad no tiene órganos registrados"
+          />
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {[
-            ["Persona", personId, setPersonId],
-            ["Cargo/condición", conditionId, setConditionId],
-            ["Libro", bookId, setBookId],
-            ["Movimiento", movementId, setMovementId],
-            ["Acuerdo", agreementId, setAgreementId],
-            ["Decisión", decisionId, setDecisionId],
-          ].map(([label, value, setter]) => (
-            <label key={label as string} className="space-y-1 text-sm">
-              <span className="font-medium text-[var(--g-text-primary)]">{label as string}</span>
-              <input
-                value={value as string}
-                onChange={(e) => (setter as (next: string) => void)(e.target.value)}
-                placeholder="UUID opcional"
-                className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:ring-2 focus:ring-[var(--g-border-focus)]"
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              />
-            </label>
-          ))}
+          <ReferenceSelect
+            label="Persona"
+            value={personId}
+            onChange={handlePersonChange}
+            options={personaOptions}
+            loading={personasLoading}
+            emptyMessage="No hay personas registradas"
+          />
+          <ReferenceSelect
+            label="Cargo/condición"
+            value={conditionId}
+            onChange={setConditionId}
+            options={cargoOptions}
+            loading={cargosLoading}
+            disabled={!personId}
+            emptyMessage={personId ? "Esta persona no tiene cargos vigentes en la sociedad" : "Selecciona primero una persona"}
+          />
+          <ReferenceSelect
+            label="Libro"
+            value={bookId}
+            onChange={setBookId}
+            options={libroOptions}
+            loading={librosLoading}
+            emptyMessage="Esta sociedad no tiene libros registrados"
+          />
+          <ReferenceSelect
+            label="Movimiento"
+            value={movementId}
+            onChange={setMovementId}
+            options={movimientoOptions}
+            loading={movimientosLoading}
+            emptyMessage="Esta sociedad no tiene movimientos de capital registrados"
+          />
+          <ReferenceSelect
+            label="Acuerdo"
+            value={agreementId}
+            onChange={setAgreementId}
+            options={agreementOptions}
+            loading={agreementsLoading}
+            emptyMessage="Esta sociedad no tiene acuerdos registrados"
+          />
+          <ReferenceSelect
+            label="Decisión"
+            value={decisionId}
+            onChange={setDecisionId}
+            options={decisionOptions}
+            loading={decisionesLoading}
+            emptyMessage="Esta sociedad no tiene decisiones unipersonales registradas"
+          />
         </div>
 
         <div className="mt-5 flex flex-wrap gap-3">
