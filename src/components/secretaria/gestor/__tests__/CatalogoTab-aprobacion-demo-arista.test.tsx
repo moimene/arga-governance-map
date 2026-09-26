@@ -177,4 +177,25 @@ describe("CatalogoTab — MOI-137 arista pantalla→librería", () => {
 
     expect(screen.getAllByText("Aprobada legalmente").length).toBeGreaterThan(0);
   });
+
+  it("el marcador de demo veta incluso cuando el informe del Comité Legal aprobaría la materia (ARGA)", () => {
+    // FORMULACION_CUENTAS + ARGA casa con el plan del informe del 01-05-2026
+    // (committeeApproved=true), que por sí solo bastaría para "Aprobada
+    // legalmente" saltándose el resto de defectos. Este es el defecto
+    // histórico exacto de MOI-137: el marcador de demo debe vetar incluso
+    // cuando el informe aprobaría la materia.
+    mockState.rows = [
+      demoMarkedActiveTemplate({
+        id: "tpl-demo-pero-informe-aprobaria",
+        tenant_id: "00000000-0000-0000-0000-000000000001",
+        materia: "FORMULACION_CUENTAS",
+        materia_acuerdo: "FORMULACION_CUENTAS",
+      }),
+    ];
+
+    renderCatalogoTab();
+
+    expect(screen.queryAllByText("Aprobada legalmente")).toHaveLength(0);
+    expect(screen.getAllByText("Vigente sin aprobación nominativa").length).toBeGreaterThan(0);
+  });
 });
