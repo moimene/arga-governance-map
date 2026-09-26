@@ -14,13 +14,16 @@ const TODOS = "__todos__";
  * Antes de esta página, un acuerdo solo se alcanzaba desde la reunión, el acta
  * o el tramitador que lo originaron. Reutiliza `useAgreementsList` (sin
  * filtro de estado servidor: la vista por defecto debe cuadrar con el total
- * del tenant) y filtra estado/órgano/materia en cliente, tal y como autoriza
- * el propio issue ("en cliente o ampliando la consulta").
+ * del tenant, o de la sociedad en modo sociedad) y filtra estado/órgano/materia
+ * en cliente, tal y como autoriza el propio issue ("en cliente o ampliando la
+ * consulta"). En modo sociedad se scopea por entity_id (review P1), igual que
+ * ConvocatoriasList/useConvocatoriasList y ReunionesLista/useReunionesList.
  */
 export default function ExpedientesAcuerdoLista() {
   const navigate = useNavigate();
   const scope = useSecretariaScope();
-  const { data, isLoading } = useAgreementsList();
+  const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
+  const { data, isLoading } = useAgreementsList(undefined, scopedEntityId);
   const [estado, setEstado] = useState(TODOS);
   const [organo, setOrgano] = useState(TODOS);
   const [materia, setMateria] = useState(TODOS);
