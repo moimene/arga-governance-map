@@ -91,6 +91,16 @@ por Moisés: son decisiones que él delegó en las recomendaciones del agente.
 - **DA-12 → decidida (MOI-186):** la «spec de continuidad» (C4→C1→M1→M2) se declara
   **sustituida por el programa RIA** del 19-09-2026 (`docs/superpowers/specs/2026-09-19-aims-cobertura-ria-experto-design.md`),
   que cubre el catálogo de medidas y el indicador. No se busca ni se reconstruye.
+- **DA-16 → actualizada (MOI-210, aplicada en Cloud el 26-09-2026, migración `20260926121000`):**
+  las cuatro FK hacia `ai_systems` con valor probatorio (`aims_classification_questionnaires`,
+  `aims_system_versions`, `aims_technical_file_sections`, `aims_monitoring_indicators`) pasan de
+  CASCADE a RESTRICT. `authenticated` conserva el DELETE sobre `ai_systems`, pero un sistema con
+  cuestionario, versión, sección del expediente o indicador ya no se puede borrar. Las sondas vivas
+  dejan de borrar por cascada (camino negativo sin residuo) y el borrado se prueba en la sonda
+  revertida `docs/superpowers/plans/2026-09-26-moi-210-sonda-revertida-post-restrict.sql`
+  (salida en `docs/superpowers/reviews/2026-09-26-ensayos-cloud/moi210-sonda-post-restrict.txt`).
+  Consecuencia para MOI-214: una prueba de extremo a extremo que dé de alta un sistema por cuestionario
+  ya no puede limpiarlo borrándolo.
 - **DA-13 → FK decidida (MOI-185):** la FK `ai_systems.tenant_id → tenants` se añade; el CHECK de
   estados sigue aplazado mientras cada módulo conserve su lista (MOI-161, opción b).
 
