@@ -139,6 +139,7 @@ function ReferenceSelect({
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled || loading}
         aria-busy={loading}
+        aria-label={label}
         className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:ring-2 focus:ring-[var(--g-border-focus)] disabled:opacity-60"
         style={{ borderRadius: "var(--g-radius-md)" }}
       >
@@ -442,6 +443,7 @@ export default function CertificacionesAutonomas() {
             <select
               value={effectiveEntityId}
               onChange={(e) => handleEntityChange(e.target.value)}
+              aria-label="Sociedad"
               className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:ring-2 focus:ring-[var(--g-border-focus)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
@@ -461,6 +463,7 @@ export default function CertificacionesAutonomas() {
                 setPrepared(null);
               }}
               disabled={kindsLoading}
+              aria-label="Tipo"
               className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:ring-2 focus:ring-[var(--g-border-focus)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
@@ -486,6 +489,7 @@ export default function CertificacionesAutonomas() {
             <select
               value={certificanteRole}
               onChange={(e) => setCertificanteRole(e.target.value)}
+              aria-label="Rol certificante"
               className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:ring-2 focus:ring-[var(--g-border-focus)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >

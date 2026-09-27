@@ -71,12 +71,23 @@ for (const entorno of ['arga', 'garrigues'] as const) {
       expect(range, 'la petición debe pedir el recuento exacto (content-range)').toMatch(/\/\d+$/);
       const serverCount = Number(range!.split('/').at(-1));
 
+      // El contador se pinta desde el primer render con `rows = data ?? []`,
+      // así que aparece en "0 expedientes en total" mientras la consulta sigue
+      // en vuelo (antes de que React procese la respuesta ya recibida por
+      // Playwright). Sondear hasta que se estabilice, no leerlo una sola vez.
       const contador = page.getByText(/expedientes? en total/);
       await expect(contador).toBeVisible({ timeout: 15_000 });
-      const texto = (await contador.textContent()) ?? '';
-      const pintado = Number(/(\d+)\s+expedientes?\s+en total/.exec(texto)?.[1]);
-      expect(pintado, `no se pudo leer el contador pintado: "${texto}"`).not.toBeNaN();
-
+      let pintado = NaN;
+      await expect
+        .poll(
+          async () => {
+            const texto = (await contador.textContent()) ?? '';
+            pintado = Number(/(\d+)\s+expedientes?\s+en total/.exec(texto)?.[1]);
+            return pintado;
+          },
+          { timeout: 15_000 },
+        )
+        .toBe(serverCount);
       expect(pintado, 'la página debe pintar exactamente lo que el servidor cuenta para este tenant').toBe(serverCount);
 
       // Control positivo: cada fila abre la ficha de expediente existente.
