@@ -78,6 +78,9 @@ ya traía; donde coincide, se adopta.
 | D-25 | F2 (MOI-170) | La revisión v2 (`fn_aims_review_assessment` con decisión) queda **sin valores por defecto**; la pantalla sigue en la v1 hasta que haya sujetos con órgano (siembra del carril C). | Con DEFAULT, PostgREST no elegía sobrecarga y la revisión fallaba en producción. |
 | D-26 | Recorrido MOI-15 | Los hallazgos del recorrido se numeran **H-32…H-36** (H-27…H-31 ya eran del bloque 5, MOI-55). H-33 (acta bloqueada sin `registration_number`) y H-32 (punto nacido en sesión) se corrigen antes de cerrar MOI-15. | El acta es el entregable del recorrido; con H-33 abierto no se genera en ninguna sociedad dada de alta por el asistente. |
 | D-27 | MOI-150 | Se ejecuta con F2.T9 en el mismo cambio (el mapa fijo del órgano de IA pasa a dato). | Mismo fichero y misma solución; dos cambios separados dejarían una pantalla por dato y otra por constante. |
+| D-28 | MOI-150 | El órgano de gobierno de la IA del grupo nuevo es el **Consejo de Administración de su matriz** (Corporación Nueva, S.A.), declarado por la vía de dato del producto como hipótesis a validar. | El grupo nuevo no tiene comité especializado; sin declaración, el panel falla cerrado. |
+| D-29 | MOI-143 | Base de cómputo de la Junta de prueba del grupo nuevo = capital con voto de `capital_holdings` vigente (60 % / 40 %, una acción un voto). El acta real se genera el día de la Junta (12-11-2026). | Es la base legal por defecto de una SA sin estatutos especiales; la fecha no se puede adelantar (un mes de antelación) y las universales siguen cerradas. |
+| D-30 | H-50 (MOI-15) | **Fallo cerrado**: ningún selector ofrece una materia decisoria sin fila en `materia_catalog`, con nota visible de las pendientes; la emisión lo bloquea. Clasificar las 14 es del Comité Legal. | Hoy se emiten convocatorias cuyas actas el servidor no deja levantar. |
 
 ## 4. Lo que queda fuera del mandato (se prepara y se deja abierto)
 
@@ -124,5 +127,20 @@ estado de cada issue en Linear.
   restante corregido en `a1489dee`; `e2e/10-grc` 14/14.
 - Recorrido MOI-15 (4.1/4.5/4.6 por pantalla en el grupo nuevo): 4.5 y 4.6 correctos; 4.1 bloqueado
   por H-33. 9 convocatorias emitidas de residuo declaradas (no hay pantalla para retirarlas).
-- En curso al anotar: ola 3b (F5 del programa RIA, MOI-181, MOI-214, MOI-146), corrección de
-  MOI-142, ola 3c (H-32/H-33) y ola 4 (F2 carriles B y C).
+
+### 5.3 Olas 3b, 3c y 4 y cierre de MOI-142 (27-09-2026, mañana)
+
+- MOI-142: Edge Function `convocation-artifact-register` v7 (fuente `capital_holdings`) y
+  `20260927138000` (postura legal del manifiesto de Junta en la raíz: toda Junta recibía 409 al
+  generar su documento). Junta `575bd05c…` del grupo nuevo emitida con documento final. La firma
+  del convocante sale vacía por la variable legacy `firma_convocante_ref` (fuente QTSP) de la
+  plantilla de Junta: pertenece a MOI-139/MOI-138.
+- Ola 3b aplicada: `20260928100000…140000` tras ensayo encadenado revertido; siembras de terceros
+  de IA (7) y aristas GRC↔IA (7). Colisión de numeración: MOI-146 pasa a H-37…H-49 (§6.8).
+- Ola 3c aplicada: `20260928150000` (H-33) y `20260928151000` (H-32). Destapa H-50 (D-30).
+- Ola 4 integrada: F2.T6/T8/T9/T11/T12/T13/T14/T17 y siembras T10/T15/T16 (13 sujetos de ARGA y 5
+  de Garrigues, «a validar por Legal»). ARGA pasa a mostrar el CATIT como órgano de IA.
+- Publicado: `4149a104` y `751db789`; `bun test` 5450 / 163 skip / 0 fail; producción 3/3.
+- Ejecutor de ensayos: ahora restaura el rol y los claims entre ficheros (una sonda dejaba la
+  sesión como `authenticated` y la migración siguiente no podía crear tablas).
+- Pendiente: ola 5 (H-50, MOI-150 grupo nuevo, MOI-15 4.1 por pantalla, MOI-16, MOI-143).
