@@ -22,6 +22,7 @@ import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { useEvidenceBySystem, evidenciasPorMedida } from "@/hooks/useAimsEvidence";
 import { usePersonasCanonical } from "@/hooks/usePersonasCanonical";
 import { useCreateComplianceChecks, useDraftAssessment, useSaveAssessment } from "@/hooks/useAiAssessments";
+import { useCurrentUserRole } from "@/hooks/useCurrentUser"; import { useHasCapability } from "@/hooks/useCapabilityMatrix";
 import { generarPlanDeAdaptacion, type AccionPDA } from "@/lib/aims/plan-adaptacion";
 import { perfilAplicable } from "@/lib/aims/perfil-aplicabilidad";
 import { mensajeUsuario } from "@/lib/aims/errores-rpc";
@@ -57,7 +58,7 @@ export default function EvaluacionNueva() {
   const [params] = useSearchParams();
   const { data: systems = [] } = useAiSystemsList();
   const saveAssessment = useSaveAssessment();
-  const createChecks = useCreateComplianceChecks();
+  const createChecks = useCreateComplianceChecks(); const puedeEvaluar = useHasCapability(useCurrentUserRole().primaryRole, "AIMS_EVALUAR");
 
   const [step, setStep] = useState(1);
   const [systemId, setSystemId] = useState(params.get("system_id") ?? "");
@@ -284,10 +285,8 @@ export default function EvaluacionNueva() {
   };
 
   const handleSubmit = async () => {
-    if (!systemId) {
-      toast.error("Selecciona un sistema de IA.");
-      return;
-    }
+    if (!systemId) { toast.error("Selecciona un sistema de IA."); return; }
+    if (!puedeEvaluar) { toast.error("Tu rol no tiene permiso para registrar autodiagnósticos de conformidad."); return; }
     // Lo no contestado NO se evalúa: ni genera finding ni da por conforme su
     // requisito. La construcción vive en `@/lib/aims/evaluacion-payload`.
     const { payload, fila } = construirPayload(true);

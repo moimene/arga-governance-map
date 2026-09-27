@@ -8,6 +8,8 @@ import ClasificacionGuiada, {
 import ResumenClasificacionConfirmada from "@/components/ai-governance/clasificacion/ResumenClasificacionConfirmada";
 import { usePersonasCanonical } from "@/hooks/usePersonasCanonical";
 import { aPayloadCuestionario, useRegistrarSistemaClasificado } from "@/hooks/useAimsClasificacion";
+import { useCurrentUserRole } from "@/hooks/useCurrentUser";
+import { SIN_CAPACIDAD_AVISO, useHasCapability } from "@/hooks/useCapabilityMatrix";
 import { type Respuestas } from "@/lib/aims/cuestionario-calificacion";
 import { ESTADOS_SISTEMA, etiqueta } from "@/lib/aims/vocabulario";
 
@@ -59,6 +61,7 @@ export default function SistemaNuevo() {
   const navigate = useNavigate();
   const registrar = useRegistrarSistemaClasificado();
   const { data: personas = [] } = usePersonasCanonical({ person_type: "PF" });
+  const puedeRegistrar = useHasCapability(useCurrentUserRole().primaryRole, "AIMS_INVENTARIO");
   const bloqueRef = useRef<HTMLDivElement>(null);
   const [form, setForm] = useState<FormState>({
     name: "",
@@ -101,6 +104,7 @@ export default function SistemaNuevo() {
     event.preventDefault();
     setSubmitted(true);
 
+    if (!puedeRegistrar) { toast.error("Tu rol no tiene permiso para registrar sistemas de IA."); return; }
     if (bloqueos.length > 0 || !confirmada) {
       toast.error(bloqueos[0] ?? "Falta confirmar la clasificación guiada.");
       return;
@@ -360,7 +364,9 @@ export default function SistemaNuevo() {
           >
             Cancelar
           </button>
-          {confirmada ? (
+          {confirmada && !puedeRegistrar ? (
+            <p className="text-xs text-[var(--g-text-secondary)]" role="alert">{SIN_CAPACIDAD_AVISO}</p>
+          ) : confirmada ? (
             <button
               type="submit"
               aria-busy={registrar.isPending}

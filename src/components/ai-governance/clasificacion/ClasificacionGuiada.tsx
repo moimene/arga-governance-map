@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, Check } from "lucide-react";
+import { useCurrentUserRole } from "@/hooks/useCurrentUser"; import { SIN_CAPACIDAD_AVISO, useHasCapability } from "@/hooks/useCapabilityMatrix";
 import {
   ETIQUETA_PERFIL,
   MINIMO_MOTIVACION_ART63,
@@ -97,6 +98,7 @@ export default function ClasificacionGuiada({
   const [fase, setFase] = useState(1);
   const [respuestas, setRespuestas] = useState<Respuestas>(respuestasIniciales ?? {});
   const [justificacion, setJustificacion] = useState(justificacionInicial ?? "");
+  const puedeClasificar = useHasCapability(useCurrentUserRole().primaryRole, "AIMS_CLASIFICAR");
 
   const resultado = useMemo(() => resultadoProvisional(respuestas), [respuestas]);
   const { bloqueos, avisos } = bloqueosParaConfirmar(respuestas, justificacion, tieneOwner, modo);
@@ -271,16 +273,17 @@ export default function ClasificacionGuiada({
           </button>
         ) : (
           <div className="space-y-2 text-right">
-            <button
-              type="button"
-              onClick={() => onConfirmar({ respuestas, justificacionArt63: justificacion, resultado })}
-              disabled={bloqueos.length > 0 || confirmando}
-              aria-busy={confirmando}
-              className={BOTON_PRIMARIO}
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              {modo === "reclasificacion" ? "Confirmar nueva clasificación" : "Confirmar clasificación"}
-            </button>
+            {puedeClasificar ? (
+              <button
+                type="button" onClick={() => onConfirmar({ respuestas, justificacionArt63: justificacion, resultado })}
+                disabled={bloqueos.length > 0 || confirmando} aria-busy={confirmando}
+                className={BOTON_PRIMARIO} style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                {modo === "reclasificacion" ? "Confirmar nueva clasificación" : "Confirmar clasificación"}
+              </button>
+            ) : (
+              <p className="text-xs text-[var(--g-text-secondary)]" role="alert">{SIN_CAPACIDAD_AVISO}</p>
+            )}
             {bloqueos.length > 0 && (
               <ul role="alert" className="space-y-1 text-xs text-[var(--status-error)]">
                 {bloqueos.map((b) => (
