@@ -449,12 +449,39 @@ tres dejan de afirmar algo que la base no sostenía):
   **Decidido al integrar F1:** se monta en **F8**, en la ficha del sistema, junto a la vista
   `v_aims_indicator_status` (F8.T10), que es la que da estado derivado a los indicadores; montarlo
   antes pintaría un monitor por sistema sin su objeto de vigilancia.
+  - **[VERIFICADO BLOQUEADO — MOI-181, 2026-09-27]** F8.T10 no está ejecutada: `v_aims_indicator_status` no existe en Cloud (`select 1 from information_schema.views where table_schema='public' and table_name='v_aims_indicator_status'` → 0 filas, medido hoy) y F8 depende de F2 (MOI-170, Backlog) por calendario de la especificación (ventana 11-01 a 12-02-2027, MOI-180, también Backlog). Nada que montar sin su objeto de vigilancia — coincide con lo que este mismo párrafo ya declaraba. Queda pendiente de MOI-180; MOI-181 no lo ejecuta.
 - **Comprobación ↔ evaluación sin enlace.** (M01 aplicada el 19-09: el enlace existe; las 61
   legacy siguen NULL. Atar la acreditación a la evaluación propia queda para F2.) Mientras M01 (F1.T14) no dé `assessment_id` a
   `ai_compliance_checks`, `sistemasConEvaluacionFirme` exige que **todas** las evaluaciones vigentes
   del sistema estén congeladas y revisadas: una ISO sin firmar impide acreditar las comprobaciones
   RIA del mismo sistema. Es conservador (nunca acredita de más); con M01, atar cada comprobación a
   la suya.
+  - **[HECHO, decisión técnica del agente — MOI-181, 2026-09-27]** F2 (M03, `subject_id`/columna de
+    evaluación por el sujeto jurídico) sigue sin ejecutar (bloqueada por MOI-170), así que «atar la
+    acreditación a la evaluación propia» no puede llegar por ese camino todavía. La regla dura
+    F11.T4 («0 UPDATE sobre el legado») y el propio issue MOI-181 («si exige escribir en filas
+    existentes de ARGA o Garrigues, no hacerlo y elevarlo») excluyen persistir un enlace inventado
+    en las 61 filas. Se implementa en su lugar una **vista de solo lectura**,
+    `public.v_aims_checks_legado_correlacion`
+    (`supabase/migrations/20260928140000_aims_checks_legado_correlacion_view.sql`), que calcula por
+    `system_id` y proximidad de fecha (`abs(fecha_comprobación − fecha_evaluación)`, desempate por
+    evaluación más antigua y luego por id) cuál es la evaluación MÁS PROBABLE de cada comprobación
+    sin enlace, sin tocar ni una fila de `ai_compliance_checks` ni de `ai_risk_assessments`
+    (`assessment_id` sigue NULL en las 61). Nombres de columna con prefijo `probable_` a propósito:
+    es una correlación DERIVADA, nunca el enlace real de M01, y ninguna pantalla puede confundirla
+    con una acreditación. `security_invoker = true` para heredar la RLS de las tablas base sin
+    repetir el criterio de tenant; `anon` sin privilegio, `authenticated` solo `SELECT`. Medido en
+    solo lectura contra `governance_OS` antes de escribir la vista (mismo cálculo, sin crearla):
+    de las 61 legacy, **58** tienen al menos una evaluación candidata en su sistema (quedan en la
+    vista) y **3** no tienen ninguna evaluación en su sistema (quedan fuera — el join es INNER a
+    propósito, no se propone nada donde no hay nada que proponer); distancia de la correlación
+    top-1 entre 0 y 199 días, media 29,7. Gate de forma (sin Cloud):
+    `src/test/schema/aims-checks-legado-correlacion-migration-shape.test.ts`, 7 tests, mutación
+    comprobada dos veces (retirar `security_invoker=true` y retirar el filtro
+    `assessment_id is null` ponen el gate en rojo; restaurado, vuelve a verde). **La migración NO
+    está aplicada a Cloud**: el agente que la escribió solo tiene autorización de lectura
+    (`SELECT`) sobre `governance_OS`; aplicarla —puro DDL aditivo, 0 filas tocadas— requiere una
+    sesión con canal de escritura y la autorización de Moisés que pide la puerta humana de MOI-181.
 
 ### Corrección de la especificación
 
@@ -521,6 +548,19 @@ tres dejan de afirmar algo que la base no sostenía):
   MG_INCI_02, y MG_ISO_IMP_02 reubicada en su sentido (A.5.3, documentar la evaluación de impacto).
   Y la clasificación de las 33 medidas cuyo texto cambió (18 de sentido, 13 de alcance, 2 de
   terminología; lista en la cabecera de `catalog-aesia.ts`).
+  - **[REDACTADO, no enviado — MOI-181, 2026-09-27]** `docs/legal/harvey/2026-09-27-lote-H-11.md`
+    contiene las cuatro correcciones y las 33 medidas clasificadas por grupo, con el texto vigente
+    de cada una extraído de `catalog-aesia.ts` (no inventado). **Discrepancia detectada al
+    redactarlo, dejada abierta a propósito y no resuelta por el agente:** este mismo ledger (línea
+    anterior) y `plan-f2-ria.md` describen la salvedad de MG_INCI_02 como del «párrafo segundo» del
+    art. 73.6, pero `catalog-aesia.ts:698` la tiene con `subpartId: "73.6.p1"` (párrafo PRIMERO); el
+    párrafo segundo en el catálogo es MG_INCI_04 («proporcionar a las autoridades toda la
+    información técnica requerida»). El documento H11-C se lo plantea a Harvey explícitamente en
+    vez de reclasificar el código por su cuenta: es un punto de encaje de artículo, reservado a
+    Legal/Harvey, no a este agente. **Envío pendiente**: la consola de Harvey
+    (`https://eu.app.harvey.ai`) exige el inicio de sesión de Moisés; se envía desde la herramienta
+    de MOI-169, no desde aquí. Hasta la respuesta, `docs/legal/harvey/registro.json` no gana entrada
+    `H-11` (solo se actualiza con un veredicto real, nunca con uno simulado).
 - **`catalog_version` (F2.T3).** Sin versión en la fila, la detección de «versión anterior» usa el
   texto y la fecha de la evaluación contra `desde`; con varias subidas de versión en el mismo día o
   sin fecha, hará falta la columna.
@@ -537,14 +577,25 @@ tres dejan de afirmar algo que la base no sostenía):
   criterio de `tieneMedicion` (falla cerrado: solo un número finito o una cadena no vacía, suelto o
   en `value`). No se compara en cliente: el dato no declara si el umbral se supera por arriba o por
   abajo.
+  - **[VERIFICADO BLOQUEADO — MOI-181, 2026-09-27]** Sigue sin cerrar: `v_aims_indicator_status` no
+    existe en Cloud (medido, ver la nota gemela bajo «Monitor por sistema»). F8.T10 es de MOI-180
+    (Backlog, calendario 2027). MOI-181 no lo ejecuta, solo lo comprueba.
 - **F1.T7 — sección «Cerrada» (SEALED):** la pestaña ya no ofrece «Editar», pero el guard del hook
   mira el estado de DESTINO, no el de origen; la inmutabilidad en servidor llega con **F9.T2**
   (trigger de guardia de `status`). Latente: 0 filas SEALED en Cloud (medido 2026-09-19).
+  - **[VERIFICADO BLOQUEADO — MOI-181, 2026-09-27]** Sigue sin trigger de servidor: ninguna
+    migración crea una función `fn_aims_revisar_seccion` ni un trigger de guardia sobre
+    `aims_technical_file_sections.status` (`grep fn_aims_revisar_seccion` en `supabase/migrations/`
+    y `src/` → 0 resultados). F9.T2 es de MOI-180 (Backlog). Sigue latente (0 filas SEALED), no
+    urgente, pero no cerrado.
 - **[DECIDIDO al integrar F1: lo cierra F9.T2 — `fn_aims_revisar_seccion` limpia `reviewed_at` al devolver una sección a estado de trabajo; F1.T4 no toca dato]** **F1.T7 — `reviewed_at` huérfano (decisión del controlador):** guardar una sección «Conforme» la
   deja en un estado de trabajo y no toca `reviewed_at`, que queda sin revisión a la que corresponder.
   La pestaña avisa antes de guardar y ya no pinta «Revisada» junto a un estado de trabajo (hoy ninguna
   fila de ARGA está en ese caso: la única «Pendiente» tiene `reviewed_at` NULL), pero el dato conserva
   la fecha. Qué cadena lo cierra —F1.T4 (legado) o F9.T2 (`fn_aims_revisar_seccion`)— está sin decidir.
+  - **[VERIFICADO BLOQUEADO — MOI-181, 2026-09-27]** La decisión de qué cadena lo cierra sigue sin
+    tomarse y `fn_aims_revisar_seccion` sigue sin existir (mismo grep que arriba). F9.T2 es de
+    MOI-180 (Backlog). MOI-181 no decide el criterio ni ejecuta el trigger.
 - **Siete celdas del Excel del experto vienen cortadas en el propio libro (I-11 del documento de
   incidencias, P-08).** Medido en el original `Dashboard_control_RIA.xlsx`, uniendo todos los
   `<t>` de cada `<si>`: `Obligaciones!I11`, `I16`, `I43`, `I49`, `I54`, `I56` e `I65` miden
