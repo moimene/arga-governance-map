@@ -14,12 +14,16 @@ import { watchReadOnly } from "./fixtures/read-only-guard";
  *     visible declarado en F2.T15, autorizado en ese carril — no aquí).
  *   - Garrigues: PI-30.owner_body_id ya era el Comité de Gobernanza de la IA
  *     y sus 6 sistemas tienen `ai_policy_id = PI-30` → panel con el comité.
- *   - Grupo Nuevo (`…0003`): 0 filas en `aims_ria_subjects` con
- *     `governing_body_id`, 0 políticas de IA con `owner_body_id`, y sus 7
- *     sistemas sin `ai_policy_id` → sin órgano acreditado, sin panel. Esta
- *     tarea (MOI-150) sólo deja un script en DRY-RUN para ese tenant: no se
- *     ha aplicado nada, así que "sin panel" es el estado real, no una
- *     suposición.
+ *   - Grupo Nuevo (`…0003`): D-28 bis (migración `20260928172000`, ensayada
+ *     y revertida, NO aplicada aún a Cloud) añade `p_governing_body_id` a
+ *     `fn_aims_proponer_sujeto`/`fn_aims_confirmar_sujeto` para que el sujeto
+ *     de este tenant pueda declarar el Consejo de Administración de
+ *     Corporación Nueva, S.A. (`scripts/aims/seed-organo-ia-grupo-nuevo.ts`,
+ *     que sigue en DRY-RUN — nadie ha corrido `--commit`). El caso `nuevo` de
+ *     abajo espera YA el panel con ese órgano: hoy (migración y siembra sin
+ *     aplicar) este caso queda EN ROJO a propósito — es el criterio de hecho
+ *     del issue, no un error del spec. Se pone en verde solo cuando el
+ *     orquestador aplique la migración y la siembra en Cloud.
  *
  * Guard de red bloqueante en los tres: este spec no debe escribir nada en
  * Cloud (ni siquiera un efecto colateral de pantalla), en ninguno de los tres
@@ -40,7 +44,14 @@ const CASOS: CasoOrgano[] = [
     entorno: "garrigues",
     esperado: { name: "Comité de Gobernanza de la Inteligencia Artificial", slug: "garrigues-comite-gobernanza-ia" },
   },
-  { entorno: "nuevo", esperado: null },
+  {
+    entorno: "nuevo",
+    // D-28 (MOI-150): Consejo de Administración de Corporación Nueva, S.A.
+    // (`db8073bb-5089-4bbf-a9a9-456d457f59b7`, tal cual está en Cloud —
+    // sin tilde en "Administracion"). En rojo hasta que la migración
+    // `20260928172000` y el seed se apliquen (ver cabecera del fichero).
+    esperado: { name: "Consejo de Administracion", slug: "corporacion-nueva-s-a-1790294732310-admin-onboarding" },
+  },
 ];
 
 test.describe("MOI-150 — órgano de gobierno de la IA en /ai-governance, por tenant", () => {

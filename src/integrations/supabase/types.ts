@@ -15288,7 +15288,12 @@ export type Database = {
         }[]
       }
       fn_aims_confirmar_sujeto: {
-        Args: { p_motivo: string; p_nuevo_status: string; p_subject_id: string }
+        Args: {
+          p_governing_body_id?: string
+          p_motivo: string
+          p_nuevo_status: string
+          p_subject_id: string
+        }
         Returns: string
       }
       fn_aims_declarar_especialidad: {
@@ -15321,6 +15326,7 @@ export type Database = {
         Args: {
           p_derivation: string
           p_entity_id: string
+          p_governing_body_id?: string
           p_questionnaire_id?: string
           p_rationale?: string
           p_role: string

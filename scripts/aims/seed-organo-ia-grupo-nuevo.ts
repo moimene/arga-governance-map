@@ -22,40 +22,24 @@
  * `scripts/politicas/seed-pr024-owner-body.ts`, para que un alta futura no
  * quede arrastrada por accidente.
  *
- * MECANISMO — LO QUE ESTE SCRIPT HACE Y LO QUE NO PUEDE HACER
- * -------------------------------------------------------------
- * El único parámetro que el issue nombra para "declarar por dato" es la vía
- * de `aims_ria_subjects` (F2.T4: `fn_aims_proponer_sujeto` /
- * `fn_aims_confirmar_sujeto`). Este script SÍ propone un sujeto hipótesis
- * (Corporación Nueva, S.A. como RESPONSABLE_DESPLIEGUE del sistema de MOI-55,
- * SIEMBRA_HIPOTESIS, a validar por el comité de IA real del cliente) por esa
- * vía — es una declaración legítima del RIA y dato útil por derecho propio.
+ * MECANISMO
+ * ---------
+ * D-28 bis (por delegación de Moisés, migración `20260928172000`): en vez de
+ * fabricar una política de IA del Grupo Nuevo (opción (b) del hueco que este
+ * script declaraba), se completó F2.T4 con el modelo de F2.T9 —
+ * `fn_aims_proponer_sujeto` acepta ahora `p_governing_body_id`, exige
+ * `AIMS_GOBIERNO` para usarlo y valida que el órgano sea del mismo tenant.
+ * Este script propone el sujeto hipótesis (Corporación Nueva, S.A. como
+ * RESPONSABLE_DESPLIEGUE del sistema de MOI-55, SIEMBRA_HIPOTESIS, a validar
+ * por el comité de IA real del cliente) declarando DE UNA VEZ el órgano
+ * (D-28: el Consejo de Administración de Corporación Nueva, S.A. — el grupo
+ * nuevo no tiene comité especializado de IA). Con esto, `governing_body_id`
+ * queda puesto y `resolveGoverningBodyIdFromSubjects`
+ * (`src/lib/aims/governing-body.ts`, F2.T9, vía `useAiGovernanceBody`) lo
+ * resuelve: el panel del Dashboard de AI Governance del Grupo Nuevo aparece.
  *
- * PERO verificado contra el SQL real de esa RPC
- * (`supabase/migrations/20260927133000_f2_a3_aims_rpc_sujetos.sql`):
- * `fn_aims_proponer_sujeto` no acepta un parámetro `governing_body_id`, y su
- * INSERT no escribe esa columna. `fn_aims_confirmar_sujeto` tampoco la toca —
- * solo actualiza `status` y `provenance`. Ninguna RPC del carril A escribe
- * `aims_ria_subjects.governing_body_id`; la tabla solo concede SELECT a
- * `authenticated` (no hay UPDATE directo posible). Medido en Cloud
- * (2026-09-27): las 13 filas de ARGA y las 5 de Garrigues en
- * `aims_ria_subjects` tienen `governing_body_id` NULL — el camino nunca se ha
- * usado para esto, ni siquiera donde ya hay sujetos sembrados.
- *
- * CONSECUENCIA: proponer este sujeto NO hace aparecer el panel del Dashboard
- * de AI Governance del Grupo Nuevo. La vía que SÍ resuelve hoy — la que ya
- * hace aparecer el panel en ARGA (CATIT, vía PR-024) y en Garrigues (vía
- * PI-30) — es `policies.owner_body_id` + `ai_systems.ai_policy_id`
- * (`resolveGoverningBodyIdFromPolicies`, `src/lib/aims/governing-body.ts`).
- * El Grupo Nuevo no tiene ninguna política de IA (`policies`) todavía — a
- * diferencia de ARGA/Garrigues, aquí no hay un PR-024/PI-30 al que enlazar. Ni
- * F2.T4 ni este issue autorizan fabricar una política nueva para servir de
- * vehículo, así que este script se detiene en la propuesta del sujeto y
- * deja el hueco declarado — no maquillado — para que Moisés decida entre (a)
- * extender `fn_aims_proponer_sujeto`/`fn_aims_confirmar_sujeto` con un
- * parámetro de órgano (una migración nueva, con su propio ensayo) o (b) crear
- * una política de IA del Grupo Nuevo y repetir el patrón de F2.T15. Ese es el
- * criterio jurídico/técnico reservado que este script NO decide por su cuenta.
+ * Requiere una sesión con `AIMS_GOBIERNO` (`admin@grupo-nuevo-demo.dev`,
+ * ADMIN_TENANT — `demo@` es SECRETARIO y no la tiene, se rechazaría).
  *
  * Uso:
  *   bun run scripts/aims/seed-organo-ia-grupo-nuevo.ts            # dry-run
@@ -89,6 +73,7 @@ export interface SujetoExistente {
   system_id: string;
   entity_id: string;
   role: string;
+  governing_body_id: string | null;
 }
 
 const ROL = "RESPONSABLE_DESPLIEGUE" as const;
@@ -98,6 +83,14 @@ export function yaDeclarado(existentes: SujetoExistente[]): boolean {
   return existentes.some(
     (e) => e.system_id === SISTEMA_MOI55_REAL_ID && e.entity_id === CORPORACION_NUEVA_ENTITY_ID && e.role === ROL,
   );
+}
+
+/** Pura: el sujeto ya existe pero sin el órgano D-28 puesto (p.ej. una corrida previa a esta migración). */
+export function faltaOrgano(existentes: SujetoExistente[]): boolean {
+  const fila = existentes.find(
+    (e) => e.system_id === SISTEMA_MOI55_REAL_ID && e.entity_id === CORPORACION_NUEVA_ENTITY_ID && e.role === ROL,
+  );
+  return fila !== undefined && fila.governing_body_id !== CDA_CORPORACION_NUEVA_ID;
 }
 
 async function main() {
@@ -123,45 +116,75 @@ async function main() {
 
   const { data: existentes, error: errSub } = await sesion
     .from("aims_ria_subjects")
-    .select("system_id, entity_id, role")
+    .select("system_id, entity_id, role, governing_body_id")
     .eq("tenant_id", GRUPO_NUEVO_TENANT);
   if (errSub) throw new Error(`lectura aims_ria_subjects: ${errSub.message}`);
 
-  const propone = !yaDeclarado((existentes ?? []) as SujetoExistente[]);
+  const filas = (existentes ?? []) as SujetoExistente[];
+  const propone = !yaDeclarado(filas);
+  const confirma = !propone && faltaOrgano(filas);
 
   console.log(`Sistema declarado: ${SISTEMA_MOI55_REAL_ID} (recorrido MOI-55, real)`);
   console.log(`Entidad sujeto: Corporación Nueva, S.A. (${CORPORACION_NUEVA_ENTITY_ID})`);
   console.log(`Rol propuesto: ${ROL} (SIEMBRA_HIPOTESIS, a validar)`);
-  console.log(propone ? "  → se propondría 1 sujeto nuevo por fn_aims_proponer_sujeto" : "  → ya declarado, sin cambio (idempotente)");
-
-  console.log(
-    `\nÓrgano D-28: Consejo de Administración de Corporación Nueva, S.A. (${CDA_CORPORACION_NUEVA_ID}).` +
-      "\nNOTA IMPORTANTE: ni fn_aims_proponer_sujeto ni fn_aims_confirmar_sujeto aceptan un parámetro de" +
-      "\norgano — declarar este sujeto NO hace aparecer el panel del Dashboard (aims_ria_subjects.governing_body_id" +
-      "\nno tiene ningún camino de escritura hoy, verificado en el SQL de F2.T4/A3 y en Cloud: 0 de las 18 filas" +
-      "\nexistentes en ARGA/Garrigues lo llevan puesto). Hace falta una decisión aparte — ver cabecera del fichero.",
-  );
+  console.log(`Órgano D-28: Consejo de Administración de Corporación Nueva, S.A. (${CDA_CORPORACION_NUEVA_ID})`);
+  if (propone) {
+    console.log("  → se propondría 1 sujeto nuevo por fn_aims_proponer_sujeto, CON el órgano D-28 puesto de una vez");
+  } else if (confirma) {
+    console.log("  → el sujeto ya existe SIN el órgano D-28 — se completaría por fn_aims_confirmar_sujeto");
+  } else {
+    console.log("  → ya declarado con el órgano D-28, sin cambio (idempotente)");
+  }
 
   if (!COMMIT) {
     console.log("\nDry-run. Ejecuta con --commit para aplicar.");
     return;
   }
 
-  if (!propone) {
+  if (!propone && !confirma) {
     console.log("\nNada que aplicar.");
     return;
   }
 
-  const { error: rpcError } = await sesion.rpc("fn_aims_proponer_sujeto", {
-    p_system_id: SISTEMA_MOI55_REAL_ID,
-    p_entity_id: CORPORACION_NUEVA_ENTITY_ID,
-    p_role: ROL,
-    p_derivation: "SIEMBRA_HIPOTESIS",
-    p_role_basis: ["3.4"],
-    p_rationale: RATIONALE,
+  if (propone) {
+    const { error: rpcError } = await sesion.rpc("fn_aims_proponer_sujeto", {
+      p_system_id: SISTEMA_MOI55_REAL_ID,
+      p_entity_id: CORPORACION_NUEVA_ENTITY_ID,
+      p_role: ROL,
+      p_derivation: "SIEMBRA_HIPOTESIS",
+      p_role_basis: ["3.4"],
+      p_rationale: RATIONALE,
+      p_governing_body_id: CDA_CORPORACION_NUEVA_ID,
+    });
+    if (rpcError) throw new Error(`fn_aims_proponer_sujeto: ${rpcError.message}`);
+    console.log("  ✓ sujeto propuesto (PROPUESTO, órgano D-28 acreditado — el panel del Dashboard debería aparecer)");
+    return;
+  }
+
+  // confirma: el sujeto ya existía (p.ej. de una corrida anterior a esta
+  // migración) sin el órgano. Se completa con el motivo D-28, sin tocar
+  // status (se pasa el mismo que ya tiene la fila).
+  const filaExistente = filas.find(
+    (e) => e.system_id === SISTEMA_MOI55_REAL_ID && e.entity_id === CORPORACION_NUEVA_ENTITY_ID && e.role === ROL,
+  )!;
+  const { data: sujetoActual, error: errActual } = await sesion
+    .from("aims_ria_subjects")
+    .select("id, status")
+    .eq("tenant_id", GRUPO_NUEVO_TENANT)
+    .eq("system_id", filaExistente.system_id)
+    .eq("entity_id", filaExistente.entity_id)
+    .eq("role", filaExistente.role)
+    .single();
+  if (errActual || !sujetoActual) throw new Error(`lectura del sujeto existente: ${errActual?.message ?? "no encontrado"}`);
+
+  const { error: rpcError } = await sesion.rpc("fn_aims_confirmar_sujeto", {
+    p_subject_id: sujetoActual.id,
+    p_nuevo_status: sujetoActual.status,
+    p_motivo: RATIONALE,
+    p_governing_body_id: CDA_CORPORACION_NUEVA_ID,
   });
-  if (rpcError) throw new Error(`fn_aims_proponer_sujeto: ${rpcError.message}`);
-  console.log("  ✓ sujeto propuesto (PROPUESTO, sin órgano acreditado — el panel sigue sin aparecer)");
+  if (rpcError) throw new Error(`fn_aims_confirmar_sujeto: ${rpcError.message}`);
+  console.log("  ✓ órgano D-28 completado sobre el sujeto existente — el panel del Dashboard debería aparecer");
 }
 
 if (import.meta.main) {
