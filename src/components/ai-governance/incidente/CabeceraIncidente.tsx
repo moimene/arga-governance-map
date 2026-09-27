@@ -193,6 +193,20 @@ export default function CabeceraIncidente({
                   <ExternalLink className="w-3 h-3" />
                 </Link>
               )}
+              {secretariaEnabled && (
+                // MOI-56: segundo destino posible del seguimiento persistente
+                // ("reunión o acuerdo", Aceptación del issue). AcuerdoSinSesionStepper
+                // ya lee `source`/`ai_incident` con el mismo contrato de
+                // cross-module-handoff.ts y persiste la derivación al adoptar.
+                <Link
+                  to={`/secretaria/acuerdos-sin-sesion/nuevo?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${incident.id}`}
+                  className="px-3 py-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] text-xs font-medium transition-colors inline-flex items-center gap-1.5"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <span>Derivar a acuerdo sin sesión</span>
+                  <ExternalLink className="w-3 h-3" />
+                </Link>
+              )}
             </div>
           </div>
         )}

@@ -70,3 +70,27 @@ export function readMeetingHandoff(get: (key: string) => string | null): ReadMee
     isCrossModule: source === "grc" || source === "aims",
   };
 }
+
+/**
+ * MOI-56: reconstruye la query string del handoff para PROPAGARLO a un flujo
+ * de creación posterior (p.ej. de `ReunionIntake` a "Reunión universal" o a
+ * "Acuerdo sin sesión"). Reutiliza `buildMeetingHandoffSearch` en vez de
+ * duplicar el mapeo de claves — antes de esta función, `ReunionIntake`
+ * MOSTRABA la derivación pero los enlaces de "crear" la perdían: el
+ * `ai_incident` no llegaba nunca al punto donde se crea la reunión.
+ * Sin contexto cruzado, devuelve `basePath` intacto.
+ */
+export function appendHandoffParams(basePath: string, ctx: ReadMeetingHandoff): string {
+  if (!ctx.isCrossModule) return basePath;
+  const search = buildMeetingHandoffSearch({
+    source: ctx.source ?? "",
+    event: ctx.event ?? "",
+    sourceId: ctx.sourceId,
+    organ: ctx.organ,
+    matter: ctx.matter,
+    rationale: ctx.rationale,
+  });
+  if (!search) return basePath;
+  const sep = basePath.includes("?") ? "&" : "?";
+  return `${basePath}${sep}${search}`;
+}
