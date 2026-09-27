@@ -50,6 +50,12 @@ const DOMAIN_TABLES = [
   // direcciones (ver aislamiento-declarado.ts). Sigue aquí —la cobertura no
   // puede encoger— pero ahora asierta de verdad por los dos lados.
   "ai_systems",
+  // MOI-170, F2 (carril A): tablas nuevas del programa RIA. Vacías en los dos
+  // tenants hasta que F2.T10/F2.T16 siembren (otro carril) — declaradas
+  // PENDIENTE en aislamiento-declarado.ts, así que su vacuidad no rompe hoy y
+  // se vuelve aserción real sola, sin tocar este fichero, en cuanto se siembre.
+  "aims_ria_subjects",
+  "aims_specialty_bodies",
 ];
 
 function anonClient(): SupabaseClient {
