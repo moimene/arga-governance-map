@@ -111,7 +111,7 @@ test.describe('Cross-module handoffs read-only', () => {
     await page.goto(`/secretaria/reuniones/nueva?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${ARGA_AI_INCIDENT_ID}`);
 
     await expect(page).not.toHaveURL('/login');
-    await expect(page.getByText('Handoff read-only desde AIMS 360')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Derivación desde AIMS 360')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('EXP-INC-03FE408A')).toBeVisible();
     await expect(page.getByText(/Sesgo detectado en scoring/i)).toBeVisible();
     await expect(page.getByText(ARGA_AI_INCIDENT_ID)).not.toBeVisible();
@@ -121,7 +121,7 @@ test.describe('Cross-module handoffs read-only', () => {
     await page.goto(`/secretaria/reuniones/nueva?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${OTHER_TENANT_AI_INCIDENT_ID}`);
 
     await expect(page).not.toHaveURL('/login');
-    await expect(page.getByText('Handoff read-only desde AIMS 360')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Derivación desde AIMS 360')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/Referencia:/i)).not.toBeVisible();
     await expect(page.getByText(OTHER_TENANT_AI_INCIDENT_ID)).not.toBeVisible();
   });
