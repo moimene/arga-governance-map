@@ -8,6 +8,8 @@ import {
 
 const COMITE = "432e420b-4db1-44f1-81da-e3575b1d3dec"; // Comité de Gobernanza de la IA (Garrigues, Cloud)
 const PI_30 = "d6d2f0db-3e60-49c4-a71f-eb472d899764"; // PI-30 (Garrigues, Cloud)
+const CATIT = "08a4156b-a814-4dc6-b953-fafac1b5b840"; // CATIT (ARGA, Cloud)
+const PR_024 = "fbf6c726-3656-48d9-ae56-b1a7c0236161"; // PR-024 (ARGA, Cloud)
 
 describe("resolveGoverningBodyIdFromSubjects — el sujeto manda primero", () => {
   it("resuelve el primer sujeto con órgano acreditado", () => {
@@ -77,27 +79,40 @@ describe("resolveAiGovernanceBodyId — sujeto antes que política, y fallo cerr
     ).toBe(COMITE);
   });
 
-  it("ARGA hoy: sin sujetos y sin ai_policy_id en sus sistemas, null — sin panel", () => {
-    // Medido en Cloud (2026-09-27): PR-024 (política de ARGA) sigue con
-    // owner_body_id NULL y los 8 sistemas de ARGA sin ai_policy_id. No se le
-    // fabrica un órgano de gobierno de la IA que nadie ha constituido.
+  it("ARGA hoy: sin sujetos, resuelve por política — PR-024 → CATIT (F2.T15)", () => {
+    // Medido en Cloud (2026-09-27, tras F2.T15): PR-024.owner_body_id = CATIT
+    // y los 8 sistemas de ARGA tienen ai_policy_id = PR-024. aims_ria_subjects
+    // sigue con 0 filas con governing_body_id en ARGA (13 sujetos, ninguno con
+    // órgano acreditado por esa vía) — resuelve por política, no por sujeto.
     expect(
-      resolveAiGovernanceBodyId({ subjects: [], systems: [{ ai_policy_id: null }], policies: [] }),
-    ).toBeNull();
+      resolveAiGovernanceBodyId({
+        subjects: [],
+        systems: [{ ai_policy_id: PR_024 }],
+        policies: [{ id: PR_024, owner_body_id: CATIT }],
+      }),
+    ).toBe(CATIT);
   });
 
-  it("Garrigues hoy: sin sujetos y sin ai_policy_id sembrado en sus sistemas, también null", () => {
-    // Medido en Cloud (2026-09-27): PI-30.owner_body_id SÍ es el comité, pero
-    // ninguno de los 6 sistemas de Garrigues tiene ai_policy_id todavía — eso
-    // lo siembra el carril C (F2.T16). Hasta entonces, el panel de Garrigues
-    // desaparece también: es el precio de resolver por dato y no por mapa, y
-    // está declarado en el ledger de esta tarea, no escrito aquí por el agente.
+  it("Garrigues hoy: sin sujetos, resuelve por política — PI-30 → Comité (F2.T15)", () => {
+    // Medido en Cloud (2026-09-27, tras F2.T15): PI-30.owner_body_id ya era el
+    // comité y los 6 sistemas de Garrigues tienen ai_policy_id = PI-30 (antes
+    // de F2.T15 esto resolvía a null; el carril C lo sembró). Igual que ARGA,
+    // aims_ria_subjects sigue con 0 filas con governing_body_id en Garrigues
+    // (5 sujetos, ninguno con órgano acreditado por esa vía).
     expect(
-      resolveAiGovernanceBodyId({ subjects: [], systems: [{ ai_policy_id: null }], policies: [{ id: PI_30, owner_body_id: COMITE }] }),
-    ).toBeNull();
+      resolveAiGovernanceBodyId({
+        subjects: [],
+        systems: [{ ai_policy_id: PI_30 }],
+        policies: [{ id: PI_30, owner_body_id: COMITE }],
+      }),
+    ).toBe(COMITE);
   });
 
-  it("un tenant sin ningún dato (grupo nuevo, recién dado de alta) también es null", () => {
+  it("un tenant sin ningún dato (grupo nuevo, recién dado de alta) es null — MOI-150 sin aplicar", () => {
+    // Medido en Cloud (2026-09-27): el Grupo Nuevo (…0003) tiene 0 filas en
+    // aims_ria_subjects y sus 7 sistemas (incluido el real del recorrido
+    // MOI-55, 75635765-…) sin ai_policy_id — MOI-150 sólo deja un script en
+    // dry-run (scripts/aims/seed-organo-ia-grupo-nuevo.ts), sin commitear.
     expect(resolveAiGovernanceBodyId({ subjects: [], systems: [], policies: [] })).toBeNull();
   });
 });

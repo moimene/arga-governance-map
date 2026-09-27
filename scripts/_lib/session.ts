@@ -12,6 +12,7 @@ const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.ANON_PUBLIC |
 
 export const ARGA_TENANT = "00000000-0000-0000-0000-000000000001";
 export const GARRIGUES_TENANT = "00000000-0000-0000-0000-000000000002";
+export const GRUPO_NUEVO_TENANT = "00000000-0000-0000-0000-000000000003";
 
 export interface Cuenta {
   email: string;
@@ -21,6 +22,7 @@ export interface Cuenta {
 export const ARGA_SECRETARIO: Cuenta = { email: "demo@arga-seguros.com", passwordEnv: "DEMO_PASSWORD_ARGA" };
 export const GARRIGUES_SECRETARIO: Cuenta = { email: "demo@garrigues-demo.dev", passwordEnv: "DEMO_PASSWORD_GARRIGUES" };
 export const GARRIGUES_ADMIN: Cuenta = { email: "admin@garrigues-demo.dev", passwordEnv: "DEMO_PASSWORD_GARRIGUES" };
+export const GRUPO_NUEVO_ADMIN: Cuenta = { email: "admin@grupo-nuevo-demo.dev", passwordEnv: "DEMO_PASSWORD_NUEVO" };
 
 export async function iniciarSesion(cuenta: Cuenta): Promise<SupabaseClient> {
   if (!ANON_KEY) {
