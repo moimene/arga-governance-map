@@ -33,6 +33,15 @@ const CATALOGO_VACIO_MEDIDO_H50 = [
   "OTROS_LIBRE",
 ];
 
+// Revisión P2 (MOI-15, ola 5): el informe original solo declaraba el impacto
+// medido en ARGA (…0001, 11 filas de `agreements`) y Garrigues (…0002, 0
+// filas). Existe un tercer tenant real con dato en estas materias sin
+// catálogo: `agreements` tiene 2 filas de APROBACION_PLAN_NEGOCIO en
+// `00000000-0000-0000-0000-000000000003` (Grupo Nuevo / tenant-cero),
+// verificado por SELECT en Cloud (governance_OS) el 2026-09-27. El fix ya es
+// genérico por catálogo, no por tenant, así que no requiere cambio de
+// código — solo declarar el impacto que faltaba en el informe.
+
 describe("materia-catalogada — criterio único de H-50", () => {
   it("fail-closed: sin catálogo (null) ninguna materia se considera catalogada", () => {
     for (const materia of ["APROBACION_CUENTAS", "OTROS_LIBRE", "CUALQUIER_COSA"]) {

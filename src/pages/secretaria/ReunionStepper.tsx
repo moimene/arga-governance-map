@@ -22,6 +22,7 @@ import { useAiIncidentHandoffReference } from "@/hooks/useAiIncidents";
 import {
   AGENDA_MATERIAS,
   MATERIAS_LIBRES,
+  agendaMateriaSelectionForKind,
   isMateriaVisibleForTipoSocial,
   labelMateria,
   resolveMateriaAlias,
@@ -1981,6 +1982,22 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
         }
         if (field === "tipo") {
           return { ...d, tipo: normalizeMateriaClase(val) };
+        }
+        if (field === "kind" && val === "DECISORIO") {
+          // H-50 revisión P1: cambiar la naturaleza a DECISORIO no puede
+          // dejar `materia` en un valor sin fila en el catálogo (p.ej. el
+          // "OTROS_LIBRE" de newSessionAgendaPoint) — el <select> de materia
+          // ya no ofrece esa opción y el navegador la pintaría como si la
+          // primera opción real estuviera seleccionada, mientras el estado
+          // real seguiría siendo la no catalogada. Mismo patrón que
+          // ConvocatoriasStepper (agendaMateriaSelectionForKind + catálogo).
+          const selection = agendaMateriaSelectionForKind({
+            kind: "DECISORIO",
+            currentMateria: d.materia,
+            organoTipo,
+            codigosCatalogo,
+          });
+          return { ...d, kind: "DECISORIO", materia: selection.materia, tipo: selection.tipo };
         }
         return { ...d, [field]: val };
       })
