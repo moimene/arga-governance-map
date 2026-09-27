@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { isOperationalSecretariaBody } from "@/lib/secretaria/operational-bodies";
+import { isOperationalSecretariaBody, type OperationalBodyLike } from "@/lib/secretaria/operational-bodies";
 
 export interface SecretariaScopedIds {
   bodyIds: string[] | null;
@@ -31,7 +31,9 @@ export async function getSecretariaScopedIds(
   if (agreementsResult.error) throw agreementsResult.error;
 
   return {
-    bodyIds: (bodiesResult.data ?? []).filter(isOperationalSecretariaBody).map((body) => body.id),
+    bodyIds: ((bodiesResult.data ?? []) as unknown as (OperationalBodyLike & { id: string })[])
+      .filter(isOperationalSecretariaBody)
+      .map((body) => body.id),
     agreementIds: (agreementsResult.data ?? []).map((agreement) => agreement.id),
   };
 }

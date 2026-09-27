@@ -18,6 +18,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesInsert } from "@/integrations/supabase/types";
 import type {
   EstadoPlantilla,
   GatePreIssue,
@@ -333,7 +334,7 @@ export async function createDraftFromImport(
   // 1. Insert borrador
   const { data, error } = await supabase
     .from("plantillas_protegidas")
-    .insert({ ...input.draftRow, tenant_id: ctx.tenantId, estado: "BORRADOR" })
+    .insert({ ...input.draftRow, tenant_id: ctx.tenantId, estado: "BORRADOR" } as unknown as TablesInsert<"plantillas_protegidas">)
     .select("id")
     .single();
   if (error || !data) {

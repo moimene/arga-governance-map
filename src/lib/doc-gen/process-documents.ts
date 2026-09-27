@@ -5,6 +5,7 @@ import { archiveDocxToStorage } from "./storage-archiver";
 import { resolveProcessDocumentFinalEvidenceReadiness } from "./process-document-readiness";
 import { domainTextTargetForKind } from "./domain-text-target";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesInsert } from "@/integrations/supabase/types";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import type { SecretariaAIAssist } from "@/lib/secretaria/document-generation-boundary";
 import { isUuidReference } from "@/lib/secretaria/certification-registry-intake";
@@ -827,7 +828,7 @@ export async function persistProcessArchiveLink(
             process_kind: input.kind,
             registry_base_artifact: true,
           },
-        });
+        } as unknown as TablesInsert<"secretaria_document_artifacts">);
       if (artifactInsertError) throw artifactInsertError;
     }
   }

@@ -2,6 +2,7 @@ import { computeContentHash, generateDocx } from "@/lib/doc-gen/docx-generator";
 import { computeSha512 } from "@/lib/doc-gen/storage-archiver";
 import { SOURCE_OBJECT_TYPE } from "@/lib/secretaria/evidence-source-types";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesInsert } from "@/integrations/supabase/types";
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -400,7 +401,7 @@ export async function archiveStandaloneCertificationDocument(
       document_url: documentUrl,
       signed_by: input.signedBy ?? "SISTEMA",
       status: "OPEN",
-    })
+    } as unknown as TablesInsert<"evidence_bundles">)
     .select("id")
     .maybeSingle();
   if (bundleError) throw bundleError;

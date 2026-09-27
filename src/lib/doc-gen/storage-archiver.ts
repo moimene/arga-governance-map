@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { resolveSandboxSafeEvidencePersistence } from "@/lib/secretaria/evidence-sandbox-gate";
+import type { Json } from "@/integrations/supabase/types";
 import {
   resolveArchiveBinaryDescriptor,
   type ArchivedBufferKind,
@@ -193,7 +194,7 @@ export async function archiveDocxToStorage(
         p_storage_path: storagePath,
         p_document_url: sentinelUrl,
         p_binary_hash_sha512: hashHex,
-        p_manifest: effectiveManifest,
+        p_manifest: effectiveManifest as unknown as Json,
       },
     );
 

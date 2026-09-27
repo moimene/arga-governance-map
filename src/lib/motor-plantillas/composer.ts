@@ -258,8 +258,8 @@ async function loadTemplateByRequest(
       .eq("tenant_id", req.tenant_id)
       .maybeSingle();
     if (error) throw error;
-    if (data && isOperationalTemplate(data as PlantillaProtegidaRow)) {
-      return assertTemplateCompatibleWithRequest(data as PlantillaProtegidaRow, req);
+    if (data && isOperationalTemplate(data as unknown as PlantillaProtegidaRow)) {
+      return assertTemplateCompatibleWithRequest(data as unknown as PlantillaProtegidaRow, req);
     }
   }
 
@@ -271,7 +271,7 @@ async function loadTemplateByRequest(
   if (error) throw error;
 
   const selected = selectProcessTemplate(
-    (data ?? []) as PlantillaProtegidaRow[],
+    (data ?? []) as unknown as PlantillaProtegidaRow[],
     req.template_profile_id
       ? [req.template_profile_id, ...templateTypes]
       : templateTypes,
