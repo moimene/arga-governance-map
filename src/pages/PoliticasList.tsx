@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,9 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
-import { usePoliciesList, policyStatusLabel } from "@/hooks/usePoliciesObligations";
-import { AlertTriangle, FileText, Plus } from "lucide-react";
+import { usePoliciesList, useCreatePolicy, policyStatusLabel } from "@/hooks/usePoliciesObligations";
+import { toast } from "@/hooks/use-toast";
+import { AlertTriangle, FileText, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const NATIVE_SELECT_CLASSES = "h-10 w-full rounded-md border border-input bg-background px-3 text-sm";
+const emptyToNull = (v: string) => (v.trim().length > 0 ? v.trim() : null);
 
 const TIER_CHIP: Record<string, string> = {
   POLITICA:      "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
@@ -24,12 +28,42 @@ const fmtDate = (d: string | null) => {
   return `${day}/${m}/${y}`;
 };
 
+const emptyNewPolicy = { policy_code: "", title: "", normative_tier: "", scope_level: "", owner_function: "" };
+
 export default function PoliticasList() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [newPolicy, setNewPolicy] = useState(emptyNewPolicy);
 
   const { data: policies = [], isLoading } = usePoliciesList();
+  const createPolicy = useCreatePolicy();
+
+  const handleCreatePolicy = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const policy_code = newPolicy.policy_code.trim();
+    const title = newPolicy.title.trim();
+    if (!policy_code || !title) {
+      toast({ title: "Código y título son obligatorios", variant: "destructive" });
+      return;
+    }
+    try {
+      await createPolicy.mutateAsync({
+        policy_code,
+        title,
+        normative_tier: emptyToNull(newPolicy.normative_tier),
+        scope_level: emptyToNull(newPolicy.scope_level),
+        owner_function: emptyToNull(newPolicy.owner_function),
+      });
+      toast({ title: `Política ${policy_code} creada en borrador` });
+      setNewPolicy(emptyNewPolicy);
+      setShowNewForm(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast({ title: "No se pudo crear la política", description: message, variant: "destructive" });
+    }
+  };
 
   const filtered = useMemo(() =>
     policies.filter((p) =>
@@ -59,8 +93,80 @@ export default function PoliticasList() {
             {isLoading ? "Cargando…" : `${policies.length} políticas y normas en el catálogo del grupo`}
           </p>
         </div>
-        <Button className="gap-1.5"><Plus className="h-4 w-4" />Nueva política</Button>
+        <Button className="gap-1.5" onClick={() => setShowNewForm((v) => !v)} aria-expanded={showNewForm}>
+          {showNewForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+          {showNewForm ? "Cancelar" : "Nueva política"}
+        </Button>
       </div>
+
+      {showNewForm && (
+        <Card className="mb-5 p-4">
+          <form onSubmit={handleCreatePolicy} className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div>
+              <label htmlFor="new-policy-code" className="mb-1 block text-xs font-medium text-muted-foreground">Código *</label>
+              <Input
+                id="new-policy-code"
+                value={newPolicy.policy_code}
+                onChange={(e) => setNewPolicy((p) => ({ ...p, policy_code: e.target.value }))}
+                placeholder="PI-99"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="new-policy-title" className="mb-1 block text-xs font-medium text-muted-foreground">Título *</label>
+              <Input
+                id="new-policy-title"
+                value={newPolicy.title}
+                onChange={(e) => setNewPolicy((p) => ({ ...p, title: e.target.value }))}
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="new-policy-tier" className="mb-1 block text-xs font-medium text-muted-foreground">Tipo normativo</label>
+              <select
+                id="new-policy-tier"
+                className={NATIVE_SELECT_CLASSES}
+                value={newPolicy.normative_tier}
+                onChange={(e) => setNewPolicy((p) => ({ ...p, normative_tier: e.target.value }))}
+              >
+                <option value="">—</option>
+                <option value="POLITICA">Política</option>
+                <option value="NORMA">Norma</option>
+                <option value="PROCEDIMIENTO">Procedimiento</option>
+                <option value="DOCUMENTO">Documento</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="new-policy-scope" className="mb-1 block text-xs font-medium text-muted-foreground">Ámbito</label>
+              <select
+                id="new-policy-scope"
+                className={NATIVE_SELECT_CLASSES}
+                value={newPolicy.scope_level}
+                onChange={(e) => setNewPolicy((p) => ({ ...p, scope_level: e.target.value }))}
+              >
+                <option value="">—</option>
+                <option value="Corporate">Grupo</option>
+                <option value="Country">País</option>
+                <option value="Entity">Entidad</option>
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <label htmlFor="new-policy-owner" className="mb-1 block text-xs font-medium text-muted-foreground">Propietario funcional</label>
+              <Input
+                id="new-policy-owner"
+                value={newPolicy.owner_function}
+                onChange={(e) => setNewPolicy((p) => ({ ...p, owner_function: e.target.value }))}
+              />
+            </div>
+            <div className="flex items-end justify-end gap-2 md:col-span-2">
+              <Button type="button" variant="outline" onClick={() => setShowNewForm(false)}>Cancelar</Button>
+              <Button type="submit" disabled={createPolicy.isPending}>
+                {createPolicy.isPending ? "Guardando..." : "Crear política"}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
 
       {attention.length > 0 && (
         <div className="mb-5 flex items-start gap-3 rounded-md border border-status-warning/30 border-l-4 border-l-status-warning bg-status-warning-bg p-4">
