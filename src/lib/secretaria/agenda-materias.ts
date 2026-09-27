@@ -1,5 +1,10 @@
 import type { TipoOrgano, TipoSocial } from "@/lib/rules-engine";
 import type { AgendaItemKind } from "@/lib/secretaria/agenda-kind";
+import {
+  esMateriaCatalogada,
+  filtrarMateriasCatalogadas,
+  type CatalogoMateriaCodigos,
+} from "@/lib/secretaria/materia-catalogada";
 
 /**
  * Catálogo canónico de materias del orden del día y su mapeo materia × órgano.
@@ -409,6 +414,25 @@ export function materiaDefaultForOrgano(organoTipo: TipoOrgano) {
   return AGENDA_MATERIAS.find((materia) => isMateriaCompatibleWithOrgano(materia.value, organoTipo)) ?? AGENDA_MATERIAS[0];
 }
 
+/**
+ * H-50 (MOI-15): variante de `materiaDefaultForOrgano` que nunca preselecciona
+ * una materia sin fila en `materia_catalog` — el acta la rechazaría en
+ * servidor. Fail-closed: mientras el catálogo carga o falla
+ * (`codigosCatalogo === null`), cae al mismo fallback conservador que la
+ * variante sin catálogo (mantiene un valor inicial válido en el formulario;
+ * la propia lista visible del selector, gateada aparte con
+ * `agendaMateriaGroupsCatalogadas`, no ofrece esa materia hasta que el
+ * catálogo confirme la fila).
+ */
+export function materiaDefaultForOrganoCatalogada(
+  organoTipo: TipoOrgano,
+  codigosCatalogo: CatalogoMateriaCodigos,
+) {
+  const compatibles = AGENDA_MATERIAS.filter((materia) => isMateriaCompatibleWithOrgano(materia.value, organoTipo));
+  const catalogada = compatibles.find((materia) => esMateriaCatalogada(materia.value, codigosCatalogo));
+  return catalogada ?? materiaDefaultForOrgano(organoTipo);
+}
+
 export interface AgendaMateriaSelection {
   materia: string;
   tipo: AgendaMateriaDef["tipo"];
@@ -427,6 +451,14 @@ export function agendaMateriaSelectionForKind(params: {
   kind: AgendaItemKind;
   currentMateria?: string | null;
   organoTipo: TipoOrgano;
+  /**
+   * H-50 (MOI-15): cuando se pasa, el default de un punto que pasa a
+   * DECISORIO nunca cae en una materia sin fila en `materia_catalog`
+   * (fail-closed mientras el catálogo carga o falla). Opcional para no
+   * romper el contrato previo de los consumidores que aún no gatean por
+   * catálogo (p.ej. tests de organo/tipoSocial ajenos a H-50).
+   */
+  codigosCatalogo?: CatalogoMateriaCodigos;
 }): AgendaMateriaSelection {
   if (params.kind === "DECISORIO") {
     const current = AGENDA_MATERIAS.find(
@@ -434,7 +466,11 @@ export function agendaMateriaSelectionForKind(params: {
         materia.value === resolveMateriaAlias(params.currentMateria) &&
         isMateriaCompatibleWithOrgano(materia.value, params.organoTipo),
     );
-    const materia = current ?? materiaDefaultForOrgano(params.organoTipo);
+    const materia =
+      current ??
+      (params.codigosCatalogo !== undefined
+        ? materiaDefaultForOrganoCatalogada(params.organoTipo, params.codigosCatalogo)
+        : materiaDefaultForOrgano(params.organoTipo));
     return {
       materia: materia.value,
       tipo: materia.tipo,
@@ -527,4 +563,46 @@ export function agendaMateriaGroups(organoTipo: TipoOrgano, tipoSocial?: TipoSoc
   ];
 
   return groups.filter((group) => group.materias.length > 0);
+}
+
+/**
+ * H-50 (MOI-15, severidad A): variante de `agendaMateriaGroups` que además
+ * gatea por `materia_catalog` (`useMateriaCatalog`) — ningún grupo devuelve
+ * una materia decisoria sin fila en el catálogo, porque el acta la rechaza en
+ * servidor ("every point needs a catalogued matter"). Fail-closed: mientras
+ * el catálogo carga o falla (`codigosCatalogo === null`), TODAS las
+ * decisorias quedan pendientes y los grupos salen vacíos — el lado seguro es
+ * no ofrecer nada, nunca ofrecer de más. Este es el punto único que deben
+ * usar los selectores que crean un punto de acuerdo nuevo; `agendaMateriaGroups`
+ * (sin catálogo) queda para consumidores que solo necesitan la partición por
+ * órgano/tipo social (p.ej. los tests de esa partición).
+ */
+export function agendaMateriaGroupsCatalogadas(
+  organoTipo: TipoOrgano,
+  tipoSocial: TipoSocial | undefined,
+  codigosCatalogo: CatalogoMateriaCodigos,
+): AgendaMateriaGroup[] {
+  return agendaMateriaGroups(organoTipo, tipoSocial)
+    .map((group) => ({
+      ...group,
+      materias: filtrarMateriasCatalogadas(group.materias, codigosCatalogo).catalogadas,
+    }))
+    .filter((group) => group.materias.length > 0);
+}
+
+/**
+ * Cuenta, para un órgano y tipo social dados, cuántas materias decisorias
+ * que se ofrecerían por órgano/tipo social quedan fuera por no tener fila en
+ * `materia_catalog`. Alimenta la nota visible «N materias pendientes de
+ * clasificación jurídica» — nunca las hace desaparecer en silencio.
+ */
+export function materiasPendientesDeCatalogo(
+  organoTipo: TipoOrgano,
+  tipoSocial: TipoSocial | undefined,
+  codigosCatalogo: CatalogoMateriaCodigos,
+): AgendaMateriaDef[] {
+  const compatibles = AGENDA_MATERIAS.filter(
+    (m) => isMateriaCompatibleWithOrgano(m.value, organoTipo) && isMateriaVisibleForTipoSocial(m, tipoSocial),
+  );
+  return filtrarMateriasCatalogadas(compatibles, codigosCatalogo).pendientes;
 }

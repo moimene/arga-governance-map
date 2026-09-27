@@ -22,10 +22,18 @@ import { useAiIncidentHandoffReference } from "@/hooks/useAiIncidents";
 import {
   AGENDA_MATERIAS,
   MATERIAS_LIBRES,
+  agendaMateriaSelectionForKind,
   isMateriaVisibleForTipoSocial,
   labelMateria,
   resolveMateriaAlias,
 } from "@/lib/secretaria/agenda-materias";
+import { useMateriaCatalog } from "@/hooks/useMateriaConfig";
+import {
+  esMateriaCatalogada,
+  filtrarMateriasCatalogadas,
+  materiaCatalogCodigos,
+  notaMateriasPendientes,
+} from "@/lib/secretaria/materia-catalogada";
 import { toast } from "sonner";
 import { useTenantContext } from "@/context/TenantContext";
 import { useBodiesByEntity } from "@/hooks/useBodies";
@@ -1899,6 +1907,28 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
     meetingRaw?.governing_bodies?.entities?.tipo_social ??
       meetingRaw?.governing_bodies?.entities?.legal_form,
   );
+  // H-50 (MOI-15, severidad A): un punto nacido en sesión (MEETING_FLOOR) con
+  // materia decisoria sin fila en `materia_catalog` emite/persiste igual,
+  // pero el acta la rechaza en servidor ("every point needs a catalogued
+  // matter"). `codigosCatalogo` es `null` mientras carga o falla el catálogo
+  // (fail-closed: ninguna decisoria se ofrece hasta confirmar la fila).
+  const {
+    data: materiaCatalogRows = [],
+    isLoading: materiaCatalogLoading,
+    isError: materiaCatalogIsError,
+  } = useMateriaCatalog();
+  const codigosCatalogo = useMemo(
+    () => materiaCatalogCodigos(materiaCatalogRows, { isLoading: materiaCatalogLoading, isError: materiaCatalogIsError }),
+    [materiaCatalogRows, materiaCatalogLoading, materiaCatalogIsError],
+  );
+  const materiasDisponibles = useMemo(
+    () =>
+      filtrarMateriasCatalogadas(
+        AGENDA_MATERIAS.filter((materia) => isMateriaVisibleForTipoSocial(materia, tipoSocial)),
+        codigosCatalogo,
+      ),
+    [tipoSocial, codigosCatalogo],
+  );
   const universalLabel = universalMeetingLabel(organoTipo);
   const universalNamespace = universalMeetingNamespace(organoTipo);
   const isUniversalMeeting = isUniversalMeetingQuorumData(existingQD);
@@ -1953,6 +1983,22 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
         if (field === "tipo") {
           return { ...d, tipo: normalizeMateriaClase(val) };
         }
+        if (field === "kind" && val === "DECISORIO") {
+          // H-50 revisión P1: cambiar la naturaleza a DECISORIO no puede
+          // dejar `materia` en un valor sin fila en el catálogo (p.ej. el
+          // "OTROS_LIBRE" de newSessionAgendaPoint) — el <select> de materia
+          // ya no ofrece esa opción y el navegador la pintaría como si la
+          // primera opción real estuviera seleccionada, mientras el estado
+          // real seguiría siendo la no catalogada. Mismo patrón que
+          // ConvocatoriasStepper (agendaMateriaSelectionForKind + catálogo).
+          const selection = agendaMateriaSelectionForKind({
+            kind: "DECISORIO",
+            currentMateria: d.materia,
+            organoTipo,
+            codigosCatalogo,
+          });
+          return { ...d, kind: "DECISORIO", materia: selection.materia, tipo: selection.tipo };
+        }
         return { ...d, [field]: val };
       })
     );
@@ -1979,6 +2025,23 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
     if (decisionWithoutResolution) {
       toast.error(
         `Completa el texto resolutivo propuesto del punto «${decisionWithoutResolution.punto}».`,
+      );
+      return;
+    }
+
+    // H-50 (MOI-15, severidad A): un punto DECISORIO sin fila en
+    // `materia_catalog` se persistiría igual, pero el acta lo rechaza en
+    // servidor ("every point needs a catalogued matter"). Bloquea aquí para
+    // no dejar el punto en un camino sin salida. Fail-closed mientras el
+    // catálogo carga o falla.
+    const decisionSinCatalogo = debatesForSave.find(
+      (point) =>
+        resolvePointKind(point, kindIndex) === "DECISORIO" &&
+        !esMateriaCatalogada(point.materia, codigosCatalogo),
+    );
+    if (decisionSinCatalogo) {
+      toast.error(
+        `«${labelMateria(decisionSinCatalogo.materia)}» no tiene fila en el catálogo de materias (materia_catalog): el acta la rechazaría en servidor. Selecciona una materia catalogada para «${decisionSinCatalogo.punto}», o espera a que termine de cargar el catálogo.`,
       );
       return;
     }
@@ -2146,6 +2209,18 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
         </div>
       )}
 
+      {/* H-50 (MOI-15): nota visible en vez de hacer desaparecer en silencio
+          las materias sin fila en `materia_catalog`. */}
+      {notaMateriasPendientes(materiasDisponibles.pendientes.length) ? (
+        <p
+          className="border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-card)] px-3 py-2 text-xs text-[var(--g-text-secondary)]"
+          style={{ borderRadius: "var(--g-radius-sm)" }}
+        >
+          {notaMateriasPendientes(materiasDisponibles.pendientes.length)}: no se ofrecen en el selector
+          de materia del punto porque el acta las rechazaría en servidor por no tener fila en el catálogo.
+        </p>
+      ) : null}
+
       {hasUniversalSpecialDocumentationMatter ? (
         <div
           className="flex items-start gap-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
@@ -2235,9 +2310,10 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
                     >
                       {/* Fix round 1 G3 Task 4, I-1: fail-closed por tipoSocial
                           (las 6 materias SLP no se ofrecen fuera de una SLP).
-                          Se conserva el resto de la lista sin filtro de
-                          órgano (comportamiento previo, sin cambios). */}
-                      {AGENDA_MATERIAS.filter((materia) => isMateriaVisibleForTipoSocial(materia, tipoSocial)).map((materia) => (
+                          H-50 (MOI-15): además fail-closed por catálogo — no
+                          se ofrece una materia sin fila en `materia_catalog`
+                          (el acta la rechazaría en servidor). */}
+                      {materiasDisponibles.catalogadas.map((materia) => (
                         <option key={materia.value} value={materia.value}>
                           {materia.label}
                         </option>
