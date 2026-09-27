@@ -291,6 +291,15 @@ export default function IncidentesList() {
                   {handoffIncident.ai_systems?.name && (
                     <> · Sistema: <span className="font-medium">{handoffIncident.ai_systems.name}</span></>
                   )}
+                  {/* F2.T13: entidad/sujeto del incidente, cuando el carril A los
+                      tiene sembrados (0 sujetos en Cloud a 2026-09-27 — no se pinta
+                      hasta F2.T16). Resuelto en solo lectura por el hook. */}
+                  {handoffIncident.entity?.common_name && (
+                    <> · Entidad: <span className="font-medium">{handoffIncident.entity.common_name}</span></>
+                  )}
+                  {handoffIncident.subject?.entity?.common_name && (
+                    <> · Sujeto: <span className="font-medium">{handoffIncident.subject.entity.common_name}</span></>
+                  )}
                 </p>
               )}
             </div>

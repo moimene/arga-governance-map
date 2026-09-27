@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient, skipToken } from "@tanstack/reac
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import type { TablesUpdate } from "@/integrations/supabase/types";
+import { pickPrimaryRiaSubject, type AimsRiaSubjectRow, type PrimaryRiaSubject } from "@/lib/aims/sujeto-escalado";
 
 export type AiSystem = {
   id: string;
@@ -86,5 +87,29 @@ export function useUpdateAiSystem() {
       qc.invalidateQueries({ queryKey: ["ai_systems"] });
       qc.invalidateQueries({ queryKey: ["ai_systems", tenantId, variables.id] });
     },
+  });
+}
+
+/**
+ * F2.T14 (MOI-170): sujeto RIA (PROVEEDOR con preferencia, si no el primero
+ * vigente) de un sistema, para el escalado a Secretaría
+ * (`EscaladoSecretariaModal.tsx`). Solo lectura sobre `aims_ria_subjects`
+ * (F2.T2); `null` sin sujetos sembrados (hoy, la mayoría de los sistemas —
+ * F2.T16 los siembra, fuera de este cambio).
+ */
+export function useAiSystemRiaSubject(systemId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    queryKey: ["aims_ria_subjects", tenantId, "for-system", systemId ?? null],
+    queryFn: tenantId && systemId ? async (): Promise<PrimaryRiaSubject | null> => {
+      const { data, error } = await supabase
+        .from("aims_ria_subjects")
+        .select("entity_id, role, entity:entity_id(common_name)")
+        .eq("tenant_id", tenantId!)
+        .eq("system_id", systemId)
+        .neq("status", "CERRADO");
+      if (error) throw error;
+      return pickPrimaryRiaSubject((data ?? []) as AimsRiaSubjectRow[]);
+    } : skipToken,
   });
 }

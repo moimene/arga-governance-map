@@ -1,19 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Send, X } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { useBodiesList } from "@/hooks/useBodies";
+import { useBodiesByEntity, useBodiesList } from "@/hooks/useBodies";
 import { buildMeetingHandoffPath } from "@/lib/secretaria/cross-module-handoff";
-import type { AiSystem } from "@/hooks/useAiSystems";
+import { useAiSystemRiaSubject, type AiSystem } from "@/hooks/useAiSystems";
+import { defaultEscaladoMatter } from "@/lib/aims/sujeto-escalado";
 
 /**
  * Escalado a Secretaría: handoff read-only, no escribe nada.
  *
- * El órgano destino sale de `governing_bodies` del tenant y NO se preselecciona
- * —`bodies[0]` es el primero que devuelve la consulta, no una elección—, y la
- * justificación nace vacía: el prerrelleno anterior encuadraba la propuesta
- * «bajo el marco RIA / AESIA» y ese texto VIAJABA al expediente de Secretaría
- * como `rationale`.
+ * F2.T14 (MOI-170): el órgano se resuelve por SOCIEDAD cuando el sistema
+ * tiene sujeto RIA conocido (`aims_ria_subjects`, F2.T2) — solo órganos que
+ * ADOPTAN (`adoptingOnly`), no los consultivos. Sin sujeto conocido (hoy, la
+ * mayoría — F2.T16 los siembra) cae al listado completo del tenant, igual
+ * que antes: no es una regresión, es el mismo comportamiento cuando no hay
+ * de dónde acotar. `organo` sigue siendo el NOMBRE elegido (texto libre, lo
+ * que ya viajaba); `organoId` viaja ADEMÁS, por id — no la sustituye, para no
+ * tocar la semántica de los emisores no-AIMS (GRC) que mandan `organ` como
+ * texto libre. Ninguno de los dos se preselecciona —el primero de la lista
+ * no es una elección—, y la justificación nace vacía: el prerrelleno
+ * anterior encuadraba la propuesta «bajo el marco RIA / AESIA» y ese texto
+ * VIAJABA al expediente de Secretaría como `rationale`.
  */
 
 export interface EscaladoSecretariaModalProps {
@@ -23,12 +31,24 @@ export interface EscaladoSecretariaModalProps {
 
 export default function EscaladoSecretariaModal({ system, onClose }: EscaladoSecretariaModalProps) {
   const navigate = useNavigate();
-  const { data: bodies = [] } = useBodiesList();
-  const [materia, setMateria] = useState(
-    `Propuesta de aprobación del Expediente Técnico para el Sistema de IA: ${system.name}`,
-  );
-  const [organo, setOrgano] = useState("");
+  const { data: subject } = useAiSystemRiaSubject(system.id);
+  const { data: bodiesByEntity = [] } = useBodiesByEntity(subject?.entityId, { adoptingOnly: true });
+  const { data: bodiesAllTenant = [] } = useBodiesList();
+  const bodies = subject?.entityId ? bodiesByEntity : bodiesAllTenant;
+  const [materia, setMateria] = useState(() => defaultEscaladoMatter(system.name, null));
+  const [materiaTocada, setMateriaTocada] = useState(false);
+  const [organoId, setOrganoId] = useState("");
   const [justificacion, setJustificacion] = useState("");
+
+  // El sujeto llega asíncrono (query aparte): si el usuario no ha tocado la
+  // materia todavía, refleja el sujeto en cuanto resuelve. No pisa un texto
+  // que la persona ya editó a mano.
+  useEffect(() => {
+    if (materiaTocada || !subject) return;
+    setMateria(defaultEscaladoMatter(system.name, subject));
+  }, [subject, materiaTocada, system.name]);
+
+  const organoSeleccionado = bodies.find((b) => b.id === organoId) ?? null;
 
   const enviar = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +60,9 @@ export default function EscaladoSecretariaModal({ system, onClose }: EscaladoSec
           source: "aims",
           event: "AIMS_SYSTEM_CONFORMITY",
           sourceId: system.id,
-          organ: organo || null,
+          organ: organoSeleccionado?.name ?? null,
+          organId: organoSeleccionado?.id ?? null,
+          entityId: subject?.entityId ?? null,
           matter: materia,
           rationale: justificacion,
         }),
@@ -82,21 +104,27 @@ export default function EscaladoSecretariaModal({ system, onClose }: EscaladoSec
         </p>
 
         <div className="space-y-3 text-xs">
+          {subject?.entityName && (
+            <p className="text-[11px] text-[var(--g-text-secondary)]">
+              Sociedad: <span className="font-medium text-[var(--g-text-primary)]">{subject.entityName}</span>
+            </p>
+          )}
+
           <div>
             <label htmlFor="aims-escalate-body" className="block font-semibold text-[var(--g-text-primary)] mb-1">
               Órgano de Gobierno Destino
             </label>
             <select
               id="aims-escalate-body"
-              value={organo}
-              onChange={(e) => setOrgano(e.target.value)}
+              value={organoId}
+              onChange={(e) => setOrganoId(e.target.value)}
               disabled={bodies.length === 0}
               className="w-full h-9 px-3 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] disabled:opacity-60"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
               <option value="">Sin órgano indicado</option>
               {bodies.map((b) => (
-                <option key={b.id} value={b.name}>
+                <option key={b.id} value={b.id}>
                   {b.name}
                 </option>
               ))}
@@ -118,7 +146,10 @@ export default function EscaladoSecretariaModal({ system, onClose }: EscaladoSec
               type="text"
               required
               value={materia}
-              onChange={(e) => setMateria(e.target.value)}
+              onChange={(e) => {
+                setMateriaTocada(true);
+                setMateria(e.target.value);
+              }}
               className="w-full h-9 px-3 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
             />

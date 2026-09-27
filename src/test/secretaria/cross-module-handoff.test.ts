@@ -70,4 +70,47 @@ describe("cross-module handoff contract", () => {
     expect(read.matter).toBe(ctx.matter);
     expect(read.rationale).toBe(ctx.rationale);
   });
+
+  // F2.T14 (MOI-170): organId/entityId viajan JUNTO a organ (texto libre), no
+  // en su lugar — un emisor no-AIMS (este mismo `ctx`, con `organ: "CDA"` y
+  // sin organId/entityId) no ve aparecer nada nuevo.
+  describe("F2.T14 — organId y entityId (MOI-158)", () => {
+    it("un emisor que no manda organId/entityId no ve aparecer esas claves", () => {
+      const search = buildMeetingHandoffSearch(ctx);
+      expect(search).not.toContain("organ_id");
+      expect(search).not.toContain("scope=sociedad");
+      const sp = new URLSearchParams(search);
+      const read = readMeetingHandoff((k) => sp.get(k));
+      expect(read.organ).toBe("CDA");
+      expect(read.organId).toBeNull();
+    });
+
+    it("round-trip: organId viaja junto a organ, sin sustituirlo", () => {
+      const search = buildMeetingHandoffSearch({
+        ...ctx,
+        organId: "body-cda-001",
+      });
+      const sp = new URLSearchParams(search);
+      const read = readMeetingHandoff((k) => sp.get(k));
+      expect(read.organ).toBe("CDA");
+      expect(read.organId).toBe("body-cda-001");
+    });
+
+    it("entityId añade scope=sociedad&entity=<id>, que useSecretariaScope ya prioriza sobre localStorage", () => {
+      const search = buildMeetingHandoffSearch({
+        ...ctx,
+        entityId: "entity-arga-espana",
+      });
+      const sp = new URLSearchParams(search);
+      expect(sp.get("scope")).toBe("sociedad");
+      expect(sp.get("entity")).toBe("entity-arga-espana");
+    });
+
+    it("sin entityId, no fuerza ningún scope", () => {
+      const search = buildMeetingHandoffSearch(ctx);
+      const sp = new URLSearchParams(search);
+      expect(sp.get("scope")).toBeNull();
+      expect(sp.get("entity")).toBeNull();
+    });
+  });
 });
