@@ -133,6 +133,25 @@ export const AISLAMIENTO_DECLARADO: readonly TablaDeclarada[] = [
       garrigues: ["RSK-GARR-PEN-010", "RSK-GARR-PEN-069"],
     },
   },
+  // MOI-170, F2 (carril A — capa de base de datos). Las dos tablas nuevas del
+  // programa RIA nacen VACÍAS en los dos tenants: este carril crea el esquema
+  // (RS-TABLA, solo por RPC) pero no siembra ninguna fila — sembrar sujetos
+  // hipótesis es F2.T16 y especialidades es F2.T10 con
+  // `scripts/aims/seed-especialidades.ts`, ninguno de los dos en este carril.
+  // Las dos direcciones quedan PENDIENTE: avanzar la siembra las convierte en
+  // aserción real sin tocar este fichero; hasta entonces no rompen la corrida.
+  {
+    tabla: "aims_ria_subjects",
+    arga: "PENDIENTE",
+    garrigues: "PENDIENTE",
+    marcadores: {},
+  },
+  {
+    tabla: "aims_specialty_bodies",
+    arga: "PENDIENTE",
+    garrigues: "PENDIENTE",
+    marcadores: {},
+  },
   {
     tabla: "delegations",
     arga: "ALGUNA",
@@ -324,5 +343,11 @@ export function direccionesVacuas(medido: ReadonlyMap<string, Conteo>): string[]
  * direcciones vacuas, todas del lado Garrigues (las 3 ausencias permanentes +
  * las 13 pendientes de siembra). Ninguna del lado ARGA: ARGA tiene filas en las
  * 23.
+ *
+ * MOI-170 (2026-09-27): +4 por `aims_ria_subjects` y `aims_specialty_bodies`
+ * (carril A del programa RIA) — las dos nacen vacías en LOS DOS tenants (este
+ * carril es solo esquema; F2.T10 y F2.T16 siembran, en otro carril), así que
+ * cada una aporta sus DOS direcciones vacuas. 16 + 4 = 20. Bajará cuando esa
+ * siembra llegue, sin tocar este número a la baja a mano.
  */
-export const VACUIDAD_MAXIMA = 16;
+export const VACUIDAD_MAXIMA = 20;
