@@ -11,7 +11,7 @@
  *     ya pasó), celebrarla por el stepper hasta registrar la votación.
  *   - 4.6: una SEGUNDA convocatoria de Consejo (nueva, con materia
  *     DELEGACION_FACULTADES en el orden del día desde el origen — no como
- *     "punto nacido en sesión", ver hallazgo H-27 más abajo), su reunión y
+ *     "punto nacido en sesión", ver hallazgo H-32 más abajo), su reunión y
  *     su acuerdo INSCRIBIBLE, con validez comprobada por el motor. Competencia
  *     de Consejo (art. 249 LSC), no de Junta — a diferencia del
  *     NOMBRAMIENTO_CONSEJERO fabricado por script en el recorrido anterior,
@@ -21,9 +21,9 @@
  *     vigentes), que el recorrido anterior no llegó a ejercitar.
  *
  * HALLAZGOS DE SERVIDOR encontrados AL RECORRER (no simulados; ver guion,
- * tabla de hallazgos, filas H-27 y H-28):
+ * tabla de hallazgos, filas H-32 y H-33):
  *
- *   H-27 (severidad A — capacidad ausente): "Añadir punto nacido en sesión"
+ *   H-32 (severidad A — capacidad ausente): "Añadir punto nacido en sesión"
  *   (Paso 4 de ReunionStepper) es HOY inutilizable en cualquier reunión que
  *   nazca de una convocatoria YA EMITIDA. El trigger
  *   `fn_secretaria_guard_emitted_agenda_dml` exige que el INSERT en
@@ -33,7 +33,7 @@
  *   fn_secretaria_materialize_convocation_agenda". El cliente lo enmascara
  *   con un toast que no nombra la causa ("Error al preparar constancias").
  *
- *   H-28 (severidad B — bloquea el recorrido): generar el acta de CUALQUIER
+ *   H-33 (severidad B — bloquea el recorrido): generar el acta de CUALQUIER
  *   reunión falla con el error de servidor "authoritative minute: entity, tax
  *   id, body and meeting officers require identified legal names" porque
  *   `fn_secretaria_close_meeting_and_generate_minute` exige
@@ -158,7 +158,7 @@ test.describe('Recorrido MOI-15 (repetición) — Grupo Nuevo', () => {
     // emitida (plan de negocio).
     //
     // HALLAZGO (severidad A, ver docs/superpowers/plans/2026-09-19-tenant-cero-guion-recorrido.md
-    // fila H-27): se intentó "Añadir punto nacido en sesión" con materia
+    // fila H-32): se intentó "Añadir punto nacido en sesión" con materia
     // DELEGACION_FACULTADES para obtener el acuerdo inscribible de 4.6 en
     // ESTA MISMA reunión. El servidor lo rechaza SIEMPRE para cualquier
     // reunión vinculada a una convocatoria EMITIDA (`immutable_at` no nulo):
@@ -216,7 +216,7 @@ test.describe('Recorrido MOI-15 (repetición) — Grupo Nuevo', () => {
 
     // Paso 6 — Cierre: generar acta.
     //
-    // HALLAZGO H-28 (ver cabecera del fichero): esto FALLARÁ con un error de
+    // HALLAZGO H-33 (ver cabecera del fichero): esto FALLARÁ con un error de
     // servidor literal porque `entities.registration_number` es NULL para
     // esta sociedad (y para las 3 del tenant) — un dato que el asistente de
     // alta nunca pide y que no tiene pantalla de edición posterior. Se deja
@@ -248,9 +248,9 @@ test.describe('Recorrido MOI-15 (repetición) — Grupo Nuevo', () => {
       const errorToast = page.getByText(/Error al generar el acta/i).first();
       const blocked = await errorToast.isVisible().catch(() => false);
       if (blocked) {
-        console.log(`[HALLAZGO H-28] fn_secretaria_close_meeting_and_generate_minute → ${rpcErrorBody}`);
+        console.log(`[HALLAZGO H-33] fn_secretaria_close_meeting_and_generate_minute → ${rpcErrorBody}`);
       } else {
-        // Si algún día se corrige H-28, este camino queda para completar la
+        // Si algún día se corrige H-33, este camino queda para completar la
         // aserción positiva de "acta descargable" sin tener que reescribir el
         // test — es justo el resultado deseado del recorrido original.
         await expect(page.locator('main').getByText('Acta generada en borrador')).toBeVisible({ timeout: 45_000 });
@@ -274,7 +274,7 @@ test.describe('Recorrido MOI-15 (repetición) — Grupo Nuevo', () => {
   }) => {
     test.setTimeout(900_000);
     // La materia va DESDE EL ORIGEN en el orden del día de la convocatoria
-    // (no como "punto nacido en sesión" — ver H-27): así el punto se
+    // (no como "punto nacido en sesión" — ver H-32): así el punto se
     // materializa en `agenda_items` por el camino legítimo
     // (`fn_secretaria_materialize_convocation_agenda`, vía la propia emisión
     // de la convocatoria), sin chocar con el guard de convocatoria emitida.
