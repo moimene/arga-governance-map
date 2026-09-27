@@ -56,6 +56,17 @@ const CATCH_ALL_DECLARADO: Record<string, string> = {
 };
 
 /**
+ * Prefijos que caen en el catch-all por decisión, por tenant. El alta de
+ * obligaciones por pantalla del grupo nuevo genera `OBL-GN-<sufijo>` sin marco
+ * con módulo propio: su sitio ES 'risk'. Nacieron en el recorrido por pantalla
+ * de MOI-146 (2026-09-27) y son dato que persiste: el gate no las exige vacías.
+ */
+const CATCH_ALL_PREFIJO: Partial<Record<CuentaDemo, string[]>> = { NUEVO: ["OBL-GN-"] };
+const declaradaEnCatchAll = (cuenta: CuentaDemo, code: string) =>
+  Object.prototype.hasOwnProperty.call(CATCH_ALL_DECLARADO, code) ||
+  (CATCH_ALL_PREFIJO[cuenta] ?? []).some((p) => code.startsWith(p));
+
+/**
  * `grc_obligations` NO es un espejo puro de `obligations`: tiene filas propias,
  * sembradas directamente, cuyo `id` es el código y no un UUID. Medido el
  * 2026-09-20: 8 en ARGA (OBL-IIA-2024-QAIP, OBL-NIS2-021, OBL-DORA-017,
@@ -116,10 +127,13 @@ describe("G-SYNC — el espejo de obligaciones respeta el criterio del código",
   it("NUEVO: el módulo ai existe (MOI-152) y sigue sin obligaciones del RIA (MOI-176 pendiente)", () => {
     const d = dato.get("NUEVO")!;
     expect(d.modulos.has("ai"), "NUEVO sin módulo 'ai' en grc_modules").toBe(true);
+    // Desde MOI-146 el grupo nuevo tiene obligaciones dadas de alta por
+    // pantalla; lo que sigue sin existir es el RIA. Si aparece una OBL-RIA-*,
+    // añade NUEVO a TENANTS_CON_OBLIGACIONES para que el gate del art. 4 lo mida.
     expect(
-      d.obligaciones.length,
-      "NUEVO ya tiene obligaciones: actualiza TENANTS_CON_OBLIGACIONES y el gate del art. 4 de abajo",
-    ).toBe(0);
+      d.obligaciones.filter((o) => o.code.startsWith("OBL-RIA-")).map((o) => o.code),
+      "NUEVO ya tiene obligaciones del RIA: añádelo a TENANTS_CON_OBLIGACIONES (gate del art. 4)",
+    ).toEqual([]);
   });
 
   it("control positivo del criterio: un OBL-PBC-* resuelve a aml y un OBL-RIA-* a ai", () => {
@@ -127,6 +141,9 @@ describe("G-SYNC — el espejo de obligaciones respeta el criterio del código",
     expect(moduloEsperado("OBL-PBC-07")).toBe("aml");
     expect(moduloEsperado("OBL-RIA-ORG-04")).toBe("ai");
     expect(moduloEsperado("OBL-LGPD-001")).toBeNull();
+    // El prefijo del grupo nuevo solo vale en su tenant.
+    expect(declaradaEnCatchAll("NUEVO", "OBL-GN-x")).toBe(true);
+    expect(declaradaEnCatchAll("ARGA", "OBL-GN-x")).toBe(false);
   });
 
   for (const [cuenta] of TENANTS) {
@@ -155,7 +172,7 @@ describe("G-SYNC — el espejo de obligaciones respeta el criterio del código",
       const enRisk = d.espejo
         .filter((e) => e.module_id === "risk")
         .map((e) => porId.get(e.id) ?? e.id)
-        .filter((code) => !Object.prototype.hasOwnProperty.call(CATCH_ALL_DECLARADO, code));
+        .filter((code) => !declaradaEnCatchAll(cuenta, code));
       expect(
         enRisk,
         `${cuenta}: obligaciones en 'risk' sin declarar. Si es correcto, decláralas en CATCH_ALL_DECLARADO con su motivo; si no, falta una rama en fn_sync_obligation_to_backbone`,
