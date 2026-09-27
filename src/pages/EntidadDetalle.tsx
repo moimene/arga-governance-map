@@ -19,8 +19,7 @@ import {
 } from "@/hooks/useEntities";
 import { usePoliciesList } from "@/hooks/usePoliciesObligations";
 import { Brain, ChevronRight, ClipboardList, Compass, Download, Edit3, ExternalLink, Network } from "lucide-react";
-import { useAiSystemsList } from "@/hooks/useAiSystems";
-import { tieneClasificacionGuiada } from "@/lib/aims/cuestionario-calificacion";
+import { useAiSystemsByEntitySubject } from "@/hooks/useAiGovernanceBody";
 
 const matTone = (m: string): "critical" | "warning" | "info" | "neutral" => {
   const l = formatMateriality(m);
@@ -38,7 +37,10 @@ export default function EntidadDetalle() {
   const { data: policies = [] } = usePoliciesList();
   const { data: delegations = [] } = useEntityDelegations(entity?.id);
   const { data: entityFindings = [] } = useEntityFindings(entity?.id);
-  const { data: allAiSystems = [] } = useAiSystemsList();
+  // F2.T12 (MOI-170): sistemas de IA de los que ESTA sociedad es sujeto
+  // (`v_aims_sistemas_por_entidad`), no el inventario entero del tenant sin
+  // atribuir. Con 0 sujetos declarados (hoy, en los dos tenants) es `[]`.
+  const { data: aiSystems = [] } = useAiSystemsByEntitySubject(entity?.id);
 
   if (isLoading) {
     return <div className="p-10 text-center text-muted-foreground">Cargando…</div>;
@@ -299,71 +301,45 @@ export default function EntidadDetalle() {
           <Card className="p-6">
             <div className="mb-2 flex items-center gap-2">
               <Brain className="h-4 w-4 text-primary" />
-              {/* `ai_systems` no tiene `entity_id`: la lista es el inventario
-                  entero del tenant y no se atribuye a esta sociedad (F1.T9). */}
-              <h3 className="text-sm font-semibold text-foreground">Sistemas de IA del grupo (sin atribución a esta sociedad)</h3>
+              {/* F2.T12 (MOI-170): la lista es "de qué sistemas es sujeto esta
+                  sociedad" (`v_aims_sistemas_por_entidad`), no el inventario
+                  entero del tenant. Antes de F2 no había sujetos que leer;
+                  ahora la tabla existe pero, con 0 sujetos declarados en
+                  Cloud, sigue vacía en los dos tenants — vacío honesto, no
+                  inventario sin atribuir disfrazado de atribuido. */}
+              <h3 className="text-sm font-semibold text-foreground">Sistemas de IA de los que esta sociedad es sujeto</h3>
               <Link to="/ai-governance/sistemas" className="ml-auto text-xs text-primary hover:underline flex items-center gap-1">
                 <ExternalLink className="h-3 w-3" />Ver inventario completo
               </Link>
             </div>
-            <p className="mb-4 text-xs text-muted-foreground">
-              El inventario todavía no registra qué sociedad es proveedora o responsable del despliegue de cada sistema.
-            </p>
-            {allAiSystems.length === 0 ? (
+            {aiSystems.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <Brain className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">No hay sistemas IA registrados en el inventario.</p>
+                <p className="text-sm text-muted-foreground">
+                  Ningún sistema de IA tiene todavía a esta sociedad como sujeto acreditado (proveedor, responsable del despliegue…).
+                </p>
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Sistema</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Riesgo EU AI Act</TableHead>
-                    <TableHead>Vendor</TableHead>
-                    <TableHead>Estado</TableHead>
+                    <TableHead>Rol</TableHead>
+                    <TableHead>Estado del sujeto</TableHead>
                     <TableHead className="text-right">Ficha</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {allAiSystems.map((sys) => (
-                    <TableRow key={sys.id}>
+                  {aiSystems.map((s) => (
+                    <TableRow key={s.subject_id}>
+                      <TableCell className="text-sm font-medium text-foreground">{s.system_name}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{s.role}</TableCell>
                       <TableCell>
-                        <div className="font-medium text-sm text-foreground">{sys.name}</div>
-                        <div className="text-xs text-muted-foreground">{sys.use_case}</div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{sys.system_type ?? "—"}</TableCell>
-                      <TableCell>
-                        {/* Sin cuestionario, el nivel es el declarado en ficha y no se
-                            pinta como riesgo medido: neutro, como en el inventario. */}
-                        {sys.risk_level && (
-                          <span title={tieneClasificacionGuiada(sys) ? undefined : "nivel declarado en ficha, sin cuestionario"}>
-                            <StatusBadge
-                              label={sys.risk_level}
-                              tone={
-                                !tieneClasificacionGuiada(sys)
-                                  ? "neutral"
-                                  : sys.risk_level === "Alto" || sys.risk_level === "Inaceptable"
-                                  ? "critical"
-                                  : sys.risk_level === "Limitado"
-                                  ? "warning"
-                                  : "active"
-                              }
-                            />
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{sys.vendor ?? "—"}</TableCell>
-                      <TableCell>
-                        <StatusBadge
-                          label={sys.status}
-                          tone={sys.status === "ACTIVO" ? "active" : sys.status === "EN_EVALUACION" ? "warning" : "neutral"}
-                        />
+                        <StatusBadge label={s.status} />
                       </TableCell>
                       <TableCell className="text-right">
                         <Link
-                          to={`/ai-governance/sistemas/${sys.id}`}
+                          to={`/ai-governance/sistemas/${s.system_id}`}
                           className="text-xs text-primary hover:underline flex items-center justify-end gap-1"
                         >
                           <ExternalLink className="h-3 w-3" />Ver

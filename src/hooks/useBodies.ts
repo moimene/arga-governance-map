@@ -145,6 +145,29 @@ export function useBodyBySlug(slug: string | undefined) {
   });
 }
 
+/**
+ * Igual que `useBodyBySlug`, pero por UUID. F2.T9/MOI-150: el órgano de IA se
+ * resuelve por dato (`aims_ria_subjects.governing_body_id` o
+ * `policies.owner_body_id`), que llega como UUID, no como slug.
+ */
+export function useBodyById(bodyId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    enabled: !!bodyId && !!tenantId,
+    queryKey: ["governing_bodies", "byId", tenantId, bodyId],
+    queryFn: async (): Promise<BodyRow | null> => {
+      const { data, error } = await supabase
+        .from("governing_bodies")
+        .select("*, entity:entity_id(id, common_name, slug, legal_name)")
+        .eq("tenant_id", tenantId!)
+        .eq("id", bodyId!)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as unknown as BodyRow | null) ?? null;
+    },
+  });
+}
+
 export function useBodyMandates(bodyId: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
