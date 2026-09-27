@@ -308,6 +308,14 @@ export interface AgendaItem {
 
 export interface CreateConvocatoriaInput {
   body_id: string;
+  /**
+   * body_type del órgano convocante (MOI-142). 'JUNTA' enruta a la RPC
+   * hermana `fn_emit_convocatoria_junta` (art. 166 LSC: convoca el órgano
+   * de administración, no un Presidente propio de la Junta); cualquier
+   * otro valor (incl. ausente, por compatibilidad) sigue en
+   * `fn_emit_convocatoria` (Consejo), sin cambio de comportamiento.
+   */
+  body_type?: string | null;
   tipo_convocatoria: string;
   fecha_1: string;
   fecha_2?: string | null;
@@ -329,26 +337,29 @@ export function useCreateConvocatoria() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: CreateConvocatoriaInput): Promise<ConvocatoriaRow> => {
-      const { data, error } = await supabase
-        .rpc("fn_emit_convocatoria", {
-          p_payload: {
-            body_id: input.body_id,
-            tipo_convocatoria: input.tipo_convocatoria,
-            fecha_1: input.fecha_1,
-            fecha_2: input.fecha_2 ?? null,
-            modalidad: input.modalidad,
-            lugar: input.lugar ?? null,
-            junta_universal: input.junta_universal,
-            is_second_call: input.is_second_call,
-            publication_channels: input.publication_channels,
-            agenda_items: input.agenda_items,
-            statutory_basis: input.statutory_basis ?? null,
-            convocatoria_text: input.convocatoria_text ?? null,
-            rule_trace: input.rule_trace ?? null,
-            reminders_trace: input.reminders_trace ?? null,
-            accepted_warnings: input.accepted_warnings ?? [],
-          } as unknown as Json,
-        });
+      const payload = {
+        body_id: input.body_id,
+        tipo_convocatoria: input.tipo_convocatoria,
+        fecha_1: input.fecha_1,
+        fecha_2: input.fecha_2 ?? null,
+        modalidad: input.modalidad,
+        lugar: input.lugar ?? null,
+        junta_universal: input.junta_universal,
+        is_second_call: input.is_second_call,
+        publication_channels: input.publication_channels,
+        agenda_items: input.agenda_items,
+        statutory_basis: input.statutory_basis ?? null,
+        convocatoria_text: input.convocatoria_text ?? null,
+        rule_trace: input.rule_trace ?? null,
+        reminders_trace: input.reminders_trace ?? null,
+        accepted_warnings: input.accepted_warnings ?? [],
+      } as unknown as Json;
+      // MOI-142: la Junta no tiene RPC de emisión propia — art. 166 LSC la
+      // convoca el órgano de administración (fn_emit_convocatoria_junta,
+      // migración 20260926114200). El Consejo sigue exactamente igual.
+      const { data, error } = (input.body_type ?? "").toUpperCase() === "JUNTA"
+        ? await supabase.rpc("fn_emit_convocatoria_junta", { p_payload: payload })
+        : await supabase.rpc("fn_emit_convocatoria", { p_payload: payload });
       if (error) throw error;
       const result = data as {
         convocatoria?: ConvocatoriaRow;

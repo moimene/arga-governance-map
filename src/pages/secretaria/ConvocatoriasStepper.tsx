@@ -43,7 +43,7 @@ import {
 } from "@/hooks/useConvocatorias";
 import { secretariaErrorMessage } from "@/lib/secretaria/supabase-error-message";
 import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
-import { usePresidenteVigente } from "@/hooks/useAuthorityEvidence";
+import { usePresidenteVigente, useAuthorityEvidence } from "@/hooks/useAuthorityEvidence";
 import { useShareholderRepresentationCandidates } from "@/hooks/useDelegations";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
@@ -622,6 +622,19 @@ export default function ConvocatoriasStepper() {
     selectedEntityId ?? undefined,
     selectedBodyId,
   );
+  // MOI-142: la Junta no tiene Presidente propio — art. 166 LSC la convoca
+  // el órgano de administración (PRESIDENTE o ADMIN_UNICO del CDA de la
+  // misma entidad, nunca el body_id de la propia Junta). Reutiliza el
+  // listado de autoridad vigente de la entidad en vez de una query nueva.
+  const { data: entityAuthorityEvidence = [] } = useAuthorityEvidence(selectedEntityId ?? undefined);
+  const juntaAdminBody = bodies.find((b) => (b.body_type ?? "").toUpperCase() === "CDA") ?? null;
+  const juntaConvocanteAuthority = juntaAdminBody
+    ? entityAuthorityEvidence.find(
+        (ev) =>
+          ev.body_id === juntaAdminBody.id &&
+          (ev.cargo === "PRESIDENTE" || ev.cargo === "ADMIN_UNICO"),
+      ) ?? null
+    : null;
   const lastResolvedOrganoTipoRef = useRef<TipoOrgano>("JUNTA_GENERAL");
   const resolvedOrganoTipo = selectedBody ? resolveOrganoTipo(selectedBody) : null;
   if (resolvedOrganoTipo) lastResolvedOrganoTipoRef.current = resolvedOrganoTipo;
@@ -2084,7 +2097,11 @@ export default function ConvocatoriasStepper() {
   );
   const borradorCapa3HasMissing = Object.keys(borradorCapa3MissingRequired).length > 0;
   const convocationAuthorityReady =
-    organoTipo !== "CONSEJO" || convocanteAuthority?.cargo === "PRESIDENTE";
+    organoTipo === "CONSEJO"
+      ? convocanteAuthority?.cargo === "PRESIDENTE"
+      : organoTipo === "JUNTA_GENERAL"
+        ? Boolean(juntaConvocanteAuthority)
+        : true;
   const representationAgendaReady = agendaItems.every((item) => {
     if (item.materia !== "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL") return true;
     const target = entities.find((entity) => entity.id === item.target_entity_id) ?? null;
@@ -2420,12 +2437,12 @@ export default function ConvocatoriasStepper() {
       return;
     }
     if (
-      organoTipo !== "CONSEJO" ||
+      (organoTipo !== "CONSEJO" && organoTipo !== "JUNTA_GENERAL") ||
       jurisdiction.toUpperCase() !== "ES" ||
       selectedEntity?.entity_status !== "Active"
     ) {
       toast.error(
-        "Este registro gobernado solo está habilitado para Consejos de sociedades españolas activas en el entorno DEMO.",
+        "Este registro gobernado solo está habilitado para Consejos y Juntas de sociedades españolas activas en el entorno DEMO.",
       );
       return;
     }
@@ -2442,6 +2459,12 @@ export default function ConvocatoriasStepper() {
     if (organoTipo === "CONSEJO" && convocanteAuthority?.cargo !== "PRESIDENTE") {
       toast.error(
         "No existe evidencia vigente del cargo de Presidente para este Consejo. Esa evidencia solo acredita el cargo y no una actuación personal; el registro DEMO queda bloqueado.",
+      );
+      return;
+    }
+    if (organoTipo === "JUNTA_GENERAL" && !juntaConvocanteAuthority) {
+      toast.error(
+        "No existe evidencia vigente de Presidente o Administrador único en el órgano de administración de esta sociedad (art. 166 LSC). Esa evidencia solo acredita el cargo y no una actuación personal; el registro DEMO queda bloqueado.",
       );
       return;
     }
@@ -2474,6 +2497,7 @@ export default function ConvocatoriasStepper() {
       const attachmentIntents = await buildSupportingAttachmentIntents(adjuntos);
       const created = await createConvocatoria.mutateAsync({
         body_id: selectedBodyId,
+        body_type: selectedBody?.body_type ?? null,
         tipo_convocatoria: tipoConvocatoria,
         fecha_1: meetingIso,
         fecha_2: fecha2Iso,

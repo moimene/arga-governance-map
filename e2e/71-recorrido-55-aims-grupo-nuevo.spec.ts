@@ -41,6 +41,14 @@ test.describe('MOI-55 — bloque 5 AIMS en Grupo Nuevo', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
   test.setTimeout(240_000);
 
+  // Este spec ESCRIBE en el grupo nuevo (alta de sistema IA, evaluación
+  // congelada, incidente). No debe correr en una pasada general de e2e:
+  // solo se activa a propósito con E2E_ESCRIBE_GRUPO_NUEVO=1.
+  test.skip(
+    process.env.E2E_ESCRIBE_GRUPO_NUEVO !== '1',
+    'Escribe en el grupo nuevo (…0003); activar explícitamente con E2E_ESCRIBE_GRUPO_NUEVO=1',
+  );
+
   test('alta guiada, congelar/revisar a cuatro ojos e incidente', async ({ page, browser }) => {
     const filtrosSistemas: Array<string | null> = [];
     page.on('request', (req) => {
