@@ -170,7 +170,7 @@ El recorrido de los bloques 0, 1, 2 y 8 del guion se ha completado exhaustivamen
 - La RPC `fn_promover_sociedad_operativa` contenía inicialmente una regla genérica que exigía `condiciones_persona (count >= 2, PRESIDENTE + SECRETARIO)` pensada únicamente para Consejos de Administración. Al no contemplar `ADMINISTRADOR_UNICO` ni `ADMINISTRADORES_SOLIDARIOS`, dejaba erróneamente en `INCOMPLETA_CARGOS` a sociedades válidas. Este defecto fue subsanado y aplicado a Cloud mediante migración en el issue **MOI-219**, pasando ambas filiales a estado `OPERATIVA`.
 
 ### 6.4 Próximos pasos naturales
-1. Abordar el recorrido de operatividad integral en los módulos restantes según guion (Bloques 5 a 7: AIMS 360, GRC, SII; cubiertos en MOI-55 y MOI-146).
+1. ~~Abordar el recorrido de operatividad integral en los módulos restantes según guion (Bloques 5 a 7: AIMS 360, GRC, SII; cubiertos en MOI-55 y MOI-146).~~ **Bloques 6 (GRC) y 7 (SII) cerrados el 2026-09-27 en MOI-146** — ver §6.7. Solo queda el bloque 5 (AIMS 360), en MOI-55.
 2. Ejecutar la solución del issue **MOI-220** (edición de matriz y % post-alta).
 3. Abordar **MOI-221** (idempotencia y protección anti-duplicación en emisión de convocatorias).
 4. Decidir para los módulos de solo lectura de consola TGMS (§3.4): desarrollo de alta por pantalla vs kit de arranque en bootstrap.
@@ -236,6 +236,80 @@ MOI-147, que este issue no supera.
   plan de acción, con recuentos de ARGA (findings 5, action_plans 8) y
   Garrigues (findings 8) idénticos antes y después. Sonda de arista:
   `src/test/schema/tenant-cero-findings-action-plan-alta.test.ts`.
+
+**Actualización 2026-09-27 (MOI-146):** en el momento de recorrer el bloque
+6.4, los **seis restantes ya no estaban «sin decidir» en el código** — los
+carriles paralelos de MOI-149 (`agent/moi-149a..d-ola2`) ya habían entregado
+alta por pantalla real para los seis (`useCreatePolicy`/`useCreateObligation`/
+`useCreateControl` en `src/hooks/usePoliciesObligations.ts`,
+`NewDelegationDialog`/`useCreateDelegation`,
+`NewConflictDialog`/`useCreateConflict`,
+`useCreateRegulatoryNotification` en `src/hooks/useRegulatoryNotif.ts`),
+verificado por pantalla en `…0003`: política (`PI-GN-*`), obligación
+(`OBL-GN-*`), control (`CTR-GN-*`, desde la ficha de la obligación),
+delegación (diálogo con censo/entidad del propio tenant), conflicto de
+interés (diálogo con persona/tipo/descripción) y notificación regulatoria
+(desde la ficha de un incidente). Detalle completo en la fila **H-34** del
+guion. La puerta humana de MOI-147 sigue siendo la que decide si esto es
+suficiente o si además hace falta un kit de arranque; este issue solo
+confirma que la vía "alta por pantalla" ya existe y funciona para los 8.
+
+### 6.7 Recorrido MOI-146 — GRC Compass y Canal interno (bloques 6 y 7, 2026-09-27)
+
+Ejecutado **por un agente por delegación de Moisés**, con Playwright local
+contra Cloud (`governance_OS`), sesión real `demo@grupo-nuevo-demo.dev`
+(SECRETARIO). Spec versionado y reproducible:
+`e2e/71-recorrido-146-grc-canal-grupo-nuevo.spec.ts` (opt-in tras
+`E2E_ESCRIBE_GRUPO_NUEVO=1`, nunca en CI). 38 capturas en
+`docs/superpowers/reviews/2026-09-27-verificacion-pantalla/recorrido-146/`.
+Filas de hallazgos H-27 a H-39 en
+`docs/superpowers/plans/2026-09-19-tenant-cero-guion-recorrido.md`.
+
+**Bloque 6 (GRC Compass):**
+- **6.1 — alta real de riesgo, incidente, excepción y tercero (TPRM):** las
+  cuatro pantallas de alta (`/grc/risk-360/nuevo`, `/grc/incidentes/nuevo`,
+  `/grc/excepciones`, `/grc/tprm`) funcionan igual que en ARGA/Garrigues, con
+  el módulo GRC y la entidad resueltos del propio tenant.
+- **6.2 — capacidad ausente, no solo dato pendiente:** `grc_modules.owner`
+  vale `"Pendiente de designación"` para los 6 (7 desde MOI-152) módulos de
+  `…0003`, **pero ninguna pantalla del producto la lee**. `useGrcModules()`
+  (el único punto de `src/` que consulta `grc_modules`) solo trae `id, name`.
+  El "Responsable" que sí se ve en `/grc` es un catálogo estático de
+  *pantallas* (`Dashboard.tsx`), no el propietario del *módulo*. Alimenta
+  **MOI-147**.
+- **6.3 — sin dato de ejemplo pintado en ninguna de las 4:**
+  Penal/Sostenibilidad/Packs son catálogo estático + dato real del tenant
+  (cero para `…0003`, correctamente aislado); Solvencia II se declara a sí
+  misma **"Contenido de demostración, no conectado"**, con los 4 KPI y las 4
+  funciones clave en "sin dato" / "No medido" — es la pantalla mejor
+  etiquetada del bloque.
+- **6.4 — desmentido el "vacío y sin botón de alta" del guion original:** los
+  8 tipos de registro de consola tienen alta por pantalla real desde la
+  oleada 2 (MOI-149, §6.6). Único hallazgo de comportamiento: una ventana de
+  carrera reproducible en `/hallazgos/nuevo` justo tras recargar la pantalla
+  (`TenantContext` todavía sin resolver), que falla cerrado con un mensaje
+  técnico en vez de desactivar el botón — severidad M, no bloqueante (H-35).
+
+**Bloque 7 (Canal interno SII):**
+- **7.1 — alta real de comunicación** (`/sii/nuevo`, 4 pasos), persistida en
+  `sii.reports` del propio tenant.
+- **7.2 — acuse y cierre correctos:** "Emitir Acuse" persiste y el chip pasa
+  a verde con fecha; "Cerrar Expediente Raíz" queda correctamente bloqueado
+  por el subexpediente autónomo sin resolver (y deja de citar el acuse una
+  vez emitido — el guardrail lee estado real, no una condición fija).
+  `/sii/libro-registro` y `/sii/buzon?token=…` reflejan el mismo caso.
+- **7.3 — confirmado en tres superficies, no solo la conocida:** el diálogo
+  de acceso a la zona SII, la ficha del caso y el libro-registro muestran los
+  tres «Pendiente de designación» para instructor/responsable del tenant
+  nuevo, sin heredar ARGA ni Garrigues (`siiRolesPara`,
+  `src/lib/sii/roles-por-tenant.ts`). Alimenta directamente **MOI-151**.
+
+**Datos de prueba creados, exclusivamente en `tenant_id = …0003`:** 1 riesgo,
+1 incidente, 1 excepción, 1 tercero TPRM, 1 política, 1 obligación, 1
+control, 1 hallazgo, 1 plan de acción, 1 delegación, 1 conflicto de interés,
+1 notificación regulatoria, 1 comunicación del canal interno (13 registros).
+Verificado por `SELECT` directo en Cloud que ARGA (`…0001`) y Garrigues
+(`…0002`) no cambiaron en ninguna de esas tablas.
 
 ## 7. Referencias
 

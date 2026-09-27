@@ -1,0 +1,134 @@
+[
+  {
+    "punto": "6.1 — Nuevo riesgo",
+    "ruta": "/grc/risk-360/nuevo",
+    "quePaso": "Formulario aceptó código, título y módulo GRC del tenant; tras \"Crear riesgo\" navegó a http://127.0.0.1:5322/grc/risk-360/nuevo.",
+    "evidencia": "6.1-riesgo-nuevo-formulario.png, 6.1-riesgo-creado-resultado.png"
+  },
+  {
+    "punto": "6.1 — Nuevo incidente",
+    "ruta": "/grc/incidentes/nuevo",
+    "quePaso": "Stepper de 4 pasos completado (tipología DORA por defecto). Navegó a http://127.0.0.1:5322/grc/incidentes/2b988955-beaf-4fad-bfd3-ab669b4dfd13?scope=grupo.",
+    "evidencia": "6.1-incidente-paso4-resumen.png, 6.1-incidente-creado-detalle.png"
+  },
+  {
+    "punto": "6.1 — Nueva excepción",
+    "ruta": "/grc/excepciones",
+    "quePaso": "Modal \"Solicitar excepción\" aceptó justificación, controles compensatorios y fecha de caducidad; se cerró tras \"Registrar Solicitud\".",
+    "evidencia": "6.1-excepcion-modal-relleno.png, 6.1-excepcion-lista-tras-alta.png"
+  },
+  {
+    "punto": "6.1 — Nuevo tercero (TPRM)",
+    "ruta": "/grc/tprm",
+    "quePaso": "Modal \"Registrar Proveedor TIC\" aceptó nombre y servicio; se cerró tras \"Guardar en Registro\".",
+    "evidencia": "6.1-tprm-modal-relleno.png, 6.1-tprm-lista-tras-alta.png"
+  },
+  {
+    "punto": "6.2 — /grc módulos y propietario",
+    "ruta": "/grc",
+    "quePaso": "El dashboard /grc NO muestra en ningún punto el propietario (\"Pendiente de designación\") de los 6 módulos de grc_modules. La única columna \"Responsable\" visible en pantalla (\"Responsable: {screen.owner}\", src/pages/grc/Dashboard.tsx) viene de un catálogo estático de PANTALLAS (\"Registro owner de GRC\", \"GRC Compass\"…), no de la columna grc_modules.owner que la fila de la BD trae poblada a \"Pendiente de designación\". Ninguna pantalla del código (grep exhaustivo de \"grc_modules\" y de useGrcModules(), que solo hace SELECT id,name) lee o pinta esa columna. mencionaAlgunaPropietario=true.",
+    "evidencia": "6.2-grc-dashboard.png"
+  },
+  {
+    "punto": "6.3 — /grc/penal-anticorrupcion",
+    "ruta": "/grc/penal-anticorrupcion",
+    "quePaso": "Pantalla renderizó sin redirigir a login. No se detectó ninguna marca de dato de ejemplo, simulado ni aviso de vacío en el texto de la página — el contenido visible es el mismo catálogo estático (taxonomía de delitos, marco ESG, packs de país) que ve cualquier tenant, y lo que varía por tenant (riesgos, controles, obligaciones reales) se filtra correctamente por tenant vía los hooks de Supabase.",
+    "evidencia": "6.3-penal.png"
+  },
+  {
+    "punto": "6.3 — /grc/sostenibilidad",
+    "ruta": "/grc/sostenibilidad",
+    "quePaso": "Pantalla renderizó sin redirigir a login. No se detectó ninguna marca de dato de ejemplo, simulado ni aviso de vacío en el texto de la página — el contenido visible es el mismo catálogo estático (taxonomía de delitos, marco ESG, packs de país) que ve cualquier tenant, y lo que varía por tenant (riesgos, controles, obligaciones reales) se filtra correctamente por tenant vía los hooks de Supabase.",
+    "evidencia": "6.3-sostenibilidad.png"
+  },
+  {
+    "punto": "6.3 — /grc/solvencia-ii",
+    "ruta": "/grc/solvencia-ii",
+    "quePaso": "Pantalla renderizó sin redirigir a login. Contiene alguna marca de dato de ejemplo/demo/simulado o aviso de \"sin datos\".",
+    "evidencia": "6.3-solvencia-ii.png"
+  },
+  {
+    "punto": "6.3 — /grc/packs",
+    "ruta": "/grc/packs",
+    "quePaso": "Pantalla renderizó sin redirigir a login. No se detectó ninguna marca de dato de ejemplo, simulado ni aviso de vacío en el texto de la página — el contenido visible es el mismo catálogo estático (taxonomía de delitos, marco ESG, packs de país) que ve cualquier tenant, y lo que varía por tenant (riesgos, controles, obligaciones reales) se filtra correctamente por tenant vía los hooks de Supabase.",
+    "evidencia": "6.3-packs.png"
+  },
+  {
+    "punto": "6.4 — Nueva política",
+    "ruta": "/politicas",
+    "quePaso": "Formulario inline \"Nueva política\" (oleada 2) aceptó código y título; la política PI-GN-mujbux0l2sgf aparece en el listado tras crearla. Confirma alta por pantalla real: el guion original de 2026-09-19 esperaba \"vacío y sin botón de alta\", pero desde la oleada 2 (MOI-149) SÍ existe alta.",
+    "evidencia": "6.4-politica-form-relleno.png, 6.4-politica-creada-lista.png"
+  },
+  {
+    "punto": "6.4 — Nueva obligación",
+    "ruta": "/obligaciones",
+    "quePaso": "Formulario inline \"Nueva obligación\" aceptó código y título; OBL-GN-mujbux0l2sgf aparece en el listado. Alta por pantalla real desde oleada 2.",
+    "evidencia": "6.4-obligacion-form-relleno.png, 6.4-obligacion-creada-lista.png"
+  },
+  {
+    "punto": "6.4 — Nuevo control (desde ficha de obligación)",
+    "ruta": "/obligaciones/OBL-GN-mujbux0l2sgf",
+    "quePaso": "\"Nuevo control\" en la ficha de la obligación aceptó código y nombre; CTR-GN-mujbux0l2sgf aparece en la ficha. Alta por pantalla real desde oleada 2.",
+    "evidencia": "6.4-control-form-relleno.png, 6.4-control-creado-ficha.png"
+  },
+  {
+    "punto": "6.4 — Nuevo hallazgo",
+    "ruta": "/hallazgos/nuevo",
+    "quePaso": "Formulario dedicado (/hallazgos/nuevo, oleada 2) aceptó el título; navegó a http://127.0.0.1:5322/hallazgos/HALL-260927043748-NM1. Confirma alta por pantalla real. HALLAZGO MENOR (severidad M): el primer envío tras un hard navigation cayó de forma reproducible en \"Sin tenant de sesión: no se puede dar de alta el hallazgo.\" (GOTCHA #10 de CLAUDE.md — TenantContext arranca en null); hicieron falta 1 intento(s) para que se resolviera. Falla cerrado correctamente (no se atribuye a otro tenant), pero la experiencia visible es un error engañoso justo al recargar la pantalla.",
+    "evidencia": "6.4-hallazgo-form-relleno.png, 6.4-hallazgo-creado-detalle.png"
+  },
+  {
+    "punto": "6.4 — Nuevo plan de acción (desde ficha de hallazgo)",
+    "ruta": "http://127.0.0.1:5322/hallazgos/HALL-260927043748-NM1",
+    "quePaso": "El formulario inline \"Nuevo plan de acción\" de la ficha del hallazgo aceptó el título y lo añadió a la lista. Alta por pantalla real.",
+    "evidencia": "6.4-plan-accion-form-relleno.png, 6.4-plan-accion-creado-ficha.png"
+  },
+  {
+    "punto": "6.4 — Nueva delegación",
+    "ruta": "/delegaciones",
+    "quePaso": "Diálogo \"Nueva delegación\" (oleada 2, MOI-149) aceptó entidad, otorgante, apoderado, tipo, ámbito y fecha de inicio; se cerró tras \"Crear delegación\". Confirma alta por pantalla real.",
+    "evidencia": "6.4-delegacion-dialog-relleno.png, 6.4-delegacion-lista-tras-alta.png"
+  },
+  {
+    "punto": "6.4 — Nuevo conflicto de interés",
+    "ruta": "/conflictos",
+    "quePaso": "Diálogo \"Declarar conflicto\" (oleada 2, MOI-149) aceptó persona, tipo y descripción; se cerró tras \"Declarar\". Confirma alta por pantalla real.",
+    "evidencia": "6.4-conflicto-dialog-relleno.png, 6.4-conflicto-lista-tras-alta.png"
+  },
+  {
+    "punto": "6.4 — Nueva notificación regulatoria (desde ficha de incidente)",
+    "ruta": "http://127.0.0.1:5322/grc/incidentes/2b988955-beaf-4fad-bfd3-ab669b4dfd13?scope=grupo",
+    "quePaso": "\"Añadir notificación\" en la ficha del incidente aceptó autoridad y tipo; DGSFP aparece en el registro. Alta por pantalla real (regulatory_notifications).",
+    "evidencia": "6.4-notificacion-regulatoria-form-relleno.png, 6.4-notificacion-regulatoria-creada.png"
+  },
+  {
+    "punto": "7.3 — Confirmación \"Pendiente de designación\" (acceso SII)",
+    "ruta": "/sii/nuevo",
+    "quePaso": "CONFIRMADO por pantalla: el diálogo de acceso a la zona SII declara el rol pendiente de designación. Texto literal: \"Zona de acceso restringido El Sistema Interno de Información (SII) se presenta en una zona separada del resto de la aplicación. La identidad de los informantes está protegida por la Ley 2/2023. Entorno de validación funcional. Los expedientes de este canal se guardan en la base de datos del prototipo, aislada por tenant, y permanecen disponibles entre sesiones y equipos. No hay cifrado, ni sello de tiempo, ni custodia por un tercero cualificado, ni eficacia jurídica: son datos de demostración. Esta confirmación no queda registrada en ningún log. Usted está accediendo como: demo@grupo-nuevo-demo.dev Rol en el Sistema Interno de Información pendiente de designación. Cancelar Entrar a zona SII Close\".",
+    "evidencia": "7.3-sii-access-gate-pendiente-designacion.png"
+  },
+  {
+    "punto": "7.1 — Alta de comunicación del canal",
+    "ruta": "/sii/nuevo",
+    "quePaso": "Asistente de 4 pasos completado (modalidad anónima estricta por defecto, entidad del propio tenant, resumen y descripción). Código de expediente detectado en confirmación: SEC-A96C46-7012B3.",
+    "evidencia": "7.1-sii-nuevo-paso1.png, 7.1-sii-nuevo-paso2-relleno.png, 7.1-sii-nuevo-paso4-confirmacion.png"
+  },
+  {
+    "punto": "7.2 — Acuse y cierre del expediente",
+    "ruta": "http://127.0.0.1:5322/sii/SII-2026-08-004",
+    "quePaso": "Instructor mostrado en la ficha: \"Pendiente de designación\", confirmado. Acuse: emitido correctamente (modal se cerró tras \"Emitir y Notificar\"). Cierre: El modal de cierre muestra guardrail BLOQUEANTE por el subexpediente autónomo sin resolver — comportamiento esperado del motor, no hallazgo.",
+    "evidencia": "7.2-sii-caso-detalle.png, 7.2-sii-caso-acuse.png, 7.2-sii-caso-cierre-intento.png"
+  },
+  {
+    "punto": "7.2 — Libro-registro",
+    "ruta": "/sii/libro-registro",
+    "quePaso": "Listado renderizó sin redirigir a login, con columna \"Instructor\". Muestra \"Pendiente de designación\" para el expediente del tenant nuevo (confirma 7.3 desde esta pantalla también).",
+    "evidencia": "7.2-sii-libro-registro.png"
+  },
+  {
+    "punto": "7.2 — Buzón (consulta por código de seguimiento)",
+    "ruta": "/sii/buzon",
+    "quePaso": "La consulta por código de seguimiento muestra el investigador asignado como \"Pendiente de designación\".",
+    "evidencia": "7.2-sii-buzon-consulta.png"
+  }
+]
