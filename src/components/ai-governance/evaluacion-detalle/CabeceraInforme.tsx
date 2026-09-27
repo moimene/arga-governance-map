@@ -19,13 +19,14 @@ import { ETIQUETA_ROL, type RolRegulatorio } from "@/lib/aims/rol-regulatorio";
 import { etiqueta, normalizeAimsStatus } from "@/lib/aims/vocabulario";
 import { chipClaseEvaluacion, rotuloEvaluacion } from "@/lib/aims/legado";
 import { pendientesDeEvidencia } from "@/lib/aims/conformidad";
+import { proveedorDeSistema, responsableInternoDeSistema } from "@/lib/aims/readiness";
 import type { AiRiskAssessment } from "@/hooks/useAiAssessments";
 import { useTenantBranding } from "@/context/TenantBrandContext";
 import { isModuleEnabled } from "@/lib/tenant-modules";
 
 export interface CabeceraInformeProps {
   assessment: AiRiskAssessment & {
-    ai_systems?: { name?: string | null; risk_level?: string | null; regulatory_role?: string | null } | null;
+    ai_systems?: { name?: string | null; vendor?: string | null; risk_level?: string | null; regulatory_role?: string | null } | null;
   };
   isIso: boolean;
   /** Resuelto en la página: el catálogo medido es el del desplegador. */
@@ -139,6 +140,15 @@ export default function CabeceraInforme({
                 <span className="italic">No asignado</span>
               )}
             </p>
+            {/* F2.T8: proveedor y responsable interno, por sujeto — sin sujetos
+                hoy, cae al vendor legado y declara la ausencia, igual que la
+                ficha del sistema. */}
+            {assessment.system_id && (
+              <p className="text-xs text-[var(--g-text-secondary)]">
+                Proveedor: {proveedorDeSistema(assessment.system_id, [], assessment.ai_systems?.vendor)} · Responsable interno:{" "}
+                {responsableInternoDeSistema(assessment.system_id, [])}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col items-end gap-1">

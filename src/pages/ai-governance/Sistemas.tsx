@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, Cpu, PlusCircle, Search, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { useScope } from "@/context/ScopeContext";
-import { filterSystemsByScope, systemStatusChipClass, systemStatusLabel } from "@/lib/aims/readiness";
+import { filterSystemsByScope, proveedorDeSistema, systemStatusChipClass, systemStatusLabel } from "@/lib/aims/readiness";
 import { claseNivelRiesgo, normalizeAimsStatus, opcionesFiltro } from "@/lib/aims/vocabulario";
 import { tieneClasificacionGuiada } from "@/lib/aims/cuestionario-calificacion";
 import FilterGroup from "@/components/ai-governance/FilterGroup";
@@ -217,7 +217,7 @@ export default function Sistemas() {
                           <RiskChip system={sys} />
                         </td>
                         <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">
-                          <span className="block truncate">{sys.vendor ?? "Sin proveedor"}</span>
+                          <span className="block truncate">{proveedorDeSistema(sys.id, [], sys.vendor, "Sin proveedor")}</span>
                         </td>
                         <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">
                           {formatDate(sys.deployment_date)}
@@ -271,7 +271,7 @@ export default function Sistemas() {
                     <dl className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
                       <div className="min-w-0">
                         <dt className="text-[var(--g-text-secondary)]">Proveedor</dt>
-                        <dd className="truncate font-medium text-[var(--g-text-primary)]">{sys.vendor ?? "Sin proveedor"}</dd>
+                        <dd className="truncate font-medium text-[var(--g-text-primary)]">{proveedorDeSistema(sys.id, [], sys.vendor, "Sin proveedor")}</dd>
                       </div>
                       <div className="min-w-0">
                         <dt className="text-[var(--g-text-secondary)]">Tipo</dt>

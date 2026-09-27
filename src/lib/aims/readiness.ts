@@ -1,3 +1,4 @@
+import { sistemaEnAmbito, type SujetoAmbito, type EntidadAmbito } from "./ambito-entidades";
 import { AESIA_RIA_REQUIREMENTS } from "./catalog-aesia";
 import { checksVigentes, evaluacionesVigentes } from "./checks-vigentes";
 import { acreditaConformidad } from "./conformidad";
@@ -807,9 +808,19 @@ export function buildAimsReadiness(input: AimsReadinessInput): AimsReadinessSumm
   };
 }
 
-export function filterSystemsByScope<T extends { name: string; description?: string | null }>(
+/**
+ * F2.T11 — datos opcionales de sujeto y entidad para filtrar por ámbito real.
+ * Sin este argumento (o con `subjects` vacío — 0 sujetos hoy en los dos
+ * tenants, medido), se comporta EXACTAMENTE como antes: pasa todo, porque no
+ * hay ningún dato del que tirar. Cuando F2.T16/T4 siembren sujetos y algún
+ * caller los traiga, el filtro real entra por `ambito-entidades.ts`.
+ */
+export type DatosAmbito = { subjects: SujetoAmbito[]; entities: EntidadAmbito[] };
+
+export function filterSystemsByScope<T extends { name: string; description?: string | null; id?: string }>(
   systems: T[],
-  _scope: string,
+  scope: string,
+  ambito?: DatosAmbito,
 ): T[] {
   // MINA DESACTIVADA (A5, 2026-08-29): esta función recortaba el inventario
   // buscando `auto`, `siniestros`, `salud`, `fraude`, `motor`, `suscripción` y
@@ -825,9 +836,73 @@ export function filterSystemsByScope<T extends { name: string; description?: str
   // recorte por vocabulario se disparaba de verdad y ocultaba EN SILENCIO
   // cualquier sistema cuyo nombre no contuviera esas palabras.
   //
-  // `ai_systems` no tiene columna de jurisdicción ni de ámbito: no hay nada por
-  // lo que filtrar. Cuando la haya, se filtra por el dato declarado, nunca por
-  // palabras del nombre.
-  return systems;
+  // F2.T11: ahora SÍ hay algo por lo que filtrar — el sujeto real
+  // (`aims_ria_subjects.entity_id`) — pero sólo cuando quien llama lo trae. Sin
+  // `ambito`, o sin sujetos dentro de él, no se filtra: sigue sin haber
+  // vocabulario ni adivinanza de nombre.
+  if (!ambito || ambito.subjects.length === 0) return systems;
+  return systems.filter((s) => (s.id ? sistemaEnAmbito(s.id, scope, ambito.subjects, ambito.entities) : true));
+}
+
+// ---------------------------------------------------------------------------
+// F2.T8 — Proveedor y responsable interno se separan por SUJETO
+// (`aims_ria_subjects`), no por el `vendor` en texto libre del sistema ni por
+// un único rótulo que mezcla los dos papeles. Con 0 sujetos hoy (medido,
+// carril A de F2 aplicado, tabla vacía), el proveedor cae al `vendor` legado
+// —igual que mostraba siempre la ficha— y el responsable interno se declara
+// «Sin responsable interno asignado»: no se inventa dato de ARGA ni de
+// Garrigues por no tenerlo todavía.
+// ---------------------------------------------------------------------------
+
+/** Forma mínima de un sujeto que necesitan los rótulos de esta sección. */
+export type SujetoResponsable = {
+  systemId: string;
+  role: string;
+  /** Denominación social del sujeto cuando su rol es de proveedor. */
+  entityLabel?: string | null;
+  ownerPersonId?: string | null;
+  /** Nombre de la persona responsable interna, ya resuelto por quien llama. */
+  ownerName?: string | null;
+};
+
+const ROLES_PROVEEDOR = new Set(["PROVEEDOR", "PROVEEDOR_GPAI", "PROVEEDOR_POSTERIOR"]);
+
+/**
+ * «Proveedor (sociedad o tercero)»: el sujeto con rol de proveedor, o el
+ * `vendor` legado si no hay ninguno. `sinDato` es el rótulo de cada pantalla
+ * cuando no hay ni sujeto ni vendor — se mantiene el que cada una ya usaba,
+ * para no introducir un cambio de texto donde el dato sigue siendo el mismo.
+ */
+export function proveedorDeSistema(
+  systemId: string,
+  subjects: SujetoResponsable[],
+  vendorLegado: string | null | undefined,
+  sinDato = "Sin proveedor declarado",
+): string {
+  const proveedor = subjects.find((s) => s.systemId === systemId && ROLES_PROVEEDOR.has(s.role) && s.entityLabel);
+  return proveedor?.entityLabel || vendorLegado || sinDato;
+}
+
+/** «Responsable interno»: la persona (`owner_person_id`) del primer sujeto de este sistema que la tenga. */
+export function responsableInternoDeSistema(systemId: string, subjects: SujetoResponsable[]): string {
+  const conResponsable = subjects.find((s) => s.systemId === systemId && s.ownerName);
+  return conResponsable?.ownerName || "Sin responsable interno asignado";
+}
+
+/**
+ * Monitor de accountability (F2.T8): cuántos sujetos tienen responsable
+ * interno frente al total. `unmeasured` sin sujetos —hoy, en los dos
+ * tenants— nunca `gap`: 0 de 0 no es una brecha, es la ausencia de dato que
+ * el resto del programa (F2.T16 y sucesivas) todavía no sembró.
+ */
+export function monitorResponsableInterno(subjects: SujetoResponsable[]): {
+  total: number;
+  conResponsable: number;
+  status: "ok" | "gap" | "unmeasured";
+} {
+  const total = subjects.length;
+  if (total === 0) return { total: 0, conResponsable: 0, status: "unmeasured" };
+  const conResponsable = subjects.filter((s) => !!s.ownerPersonId).length;
+  return { total, conResponsable, status: conResponsable === total ? "ok" : "gap" };
 }
 

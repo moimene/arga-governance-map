@@ -1,7 +1,13 @@
 import { ChevronLeft, Cpu, Edit, FileCheck, Plus, Send } from "lucide-react";
 import type { AiSystem } from "@/hooks/useAiSystems";
 import type { AimsSystemVersion } from "@/hooks/useAimsTechnicalFile";
-import { systemStatusChipClass, systemStatusLabel } from "@/lib/aims/readiness";
+import {
+  systemStatusChipClass,
+  systemStatusLabel,
+  proveedorDeSistema,
+  responsableInternoDeSistema,
+  type SujetoResponsable,
+} from "@/lib/aims/readiness";
 import { claseNivelRiesgo } from "@/lib/aims/vocabulario";
 import { tieneClasificacionGuiada } from "@/lib/aims/cuestionario-calificacion";
 import { vinculaArt47 } from "@/lib/aims/expediente-tecnico";
@@ -23,6 +29,8 @@ export interface CabeceraSistemaProps {
   onNuevoAutodiagnostico: () => void;
   onDeclaracion: () => void;
   onEscalar: () => void;
+  /** Sujetos (F2.T2) de este sistema. Sin caller que los traiga hoy (0 sujetos en Cloud): por defecto vacío, cae al `vendor` legado. */
+  subjects?: SujetoResponsable[];
 }
 
 const BOTON_SECUNDARIO =
@@ -42,6 +50,7 @@ export default function CabeceraSistema({
   onNuevoAutodiagnostico,
   onDeclaracion,
   onEscalar,
+  subjects = [],
 }: CabeceraSistemaProps) {
   const conCuestionario = tieneClasificacionGuiada(system);
   // Sin cuestionario COMPLETED el rol y el nivel son dato declarado en ficha:
@@ -157,9 +166,19 @@ export default function CabeceraSistema({
                 : "No declarado"}
             </span>
           </div>
+          {/* F2.T8: proveedor (sociedad o tercero) y responsable interno son
+              papeles distintos del RIA — un mismo rótulo los confundía. */}
           <div>
-            <span className="text-[var(--g-text-secondary)] block mb-0.5">Proveedor / Responsable:</span>
-            <span className="font-semibold text-[var(--g-text-primary)]">{system.vendor || "No declarado"}</span>
+            <span className="text-[var(--g-text-secondary)] block mb-0.5">Proveedor (sociedad o tercero):</span>
+            <span className="font-semibold text-[var(--g-text-primary)]">
+              {proveedorDeSistema(system.id, subjects, system.vendor)}
+            </span>
+          </div>
+          <div>
+            <span className="text-[var(--g-text-secondary)] block mb-0.5">Responsable interno:</span>
+            <span className="font-semibold text-[var(--g-text-primary)]">
+              {responsableInternoDeSistema(system.id, subjects)}
+            </span>
           </div>
           <div>
             <span className="text-[var(--g-text-secondary)] block mb-0.5">Fecha Despliegue:</span>

@@ -1217,9 +1217,14 @@ describe("F1.T9 — atribuciones falsas fuera", () => {
     expect(src.match(/groupFullLabel|groupPortfolioLabel|tenant-brand-labels/)?.[0] ?? null,
       "la declaración rellena la entidad con el rótulo del grupo").toBeNull();
     // Y lo dice, en pantalla y en el borrador descargable: dos usos del aviso.
+    // F2.T17 hizo el aviso CONDICIONAL (rama `else` de un ternario, en las dos
+    // superficies) porque ahora hay un caso en el que sí se identifica la
+    // sociedad: el sujeto PROVEEDOR. Se cuenta el identificador completo —
+    // 1 declaración + 2 usos, uno por superficie— en vez del patrón literal
+    // `{AVISO_ENTIDAD_ART47}` que sólo casaba con la interpolación directa.
     expect(src).toMatch(/El grupo no es una persona jur[íi]dica/);
-    expect((src.match(/\{AVISO_ENTIDAD_ART47\}|\$\{AVISO_ENTIDAD_ART47\}/g) ?? []).length,
-      "el aviso no llega a la pantalla y al borrador").toBeGreaterThanOrEqual(2);
+    expect((src.match(/\bAVISO_ENTIDAD_ART47\b/g) ?? []).length,
+      "el aviso no llega a la pantalla y al borrador (o perdió su declaración)").toBeGreaterThanOrEqual(3);
   });
 
   // Decisión del controlador al integrar F1 (19-09-2026): ARGA tiene 6 sistemas

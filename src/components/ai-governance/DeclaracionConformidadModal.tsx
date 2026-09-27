@@ -21,16 +21,30 @@ import { toast } from "sonner";
 const AVISO_ENTIDAD_ART47 =
   "El grupo no es una persona jurídica: la declaración la asume la sociedad proveedora del sistema, que esta ficha todavía no identifica. Complétela antes de la emisión.";
 
+/** F2.T17: la sociedad proveedora del sujeto (`aims_ria_subjects`, rol PROVEEDOR*), no el grupo. */
+export interface SujetoProveedorArt47 {
+  legalName: string;
+  address?: string | null;
+}
+
 interface DeclaracionConformidadModalProps {
   system: AiSystem;
   isOpen: boolean;
   onClose: () => void;
+  /**
+   * F2.T17. Sin sujeto PROVEEDOR (0 en Cloud hoy, medido), se mantiene el
+   * hueco "[por identificar antes de la emisión]" que ya mostraba la
+   * declaración — no se ofrece ninguna sociedad porque no hay ninguna
+   * acreditada todavía.
+   */
+  sujetoProveedor?: SujetoProveedorArt47 | null;
 }
 
 export default function DeclaracionConformidadModal({
   system,
   isOpen,
   onClose,
+  sujetoProveedor = null,
 }: DeclaracionConformidadModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const branding = useTenantBranding();
@@ -49,11 +63,20 @@ export default function DeclaracionConformidadModal({
   // sin rol o sin nivel. Mismo criterio que el chip de la cabecera.
   const vincula = tieneClasificacionGuiada(system) ? vinculaArt47(system.regulatory_role, system.risk_level) : null;
   const rolLabel = ETIQUETA_ROL[system.regulatory_role as RolRegulatorio] ?? system.regulatory_role ?? "";
+  // F2.T17: el cap. V (arts. 51-56) vincula al PROVEEDOR DEL MODELO de uso
+  // general, no a quien es proveedor del sistema que lo integra. La hoja lo
+  // deriva para cualquier dependencia GPAI (con nota que lo aclara, para las
+  // pantallas que sí distinguen rol de nota); esta declaración se emite a
+  // nombre de un proveedor concreto y no puede listar una obligación que no
+  // es suya: se filtra salvo que el rol sea, literalmente, PROVEEDOR_GPAI.
   const marcos = derivarMarcos(
     system.regulatory_role,
     system.risk_level,
     Boolean(system.regulatory_profile?.gpai),
-  );
+  ).filter((m) => m.code !== "RIA_CAP_V_GPAI" || system.regulatory_role === "PROVEEDOR_GPAI");
+  // F2.T17: sin sujeto PROVEEDOR (0 en Cloud hoy), se mantiene el hueco que ya
+  // mostraba la declaración; con sujeto, la sociedad — nunca el grupo.
+  const sociedadProveedora = sujetoProveedor?.legalName ?? null;
 
   if (!isOpen) return null;
 
@@ -116,8 +139,8 @@ DECLARACIÓN DE CONFORMIDAD UE (REGLAMENTO UE 2024/1689 - ARTÍCULO 47)
 
 2. RESPONSABLE DE LA DECLARACIÓN:
    - Rol regulatorio: ${rolLabel}
-   - Sociedad proveedora: [por identificar antes de la emisión]
-     ${AVISO_ENTIDAD_ART47}
+   - Sociedad proveedora: ${sociedadProveedora ?? "[por identificar antes de la emisión]"}
+     ${sociedadProveedora ? (sujetoProveedor?.address ?? "Sin dirección registrada para esta sociedad.") : AVISO_ENTIDAD_ART47}
    - Persona / Cargo Responsable: [por completar antes de la emisión]
 
 3. DECLARACIÓN DE RESPONSABILIDAD:
@@ -217,8 +240,19 @@ validación funcional y no constituye una declaración de conformidad emitida.
               </div>
               <div className="col-span-2">
                 <span className="font-semibold text-[var(--g-text-secondary)] block">Sociedad proveedora:</span>
-                <span className="italic">[por identificar antes de la emisión]</span>
-                <p className="mt-1 text-[var(--g-text-secondary)]">{AVISO_ENTIDAD_ART47}</p>
+                {sociedadProveedora ? (
+                  <>
+                    <span className="font-bold">{sociedadProveedora}</span>
+                    <p className="mt-1 text-[var(--g-text-secondary)]">
+                      {sujetoProveedor?.address ?? "Sin dirección registrada para esta sociedad."}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <span className="italic">[por identificar antes de la emisión]</span>
+                    <p className="mt-1 text-[var(--g-text-secondary)]">{AVISO_ENTIDAD_ART47}</p>
+                  </>
+                )}
               </div>
             </div>
 
