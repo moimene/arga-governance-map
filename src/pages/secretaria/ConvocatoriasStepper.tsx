@@ -17,14 +17,21 @@ import {
   MATERIAS_LIBRES,
   agendaItemsForDecisionEngine,
   agendaMateriaSelectionForKind,
-  agendaMateriaGroups,
+  agendaMateriaGroupsCatalogadas,
   isMateriaInformativa,
   isMateriaCompatibleWithOrgano,
   labelMateria,
-  materiaDefaultForOrgano,
+  materiaDefaultForOrganoCatalogada,
   materiaInformativaDefault,
+  materiasPendientesDeCatalogo,
   resolveMateriaAlias,
 } from "@/lib/secretaria/agenda-materias";
+import {
+  esMateriaCatalogada,
+  materiaCatalogCodigos,
+  notaMateriasPendientes,
+  type CatalogoMateriaCodigos,
+} from "@/lib/secretaria/materia-catalogada";
 import { checkNoticePeriodByType, useEntityRules } from "@/hooks/useJurisdiccionRules";
 import { useMateriaCatalog } from "@/hooks/useMateriaConfig";
 import { useEntitiesList } from "@/hooks/useEntities";
@@ -429,7 +436,11 @@ function isFormatoReunion(value: string | null | undefined): value is "PRESENCIA
   return value === "PRESENCIAL" || value === "TELEMATICA" || value === "MIXTA";
 }
 
-function normalizeAgendaDraftItems(items: ConvocatoriaWithBody["agenda_items"], organoTipo: TipoOrgano): AgendaItem[] {
+function normalizeAgendaDraftItems(
+  items: ConvocatoriaWithBody["agenda_items"],
+  organoTipo: TipoOrgano,
+  codigosCatalogo: CatalogoMateriaCodigos,
+): AgendaItem[] {
   if (!Array.isArray(items) || items.length === 0) return [newAgendaItem(organoTipo)];
   return items.map((item) => {
     const kind = item.kind ?? "DELIBERATIVO";
@@ -446,8 +457,8 @@ function normalizeAgendaDraftItems(items: ConvocatoriaWithBody["agenda_items"], 
     const materia = kind === "DECISORIO"
       ? (
           isMateriaInformativa(normalizedRawMateria)
-            ? materiaDefaultForOrgano(organoTipo).value
-            : normalizedRawMateria || materiaDefaultForOrgano(organoTipo).value
+            ? materiaDefaultForOrganoCatalogada(organoTipo, codigosCatalogo).value
+            : normalizedRawMateria || materiaDefaultForOrganoCatalogada(organoTipo, codigosCatalogo).value
         )
       : (isMateriaInformativa(normalizedRawMateria) ? normalizedRawMateria : "");
     const meta = AGENDA_MATERIAS.find((m) => m.value === materia);
@@ -857,8 +868,24 @@ export default function ConvocatoriasStepper() {
     setAgendaItems((prev) => prev.map((i) => i.id === id ? { ...i, ...patch } : i));
   }
 
+  // H-50 (MOI-15): catálogo de materias — declarado antes de los efectos que
+  // lo consumen para redefaultear/gatear la materia de un punto DECISORIO.
+  // `null` mientras carga o falla (fail-closed: ninguna materia decisoria se
+  // ofrece hasta que el catálogo confirme la fila).
+  const {
+    data: materiaCatalogRows = [],
+    isLoading: materiaCatalogLoading,
+    isError: materiaCatalogIsError,
+  } = useMateriaCatalog();
+  const codigosCatalogo = useMemo(
+    () => materiaCatalogCodigos(materiaCatalogRows, { isLoading: materiaCatalogLoading, isError: materiaCatalogIsError }),
+    [materiaCatalogRows, materiaCatalogLoading, materiaCatalogIsError],
+  );
+
   useEffect(() => {
-    const defaultMateria = materiaDefaultForOrgano(organoTipo);
+    // H-50 (MOI-15): variante catalogada — nunca redefaultea a una materia
+    // sin fila en `materia_catalog`.
+    const defaultMateria = materiaDefaultForOrganoCatalogada(organoTipo, codigosCatalogo);
     setAgendaItems((prev) =>
       prev.map((item) => {
         const isEmptyDraft = item.titulo.trim().length === 0 && !item.propuesta_acuerdo?.trim();
@@ -871,7 +898,7 @@ export default function ConvocatoriasStepper() {
         };
       }),
     );
-  }, [organoTipo]);
+  }, [organoTipo, codigosCatalogo]);
 
   // ── Step 4 ──
   const { data: mandates = [] } = useBodyMandates(selectedBodyId ?? undefined);
@@ -1009,7 +1036,7 @@ export default function ConvocatoriasStepper() {
     // al clonarlas pasan al valor seguro de nueva captura EAD_INTERPOSITION.
     setChannels(channelsForNewCapture(source.publication_channels));
     setExcludedPersonIds(excludedRecipientsFromTrace(source.reminders_trace));
-    setAgendaItems(normalizeAgendaDraftItems(source.agenda_items, organoTipo));
+    setAgendaItems(normalizeAgendaDraftItems(source.agenda_items, organoTipo, codigosCatalogo));
     setDocumentosIncluidos(new Set());
     setBorradorDirty(false);
     setCloneSourceId(source.id);
@@ -1070,7 +1097,6 @@ export default function ConvocatoriasStepper() {
   // jurídico y la clase LSC de materias que no existen en AGENDA_MATERIAS
   // (p.ej. DIVIDENDO_A_CUENTA, ADQUISICION_PROPIA). Solo clases compatibles
   // con `agreements` (ORDINARIA/ESTATUTARIA/ESTRUCTURAL).
-  const { data: materiaCatalogRows = [], isLoading: materiaCatalogLoading } = useMateriaCatalog();
   const findCatalogMateria = useCallback(
     (canonical: string | null) =>
       canonical
@@ -1746,7 +1772,7 @@ export default function ConvocatoriasStepper() {
     setChannels(channelsForNewCapture(source.publication_channels));
     setExcludedPersonIds(excludedRecipientsFromTrace(source.reminders_trace));
     if (Array.isArray(source.agenda_items) && source.agenda_items.length > 0) {
-      setAgendaItems(normalizeAgendaDraftItems(source.agenda_items, organoTipo));
+      setAgendaItems(normalizeAgendaDraftItems(source.agenda_items, organoTipo, codigosCatalogo));
     }
     if (source.convocatoria_text) {
       setBorradorTexto(source.convocatoria_text);
@@ -2433,6 +2459,21 @@ export default function ConvocatoriasStepper() {
     if (invalidNonDecisionItem) {
       toast.error(
         `Selecciona una categoría informativa válida para «${invalidNonDecisionItem.titulo}».`,
+      );
+      return;
+    }
+    // H-50 (MOI-15, severidad A): un punto DECISORIO sin fila en
+    // `materia_catalog` emite la convocatoria pero el acta lo rechaza en
+    // servidor ("every point needs a catalogued matter"). Bloquea aquí, con
+    // mensaje claro, en vez de dejar avanzar a un camino sin salida.
+    // Fail-closed: mientras el catálogo carga o falla, cualquier punto
+    // DECISORIO queda como no catalogado y bloquea la emisión.
+    const invalidDecisionMateria = agendaItems.find(
+      (item) => item.titulo.trim().length > 0 && item.kind === "DECISORIO" && !esMateriaCatalogada(item.materia, codigosCatalogo),
+    );
+    if (invalidDecisionMateria) {
+      toast.error(
+        `«${labelMateria(invalidDecisionMateria.materia)}» no tiene fila en el catálogo de materias (materia_catalog): el acta la rechazaría en servidor. Selecciona una materia catalogada para «${invalidDecisionMateria.titulo}», o espera a que termine de cargar el catálogo.`,
       );
       return;
     }
@@ -3484,6 +3525,25 @@ export default function ConvocatoriasStepper() {
                 someten al motor de validez.
               </p>
 
+              {/* H-50 (MOI-15): nota visible en vez de hacer desaparecer en
+                  silencio las materias sin fila en `materia_catalog`. La
+                  clasificación (clase, mayoría, cita legal) es criterio del
+                  Comité Legal, no de este selector. */}
+              {(() => {
+                const nota = notaMateriasPendientes(
+                  materiasPendientesDeCatalogo(organoTipo, tipoSocial, codigosCatalogo).length,
+                );
+                return nota ? (
+                  <p
+                    className="border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-card)] px-3 py-2 text-xs text-[var(--g-text-secondary)]"
+                    style={{ borderRadius: "var(--g-radius-sm)" }}
+                  >
+                    {nota}: no se ofrecen en el selector porque el acta las rechazaría en servidor por
+                    no tener fila en el catálogo de materias.
+                  </p>
+                ) : null;
+              })()}
+
               {agendaRuleSpecs.length > 0 && (
                 <RuleResolutionPanel
                   loading={ruleResolutionsLoading}
@@ -3510,7 +3570,11 @@ export default function ConvocatoriasStepper() {
                   // Fix round 1 G3 Task 4, I-1: se pasa `tipoSocial` (ya
                   // computado arriba) para que las materias `soloTipoSocial`
                   // (las 6 SLP) no aparezcan en una convocatoria de ARGA (SA).
-                  const materiaGroups = agendaMateriaGroups(organoTipo, tipoSocial)
+                  // H-50 (MOI-15): variante *Catalogadas — nunca ofrece una
+                  // materia decisoria sin fila en `materia_catalog` (el acta
+                  // la rechazaría en servidor). Fail-closed mientras
+                  // `codigosCatalogo` está cargando o en error.
+                  const materiaGroups = agendaMateriaGroupsCatalogadas(organoTipo, tipoSocial, codigosCatalogo)
                     .map((group) => ({
                       ...group,
                       materias: group.materias.filter(
@@ -3606,6 +3670,7 @@ export default function ConvocatoriasStepper() {
                                   kind: opt.value,
                                   currentMateria: item.materia,
                                   organoTipo,
+                                  codigosCatalogo,
                                 });
                                 const patch: Partial<AgendaItem> = {
                                   kind: opt.value,

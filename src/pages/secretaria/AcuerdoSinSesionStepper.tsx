@@ -9,7 +9,14 @@ import { useEntitiesList } from "@/hooks/useEntities";
 import { StepRail } from "./_shared/StepNav";
 import { useBodiesByEntity, useNoSessionParticipants } from "@/hooks/useBodies";
 import { usePlantillaProtegida } from "@/hooks/usePlantillasProtegidas";
-import { resolveMateriaAlias } from "@/lib/secretaria/agenda-materias";
+import { resolveMateriaAlias, labelMateria } from "@/lib/secretaria/agenda-materias";
+import { useMateriaCatalog } from "@/hooks/useMateriaConfig";
+import {
+  esMateriaCatalogada,
+  filtrarMateriasCatalogadas,
+  materiaCatalogCodigos,
+  notaMateriasPendientes,
+} from "@/lib/secretaria/materia-catalogada";
 import {
   useCreateNoSessionResolution,
   useAdoptNoSessionAgreement,
@@ -198,6 +205,21 @@ export default function AcuerdoSinSesionStepper() {
       ? scope.selectedEntity?.id ?? searchParams.get("entity")
       : null;
   const isSociedadScoped = Boolean(scopedEntityId);
+  // H-50 (MOI-15, severidad A): AGREEMENT_KINDS ofrecía materias sin fila en
+  // `materia_catalog` (p.ej. APROBACION_PLAN_NEGOCIO, FINANCIACION,
+  // CONTRATACION_RELEVANTE, RATIFICACION_ACTOS, OTROS_LIBRE). El acuerdo se
+  // adopta igual (no pasa por `agenda_items`/acta), pero deja un expediente
+  // sin materia jurídica acreditada. `codigosCatalogo` es `null` mientras el
+  // catálogo carga o falla (fail-closed).
+  const {
+    data: materiaCatalogRows = [],
+    isLoading: materiaCatalogLoading,
+    isError: materiaCatalogIsError,
+  } = useMateriaCatalog();
+  const codigosCatalogo = useMemo(
+    () => materiaCatalogCodigos(materiaCatalogRows, { isLoading: materiaCatalogLoading, isError: materiaCatalogIsError }),
+    [materiaCatalogRows, materiaCatalogLoading, materiaCatalogIsError],
+  );
   const scopedListPath = scope.createScopedTo("/secretaria/acuerdos-sin-sesion");
   const createResolution = useCreateNoSessionResolution();
   const adoptAgreement = useAdoptNoSessionAgreement();
@@ -216,6 +238,17 @@ export default function AcuerdoSinSesionStepper() {
   const [matterClass, setMatterClass] = useState<"ORDINARIA" | "ESTATUTARIA" | "ESTRUCTURAL">("ORDINARIA");
   const [agreementKind, setAgreementKind] = useState("");
   const [requiresUnanimity, setRequiresUnanimity] = useState(false);
+  // H-50 (MOI-15): tipos de acuerdo de `matterClass` con fila en
+  // `materia_catalog` — único criterio para ofrecerlos y para bloquear su
+  // persistencia si de algún modo llegan sin catalogar.
+  const agreementKindsCatalogados = useMemo(
+    () =>
+      filtrarMateriasCatalogadas(
+        (AGREEMENT_KINDS[matterClass] ?? []).map((k) => ({ value: k })),
+        codigosCatalogo,
+      ),
+    [matterClass, codigosCatalogo],
+  );
 
   useEffect(() => {
     if (!scopedEntityId) return;
@@ -235,12 +268,17 @@ export default function AcuerdoSinSesionStepper() {
     const matchedClass = (Object.keys(AGREEMENT_KINDS) as Array<keyof typeof AGREEMENT_KINDS>).find(
       (matter) => AGREEMENT_KINDS[matter].includes(canonical),
     );
-    if (matchedClass) {
+    // H-50 (MOI-15): un handoff no puede preseleccionar una materia sin fila
+    // en `materia_catalog` — quedaría marcada aplicada sin selector visible
+    // que la explique. Mientras el catálogo carga (`codigosCatalogo === null`)
+    // se espera sin marcar como aplicado, para reintentar cuando resuelva.
+    if (matchedClass && codigosCatalogo === null) return;
+    if (matchedClass && esMateriaCatalogada(canonical, codigosCatalogo)) {
       setMatterClass(matchedClass as "ORDINARIA" | "ESTATUTARIA" | "ESTRUCTURAL");
       setAgreementKind(canonical);
     }
     setAppliedMateriaParam(requestedMateriaParam);
-  }, [appliedMateriaParam, requestedMateriaParam]);
+  }, [appliedMateriaParam, requestedMateriaParam, codigosCatalogo]);
 
   const { data: entities = [] } = useEntitiesList({ sociedadesOnly: true });
   const { data: bodies = [] } = useBodiesByEntity(selectedEntityId ?? undefined, { adoptingOnly: true });
@@ -333,6 +371,16 @@ export default function AcuerdoSinSesionStepper() {
     // Si el proceso ya está abierto, reabrir el paso 4 en lugar de crear otro.
     if (resolutionId) {
       setCurrent(4);
+      return;
+    }
+    // H-50 (MOI-15, severidad A): bloquea abrir la votación de un tipo de
+    // acuerdo sin fila en `materia_catalog` — el expediente quedaría sin
+    // materia jurídica acreditada. Fail-closed mientras el catálogo carga o
+    // falla.
+    if (!esMateriaCatalogada(agreementKind, codigosCatalogo)) {
+      toast.error(
+        `«${AGREEMENT_KIND_LABELS[agreementKind] ?? labelMateria(agreementKind)}» no tiene fila en el catálogo de materias (materia_catalog). Selecciona otro tipo de acuerdo, o espera a que termine de cargar el catálogo.`,
+      );
       return;
     }
     openingVotingRef.current = true;
@@ -678,15 +726,19 @@ export default function AcuerdoSinSesionStepper() {
                       {/* BATCH 9 (ronda 2 U-F): filtrar agreement_kinds por
                           body_type del órgano seleccionado. Si no hay body_type
                           (legacy) o el body es JUNTA, se muestran todos.
-                          Para CdA/Comisión solo se muestran kinds compatibles. */}
-                      {(AGREEMENT_KINDS[matterClass] ?? [])
-                        .filter((k) => {
+                          Para CdA/Comisión solo se muestran kinds compatibles.
+                          H-50 (MOI-15): además, fail-closed por catálogo — no
+                          se ofrece un tipo sin fila en `materia_catalog`, ya
+                          que el expediente quedaría sin materia jurídica
+                          acreditada. */}
+                      {agreementKindsCatalogados.catalogadas
+                        .filter(({ value: k }) => {
                           const bodyType = selectedBody?.body_type?.toUpperCase();
                           if (!bodyType) return true;
                           const allowedSet = AGREEMENT_KIND_BY_BODY_TYPE[bodyType];
                           return !allowedSet || allowedSet.has(k);
                         })
-                        .map((k) => (
+                        .map(({ value: k }) => (
                           <option key={k} value={k}>{AGREEMENT_KIND_LABELS[k] ?? k}</option>
                         ))}
                     </select>
@@ -708,6 +760,12 @@ export default function AcuerdoSinSesionStepper() {
                         </p>
                       );
                     })()}
+                    {notaMateriasPendientes(agreementKindsCatalogados.pendientes.length) ? (
+                      <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                        {notaMateriasPendientes(agreementKindsCatalogados.pendientes.length)}: no se
+                        ofrecen porque el catálogo (materia_catalog) no tiene fila para ellas.
+                      </p>
+                    ) : null}
                   </div>
 
                   <label className="flex items-center gap-2 cursor-pointer">
