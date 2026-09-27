@@ -1112,28 +1112,45 @@ describe("C1 — los 10 acuerdos de la Junta en Cloud", () => {
     expect(enArga ?? []).toHaveLength(0);
   });
 
-  it("la plataforma NO ha emitido acta ni certificación de la Junta, y el día que lo haga este test cae", async () => {
-    // Condición nº2 y nº3 del diseño de la Task 8.
+  it("MOI-143: si la Junta tiene acta, tiene manifiesto legal coherente; sigue exigiendo 0 certificaciones", async () => {
+    // Condición nº2 y nº3 del diseño de la Task 8, REESCRITA a propósito
+    // (regla dura 3 de CLAUDE.md: "sigue vacío" → "no se ha perdido/lo que
+    // hay es coherente"). Hasta MOI-143, `fn_secretaria_build_minute_legal_manifest`
+    // cerraba en bloque TODA Junta con `IF v_is_junta THEN RAISE EXCEPTION`,
+    // así que el único cero medible era "0 actas". MOI-143 quita esa
+    // excepción SOLO cuando el evaluador dedicado de capital
+    // (`fn_secretaria_server_junta_resolution_evaluation`) existe y se
+    // invoca — así que hoy puede aparecer un acta legítima de Junta. Un
+    // gate que siguiera exigiendo 0 se pondría en rojo el día que alguien
+    // haga bien su trabajo: lo que hace falta vigilar es que, SI aparece,
+    // venga con manifiesto legal coherente — no que no aparezca nunca.
     //
-    // `fn_secretaria_build_minute_legal_manifest` cierra a propósito la emisión
-    // de acta autoritativa para TODA Junta —`IF v_is_junta THEN RAISE EXCEPTION
-    // '… economic Junta quorum requires the dedicated capital evaluator before
-    // legal finalization'`— porque su modelo exige censo POLITICO y que la
-    // asistencia cubra cada asiento: el de un colegiado de asiento único. Una
-    // Junta de Socios vota por participaciones. Y sin acta no hay certificación:
-    // `fn_generar_certificacion` exige un acta y la variante sin sesión es un
-    // rechazo puro.
-    //
-    // Hoy estos ceros son consecuencia de una imposibilidad técnica. Este test
-    // existe para que el día que alguien abra esa puerta —escribiendo el
-    // evaluador de capital, o saltándose el guard con
-    // `set_config('app.secretaria_authoritative_rpc','1')` antes de un INSERT,
-    // que está nombrado y RECHAZADO en el diseño— sea una DECISIÓN y no un
-    // efecto colateral que nadie mire. El test no prohíbe: obliga a mirar.
+    // La Junta canónica de Garrigues (06/05/2026) en particular sigue sin
+    // poder generar acta hoy por una razón de DATO, no de diseño: su censo
+    // ECONOMICO ya congelado (2a4cdc49…) es anterior a esta migración y no
+    // lleva `raw_votes`/`share_class_code` — el evaluador lo rechaza
+    // explícitamente (ver verificación de la migración
+    // 20260928160000_secretaria_junta_capital_evaluator.sql). Por eso este
+    // test sigue viendo 0 actas de Garrigues hoy, pero ya no lo EXIGE: si
+    // mañana se cierra con un censo posterior a esta migración, debe seguir
+    // siendo un acta con manifiesto legal completo, no solo "> 0 filas".
     const { data: actas, error: eActas } = await garr.from("minutes")
-      .select("id, meeting_id").eq("tenant_id", GARRIGUES_TENANT);
+      .select("id, meeting_id, legal_gate_status, authoritative_manifest, authoritative_manifest_hash")
+      .eq("tenant_id", GARRIGUES_TENANT);
     expect(eActas).toBeNull();
-    expect(actas ?? []).toHaveLength(0);
+    for (const acta of actas ?? []) {
+      expect(["MANIFEST_READY", "ARTIFACT_FINAL", "APPROVED_SIGNED"]).toContain(acta.legal_gate_status);
+      expect(String(acta.authoritative_manifest_hash ?? "")).toMatch(/^[0-9a-f]{64}$/);
+      const manifest = acta.authoritative_manifest as {
+        resolutions?: Array<{ server_evaluation?: { source?: string } }>;
+      } | null;
+      expect(manifest).toBeTruthy();
+      const resoluciones = manifest?.resolutions ?? [];
+      expect(resoluciones.length).toBeGreaterThan(0);
+      for (const resolucion of resoluciones) {
+        expect(resolucion.server_evaluation?.source).toBe("SERVER_AUTHORITATIVE");
+      }
+    }
 
     const { data: certs, error: eCerts } = await garr.from("certifications")
       .select("id").eq("tenant_id", GARRIGUES_TENANT);

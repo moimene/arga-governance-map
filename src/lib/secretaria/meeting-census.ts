@@ -157,3 +157,65 @@ export function summarizeMeetingAttendance(
     quorumTotal: quorumRows.length,
   };
 }
+
+// --- MOI-143: quórum y mayoría por capital de una Junta ---------------------
+//
+// Espejo puro (sin red) de `fn_secretaria_server_junta_resolution_evaluation`
+// (supabase/migrations/20260928160000_secretaria_junta_capital_evaluator.sql).
+// El SQL es la autoridad; esta función es la misma aritmética, testeable sin
+// Cloud. Dos criterios legales deliberadamente NO modelados, dejados para el
+// Comité Legal:
+//   - Mayoría reforzada (arts. 194/201.2 LSC) por materia estatutaria: aquí
+//     siempre se aplica la mayoría ordinaria del art. 201.1 (favor > contra
+//     del capital presente o representado).
+//   - Porcentaje mínimo de quórum de primera/segunda convocatoria (art. 193
+//     LSC): aquí el quórum es el suelo "algún voto elegible concurrió"
+//     (concurrentWeight > 0), no un porcentaje de la base declarada.
+export interface JuntaCapitalSeat {
+  personId: string;
+  /** Votos crudos ya en la base declarada (0 si la clase/titularidad queda
+   *  excluida de esa base, p. ej. clase B bajo VOTOS_CLASE_A_NO_AUTOCARTERA). */
+  rawVotes: number;
+}
+
+export type JuntaCapitalVoteValue = "FAVOR" | "CONTRA" | "ABSTENCION";
+
+export interface JuntaCapitalVote {
+  personId: string;
+  value: JuntaCapitalVoteValue;
+}
+
+export interface JuntaCapitalQuorumMajorityResult {
+  concurrentWeight: number;
+  favor: number;
+  contra: number;
+  abstencion: number;
+  quorumReached: boolean;
+  majorityReached: boolean;
+  /** Porcentaje del capital concurrente sobre la base declarada. */
+  presentPct: number;
+}
+
+export function evaluarQuorumYMayoriaJuntaPorCapital(
+  seats: JuntaCapitalSeat[],
+  votes: JuntaCapitalVote[],
+  baseVotos: number,
+): JuntaCapitalQuorumMajorityResult {
+  const votesByPerson = new Map(votes.map((vote) => [vote.personId, vote.value]));
+  let concurrentWeight = 0;
+  let favor = 0;
+  let contra = 0;
+  let abstencion = 0;
+  for (const seat of seats) {
+    const value = votesByPerson.get(seat.personId);
+    if (!value) continue;
+    concurrentWeight += seat.rawVotes;
+    if (value === "FAVOR") favor += seat.rawVotes;
+    else if (value === "CONTRA") contra += seat.rawVotes;
+    else abstencion += seat.rawVotes;
+  }
+  const quorumReached = concurrentWeight > 0;
+  const majorityReached = quorumReached && favor > contra;
+  const presentPct = baseVotos > 0 ? (concurrentWeight / baseVotos) * 100 : 0;
+  return { concurrentWeight, favor, contra, abstencion, quorumReached, majorityReached, presentPct };
+}
