@@ -4,6 +4,8 @@ import { AlertTriangle, ChevronLeft, Save } from "lucide-react";
 import { toast } from "sonner";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { useCreateAiIncident, type AiIncident } from "@/hooks/useAiIncidents";
+import { useCurrentUserRole } from "@/hooks/useCurrentUser";
+import { SIN_CAPACIDAD_AVISO, useHasCapability } from "@/hooks/useCapabilityMatrix";
 import { mensajeUsuario } from "@/lib/aims/errores-rpc";
 import FormularioIncidente, {
   type FormState,
@@ -24,6 +26,8 @@ export default function IncidenteNuevo() {
   const [params] = useSearchParams();
   const createIncident = useCreateAiIncident();
   const { data: systems = [], isLoading: loadingSystems } = useAiSystemsList();
+  const { primaryRole } = useCurrentUserRole();
+  const puedeRegistrar = useHasCapability(primaryRole, "AIMS_INCIDENTE");
   const [submitted, setSubmitted] = useState(false);
   const [form, setForm] = useState<FormState>({
     system_id: params.get("system_id") ?? "",
@@ -61,6 +65,10 @@ export default function IncidenteNuevo() {
 
     if (form.title.trim().length < 3 || !form.system_id) {
       toast.error("Revisa los campos obligatorios.");
+      return;
+    }
+    if (!puedeRegistrar) {
+      toast.error("Tu rol no tiene permiso para registrar incidentes IA.");
       return;
     }
 
@@ -147,16 +155,22 @@ export default function IncidenteNuevo() {
           >
             Cancelar
           </button>
-          <button
-            type="submit"
-            aria-busy={createIncident.isPending}
-            disabled={createIncident.isPending}
-            className="inline-flex items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-70"
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            <Save className="h-4 w-4" />
-            {createIncident.isPending ? "Registrando..." : "Registrar incidente"}
-          </button>
+          {puedeRegistrar ? (
+            <button
+              type="submit"
+              aria-busy={createIncident.isPending}
+              disabled={createIncident.isPending}
+              className="inline-flex items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-70"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <Save className="h-4 w-4" />
+              {createIncident.isPending ? "Registrando..." : "Registrar incidente"}
+            </button>
+          ) : (
+            <p className="self-center text-xs text-[var(--g-text-secondary)]" role="alert">
+              {SIN_CAPACIDAD_AVISO}
+            </p>
+          )}
         </div>
       </form>
     </div>

@@ -9,6 +9,8 @@
 import { AlertTriangle, Save } from "lucide-react";
 import { ADAPTATION_PLANS } from "@/lib/aims/catalog-aesia";
 import type { AccionPDA } from "@/lib/aims/plan-adaptacion";
+import { useCurrentUserRole } from "@/hooks/useCurrentUser";
+import { SIN_CAPACIDAD_AVISO, useHasCapability } from "@/hooks/useCapabilityMatrix";
 import { LABEL_CLASSES, TEXTAREA_CLASSES } from "./estado-medida";
 
 export type EstadisticasEvaluacion = {
@@ -40,6 +42,8 @@ export default function PasoRevision({
   onPrev,
   onSubmit,
 }: PasoRevisionProps) {
+  const { primaryRole } = useCurrentUserRole();
+  const puedeEvaluar = useHasCapability(primaryRole, "AIMS_EVALUAR");
   return (
     <div className="space-y-6">
       <div
@@ -207,16 +211,22 @@ export default function PasoRevision({
           >
             Atrás
           </button>
-          <button
-            type="button"
-            onClick={onSubmit}
-            disabled={guardando}
-            className="flex items-center gap-2 px-6 py-2.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-sm font-medium transition-colors disabled:opacity-50"
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            <Save className="w-4 h-4" />
-            <span>{guardando ? "Registrando..." : "Guardar autodiagnóstico"}</span>
-          </button>
+          {puedeEvaluar ? (
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={guardando}
+              className="flex items-center gap-2 px-6 py-2.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-sm font-medium transition-colors disabled:opacity-50"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <Save className="w-4 h-4" />
+              <span>{guardando ? "Registrando..." : "Guardar autodiagnóstico"}</span>
+            </button>
+          ) : (
+            <p className="text-xs text-[var(--g-text-secondary)]" role="alert">
+              {SIN_CAPACIDAD_AVISO}
+            </p>
+          )}
         </div>
       </div>
     </div>
