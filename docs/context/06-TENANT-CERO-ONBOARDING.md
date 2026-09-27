@@ -278,6 +278,24 @@ guion. La puerta humana de MOI-147 sigue siendo la que decide si esto es
 suficiente o si además hace falta un kit de arranque; este issue solo
 confirma que la vía "alta por pantalla" ya existe y funciona para los 8.
 
+**Ola 5 (2026-09-27/28) — Objetivo 4.1: punto nacido en sesión con materia catalogada + acta.** Ejecutado por un agente (Claude, sesión de orquestador), navegador Chromium (Playwright, canal `chrome`) contra `governance_OS` real, puerto 5342, cuentas `demo@`/`admin@grupo-nuevo-demo.dev` del fixture del repo (contraseñas nunca impresas), por delegación de Moisés. Base: H-32 (RPC `fn_secretaria_add_session_agenda_item`, migración `20260928151000`) y H-33 (identificador fiscal por COALESCE con `persons.tax_id`, migración `20260928150000`) YA APLICADAS en Cloud y en el repo antes de esta ola.
+
+*H-32/H-33 tras el arreglo:* verificado en vivo — "Añadir punto nacido en sesión" en la reunión `81a4de74-2bc4-4f99-8a98-12bfc038a630` (EN_CURSO, Consejo de Corporación Nueva, S.A., nacida de la convocatoria `247ff78a…` con materia `DELEGACION_FACULTADES`) YA NO lanza `42501 AGENDA_EMITIDA_RPC_REQUIRED`: la materialización pasa por la RPC gobernada y persiste un segundo `agenda_items` (H-32 confirmado corregido para el camino de inserción). H-33 no se pudo confirmar de extremo a extremo en esta ola porque el cierre de la reunión choca antes con el gate temporal (`scheduled_end`) y con los hallazgos nuevos H-50/H-51/H-52 descritos abajo — no hay evidencia de que el fix de H-33 en sí mismo esté roto, solo que otras puertas se abren primero.
+
+*Materia catalogada, verificado por SELECT antes de tocar nada:* `APROBACION_PLAN_NEGOCIO` (única materia de la reunión `ffd71122…`, bloqueada — ver H-50) tiene rule pack `GN_APROBACION_PLAN_NEGOCIO` ACTIVE pero **no** existe en `materia_catalog`. `APROBACION_PRESUPUESTO` sí está en el catálogo y tiene rule pack `GN_APROBACION_PRESUPUESTO` (CONSEJO, ACTIVE): es la materia usada para el punto nacido en sesión de esta ola, precisamente para no repetir el hueco de H-50.
+
+*Punto nacido en sesión (a):* añadido por pantalla en la reunión `81a4de74…` — "Aprobación del presupuesto anual 2027 de Corporación Nueva, S.A.", `kind=DECISORIO`, materia elegida `APROBACION_PRESUPUESTO`. Persistido como `agenda_items.id=dc938c06-1334-4936-a84b-02297336f7fb`, `order_number=2`. **Hallazgo nuevo H-52**: `agenda_items.matter_code` de ese punto quedó `NULL` en Cloud pese a la selección en pantalla — la RPC de H-32 no acepta parámetro de materia y el cliente no la persiste para un punto recién materializado (detalle y cita de código en la fila H-52 del guion).
+
+*Votación (b, parcial):* al llegar a Votaciones con el punto 1 (`DELEGACION_FACULTADES`) ya `ADOPTED` desde la ola anterior y el punto 2 sin resolver, el botón "Registrar/Recalcular votación..." no se renderiza — **hallazgo nuevo H-51** (`puedeRecalcularResoluciones` no contempla un punto votable adicional sin resolución cuando ya hay resoluciones completas). No se pudo registrar el voto del punto 2 por pantalla.
+
+*Cierre y acta (b/c):* `fn_secretaria_close_meeting_and_generate_minute` rechazó el primer intento con `atomic meeting close: a future or still-open meeting cannot be closed or produce legal minutes` porque `scheduled_end` (`2026-09-27 06:11:00+00`) todavía no había pasado (medido: servidor en `05:32:29+00`). Se esperó de verdad, con reintentos reales cada 60s, hasta que el gate temporal se abriera. [RESULTADO FINAL PENDIENTE DE COMPLETAR EN ESTA MISMA EDICIÓN TRAS EL POLL — ver `e2e/71-recorrido-15-grupo-nuevo.spec.ts`, evidencia en `docs/superpowers/reviews/2026-09-27-verificacion-pantalla/recorrido-15/ola5-punto-sesion/`.]
+
+*Reunión `ffd71122…` (objetivo 4.1 original):* declarada bloqueada por H-50 (su único punto, `APROBACION_PLAN_NEGOCIO`, no tiene fila en `materia_catalog`) y NO se ha tocado en esta ola, por instrucción expresa.
+
+*Aislamiento verificado por SELECT antes/después:* `agenda_items` de `…0003` 7→8 (el único punto nuevo); `agreements_0003` sin cambio en 7 (ninguna resolución nueva, consistente con H-51); ARGA (`…0001`, 27 `meetings`, 52 `agreements`) y Garrigues (`…0002`, 1 `meeting`, 10 `agreements`) sin ninguna fila nueva — el `created_at` más reciente de `meetings`/`agreements` de ambos sigue siendo anterior al 2026-09-06, igual que en las repeticiones previas de este mismo issue.
+
+**Hallazgos nuevos de esta ola** (tabla del guion): H-50 (B, bloquea `ffd71122…` de forma permanente e independiente de H-33), H-51 (A, capacidad ausente para votar un segundo punto), H-52 (A, la materia de un punto nacido en sesión no se persiste).
+
 ### 6.8 Recorrido MOI-146 — GRC Compass y Canal interno (bloques 6 y 7, 2026-09-27)
 
 Ejecutado **por un agente por delegación de Moisés**, con Playwright local

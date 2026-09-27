@@ -2163,6 +2163,7 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
         {debates.map((d, idx) => (
           <div
             key={idx}
+            data-testid={`agenda-punto-${idx}`}
             className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
             style={{ borderRadius: "var(--g-radius-lg)" }}
           >
