@@ -59,7 +59,7 @@ const restaurarMocks = await mockearModulos([
   ["@/hooks/useAiIncidents", () => ({ useAiIncidentsList: consulta() })],
   ["@/hooks/useAiAssessments", () => ({ useAllAssessments: consulta("assessments"), useAllComplianceChecks: consulta() })],
   ["@/hooks/useAimsClasificacion", () => ({ useCuestionariosVigentesDelTenant: consulta() })],
-  ["@/hooks/useBodies", () => ({ useBodyBySlug: () => ({ data: null }) })],
+  ["@/hooks/useAiGovernanceBody", () => ({ useAiGovernanceBody: () => ({ data: null, isLoading: false, error: null }) })],
   ["@/context/ScopeContext", () => ({ useScope: () => ({ scope: "Todos" }) })],
   ["@/context/TenantContext", () => ({ useTenantContext: () => ({ tenantId: null }) })],
 ]);
@@ -180,14 +180,15 @@ describe("la clasificación guiada se cuenta del dato, y el órgano sigue enlaza
   });
 
   it("la arista del órgano rector sobrevive a la descomposición", () => {
-    // La página resuelve el órgano por tenant —`useBodyBySlug` filtra además
-    // por `tenant_id`— y sólo monta el componente si la consulta devuelve fila.
-    // El componente pinta el enlace. Las dos mitades se comprueban juntas: sin
-    // esto, quitar el `<Link` dejaría un rótulo muerto y nadie lo notaría.
+    // La página resuelve el órgano por DATO (F2.T9/MOI-150: `useAiGovernanceBody`,
+    // sujeto o política de IA — ya no por un mapa fijo de tenants) y sólo monta
+    // el componente si la consulta devuelve fila. El componente pinta el
+    // enlace. Las dos mitades se comprueban juntas: sin esto, quitar el `<Link`
+    // dejaría un rótulo muerto y nadie lo notaría.
     const page = sinComentarios(read(DASHBOARD));
     expect(
-      /useBodyBySlug\(\s*aiGovernanceBodySlug\(/.test(page),
-      "el slug resuelto por tenant ya no alimenta la consulta del órgano",
+      /const\s*\{\s*data:\s*aiBody\s*\}\s*=\s*useAiGovernanceBody\(\)/.test(page),
+      "useAiGovernanceBody() ya no alimenta aiBody",
     ).toBe(true);
     expect(/\{aiBody && <OrganoRector\s/.test(page), "el panel del órgano se monta sin condición").toBe(true);
 

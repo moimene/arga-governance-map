@@ -14,9 +14,7 @@ import {
   systemStatusLabel,
 } from "@/lib/aims/readiness";
 import { useScope } from "@/context/ScopeContext";
-import { useTenantContext } from "@/context/TenantContext";
-import { useBodyBySlug } from "@/hooks/useBodies";
-import { aiGovernanceBodySlug } from "@/lib/aims/governing-body";
+import { useAiGovernanceBody } from "@/hooks/useAiGovernanceBody";
 import { claseNivelRiesgo } from "@/lib/aims/vocabulario";
 import { sistemasCubiertos } from "@/lib/aims/legado";
 import { tieneClasificacionGuiada } from "@/lib/aims/cuestionario-calificacion";
@@ -44,12 +42,11 @@ function RiskBadge({ system }: { system: { risk_level: string | null; regulatory
 
 export default function AiDashboard() {
   const { scope } = useScope();
-  // Órgano de gobierno de la IA del tenant. Doble puerta: el mapa no devuelve
-  // slug para un tenant sin órgano declarado, y `useBodyBySlug` filtra por
-  // `tenant_id`, así que tampoco lo encontraría. Si no hay fila, no se pinta
-  // nada — que es lo que corresponde cuando nadie ha constituido el órgano.
-  const { tenantId } = useTenantContext();
-  const { data: aiBody } = useBodyBySlug(aiGovernanceBodySlug(tenantId) ?? undefined);
+  // Órgano de gobierno de la IA del tenant, resuelto por dato (F2.T9,
+  // MOI-150): un sujeto con `governing_body_id`, o la política de IA de algún
+  // sistema con `owner_body_id`. Sin ninguna de las dos, `null` — no se pinta
+  // nada, que es lo que corresponde cuando nadie ha constituido el órgano.
+  const { data: aiBody } = useAiGovernanceBody();
   const { data: rawSystems = [], isLoading: loadingSystems, error: errSystems } = useAiSystemsList();
   const { data: rawIncidents = [], isLoading: loadingIncidents, error: errIncidents } = useAiIncidentsList();
   const { data: rawAssessments = [], isLoading: loadingAssessments, error: errAssessments } = useAllAssessments();

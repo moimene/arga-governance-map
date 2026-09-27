@@ -1184,30 +1184,39 @@ describe("2026-09-19 — F1.T6: la vigilancia no promete lo que no mide", () => 
   });
 });
 
-// F1.T9 (programa de cobertura RIA, 2026-09-19; cierra GC-10, GC-17, GC-53).
-// Tres atribuciones que el dato no sostiene: `ai_systems` no tiene
-// `entity_id`, así que la ficha de una sociedad no puede decir qué sistemas son
-// SUYOS; el grupo no es una persona jurídica, así que no puede figurar como la
-// entidad que asume la declaración del art. 47; y Q2_2 no pregunta por el
-// art. 6.1 (anexo I), sino por el 6.2 y el anexo III.
-describe("F1.T9 — atribuciones falsas fuera", () => {
+// F1.T9 (programa de cobertura RIA, 2026-09-19; cierra GC-10, GC-17, GC-53) —
+// ACTUALIZADO por F2.T12 (MOI-170, 2026-09-28). F1.T9 impedía que la ficha de
+// una sociedad se atribuyera sistemas de IA porque `ai_systems` no tenía
+// `entity_id`: no había ningún dato que sostuviera "estos sistemas son de esta
+// sociedad". F2 crea `aims_ria_subjects` (quién es sujeto de qué sistema, en
+// qué rol) y la vista `v_aims_sistemas_por_entidad`. Ahora SÍ hay un dato real
+// que sostiene la atribución — pero solo por esa vía. `ai_systems` sigue sin
+// `entity_id`: si alguien vuelve a leerlo de ahí, es la misma atribución
+// fabricada que F1.T9 prohibía, con otro nombre de columna.
+//
+// El grupo sigue sin ser persona jurídica (declaración del art. 47), y Q2_2
+// sigue rotulado por el art. 6.2 y el anexo III: esos dos criterios de F1.T9
+// no los toca F2 y se conservan tal cual.
+describe("F2.T12 — atribución de sistemas de IA solo por sujeto real, nunca por una columna inventada", () => {
   const ENTIDAD = "src/pages/EntidadDetalle.tsx";
-  const ATRIBUCION = /Sistemas\s+(?:de\s+)?IA\s+de\s+esta\s+(?:entidad|sociedad)/i;
 
-  it("el patrón de atribución casaría con el rótulo retirado (control positivo del instrumento)", () => {
-    expect(ATRIBUCION.test("Sistemas IA de esta entidad")).toBe(true);
-    expect(ATRIBUCION.test("Sistemas de IA de esta sociedad")).toBe(true);
-    expect(ATRIBUCION.test("Sistemas de IA del grupo (sin atribución a esta sociedad)")).toBe(false);
+  it("la ficha de una sociedad atribuye sistemas por `aims_ria_subjects` (vía la vista), no por un `entity_id` que `ai_systems` no tiene", () => {
+    const src = sinComentarios(read(ENTIDAD));
+    // Control positivo: la sección sigue existiendo y pinta con dato real.
+    expect(src).toContain("useAiSystemsByEntitySubject(");
+    expect(src).toContain("aiSystems.map(");
+    // La vía prohibida por F1.T9 no vuelve: ni el hook del inventario entero
+    // del tenant, ni un acceso a `entity_id` sobre filas de `ai_systems`.
+    expect(src).not.toContain("useAiSystemsList(");
+    expect(src).not.toContain("allAiSystems");
   });
 
-  it("la ficha de una sociedad no se atribuye los sistemas de IA del grupo", () => {
+  it("con 0 sujetos declarados (hoy, en los dos tenants) dice un vacío honesto, no el inventario sin atribuir", () => {
     const src = sinComentarios(read(ENTIDAD));
-    // Control positivo: la sección sigue pintando el inventario; sin esto, una
-    // sección vaciada dejaría la ausencia de abajo verde sin mirar nada.
-    expect(src).toContain("useAiSystemsList(");
-    expect(src).toContain("allAiSystems.map(");
-    expect(src).toContain("Sistemas de IA del grupo (sin atribución a esta sociedad)");
-    expect(src.match(ATRIBUCION)?.[0] ?? null, `${ENTIDAD} vuelve a atribuir los sistemas a la sociedad`).toBeNull();
+    expect(src).toMatch(/sujeto acreditado/i);
+    // El rótulo que F1.T9 fijaba para la ausencia de dato ya no aplica: ahora
+    // SÍ hay una tabla de atribución real, aunque hoy esté vacía.
+    expect(src).not.toContain("Sistemas de IA del grupo (sin atribución a esta sociedad)");
   });
 
   it("la declaración del art. 47 no pone al grupo como entidad y lo avisa", () => {
@@ -1222,16 +1231,15 @@ describe("F1.T9 — atribuciones falsas fuera", () => {
       "el aviso no llega a la pantalla y al borrador").toBeGreaterThanOrEqual(2);
   });
 
-  // Decisión del controlador al integrar F1 (19-09-2026): ARGA tiene 6 sistemas
+  // Decisión del controlador al integrar F1 (19-09-2026): ARGA tenía 6 sistemas
   // «Alto» y 0 cuestionarios, y la ficha de la sociedad los pintaba en rojo.
-  // Capa de TEXTO, débil y declarada: montar la ficha arrastra una docena de
-  // hooks; lo que se vigila es que el tono crítico solo se alcance con cuestionario.
-  it("la ficha de una sociedad no pinta en rojo un nivel sin cuestionario", () => {
+  // Superado por F2.T12: la tabla de esta pestaña ya no lee `risk_level` en
+  // absoluto (viene de `v_aims_sistemas_por_entidad`, que no lo tiene) — no
+  // hay nivel que pintar en rojo, ni con cuestionario ni sin él.
+  it("la ficha de una sociedad no pinta un nivel de riesgo en su tabla de sistemas por sujeto", () => {
     const src = sinComentarios(read(ENTIDAD));
-    // Control positivo: el tono crítico sigue existiendo para los clasificados.
-    expect(src).toContain('"critical"');
-    expect(src).toMatch(/!tieneClasificacionGuiada\(sys\)\s*\?\s*"neutral"/);
-    expect(src).toContain("nivel declarado en ficha, sin cuestionario");
+    expect(src).not.toContain("risk_level");
+    expect(src).not.toContain("tieneClasificacionGuiada");
   });
 
   it("Q2_2 se rotula por el art. 6.2 y el anexo III, no por el 6.1", async () => {

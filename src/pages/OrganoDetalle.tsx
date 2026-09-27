@@ -8,10 +8,11 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { ObjectHeader } from "@/components/ObjectHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useBodyBySlug, useBodyMandates, useBodyMeetings, formatDate, formatTime } from "@/hooks/useBodies";
+import { useAiSystemsByGoverningBody } from "@/hooks/useAiGovernanceBody";
 import { useConvocatoriasList, type ConvocatoriaWithBody } from "@/hooks/useConvocatorias";
 import { getRegulationById } from "@/data/regulations";
 import { organoNaturalezaBadges } from "@/lib/organo-naturaleza";
-import { AlertTriangle, CalendarPlus, Download, FileCheck2, Network, Plus, UserPlus } from "lucide-react";
+import { AlertTriangle, Brain, CalendarPlus, Download, ExternalLink, FileCheck2, Network, Plus, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useTenantBranding, useTenantBrandingLoading } from "@/context/TenantBrandContext";
@@ -44,6 +45,9 @@ export default function OrganoDetalle() {
   const { data: members = [] } = useBodyMandates(body?.id);
   const { data: bodyMeetings = [] } = useBodyMeetings(body?.id);
   const { data: allConvocatorias = [] } = useConvocatoriasList();
+  // F2.T9 (MOI-170): sistemas de IA gobernados por este órgano, por dato
+  // (`v_aims_sistemas_por_organo`), no por una lista fija en el programa.
+  const { data: aiSystems = [] } = useAiSystemsByGoverningBody(body?.id);
   const bodyId = body?.id;
   const bodyConvocatorias = (allConvocatorias as ConvocatoriaWithBody[])
     .filter((c) => c.body_id === bodyId)
@@ -129,11 +133,14 @@ export default function OrganoDetalle() {
       )}
 
       <Tabs defaultValue="composicion" className="mt-6">
-        <TabsList className="grid w-full max-w-3xl grid-cols-4">
+        <TabsList className="grid w-full max-w-3xl grid-cols-5">
           <TabsTrigger value="composicion">Composición</TabsTrigger>
           <TabsTrigger value="calendario">Calendario</TabsTrigger>
           <TabsTrigger value="reglamento">Reglamento</TabsTrigger>
           <TabsTrigger value="secretaria">Secretaría</TabsTrigger>
+          <TabsTrigger value="ai" className="flex items-center gap-1">
+            <Brain className="h-3.5 w-3.5" />Sistemas IA
+          </TabsTrigger>
           {/* Pestaña "Historial" retirada: su contenido era un placeholder
               "disponible próximamente" (dead-end en demo). Reintroducir cuando
               exista el timeline de auditoría real. */}
@@ -340,6 +347,53 @@ export default function OrganoDetalle() {
               )}
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="ai" className="mt-4">
+          <Card>
+            <div className="flex items-center justify-between border-b border-border px-5 py-3">
+              <div className="text-sm font-semibold">Sistemas de IA gobernados ({aiSystems.length})</div>
+              <Button asChild size="sm" variant="outline" className="gap-1.5">
+                <Link to="/ai-governance/sistemas"><ExternalLink className="h-3.5 w-3.5" />Ver inventario completo</Link>
+              </Button>
+            </div>
+            {aiSystems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-2 p-10 text-center">
+                <Brain className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Ningún sistema de IA tiene todavía a este órgano como sujeto acreditado.
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Sistema</TableHead>
+                    <TableHead>Rol</TableHead>
+                    <TableHead>Estado del sujeto</TableHead>
+                    <TableHead className="text-right">Ficha</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {aiSystems.map((s) => (
+                    <TableRow key={s.subject_id}>
+                      <TableCell className="text-sm font-medium">{s.system_name}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{s.role}</TableCell>
+                      <TableCell><StatusBadge label={s.status} /></TableCell>
+                      <TableCell className="text-right">
+                        <Link
+                          to={`/ai-governance/sistemas/${s.system_id}`}
+                          className="text-xs text-primary hover:underline flex items-center justify-end gap-1"
+                        >
+                          <ExternalLink className="h-3 w-3" />Ver
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
         </TabsContent>
 
       </Tabs>

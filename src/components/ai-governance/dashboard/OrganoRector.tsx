@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, UserCheck } from "lucide-react";
 
 export interface OrganoRectorProps {
-  /** Slug del órgano, tal como lo resolvió `aiGovernanceBodySlug(tenantId)` en la página. */
+  /** Slug del órgano, tal como lo resolvió `useAiGovernanceBody()` en la página. */
   slug: string;
   name: string;
 }
@@ -11,10 +11,11 @@ export interface OrganoRectorProps {
  * Enlace al órgano de gobierno de la IA del tenant.
  *
  * La ARISTA vive entre dos ficheros y así se prueba: la página resuelve el
- * órgano con `useBodyBySlug(aiGovernanceBodySlug(tenantId))` y sólo monta esto
- * cuando la consulta devuelve fila —un tenant sin órgano declarado no ve nada,
- * porque nadie se lo ha constituido—; aquí se pinta el enlace a su ficha.
- * `/organos/:id` resuelve por SLUG, no por UUID (`useBodyBySlug`).
+ * órgano con `useAiGovernanceBody()` (por dato: sujeto o política de IA,
+ * F2.T9/MOI-150) y sólo monta esto cuando la consulta devuelve fila —un
+ * tenant sin órgano acreditado no ve nada, porque nadie se lo ha constituido—;
+ * aquí se pinta el enlace a su ficha. `/organos/:id` resuelve por SLUG, no
+ * por UUID (`useBodyBySlug`).
  */
 export function OrganoRector({ slug, name }: OrganoRectorProps) {
   return (
