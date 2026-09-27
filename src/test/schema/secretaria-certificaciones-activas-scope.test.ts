@@ -21,6 +21,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   DEMO_TENANT,
   GARRIGUES_TENANT,
+  NUEVO_TENANT,
   sesionDe,
 } from "../helpers/supabase-test-client";
 import {
@@ -121,5 +122,31 @@ describe("Sonda viva · Catálogo de tipos de certificación de Secretaría (MOI
 
     expect(error).toBeNull();
     expect(data ?? []).toHaveLength(0);
+  });
+
+  // MOI-16 (2026-09-27): el bootstrap de Grupo Nuevo (MOI-233) siembra su propio
+  // catálogo sin las 3 filas retiradas, en vez de sembrarlas y desactivarlas como
+  // en ARGA. El resultado visible debe ser el mismo por la misma vía genérica
+  // (`certificationKindExclusion`), no por casualidad de que el tenant esté vacío.
+  it("Grupo Nuevo: ningún tipo activo afirma envío/entrega/firma cualificada (MOI-16)", async () => {
+    const nuevoClient = await sesionDe("NUEVO");
+    const { data, error } = await nuevoClient
+      .from("standalone_certification_kinds")
+      .select("kind_code, label, is_active, requires_qes")
+      .eq("tenant_id", NUEVO_TENANT)
+      .eq("is_active", true);
+
+    expect(error).toBeNull();
+    // Control positivo: si esto fuera 0, las negativas de abajo pasarían vacuas.
+    expect((data ?? []).length).toBeGreaterThanOrEqual(35);
+
+    const activos = (data ?? []) as CertificationKindScopeInput[];
+    const excluidos = activos.filter((k) => certificationKindExclusion(k) !== null);
+    expect(excluidos).toHaveLength(0);
+
+    const codes = activos.map((row) => row.kind_code);
+    expect(codes).not.toContain("CERT_ENVIO_CONVOCATORIA");
+    expect(codes).not.toContain("CERT_ERDS_ENTREGA");
+    expect(codes).not.toContain("CERT_COMUNICACIONES_REGULATORIAS");
   });
 });
