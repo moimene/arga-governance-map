@@ -80,29 +80,55 @@ describe("C3 Tarea 5 — hallazgos enlazados y planes etiquetados", () => {
     expect(new Set(original).size).toBe(CELDAS_BANDA_ALTA.length);
   });
 
-  it("todo plan de acción de Garrigues cuelga de un hallazgo del propio tenant", async () => {
+  it("todo plan de acción de Garrigues tiene un origen tipado (hallazgo, obligación o sistema de IA) del propio tenant", async () => {
     // ANTES decía `expect(data).toEqual([])` — «no hay planes, y eso es el
     // requisito». Eso era la orden vieja, la de no sembrar el tenant: el primer
     // plan simulado ponía en rojo justo el avance que ahora se pide, y la
     // salida fácil habría sido revertir la siembra en vez de tocar el gate.
     //
+    // F5.T7 (MOI-175, D-04): `finding_id` es anulable desde 20260928101000 —
+    // un plan puede nacer de `obligation_id` o `ai_system_id` sin que haga
+    // falta fabricar un hallazgo. La invariante ya no es «cuelga de UN
+    // hallazgo propio»: es «tiene AL MENOS un origen, y cada origen que trae
+    // es del propio tenant» (el CHECK de la BD ya impide los tres NULL a la
+    // vez; esto vigila la ARISTA con el dato real, no solo el esquema).
+    //
     // Queda vigilado lo que es defecto con cero planes y con doscientos: uno
-    // huérfano o colgado del hallazgo de otro tenant. Y que el recuento se MIDA
-    // —un error de PostgREST no puede volver a pasar por «no hay ninguno»—.
+    // huérfano, sin ningún origen, o colgado de un origen de otro tenant. Y
+    // que el recuento se MIDA —un error de PostgREST no puede volver a pasar
+    // por «no hay ninguno»—.
     const { data, error } = await garr.from("action_plans")
-      .select("id, title, finding_id").eq("tenant_id", GARRIGUES_TENANT);
+      .select("id, title, finding_id, obligation_id, ai_system_id").eq("tenant_id", GARRIGUES_TENANT);
     expect(error).toBeNull();
     expect(data, "la consulta de action_plans no devolvió ni filas ni error").not.toBeNull();
 
-    const { data: hallazgos, error: eH } = await garr.from("findings")
-      .select("id").eq("tenant_id", GARRIGUES_TENANT);
+    const [{ data: hallazgos, error: eH }, { data: obligaciones, error: eO }, { data: sistemas, error: eS }] =
+      await Promise.all([
+        garr.from("findings").select("id").eq("tenant_id", GARRIGUES_TENANT),
+        garr.from("obligations").select("id").eq("tenant_id", GARRIGUES_TENANT),
+        garr.from("ai_systems").select("id").eq("tenant_id", GARRIGUES_TENANT),
+      ]);
     expect(eH).toBeNull();
-    // Control positivo: sin hallazgos, la comprobación de abajo se haría contra
-    // un conjunto vacío y cualquier plan pasaría por huérfano o por bueno según
-    // el azar de la consulta.
+    expect(eO).toBeNull();
+    expect(eS).toBeNull();
+    // Control positivo: sin nada de esto, la comprobación de abajo se haría
+    // contra tres conjuntos vacíos y cualquier plan pasaría por huérfano o por
+    // bueno según el azar de la consulta.
     expect(hallazgos.length).toBeGreaterThan(0);
-    const propios = new Set(hallazgos.map((h) => h.id));
-    expect(data.filter((p) => !propios.has(p.finding_id)).map((p) => p.title)).toEqual([]);
+    expect(obligaciones.length).toBeGreaterThan(0);
+
+    const hallazgosPropios = new Set(hallazgos.map((h) => h.id));
+    const obligacionesPropias = new Set(obligaciones.map((o) => o.id));
+    const sistemasPropios = new Set((sistemas ?? []).map((s) => s.id));
+
+    const sinOrigenPropio = data.filter((p) => {
+      const origenPropio =
+        (p.finding_id && hallazgosPropios.has(p.finding_id)) ||
+        (p.obligation_id && obligacionesPropias.has(p.obligation_id)) ||
+        (p.ai_system_id && sistemasPropios.has(p.ai_system_id));
+      return !origenPropio;
+    });
+    expect(sinOrigenPropio.map((p) => p.title)).toEqual([]);
   });
 
   it("y la ausencia se explica con su motivo y su fuente, no en blanco", () => {

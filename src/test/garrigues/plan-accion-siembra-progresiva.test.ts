@@ -56,4 +56,19 @@ describe("el aviso de planes de acción describe un hueco por sembrar, no una de
     expect(src).toContain("PLAN_ACCION_AUSENCIA.tenantId");
     expect(src).toContain("No hay planes de acción disponibles.");
   });
+
+  it("F5.T7 (MOI-175): un plan con origen obligación/sistema de IA (sin hallazgo) no hace desaparecer el aviso solo", () => {
+    // Desde 20260928101000, `action_plans.finding_id` es anulable: un plan
+    // puede nacer de `obligation_id`/`ai_system_id` sin hallazgo. Esta
+    // pantalla es específicamente de Auditoría Interna (filtra
+    // `findings?.origin === "AuditInterna"` DENTRO del queryFn, antes de que
+    // el componente vea el resultado) — un plan de esos orígenes nuevos trae
+    // `findings: null` y por tanto SIGUE fuera de `plans`, así que el aviso de
+    // "aún por incorporar" no se apaga por un plan que no le pertenece a esta
+    // vista. Se comprueba en el FUENTE (arista, no render): que el filtro de
+    // origen sigue existiendo y sigue siendo la única puerta de entrada a
+    // `plans`.
+    const src = sinComentarios(readFileSync(join(process.cwd(), PANTALLA), "utf8"));
+    expect(src).toContain('p.findings?.origin === "AuditInterna"');
+  });
 });

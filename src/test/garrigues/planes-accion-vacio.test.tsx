@@ -5,6 +5,14 @@
 // el componente se lo mostrara a TODO el mundo, ARGA incluida — y eso sería
 // contarle a ARGA una procedencia que no es la suya. Así que se monta dos
 // veces, una por tenant, y se exige que ARGA vea exactamente lo que veía.
+//
+// F5.T7 (MOI-175): revisado tras hacer `action_plans.finding_id` anulable
+// (20260928101000). No cambia nada aquí: el mock de `useQuery` sustituye la
+// query entera (incluido el filtro `origin === "AuditInterna"` que vive
+// DENTRO del `queryFn` real, no del componente), así que `data: []` sigue
+// significando "cero planes visibles en esta vista" con independencia de si
+// existen planes de otro origen en Cloud. La arista del filtro de origen la
+// vigila `plan-accion-siembra-progresiva.test.ts`.
 import { afterAll, afterEach, describe, expect, it } from "bun:test";
 import { render, screen, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";

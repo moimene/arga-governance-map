@@ -188,7 +188,12 @@ export function useFindingRelatedControls(obligationId: string | null | undefine
 
 export interface ActionPlanRow {
   id: string;
-  finding_id: string;
+  // F5.T7 (MOI-175, D-04): finding_id es anulable desde 20260928101000 — un
+  // plan puede nacer de obligation_id o ai_system_id en su lugar (CHECK
+  // action_plans_origen_check exige al menos uno de los tres).
+  finding_id: string | null;
+  obligation_id: string | null;
+  ai_system_id: string | null;
   title: string;
   responsible_id: string | null;
   due_date: string | null;
@@ -212,7 +217,12 @@ export function useActionPlansByFinding(findingId: string | null | undefined) {
         .order("due_date", { ascending: true });
       if (error) throw error;
       type ApRaw = ActionPlanRow & { responsible?: { full_name?: string | null } | null };
-      return ((data ?? []) as ApRaw[]).map((r): ActionPlanFull => ({
+      // `as unknown as`: los tipos generados de Supabase (types.ts) todavía no
+      // conocen `obligation_id`/`ai_system_id` (F5.T7, migración 20260928101000
+      // pendiente de aplicar en Cloud + regenerar). El cast directo lo rechaza
+      // TypeScript por solape insuficiente; se resuelve igual que el resto de
+      // este boundary (patrón "Ola 3").
+      return ((data ?? []) as unknown as ApRaw[]).map((r): ActionPlanFull => ({
         ...r,
         responsible_name: r.responsible?.full_name ?? null,
       }));
@@ -256,9 +266,14 @@ export function useCreateFinding() {
   });
 }
 
-// MOI-149 (D-23): alta de planes de acción. `action_plans` exige `finding_id`
-// (NOT NULL) y desde 2026-09-06 `tenant_id` tampoco tiene DEFAULT (antes caía
-// en ARGA en silencio): igual que arriba, se nombra siempre.
+// MOI-149 (D-23): alta de planes de acción DESDE UN HALLAZGO (este es el
+// camino de HallazgoDetalle.tsx). `finding_id` sigue obligatorio para ESTE
+// input concreto — el origen desde obligación/sistema de IA (F5.T7, MOI-175,
+// D-04) es un alta distinta, sin pantalla propia todavía; no fabricada aquí.
+// `action_plans.finding_id` es anulable a nivel de esquema desde
+// 20260928101000, pero este tipo de escritura sigue siendo "desde un
+// hallazgo" y lo exige. Desde 2026-09-06 `tenant_id` tampoco tiene DEFAULT
+// (antes caía en ARGA en silencio): igual que arriba, se nombra siempre.
 export type ActionPlanWriteInput = {
   finding_id: string;
   title: string;
@@ -279,7 +294,9 @@ export function useCreateActionPlan() {
         .select()
         .single();
       if (error) throw error;
-      return data as ActionPlanRow;
+      // Ver nota "as unknown as" de arriba: mismo motivo (columnas de F5.T7
+      // pendientes de regenerar en types.ts).
+      return data as unknown as ActionPlanRow;
     },
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ["actionPlans", "byFinding", variables.finding_id] });

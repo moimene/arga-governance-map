@@ -314,6 +314,10 @@ const App = () => (
                   <Route path="/grc/excepciones"          element={<Suspense fallback={<ModuleFallback />}><Excepciones /></Suspense>} />
                   <Route path="/grc/tprm"                 element={<Suspense fallback={<ModuleFallback />}><TPRM /></Suspense>} />
                   <Route path="/grc/solvencia-ii"         element={<Suspense fallback={<ModuleFallback />}><SolvenciaII /></Suspense>} />
+                  {/* F5.T4 (MOI-175): la gobernanza de IA vive en /ai-governance, no dentro
+                      del ModuleShell genérico de GRC. Redirige antes de la ruta paramétrica
+                      para que /grc/m/ai nunca monte ModuleShell/ModuleDashboard. */}
+                  <Route path="/grc/m/ai" element={<Navigate to="/ai-governance/programa" replace />} />
                   <Route path="/grc/m/:moduleId" element={<RequireGrcModule><Suspense fallback={<ModuleFallback />}><ModuleShell /></Suspense></RequireGrcModule>}>
                     <Route index element={<Suspense fallback={<ModuleFallback />}><ModuleDashboard /></Suspense>} />
                     <Route path="dashboard" element={<Suspense fallback={<ModuleFallback />}><ModuleDashboard /></Suspense>} />
@@ -322,6 +326,9 @@ const App = () => (
 
                   {/* AI Governance */}
                   <Route path="/ai-governance"              element={<Suspense fallback={<ModuleFallback />}><AiDashboard /></Suspense>} />
+                  {/* F5.T4 (MOI-175): destino de la redirección de /grc/m/ai. Mismo panel
+                      que el índice del módulo; alias de ruta, no una pantalla nueva. */}
+                  <Route path="/ai-governance/programa"     element={<Suspense fallback={<ModuleFallback />}><AiDashboard /></Suspense>} />
                   <Route path="/ai-governance/sistemas"     element={<Suspense fallback={<ModuleFallback />}><Sistemas /></Suspense>} />
                   <Route path="/ai-governance/sistemas/nuevo" element={<Suspense fallback={<ModuleFallback />}><SistemaNuevo /></Suspense>} />
                   <Route path="/ai-governance/sistemas/:id" element={<Suspense fallback={<ModuleFallback />}><SistemaDetalle /></Suspense>} />
