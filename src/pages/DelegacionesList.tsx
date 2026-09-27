@@ -8,8 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useDelegationsList, delegationStatusLabel, delegationStatusTone, formatDate } from "@/hooks/useDelegations";
-import { AlertTriangle, Ban, Clock, Key, Plus, XCircle } from "lucide-react";
+import { AlertTriangle, Ban, Clock, Key, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { NewDelegationDialog } from "@/components/NewDelegationDialog";
 
 const toneMap = {
   primary: { bg: "bg-primary/10", text: "text-primary", value: "text-primary" },
@@ -75,7 +76,7 @@ export default function DelegacionesList() {
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">Quién tiene poderes de representación, con qué límites y por cuánto tiempo</p>
         </div>
-        <Button className="gap-1.5"><Plus className="h-4 w-4" />Nueva delegación</Button>
+        <NewDelegationDialog />
       </div>
 
       <div className="mb-5 grid grid-cols-4 gap-4">

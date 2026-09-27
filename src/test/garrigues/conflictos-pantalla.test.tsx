@@ -24,6 +24,14 @@ const restaurarMocks = await mockearModulos([
   ["@/hooks/useConflicts", () => ({
     useConflictsList: () => ({ data: filasActuales, isLoading: false }),
     useAttestationsList: () => ({ data: [], isLoading: false }),
+    // MOI-149: `Conflictos.tsx` monta ahora `<NewConflictDialog>`, que llama
+    // a estos dos hooks. Sin mockearlos, `usePersonasCanonical` (useQuery
+    // real) revienta con "No QueryClient set" — esta pantalla se prueba sin
+    // provider, a propósito, mockeando todo lo que toca Supabase.
+    useCreateConflict: () => ({ mutateAsync: async () => ({}), isPending: false }),
+  })],
+  ["@/hooks/usePersonasCanonical", () => ({
+    usePersonasCanonical: () => ({ data: [], isLoading: false }),
   })],
 ]);
 afterAll(restaurarMocks);

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTenantContext } from "@/context/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -197,6 +197,46 @@ export function useAttestationsList() {
         person_role: roles.get(r.person_id) ?? null,
         completed_at: formatDateTime(r.completed_at),
       }));
+    },
+  });
+}
+
+export interface CreateConflictInput {
+  person_id: string;
+  conflict_type: "Permanente" | "Situacional";
+  description: string;
+}
+
+export function useCreateConflict() {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateConflictInput): Promise<ConflictRow> => {
+      if (!tenantId) throw new Error("Tenant no inicializado");
+      // `code` no tiene UNIQUE global (a diferencia de delegations): un
+      // sufijo aleatorio evita choques visuales sin necesitar reintento.
+      const suffix = (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36))
+        .replace(/-/g, "")
+        .slice(0, 6)
+        .toUpperCase();
+      const { data, error } = await supabase
+        .from("conflicts_of_interest")
+        .insert({
+          tenant_id: tenantId,
+          code: `GN-COI-${suffix}`,
+          person_id: input.person_id,
+          conflict_type: input.conflict_type,
+          description: input.description,
+          status: "Declarado",
+          declared_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ConflictRow;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["conflicts", tenantId] });
     },
   });
 }
