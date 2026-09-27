@@ -30,6 +30,14 @@ test.describe.configure({ timeout: 180_000 });
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
+// Este spec ESCRIBE en el grupo nuevo (emite una convocatoria real, para
+// siempre en producción). No debe correr en una pasada general de e2e:
+// solo se activa a propósito con E2E_ESCRIBE_GRUPO_NUEVO=1.
+test.skip(
+  process.env.E2E_ESCRIBE_GRUPO_NUEVO !== '1',
+  'Escribe en el grupo nuevo (…0003); activar explícitamente con E2E_ESCRIBE_GRUPO_NUEVO=1',
+);
+
 test('MOI-142 · Junta grupo nuevo: convocar y emitir hasta el final por pantalla', async ({ page }) => {
   const crossTenantWrites: string[] = [];
   const domainWrites4xx: string[] = [];
@@ -87,7 +95,11 @@ test('MOI-142 · Junta grupo nuevo: convocar y emitir hasta el final por pantall
 
   // ── PASO 2: Fecha y plazo legal (fecha futura, +45 días: SA exige 30) ──
   await expect(page.getByRole('heading', { name: /Paso 2\. Fecha y plazo legal/i })).toBeVisible({ timeout: 10_000 });
-  const futureDate = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  // +45..54 días (jitter por minuto actual): SA exige 30, deja margen de
+  // sobra y evita colisionar con una convocatoria emitida en una corrida
+  // anterior el mismo día natural (mismo body_id + fecha_1 => duplicado).
+  const dayOffset = 45 + (new Date().getMinutes() % 10);
+  const futureDate = new Date(Date.now() + dayOffset * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   await page.locator('input[type="date"]').first().fill(futureDate);
   await page.locator('input[type="time"]').first().fill('10:00');
   const lugarInput = page.locator('input[type="text"]').first();
@@ -131,10 +143,16 @@ test('MOI-142 · Junta grupo nuevo: convocar y emitir hasta el final por pantall
   await page.getByRole('button', { name: /^Siguiente$/i }).click();
 
   // ── PASO 5: Canales de publicación ────────────────────────────────
+  // El servidor (fn_convocation_manifest_enrich_recipients) exige un canal
+  // de notificación DIRECTA a destinatarios (EAD_INTERPOSITION o
+  // EMAIL_SIMPLE); en una Junta el primer checkbox del listado sin filtrar
+  // es "Web corporativa" (art. 173 LSC), que no basta por sí solo.
   await expect(page.getByRole('heading', { name: /Paso 5\./i })).toBeVisible({ timeout: 10_000 });
-  const firstChannel = page.locator('main input[type="checkbox"]').first();
-  if (await firstChannel.isVisible().catch(() => false) && !(await firstChannel.isChecked())) {
-    await firstChannel.check();
+  const emailChannel = page.locator('main label', { hasText: /Email simple/i }).first();
+  await expect(emailChannel).toBeVisible({ timeout: 10_000 });
+  const emailChannelCheckbox = emailChannel.locator('input[type="checkbox"]');
+  if (!(await emailChannelCheckbox.isChecked())) {
+    await emailChannel.click();
   }
   await expect(page.getByRole('button', { name: /^Siguiente$/i })).toBeEnabled({ timeout: 15_000 });
   await page.getByRole('button', { name: /^Siguiente$/i }).click();
@@ -222,6 +240,33 @@ test('MOI-142 · Junta grupo nuevo: convocar y emitir hasta el final por pantall
   }
   console.log('[MOI-142 verif-c] Llamadas RPC fn_emit_convocatoria observadas:', rpcCalls.length);
   for (const c of rpcCalls) console.log('  ' + c);
+
+  // ── PASO 9 (post-emisión): el documento final se genera en servidor
+  // (convocation-artifact-register), vía el botón "Borrador DEMO revisado
+  // DOCX" de la ficha — genérico por organoTipo, sin rama específica de
+  // Consejo. Solo se intenta si la emisión tuvo éxito.
+  if (successVisible) {
+    await page.getByRole('button', { name: /^Abrir convocatoria$/i }).click();
+    await page.waitForURL(/\/secretaria\/convocatorias\/[0-9a-f-]{36}/, { timeout: 15_000 });
+    const docxBtn = page.getByRole('button', { name: /Borrador DEMO/i }).first();
+    await expect(docxBtn).toBeVisible({ timeout: 15_000 });
+    await docxBtn.click();
+    const docxSuccess = page.getByText(/Documento Word generado/i).first();
+    const docxError = page.getByText(/No se pudo generar el documento|Faltan variables obligatorias/i).first();
+    await Promise.race([
+      docxSuccess.waitFor({ state: 'visible', timeout: 30_000 }).catch(() => null),
+      docxError.waitFor({ state: 'visible', timeout: 30_000 }).catch(() => null),
+    ]);
+    await page.screenshot({ path: 'docs/superpowers/reviews/2026-09-27-verificacion-pantalla/verif-c/moi142-paso9-docx-resultado.png' });
+    if (await docxSuccess.isVisible().catch(() => false)) {
+      console.log('[MOI-142 verif-c] Documento final (DOCX) generado y archivado en servidor para la Junta.');
+    } else if (await docxError.isVisible().catch(() => false)) {
+      const docxErrorText = await page.locator('[data-sonner-toast], [role="status"], [role="alert"]').allTextContents();
+      console.log('[MOI-142 verif-c] HALLAZGO — la generación del documento final falla para Junta:', JSON.stringify(docxErrorText));
+    } else {
+      console.log('[MOI-142 verif-c] Generación de documento: ni éxito ni error detectados tras 30s — ver captura.');
+    }
+  }
 
   // Guard: nunca escrituras cross-tenant hacia ARGA/Garrigues desde esta sesión.
   expect(crossTenantWrites, 'no cross-tenant domain writes to ARGA/Garrigues').toEqual([]);

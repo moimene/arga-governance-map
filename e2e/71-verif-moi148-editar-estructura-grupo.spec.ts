@@ -46,6 +46,14 @@ async function setPorcentaje(page: import('@playwright/test').Page, value: strin
   return { errorVisible };
 }
 
+// Este spec ESCRIBE en el grupo nuevo (cambia y revierte un porcentaje real
+// de participación). No debe correr en una pasada general de e2e: solo se
+// activa a propósito con E2E_ESCRIBE_GRUPO_NUEVO=1.
+test.skip(
+  process.env.E2E_ESCRIBE_GRUPO_NUEVO !== '1',
+  'Escribe en el grupo nuevo (…0003); activar explícitamente con E2E_ESCRIBE_GRUPO_NUEVO=1',
+);
+
 test('MOI-148 · Grupo nuevo: cambiar y revertir el porcentaje de la filial 2.3 por pantalla', async ({ page }) => {
   const crossTenantWrites: string[] = [];
   page.on('request', (req) => {

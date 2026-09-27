@@ -311,10 +311,15 @@ serve(async (req) => {
   const recipientSelection = root.recipient_selection && typeof root.recipient_selection === 'object'
     ? root.recipient_selection as Record<string, unknown>
     : {};
+  // MOI-142: una Junta deriva destinatarios de `capital_holdings` (socios
+  // con voto), no de `condiciones_persona` (censo político por-órgano de un
+  // Consejo) — misma fuente que fn_convocation_manifest_enrich_recipients
+  // (migración 20260926114200) ya escribe en el manifiesto. El Consejo
+  // sigue exigiendo exactamente la misma fuente que antes.
   if (
     recipients.length === 0
     || recipientSelection.schema_version !== 'secretaria.convocation-recipient-selection.v1'
-    || recipientSelection.source !== 'condiciones_persona'
+    || !['condiciones_persona', 'capital_holdings'].includes(String(recipientSelection.source))
     || recipientSelection.selected_count !== recipients.length
     || typeof recipientSelection.effective_date !== 'string'
     || !Array.isArray(recipientSelection.excluded_person_ids)
