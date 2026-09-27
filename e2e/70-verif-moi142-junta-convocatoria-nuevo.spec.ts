@@ -244,8 +244,10 @@ test('MOI-142 · Junta grupo nuevo: convocar y emitir hasta el final por pantall
   // ── PASO 9 (post-emisión): el documento final se genera en servidor
   // (convocation-artifact-register), vía el botón "Borrador DEMO revisado
   // DOCX" de la ficha — genérico por organoTipo, sin rama específica de
-  // Consejo. Solo se intenta si la emisión tuvo éxito.
-  if (successVisible) {
+  // Consejo. Desde el cierre de MOI-142 la emisión de Junta DEBE completarse
+  // y el documento final DEBE generarse: el spec se pone rojo si no.
+  expect(successVisible, 'la emisión de la convocatoria de Junta debe completarse').toBe(true);
+  {
     await page.getByRole('button', { name: /^Abrir convocatoria$/i }).click();
     await page.waitForURL(/\/secretaria\/convocatorias\/[0-9a-f-]{36}/, { timeout: 15_000 });
     const docxBtn = page.getByRole('button', { name: /Borrador DEMO/i }).first();
@@ -258,14 +260,12 @@ test('MOI-142 · Junta grupo nuevo: convocar y emitir hasta el final por pantall
       docxError.waitFor({ state: 'visible', timeout: 30_000 }).catch(() => null),
     ]);
     await page.screenshot({ path: 'docs/superpowers/reviews/2026-09-27-verificacion-pantalla/verif-c/moi142-paso9-docx-resultado.png' });
-    if (await docxSuccess.isVisible().catch(() => false)) {
-      console.log('[MOI-142 verif-c] Documento final (DOCX) generado y archivado en servidor para la Junta.');
-    } else if (await docxError.isVisible().catch(() => false)) {
+    if (await docxError.isVisible().catch(() => false)) {
       const docxErrorText = await page.locator('[data-sonner-toast], [role="status"], [role="alert"]').allTextContents();
       console.log('[MOI-142 verif-c] HALLAZGO — la generación del documento final falla para Junta:', JSON.stringify(docxErrorText));
-    } else {
-      console.log('[MOI-142 verif-c] Generación de documento: ni éxito ni error detectados tras 30s — ver captura.');
     }
+    await expect(docxSuccess, 'el documento final de la Junta debe generarse en servidor').toBeVisible();
+    console.log('[MOI-142 verif-c] Documento final (DOCX) generado y archivado en servidor para la Junta:', page.url());
   }
 
   // Guard: nunca escrituras cross-tenant hacia ARGA/Garrigues desde esta sesión.
