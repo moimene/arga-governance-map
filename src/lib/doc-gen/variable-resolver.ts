@@ -393,6 +393,7 @@ async function resolveMeetingVars(meetingId: string, tenantId: string): Promise<
   // de tabla arbitrarios: se recupera el mismo `.from()` no tipado por tabla
   // que tenía antes SOLO para esta llamada, sin tocar el resultado (sigue
   // siendo `[]`).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const untypedFrom = (table: string): any => supabase.from(table as never);
 
   const [participantsResult, agendaResult, resolutionsResult] = await Promise.all([
