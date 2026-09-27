@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "./types";
 
 // External Supabase project (publishable values, safe in client)
 const DEMO_SUPABASE_URL = "https://hzqwefkwsxopwrmtksbg.supabase.co";
@@ -8,7 +9,7 @@ const viteEnv = import.meta.env as ImportMetaEnv;
 const SUPABASE_URL = viteEnv.VITE_SUPABASE_URL || DEMO_SUPABASE_URL;
 const SUPABASE_ANON_KEY = viteEnv.VITE_SUPABASE_ANON_KEY || DEMO_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: typeof localStorage === "undefined" ? undefined : localStorage,
     persistSession: true,
