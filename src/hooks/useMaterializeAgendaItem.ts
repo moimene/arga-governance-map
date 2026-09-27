@@ -1,18 +1,28 @@
 /**
- * Hook `useMaterializeAgendaItem` (Codex P2 round 6).
+ * Hook `useMaterializeAgendaItem` (Codex P2 round 6; H-27/MOI-15).
  *
- * Materializa un row en `agenda_items` on-demand desde un punto que viene
- * de la convocatoria (source_table='convocatorias') o de la agenda libre
- * de sesión. Es prerrequisito para `reclassify_agenda_item_kind` que
- * requiere un agenda_item_id real.
+ * Materializa un row en `agenda_items` on-demand para un punto nacido en
+ * sesión (origin MEETING_FLOOR, sin convocatoria). Es prerrequisito para
+ * `reclassify_agenda_item_kind`, que requiere un agenda_item_id real.
  *
  * Flujo:
- *  1. INSERT en agenda_items con (meeting_id, tenant_id, order_number,
- *     title, kind, decision_subtype).
+ *  1. RPC `fn_secretaria_add_session_agenda_item(meeting_id, order_number,
+ *     title, kind, decision_subtype)`.
  *  2. Invalida queries derivadas (`meeting_agenda_sources`, `agenda_items`,
  *     `agenda_item_kind_changelog`) para que la UI refleje el nuevo row.
  *  3. Devuelve el nuevo `id` para que el caller pueda pasarlo al dialog
  *     de reclasificación.
+ *
+ * H-27 (MOI-15, 2026-09-27): este hook hacía un INSERT directo por
+ * PostgREST. Para cualquier reunión nacida de una convocatoria EMITIDA, el
+ * trigger `fn_secretaria_guard_emitted_agenda_dml` rechaza CUALQUIER
+ * escritura directa en `agenda_items` con 42501
+ * `AGENDA_EMITIDA_RPC_REQUIRED` — exige una RPC gobernada, y no existía
+ * ninguna para un punto nacido en sesión. El paso "Añadir punto nacido en
+ * sesión" (DebatesStep en ReunionStepper) quedaba inutilizable en cualquier
+ * reunión convocada. La migración `20260928151000` crea la RPC gobernada;
+ * este hook la llama en vez de insertar directamente. El contrato del
+ * hook (params/retorno) no cambia, así que ningún caller necesita tocarse.
  *
  * Codex P2 (round 6) reportó que el chip "Reclasificar" estaba
  * permanentemente disabled para puntos de convocatoria porque
@@ -21,6 +31,7 @@
  */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { secretariaErrorMessage } from "@/lib/secretaria/supabase-error-message";
 import type { AgendaItemKind } from "@/lib/secretaria/agenda-kind";
 
 interface MaterializeAgendaItemParams {
@@ -41,48 +52,26 @@ export function useMaterializeAgendaItem() {
         throw new Error("meetingId y tenantId son obligatorios para materializar");
       }
       const safeTitle = (params.title ?? "").trim().slice(0, 240) || "Punto sin título";
-      // Codex P2 round 15: idempotencia. Si dos clientes con cache stale
-      // intentan materializar el mismo (meeting_id, order_number) concurrente,
-      // el UNIQUE ix_agenda_items_meeting_order (000066) rechaza duplicados.
-      // En lugar de fallar, primero intentamos INSERT y si choca con UNIQUE
-      // (23505), hacemos SELECT del row existente y devolvemos su id.
-      const insertResult = await supabase
-        .from("agenda_items")
-        .insert({
-          meeting_id: params.meetingId,
-          tenant_id: params.tenantId,
-          order_number: params.orderNumber,
-          title: safeTitle,
-          // Default conservador a DELIBERATIVO si no viene kind explícito
-          // (espejo de normalizeAgendaItemKind del cliente).
-          kind: (params.kind ?? "DELIBERATIVO") as string,
-          decision_subtype: params.decisionSubtype ?? null,
-        })
-        .select("id")
-        .single();
-
-      if (insertResult.error) {
-        // UNIQUE violation → otro cliente ya materializó. SELECT y devolver id.
-        const isUniqueViolation =
-          (insertResult.error as { code?: string }).code === "23505" ||
-          /duplicate key|unique/i.test(insertResult.error.message ?? "");
-        if (isUniqueViolation) {
-          const { data: existing, error: selErr } = await supabase
-            .from("agenda_items")
-            .select("id")
-            .eq("meeting_id", params.meetingId)
-            .eq("order_number", params.orderNumber)
-            .maybeSingle();
-          if (selErr) throw selErr;
-          if (!existing?.id) {
-            throw new Error("INSERT colisionó por UNIQUE pero SELECT no encontró el row");
-          }
-          return existing.id as string;
-        }
-        throw insertResult.error;
+      const rpcArgs = {
+        p_meeting_id: params.meetingId,
+        p_order_number: params.orderNumber,
+        p_title: safeTitle,
+        // Default conservador a DELIBERATIVO si no viene kind explícito
+        // (espejo de normalizeAgendaItemKind del cliente).
+        p_kind: (params.kind ?? "DELIBERATIVO") as string,
+        p_decision_subtype: params.decisionSubtype ?? null,
+      };
+      // La RPC ya es idempotente en servidor (Codex P2 round 15 vivía aquí
+      // client-side contra un INSERT directo; ahora vive dentro de
+      // fn_secretaria_add_session_agenda_item con FOR UPDATE sobre el
+      // (meeting_id, order_number) existente): dos clientes con cache stale
+      // que materialicen el mismo punto reciben el mismo id, no un 23505.
+      const { data, error } = await supabase.rpc("fn_secretaria_add_session_agenda_item", rpcArgs);
+      if (error) {
+        throw new Error(secretariaErrorMessage(error, "No se pudo materializar el punto de agenda."));
       }
-      if (!insertResult.data?.id) throw new Error("INSERT agenda_items no devolvió id");
-      return insertResult.data.id as string;
+      if (!data) throw new Error("fn_secretaria_add_session_agenda_item no devolvió id");
+      return data as string;
     },
     onSuccess: (_id, vars) => {
       // Codex P2 round 7: queryKey real es

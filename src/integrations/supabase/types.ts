@@ -16152,6 +16152,16 @@ export type Database = {
         }
         Returns: Json
       }
+      fn_secretaria_add_session_agenda_item: {
+        Args: {
+          p_decision_subtype?: string | null
+          p_kind?: string
+          p_meeting_id: string
+          p_order_number: number
+          p_title: string
+        }
+        Returns: string
+      }
       fn_secretaria_annual_accounts_evidence_binary: {
         Args: { p_manifest: Json }
         Returns: Json
