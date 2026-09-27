@@ -2064,7 +2064,11 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
         });
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al preparar constancias");
+      // H-27 (MOI-15): el toast nombra la causa real (código+texto del
+      // servidor, p. ej. AGENDA_EMITIDA_RPC_REQUIRED o
+      // SESSION_AGENDA_ITEM_MEETING_NOT_OPEN) en vez de un genérico que
+      // ocultaba que el punto nacido en sesión no se pudo materializar.
+      toast.error(secretariaErrorMessage(e, "Error al preparar constancias"));
       return;
     }
 
