@@ -161,13 +161,15 @@ describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta"
 
   // EXACTO A PROPÓSITO: contrato cero-cambio de ARGA, no conteo cerrado de los
   // que estorban a la siembra de Garrigues.
-  it("ARGA sigue con sus 25 políticas y sin ownership por órgano", async () => {
+  // Única excepción declarada: PR-024 (política de IA de ARGA) con el CATIT como
+  // órgano, alta de F2.T15 (MOI-170, cierre masivo 27-09-2026, D-U2).
+  it("ARGA sigue con sus 25 políticas y sin ownership por órgano salvo PR-024 (F2.T15)", async () => {
     expect(argaAuthed && arga, "sin sesión de ARGA no se puede asertar nada").toBeTruthy();
     const { count } = await arga.from("policies").select("id", { count: "exact", head: true });
     expect(count).toBe(25);
-    const { count: owned } = await arga
-      .from("policies").select("id", { count: "exact", head: true }).not("owner_body_id", "is", null);
-    expect(owned).toBe(0);
+    const { data: owned } = await arga
+      .from("policies").select("policy_code").not("owner_body_id", "is", null);
+    expect((owned ?? []).map((r) => r.policy_code)).toEqual(["PR-024"]);
   });
 
   it("ARGA no ve ninguna política de Garrigues", async () => {

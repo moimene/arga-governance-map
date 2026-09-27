@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { useBodyById, type BodyRow } from "@/hooks/useBodies";
@@ -17,9 +17,8 @@ import { resolveAiGovernanceBodyId } from "@/lib/aims/governing-body";
 export function useAiGovernanceBody() {
   const { tenantId } = useTenantContext();
   const bodyIdQuery = useQuery({
-    enabled: !!tenantId,
     queryKey: ["ai_governance_body_id", tenantId],
-    queryFn: async (): Promise<string | null> => {
+    queryFn: tenantId ? async (): Promise<string | null> => {
       const { data: subjects, error: errSub } = await supabase
         .from("aims_ria_subjects")
         .select("governing_body_id")
@@ -32,7 +31,10 @@ export function useAiGovernanceBody() {
         .from("ai_systems")
         .select("ai_policy_id")
         .eq("tenant_id", tenantId!)
-        .not("ai_policy_id", "is", null);
+        .not("ai_policy_id", "is", null)
+        // Orden fijo: con varias políticas de IA con órganos distintos, el
+        // resultado no puede depender del orden en que Postgres devuelva filas.
+        .order("id", { ascending: true });
       if (errSys) throw errSys;
 
       const policyIds = [...new Set((systems ?? []).map((s) => s.ai_policy_id as string))];
@@ -41,6 +43,7 @@ export function useAiGovernanceBody() {
         const { data: pol, error: errPol } = await supabase
           .from("policies")
           .select("id, owner_body_id")
+          .eq("tenant_id", tenantId!)
           .in("id", policyIds);
         if (errPol) throw errPol;
         policies = pol ?? [];
@@ -51,7 +54,7 @@ export function useAiGovernanceBody() {
         systems: (systems ?? []) as { ai_policy_id: string | null }[],
         policies,
       });
-    },
+    } : skipToken,
   });
 
   const bodyQuery = useBodyById(bodyIdQuery.data ?? undefined);
@@ -81,9 +84,8 @@ export interface AiSystemBySubjectRow {
 export function useAiSystemsByEntitySubject(entityId: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!entityId && !!tenantId,
     queryKey: ["v_aims_sistemas_por_entidad", tenantId, entityId],
-    queryFn: async (): Promise<AiSystemBySubjectRow[]> => {
+    queryFn: tenantId && entityId ? async (): Promise<AiSystemBySubjectRow[]> => {
       const { data, error } = await supabase
         .from("v_aims_sistemas_por_entidad")
         .select("subject_id, system_id, tenant_id, system_name, role, status")
@@ -91,7 +93,7 @@ export function useAiSystemsByEntitySubject(entityId: string | undefined) {
         .eq("entity_id", entityId!);
       if (error) throw error;
       return (data ?? []) as AiSystemBySubjectRow[];
-    },
+    } : skipToken,
   });
 }
 
@@ -112,9 +114,8 @@ export interface AiSystemByBodyRow {
 export function useAiSystemsByGoverningBody(bodyId: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!bodyId && !!tenantId,
     queryKey: ["v_aims_sistemas_por_organo", tenantId, bodyId],
-    queryFn: async (): Promise<AiSystemByBodyRow[]> => {
+    queryFn: tenantId && bodyId ? async (): Promise<AiSystemByBodyRow[]> => {
       const { data, error } = await supabase
         .from("v_aims_sistemas_por_organo")
         .select("subject_id, system_id, tenant_id, system_name, entity_id, role, status")
@@ -122,6 +123,6 @@ export function useAiSystemsByGoverningBody(bodyId: string | undefined) {
         .eq("governing_body_id", bodyId!);
       if (error) throw error;
       return (data ?? []) as AiSystemByBodyRow[];
-    },
+    } : skipToken,
   });
 }

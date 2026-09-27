@@ -112,9 +112,11 @@ describe("G4 — ownership navegable del catálogo normativo (Cloud)", () => {
     if (!arga) return;
     const { data: pol, error } = await arga.from("policies").select(POLICY_SELECT);
     expect(error).toBeNull();
-    const polRows = (pol ?? []) as Array<{ owner_body: OwnerEmbed; owner_function: string | null }>;
+    const polRows = (pol ?? []) as Array<{ policy_code: string; owner_body: OwnerEmbed; owner_function: string | null }>;
     expect(polRows.length).toBeGreaterThan(0);
-    expect(polRows.every((r) => r.owner_body === null)).toBe(true);
+    // Única política con órgano: PR-024 (política de IA) con el CATIT, alta
+    // declarada de F2.T15 (MOI-170, cierre masivo 27-09-2026, D-U2).
+    expect(polRows.filter((r) => r.owner_body !== null).map((r) => r.policy_code)).toEqual(["PR-024"]);
 
     const CON_ORGANO_DECLARADO: Record<string, string> = {
       "OBL-RIA-ORG-04": "F5.T5 — art. 4 RIA, órgano CATIT (D-U2)",
