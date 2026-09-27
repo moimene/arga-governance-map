@@ -1,0 +1,5 @@
+ guard_patched | rpc_gate_patched 
+---------------+------------------
+ t             | t
+(1 row)
+

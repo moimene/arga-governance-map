@@ -1,0 +1,3 @@
+psql:/tmp/apply_20260927105600.sql:65: NOTICE:  policy "aims_secretaria_derivations_tenant_select" for relation "public.aims_secretaria_derivations" does not exist, skipping
+psql:/tmp/apply_20260927105600.sql:74: NOTICE:  policy "aims_secretaria_derivations_tenant_insert" for relation "public.aims_secretaria_derivations" does not exist, skipping
+psql:/tmp/apply_20260927105600.sql:200: NOTICE:  VERIFICACION MOI-56: OK (10 columnas, 2 políticas sin delete/update, 2 índices de idempotencia, control positivo confirmado)

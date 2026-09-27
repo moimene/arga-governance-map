@@ -1,0 +1,27 @@
+psql:supabase/migrations/proposed/20260927105600_aims_secretaria_derivaciones.probe.sql:45: NOTICE:  policy "aims_secretaria_derivations_tenant_select" for relation "public.aims_secretaria_derivations" does not exist, skipping
+psql:supabase/migrations/proposed/20260927105600_aims_secretaria_derivaciones.probe.sql:50: NOTICE:  policy "aims_secretaria_derivations_tenant_insert" for relation "public.aims_secretaria_derivations" does not exist, skipping
+                       set_config                       
+--------------------------------------------------------
+ {"tenant_id" : "00000000-0000-0000-0000-000000000001"}
+(1 row)
+
+psql:supabase/migrations/proposed/20260927105600_aims_secretaria_derivaciones.probe.sql:103: NOTICE:  PROBE OK: derivación 4c03a6d1-2304-4ab5-baf7-26691a05f0e5 creada y leída dentro de ARGA
+psql:supabase/migrations/proposed/20260927105600_aims_secretaria_derivaciones.probe.sql:120: NOTICE:  PROBE OK: segundo INSERT del mismo par rechazado por índice único (23505) -- idempotencia confirmada
+                       set_config                       
+--------------------------------------------------------
+ {"tenant_id" : "00000000-0000-0000-0000-000000000002"}
+(1 row)
+
+psql:supabase/migrations/proposed/20260927105600_aims_secretaria_derivaciones.probe.sql:141: NOTICE:  PROBE OK: la sesión Garrigues no ve la derivación de ARGA (RLS por SELECT confirmada)
+psql:supabase/migrations/proposed/20260927105600_aims_secretaria_derivaciones.probe.sql:159: NOTICE:  PROBE OK: INSERT cruzado rechazado por RLS (insufficient_privilege / 42501)
+                       set_config                       
+--------------------------------------------------------
+ {"tenant_id" : "00000000-0000-0000-0000-000000000001"}
+(1 row)
+
+psql:supabase/migrations/proposed/20260927105600_aims_secretaria_derivaciones.probe.sql:179: NOTICE:  PROBE OK: INSERT sin destino rechazado (new row violates row-level security policy for table "aims_secretaria_derivations" )
+ filas_totales_antes_de_deshacer | politicas 
+---------------------------------+-----------
+                               1 |         2
+(1 row)
+

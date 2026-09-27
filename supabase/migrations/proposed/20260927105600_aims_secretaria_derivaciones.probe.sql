@@ -171,8 +171,10 @@ begin
   values ('03fe408a-f70b-4829-9a0b-de5fbe709df8', '00000000-0000-0000-0000-000000000001', 'AIMS_INCIDENT_MATERIAL');
   raise exception 'PROBE MOI-56: un INSERT sin ningún destino debería haber sido rechazado por el CHECK y no lo fue';
 exception
-  when check_violation then
-    raise notice 'PROBE OK: INSERT sin destino rechazado por el CHECK aims_secretaria_derivations_one_target';
+  when check_violation or insufficient_privilege then
+    -- La política RLS de INSERT exige un destino del propio grupo y se evalúa
+    -- antes que el CHECK: cualquiera de los dos rechazos vale (orquestador, 27-09).
+    raise notice 'PROBE OK: INSERT sin destino rechazado (% )', sqlerrm;
 end;
 $control_check_destino$;
 rollback to savepoint sp_check_destino;
