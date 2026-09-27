@@ -9,8 +9,9 @@
  * PI-30 (Garrigues, Published): `owner_body_id` ya está puesto al Comité de
  * Gobernanza de la IA (medido en Cloud el 2026-09-27) — se declara sin
  * cambio, no se pisa.
- * `ai_systems.ai_policy_id`: los 8 de ARGA → PR-024, los 3 nombrados de
- * Garrigues (Copilot, Harvey, GA_IA) → PI-30, solo donde es NULL.
+ * `ai_systems.ai_policy_id`: los 8 de ARGA → PR-024, los 6 sistemas de
+ * Garrigues → PI-30 (spec §8.7 y criterio de aceptación F2.T16: "ai_policy_id
+ * = PI-30 ... en los 6 de Garrigues"), solo donde es NULL.
  *
  * Escribe con sesión real por tenant (SECRETARIO tiene AIMS_INVENTARIO, que
  * es lo que exige la política UPDATE de `ai_systems`; `policies` es
@@ -41,13 +42,16 @@ export const ARGA_SYSTEM_IDS = [
   "90000000-0000-0000-0000-000000000001", // Motor de triaje de siniestros auto
 ];
 
-// Solo los 3 nombrados en la spec §8.7 (Copilot, GA_IA, Harvey) — los otros
-// tres sistemas de Garrigues (los 2 "Acuerdo enterprise" y "Soluciones
-// agénticas de proceso") no están en el alcance de esta siembra.
+// Los 6 sistemas de Garrigues (spec §8.7: "ai_policy_id = PI-30 y órgano =
+// Comité en los 6"; criterio de aceptación F2.T16 repite "en los 6 de
+// Garrigues"). Medidos en Cloud el 2026-09-27, los 6 con ai_policy_id NULL.
 export const GARRIGUES_SYSTEM_IDS = [
   "ad4bd689-a6ca-43b3-a8ae-7b57a705fd36", // Copilot
   "9de8fb46-6da9-4097-9273-4b307a9744a1", // Garrigues GA_IA
   "2f877e8c-875d-4b11-9b39-aed0826cacb5", // Harvey
+  "bd0ece3d-86fb-4c33-8e3d-df8b25d0394f", // Acuerdo enterprise Anthropic
+  "3cb6547f-656f-485f-b9da-04426f55e8bb", // Acuerdo enterprise OpenAI
+  "5cdc4893-f57d-4596-a80d-a9079e50fadb", // Soluciones agénticas de proceso
 ];
 
 export interface PoliticaRow {

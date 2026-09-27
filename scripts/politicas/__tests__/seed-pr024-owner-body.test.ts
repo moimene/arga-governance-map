@@ -37,7 +37,7 @@ describe("seed-pr024-owner-body — construirPlanPoliticas", () => {
 });
 
 describe("seed-pr024-owner-body — construirPlanSistemas", () => {
-  it("los 8 sistemas ARGA sin ai_policy_id apuntan a PR-024 y los 3 de Garrigues a PI-30", () => {
+  it("los 8 sistemas ARGA sin ai_policy_id apuntan a PR-024 y los 6 de Garrigues a PI-30", () => {
     const sistemas: SistemaRow[] = [...ARGA_SYSTEM_IDS, ...GARRIGUES_SYSTEM_IDS].map((id) => ({ id, ai_policy_id: null }));
     const plan = construirPlanSistemas(sistemas);
     expect(plan).toHaveLength(ARGA_SYSTEM_IDS.length + GARRIGUES_SYSTEM_IDS.length);
