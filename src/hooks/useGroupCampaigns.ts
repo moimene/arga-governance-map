@@ -5,6 +5,7 @@ import {
   EAD_INTERPOSITION_CHANNEL,
   sanitizeEadInterpositionTraceValue,
 } from "@/lib/secretaria/ead-channel-semantics";
+import type { TablesInsert } from "@/integrations/supabase/types";
 
 export type GroupCampaignOrgan = "ADMIN" | "JUNTA" | "POST" | "COMPLIANCE";
 
@@ -409,7 +410,7 @@ async function createAgreement(
         campaign_step: step.materia,
       },
       unipersonal_decision_id: extra?.unipersonalDecisionId ?? null,
-    })
+    } as unknown as TablesInsert<"agreements">)
     .select("id")
     .single();
 
@@ -699,7 +700,7 @@ export function useGroupCampaignWarRoom() {
 
       if (campaignsError) throw campaignsError;
 
-      const campaigns = (campaignRows ?? []) as CampaignRow[];
+      const campaigns = (campaignRows ?? []) as unknown as CampaignRow[];
       const campaignIds = campaigns.map((campaign) => campaign.id);
       if (campaignIds.length === 0) return [];
 
@@ -862,7 +863,7 @@ export function useLaunchGroupCampaign() {
             status: "EN_CURSO",
             params: input.params,
             acuerdos_cadena: input.acuerdosCadena,
-          })
+          } as unknown as TablesInsert<"group_campaigns">)
           .select("id")
           .single();
 
@@ -902,7 +903,7 @@ export function useLaunchGroupCampaign() {
               rule_pack_code: expediente.rulePackCode,
               alertas: expedienteAlertas,
               explain: expedienteExplain,
-            })
+            } as unknown as TablesInsert<"group_campaign_expedientes">)
             .select("id")
             .single();
 
@@ -944,7 +945,7 @@ export function useLaunchGroupCampaign() {
                 deadline: stepForNewCapture.deadline,
                 alertas: stepForNewCapture.alertas,
                 explain: stepForNewCapture.explain,
-              })
+              } as unknown as TablesInsert<"group_campaign_steps">)
               .select("id")
               .single();
 

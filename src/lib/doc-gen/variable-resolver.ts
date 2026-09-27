@@ -174,9 +174,19 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
     (data as { es_unipersonal?: unknown }).es_unipersonal,
   );
 
+  // `tax_id` y `bylaws_commission_article` NO existen en `entities` (53
+  // columnas reales, verificado): con el genérico Database activo (MOI-194)
+  // `data` ya no las tiene en su tipo. El acceso sigue devolviendo
+  // `undefined` en tiempo de ejecución igual que antes — el fallback a
+  // `registration_number`/"—" es el comportamiento vigente, no nuevo.
+  const ghostEntityColumns = data as unknown as {
+    tax_id?: string | null;
+    bylaws_commission_article?: string | null;
+  };
+
   const legacyFieldsRaw: Record<string, unknown> = {
     name: data.common_name || data.legal_name,
-    tax_id: data.tax_id || data.registration_number,
+    tax_id: ghostEntityColumns.tax_id || data.registration_number,
     registration_number: data.registration_number,
     legal_name: data.legal_name,
     common_name: data.common_name,
@@ -184,10 +194,10 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
     legal_form: data.legal_form,
     entity_type_detail: data.tipo_social || data.legal_form,
     denominacion_social: data.legal_name || data.common_name,
-    cif: data.tax_id || data.registration_number || "—",
+    cif: ghostEntityColumns.tax_id || data.registration_number || "—",
     // ITEM-026: aliases usados por plantillas ACTIVA (el resolver emitía solo
     // cif/tipo_social y las plantillas con nif/tipo_sociedad quedaban en blanco).
-    nif: data.tax_id || data.registration_number || "—",
+    nif: ghostEntityColumns.tax_id || data.registration_number || "—",
     domicilio_social: data.address || "—",
     registro_mercantil: data.registry_location || "—",
     tomo: data.registry_volume || "—",
@@ -197,7 +207,7 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
     lugar: data.city || data.address || "—",
     tipo_social: data.tipo_social || data.legal_form,
     tipo_sociedad: data.tipo_social || data.legal_form,
-    articulo_estatutos_comision: data.bylaws_commission_article || "—",
+    articulo_estatutos_comision: ghostEntityColumns.bylaws_commission_article || "—",
     // Codex P2 round 12: derivar es_cotizada / es_unipersonal de la fila
     // entities (columnas booleanas reales). ARGA Seguros está seeded como
     // entities.es_cotizada=true; sin esto, el resolver caía al catalog default
@@ -377,8 +387,17 @@ async function resolveMeetingVars(meetingId: string, tenantId: string): Promise<
 
   if (error || !meeting) return {};
 
+  // `meeting_participants` NO existe en Cloud (la tabla real de asistentes es
+  // `meeting_attendees`); esta consulta siempre ha devuelto error/vacío. Con
+  // el genérico Database activo (MOI-194), `.from()` deja de aceptar nombres
+  // de tabla arbitrarios: se recupera el mismo `.from()` no tipado por tabla
+  // que tenía antes SOLO para esta llamada, sin tocar el resultado (sigue
+  // siendo `[]`).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const untypedFrom = (table: string): any => supabase.from(table as never);
+
   const [participantsResult, agendaResult, resolutionsResult] = await Promise.all([
-    supabase.from("meeting_participants").select("*").eq("meeting_id", meetingId).eq("tenant_id", tenantId),
+    untypedFrom("meeting_participants").select("*").eq("meeting_id", meetingId).eq("tenant_id", tenantId),
     supabase.from("agenda_items").select("*").eq("meeting_id", meetingId).eq("tenant_id", tenantId),
     supabase.from("meeting_resolutions").select("*").eq("meeting_id", meetingId).eq("tenant_id", tenantId),
   ]);

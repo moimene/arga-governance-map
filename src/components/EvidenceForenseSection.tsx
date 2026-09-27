@@ -45,7 +45,7 @@ function EvidenceBundleDownloadLink({ bundleId, hasUrl }: { bundleId: string; ha
 export function EvidenceForenseSection() {
   const { data: bundles = [], isLoading } = useEvidenceBundlesList();
   const verifyMutation = useVerifyAuditChain();
-  const [verifyResult, setVerifyResult] = useState<{ valid: boolean; chain_length?: number; errors?: string[] } | null>(null);
+  const [verifyResult, setVerifyResult] = useState<Awaited<ReturnType<typeof verifyMutation.mutateAsync>> | null>(null);
 
   const handleVerify = async () => {
     const result = await verifyMutation.mutateAsync();

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { useCurrentUser } from "./useCurrentUser";
+import type { TablesInsert } from "@/integrations/supabase/types";
 
 export type ObligatoriedadOverride = "OBLIGATORIO" | "RECOMENDADO" | "OPCIONAL";
 
@@ -126,7 +127,7 @@ export function useUpsertCapa3Override() {
             compatible_with_canonical_version: input.canonicalVersion,
             motivo: input.motivo,
             created_by: user?.id ?? null,
-          },
+          } as unknown as TablesInsert<"plantilla_capa3_overrides_por_entidad">,
           { onConflict: "entity_id,plantilla_id,campo" },
         )
         .select("*")

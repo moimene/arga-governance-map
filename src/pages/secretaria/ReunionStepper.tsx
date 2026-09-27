@@ -55,6 +55,7 @@ import {
 } from "@/hooks/useReunionSecretaria";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import {
   buildMeetingAdoptionSnapshot,
   evaluateMeetingVoteCompleteness,
@@ -2034,7 +2035,7 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
           }
           const { error: agendaUpdateError } = await supabase
             .from("agenda_items")
-            .update(updatePayload)
+            .update(updatePayload as unknown as TablesUpdate<"agenda_items">)
             .eq("tenant_id", tenantId)
             .eq("id", existingAgendaItemId);
           if (agendaUpdateError) throw agendaUpdateError;
@@ -4036,7 +4037,7 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
         }
       : baseQuorumData;
     const content = buildActaContent(
-      meeting ? { ...meeting, quorum_data: qdForMinute } : meeting,
+      meeting ? ({ ...meeting, quorum_data: qdForMinute } as unknown as typeof meeting) : meeting,
       attendees,
       resolutions,
       actaPuntos,

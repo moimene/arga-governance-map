@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { useCurrentUser } from "./useCurrentUser";
 import type { EntitySettingsCatalogRow } from "./useEntitySettingsCatalog";
+import type { Json } from "@/integrations/supabase/types";
 
 export interface EntitySettingRow {
   id: string;
@@ -109,7 +110,7 @@ export function useUpsertEntitySetting() {
             tenant_id: tenantId,
             entity_id: entityId,
             key,
-            value,
+            value: value as Json,
             updated_at: new Date().toISOString(),
             updated_by: user?.id ?? null,
           },

@@ -30,7 +30,7 @@ import { useSecretariaScope } from "@/components/secretaria/shell";
 import { AgendaDraftInbox } from "@/components/secretaria/AgendaDraftInbox";
 import { getSecretariaScopedIds } from "@/lib/secretaria/scope-filters";
 import { statusLabel } from "@/lib/secretaria/status-labels";
-import { minuteHasLegalSignature } from "@/lib/secretaria/authoritative-legal-state";
+import { minuteHasLegalSignature, type MinuteLegalGateStatus } from "@/lib/secretaria/authoritative-legal-state";
 import { classifyBookDeadline } from "@/lib/secretaria/libros-societarios";
 import { REGISTRY_IN_PROGRESS_STATUSES } from "@/lib/secretaria/registry-lifecycle";
 import { useSecretariaDocumentArtifacts } from "@/hooks/useSecretariaDocumentArtifacts";
@@ -204,7 +204,7 @@ function useSecretariaKpis(entityId?: string | null) {
         if (error) throw error;
         return (data ?? []).filter((row) =>
           minuteHasLegalSignature({
-            legalGateStatus: row.legal_gate_status,
+            legalGateStatus: row.legal_gate_status as MinuteLegalGateStatus | null,
             signedAt: row.signed_at,
             isLocked: row.is_locked,
             approvalEvidenceMode: row.approval_evidence_mode,

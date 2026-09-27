@@ -47,6 +47,7 @@ import { statusLabel } from "@/lib/secretaria/status-labels";
 import { registryPendingNotice } from "@/lib/secretaria/agreement-registry-sync";
 import { evaluarDesfaseNormativo } from "@/lib/secretaria/desfase-normativo";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { PreviewGatePanel } from "@/components/secretaria/PreviewGatePanel";
 import { AutorizacionesRegulatoriasCard } from "@/components/secretaria/AutorizacionesRegulatoriasCard";
 import { AgreementDocumentRequirementsPanel } from "@/components/secretaria/AgreementDocumentRequirementsPanel";
@@ -1935,7 +1936,7 @@ function ApprovalWorkflowCard({
   const saveWorkflow = useCallback(async (next: ApprovalStep[] | null, prev?: ApprovalStep[]) => {
     const { error } = await supabase
       .from("agreements")
-      .update({ approval_workflow: next })
+      .update({ approval_workflow: next as unknown as Json })
       .eq("id", agreementId)
       .eq("tenant_id", tenantId!);
     if (error) {

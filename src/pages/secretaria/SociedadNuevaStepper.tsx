@@ -5,6 +5,7 @@ import { AlertTriangle, Building2, ChevronLeft } from "lucide-react";
 import { StepPills } from "./_shared/StepNav";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { useTenantContext } from "@/context/TenantContext";
 import { useSociedades } from "@/hooks/useSociedades";
 import { buildRpcPayload } from "@/lib/secretaria/sociedad-onboarding/builders";
@@ -302,7 +303,7 @@ export default function SociedadNuevaStepper() {
       const payload = buildRpcPayload(draft, catalogKeys);
       const { data, error } = await supabase.rpc("fn_crear_sociedad_legal_y_capital", {
         p_tenant_id: tenantId,
-        p_payload: payload,
+        p_payload: payload as unknown as Json,
       });
       if (error) throw error;
 

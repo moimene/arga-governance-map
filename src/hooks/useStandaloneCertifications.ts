@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { archiveStandaloneCertificationDocument } from "@/lib/secretaria/standalone-certifications/document";
+import type { Json } from "@/integrations/supabase/types";
 
 export interface StandaloneCertificationKindRow {
   id: string;
@@ -149,10 +150,10 @@ export function usePrepareStandaloneCertificationSource() {
     }): Promise<PreparedStandaloneCertificationSource> => {
       const { data, error } = await supabase.rpc("fn_prepare_standalone_certification_source", {
         p_kind: params.kindCode,
-        p_source_input: params.sourceInput,
+        p_source_input: params.sourceInput as unknown as Json,
       });
       if (error) throw error;
-      return data as PreparedStandaloneCertificationSource;
+      return data as unknown as PreparedStandaloneCertificationSource;
     },
   });
 }
@@ -170,10 +171,10 @@ export function useCreateStandaloneCertification() {
     }): Promise<string> => {
       const { data, error } = await supabase.rpc("fn_create_standalone_certification", {
         p_kind: params.kindCode,
-        p_source_input: params.sourceInput,
+        p_source_input: params.sourceInput as unknown as Json,
         p_cutoff_at: params.cutoffAt ?? null,
         p_issued_to: params.issuedTo ?? null,
-        p_capa3: params.capa3 ?? {},
+        p_capa3: (params.capa3 ?? {}) as unknown as Json,
       });
       if (error) throw error;
       return String(data);

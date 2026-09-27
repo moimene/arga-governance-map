@@ -23,7 +23,7 @@ export function usePactosVigentes(entity_id?: string) {
 
       if (error) throw error;
 
-      return (data ?? []) as PactoParasocial[];
+      return (data ?? []) as unknown as PactoParasocial[];
     },
     enabled: !!entity_id && !!tenantId,
   });
@@ -47,7 +47,7 @@ export function usePactosParasociales(entity_id?: string) {
 
       if (error) throw error;
 
-      return (data ?? []) as PactoParasocial[];
+      return (data ?? []) as unknown as PactoParasocial[];
     },
     enabled: !!entity_id && !!tenantId,
   });

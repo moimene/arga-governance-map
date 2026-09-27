@@ -8,6 +8,7 @@ import {
   isMaterializableMeetingAgreement,
   type AgreementOrigin,
 } from "@/lib/secretaria/agreement-360";
+import type { Json, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import {
   mergeMeetingAgendaSources,
   type ConvocatoriaAgendaItemSource,
@@ -472,7 +473,7 @@ export function useCreateUniversalMeeting() {
           location: input.lugar.trim(),
           confidentiality_level: "NORMAL",
           quorum_data: buildUniversalMeetingQuorumData(hydrated),
-        })
+        } as unknown as TablesInsert<"meetings">)
         .select("id")
         .single();
       if (error) throw error;
@@ -851,7 +852,7 @@ export function useUpdateQuorumData(meetingId: string | undefined) {
       if (!meetingId || !tenantId) return;
       const { error } = await supabase
         .from("meetings")
-        .update({ quorum_data })
+        .update({ quorum_data } as unknown as TablesUpdate<"meetings">)
         .eq("id", meetingId)
         .eq("tenant_id", tenantId);
       if (error) throw error;
@@ -900,7 +901,7 @@ export function useReplaceAgendaItemConstancias(meetingId: string | undefined) {
 
       const { data, error } = await supabase
         .from("agenda_item_constancias")
-        .insert(payload)
+        .insert(payload as unknown as TablesInsert<"agenda_item_constancias">[])
         .select("id, agenda_item_id");
       if (error) throw error;
       return data ?? [];
@@ -1034,11 +1035,11 @@ export function useSaveMeetingResolutions(meetingId: string | undefined) {
       const { data: saved, error: saveErr } = await supabase.rpc("fn_save_meeting_resolutions", {
         p_tenant_id: tenantId,
         p_meeting_id: meetingId,
-        p_rows: rpcRows,
+        p_rows: rpcRows as unknown as Json,
       });
       if (saveErr) throw saveErr;
 
-      return ((saved ?? []) as SaveMeetingResolutionRpcResult[]).map((row) => ({
+      return ((saved ?? []) as unknown as SaveMeetingResolutionRpcResult[]).map((row) => ({
         agenda_item_index: row.agenda_item_index,
         resolution_id: row.resolution_id,
         agreement_id: row.agreement_id ?? null,

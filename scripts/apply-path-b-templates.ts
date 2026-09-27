@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { supabase } from "../src/integrations/supabase/client";
+import type { TablesInsert, TablesUpdate } from "../src/integrations/supabase/types";
 
 const SQL_PATH = "docs/legal-team/sql-drafts/2026-05-02-plantillas-core-v2-mejoras.sql";
 const EXPECTED_ROWS = 16;
@@ -323,14 +324,14 @@ async function main() {
     if (existing.length === 1) {
       const { error } = await supabase
         .from("plantillas_protegidas")
-        .update(toUpdateRow(row))
+        .update(toUpdateRow(row) as unknown as TablesUpdate<"plantillas_protegidas">)
         .eq("id", existing[0].id);
       if (error) throw error;
       updated += 1;
     } else {
       const { error } = await supabase
         .from("plantillas_protegidas")
-        .insert(toInsertRow(row));
+        .insert(toInsertRow(row) as unknown as TablesInsert<"plantillas_protegidas">);
       if (error) throw error;
       inserted += 1;
     }

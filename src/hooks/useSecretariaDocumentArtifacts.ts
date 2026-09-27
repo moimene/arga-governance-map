@@ -5,6 +5,7 @@ import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import type { SecretariaAdoptionMode, SecretariaDocumentType } from "@/lib/secretaria/document-generation-boundary";
 import { buildSecretariaDocumentGenerationRequest } from "@/lib/secretaria/document-generation-boundary";
 import { composeDocument } from "@/lib/motor-plantillas/composer";
+import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
 export interface SecretariaDocumentArtifactRow {
   id: string;
@@ -314,7 +315,7 @@ export function useCreateSecretariaDocumentArtifact() {
           source_payload: params.sourcePayload ?? {},
           evidence_status: params.evidenceStatus ?? "DEMO_OPERATIVA",
           metadata: params.metadata ?? {},
-        })
+        } as unknown as TablesInsert<"secretaria_document_artifacts">)
         .select("*")
         .single();
       if (error) throw error;
@@ -423,7 +424,7 @@ export function useCreateAndLinkAgreementDocumentArtifact() {
             archive_skipped_reason: composition.archive.skippedReason ?? null,
             ...(params.metadata ?? {}),
           },
-        })
+        } as unknown as TablesInsert<"secretaria_document_artifacts">)
         .select("*")
         .single();
       if (artifactError) throw artifactError;
@@ -494,7 +495,7 @@ export function useCreateAndLinkAgreementDocumentArtifact() {
       if (extraAnnexLinks.length > 0) {
         const { error: extraAnnexError } = await supabase
           .from("document_annex_links")
-          .upsert(extraAnnexLinks, { onConflict: "tenant_id,artifact_id,linked_domain,linked_id,annex_role" });
+          .upsert(extraAnnexLinks as unknown as TablesInsert<"document_annex_links">[], { onConflict: "tenant_id,artifact_id,linked_domain,linked_id,annex_role" });
         if (extraAnnexError) throw extraAnnexError;
       }
 
@@ -536,7 +537,7 @@ export function useUpdateSecretariaDocumentArtifactStatus() {
       }
       const { data, error } = await supabase
         .from("secretaria_document_artifacts")
-        .update(patch)
+        .update(patch as unknown as TablesUpdate<"secretaria_document_artifacts">)
         .eq("tenant_id", tenantId)
         .eq("id", params.artifactId)
         .select("*")

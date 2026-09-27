@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import type { TablesInsert } from "@/integrations/supabase/types";
 
 export type RegulatoryNotificationLite = {
   id: string;
@@ -100,7 +101,7 @@ export function useCreateIncident() {
     }) => {
       const { data, error } = await supabase
         .from("incidents")
-        .insert({ ...input, tenant_id: tenantId! })
+        .insert({ ...input, tenant_id: tenantId! } as unknown as TablesInsert<"incidents">)
         .select()
         .single();
       if (error) throw error;

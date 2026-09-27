@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Check, ChevronRight, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesInsert } from "@/integrations/supabase/types";
 import { StepRail } from "./_shared/StepNav";
 import { useTenantContext } from "@/context/TenantContext";
 import { useSecretariaScope } from "@/components/secretaria/shell";
@@ -613,7 +614,7 @@ export default function CoAprobacionStepper() {
             },
           },
           compliance_snapshot: motorResult,
-        })
+        } as unknown as TablesInsert<"agreements">)
         .select("id")
         .single();
 

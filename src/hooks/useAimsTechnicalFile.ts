@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient, skipToken } from "@tanstack/reac
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { ANEXO_IV_SECCIONES, esEstadoSeccionEditable } from "@/lib/aims/expediente-tecnico";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 
 // Los tipos siguientes reflejan las columnas REALES de Cloud
 // (`information_schema`, verificado 2026-08-29). La versión anterior declaraba
@@ -173,7 +174,7 @@ export function useUpdateTechnicalFileSection() {
       }
       const { data, error } = await supabase
         .from("aims_technical_file_sections")
-        .update({ content, status })
+        .update({ content, status } as unknown as TablesUpdate<"aims_technical_file_sections">)
         .eq("tenant_id", tenantId!)
         .eq("id", id)
         .select()

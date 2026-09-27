@@ -1,29 +1,14 @@
 import { useQuery, useMutation, useQueryClient, skipToken } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 
 /**
- * NOTA SOBRE EL TIPADO DE ESTAS TABLAS (2026-09-06).
- *
- * Los `.from("aims_…" as never)` que había aquí se han retirado: no hacían
- * nada. `supabase.from()` en esta app NO está tipado por tabla, y la causa no
- * es que falten las tablas en los tipos generados —que faltan: ninguna de las
- * `aims_fria_*` ni `aims_incident_*` está en `supabase/functions/_types/
- * database.ts`—, sino que `createClient` se construye SIN el genérico
- * `Database` (`src/integrations/supabase/client.ts`, y no hay ni un
- * `createClient<…>` en todo el repo). Con el cliente sin genérico, `from()`
- * acepta cualquier `string` y devuelve filas `any`.
- *
- * Consecuencia práctica: regenerar los tipos NO tiparía estos accesos, y el
- * `as never` solo servía para aparentar que había una razón de tipos detrás.
- * Comprobado: `bun run typecheck` pasa igual sin los casts.
- *
- * Lo que de verdad protege el shape de estas consultas es
- * `src/test/aims/aims-column-contract.test.ts`, que pregunta a Cloud por cada
- * columna declarada aquí. (Hasta el 2026-09-07 este comentario apuntaba a
- * `no-fabricated-claims.test.ts`, que no consulta Cloud: compara contra una
- * lista congelada de 19 fantasmas conocidos y no puede ver uno nuevo.) El día que el cliente reciba su
- * genérico, este comentario sobra.
+ * `src/integrations/supabase/client.ts` construye el cliente con el genérico
+ * `Database` (MOI-194): `from()` ya está tipado por tabla y `supabase.from()`
+ * valida columnas contra `src/integrations/supabase/types.ts`. Lo que sigue
+ * protegiendo el shape de estas consultas frente a Cloud es
+ * `src/test/aims/aims-column-contract.test.ts`.
  */
 
 export interface IncidentRegimeCase {
@@ -162,7 +147,7 @@ export function useUpdateIncidentRegime() {
         .update({
           ...updates,
           updated_at: new Date().toISOString(),
-        })
+        } as unknown as TablesUpdate<"aims_incident_regimes">)
         .eq("tenant_id", tenantId!)
         .eq("id", id)
         .select()

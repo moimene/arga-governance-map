@@ -1,29 +1,11 @@
 // Tipos del esquema de `governance_OS` (hzqwefkwsxopwrmtksbg), GENERADOS.
 //
-// Generado el 2026-09-07 con (regenerado el 2026-09-19 tras M01, 20260919100000, por la
-// Management API: GET /v1/projects/<ref>/types/typescript?included_schemas=public):
-//   supabase gen types typescript --db-url "postgresql://postgres.<ref>:<pw>@aws-1-eu-central-1.pooler.supabase.com:5432/postgres"
-// (introspección de solo lectura; la contraseña vive en .env como DATABASE_PASSWORD).
-// No editar a mano: regenerar con el mismo comando.
-//
-// NO ESTÁ CABLEADO AL CLIENTE, y es deliberado. `client.ts` sigue siendo
-// `createClient(...)` sin el genérico. MEDIDO el 2026-09-07: con
-// `createClient<Database>(...)` el repo pasa de 0 a 183 errores de `tsc -b` en
-// 48 ficheros (66 TS2352 de casts sobre retornos `Json` de RPC, 51 TS2769 de
-// overloads de insert/update, 32 TS2345, 24 TS2322, 8 TS2339). El proyecto usa
-// TS relajado a propósito (`noImplicitAny:false`, `strictNullChecks:false`) y
-// prohíbe añadir anotaciones donde no las había: tiparlo es una migración de su
-// propio tamaño, no un arreglo de una pasada.
-//
-// Lo que esa medición SÍ destapó, y queda anotado para quien migre (ficheros de
-// otro carril, no tocados aquí):
-//   - src/lib/doc-gen/variable-resolver.ts lee `entities.tax_id` y
-//     `entities.bylaws_commission_article`; ninguna de las dos existe en las 53
-//     columnas de `entities`, así que `nif`/`cif`/`articulo_estatutos_comision`
-//     caen siempre al fallback.
-//   - src/lib/doc-gen/variable-resolver.ts:381 consulta la tabla
-//     `meeting_participants`, que no existe en Cloud (la real es
-//     `meeting_attendees`): la lista de participantes del documento sale vacía.
+// Regenerado el 2026-09-27 (MOI-194) vía MCP `generate_typescript_types`
+// (introspección de solo lectura contra Cloud). Sustituye la copia del
+// 2026-09-19: incorpora, entre otros, `ai_systems_tenant_id_fkey`,
+// `risks.ai_system_id`/`ai_systems_fk`, `hash_recipe_version` y
+// `fn_secretaria_actualizar_estructura_grupo` de las migraciones del
+// 2026-09-26. No editar a mano: regenerar con la misma herramienta.
 //
 // El gemelo `supabase/functions/_types/database.ts` es la copia de las Edge
 // Functions y está congelado en mayo de 2026 (le faltan, por ejemplo, las
@@ -998,6 +980,13 @@ export type Database = {
             columns: ["owner_id"]
             isOneToOne: false
             referencedRelation: "persons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_systems_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -3073,6 +3062,7 @@ export type Database = {
           created_at: string | null
           current_hash: string | null
           delta: Json | null
+          hash_recipe_version: number | null
           hash_sha512: string | null
           id: string
           ip_address: unknown
@@ -3093,6 +3083,7 @@ export type Database = {
           created_at?: string | null
           current_hash?: string | null
           delta?: Json | null
+          hash_recipe_version?: number | null
           hash_sha512?: string | null
           id?: string
           ip_address?: unknown
@@ -3113,6 +3104,7 @@ export type Database = {
           created_at?: string | null
           current_hash?: string | null
           delta?: Json | null
+          hash_recipe_version?: number | null
           hash_sha512?: string | null
           id?: string
           ip_address?: unknown
@@ -11000,6 +10992,7 @@ export type Database = {
       }
       risks: {
         Row: {
+          ai_system_id: string | null
           assessed_band: string | null
           assessment_breakdown: Json | null
           assessment_provenance: Json | null
@@ -11021,6 +11014,7 @@ export type Database = {
           title: string
         }
         Insert: {
+          ai_system_id?: string | null
           assessed_band?: string | null
           assessment_breakdown?: Json | null
           assessment_provenance?: Json | null
@@ -11042,6 +11036,7 @@ export type Database = {
           title: string
         }
         Update: {
+          ai_system_id?: string | null
           assessed_band?: string | null
           assessment_breakdown?: Json | null
           assessment_provenance?: Json | null
@@ -11063,6 +11058,13 @@ export type Database = {
           title?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "risks_ai_system_id_fkey"
+            columns: ["ai_system_id"]
+            isOneToOne: false
+            referencedRelation: "ai_systems"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "risks_entity_id_fkey"
             columns: ["entity_id"]
@@ -15497,6 +15499,15 @@ export type Database = {
         Args: { p_tenant_id: string }
         Returns: Json
       }
+      fn_secretaria_actualizar_estructura_grupo: {
+        Args: {
+          p_entity_id: string
+          p_ownership_percentage: number
+          p_parent_entity_id: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       fn_secretaria_annual_accounts_evidence_binary: {
         Args: { p_manifest: Json }
         Returns: Json
@@ -16248,4 +16259,3 @@ export const Constants = {
     },
   },
 } as const
-

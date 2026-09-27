@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { appendChangelog, buildDiffSummary } from "@/lib/secretaria/template-admin/changelog";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import {
   transitionTemplateState,
   type TransitionResult,
@@ -94,7 +95,7 @@ export function usePlantillasProtegidas() {
         .eq("tenant_id", tenantId!)
         .order("tipo", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as PlantillaProtegidaRow[];
+      return (data ?? []) as unknown as PlantillaProtegidaRow[];
     },
   });
 }
@@ -111,7 +112,7 @@ export function usePlantillaProtegida(id?: string) {
         .eq("tenant_id", tenantId!)
         .maybeSingle();
       if (error) throw error;
-      return data as PlantillaProtegidaRow | null;
+      return data as unknown as PlantillaProtegidaRow | null;
     },
     enabled: !!id && !!tenantId,
   });
@@ -318,7 +319,7 @@ export function useUpdateContenidoPlantilla() {
 
       const { data: updated, error } = await supabase
         .from("plantillas_protegidas")
-        .update(updates)
+        .update(updates as unknown as TablesUpdate<"plantillas_protegidas">)
         .eq("id", params.id)
         .eq("tenant_id", tenantId)
         .eq("estado", "BORRADOR")
@@ -346,7 +347,7 @@ export function useUpdateContenidoPlantilla() {
       } catch (err) {
         await supabase
           .from("plantillas_protegidas")
-          .update(rollback)
+          .update(rollback as unknown as TablesUpdate<"plantillas_protegidas">)
           .eq("id", params.id)
           .eq("tenant_id", tenantId)
           .eq("estado", "BORRADOR");

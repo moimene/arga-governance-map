@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { supabase } from "../src/integrations/supabase/client";
+import type { TablesUpdate } from "../src/integrations/supabase/types";
 import { auditTemplateInventory, type TemplateInventoryRow } from "../src/lib/secretaria/template-inventory-audit";
 
 const TENANT_ID = "00000000-0000-0000-0000-000000000001";
@@ -452,7 +453,7 @@ async function main() {
   for (const update of updates) {
     const { error: updateError } = await supabase
       .from("plantillas_protegidas")
-      .update(update.patch)
+      .update(update.patch as unknown as TablesUpdate<"plantillas_protegidas">)
       .eq("tenant_id", TENANT_ID)
       .eq("id", update.id);
     if (updateError) throw updateError;
