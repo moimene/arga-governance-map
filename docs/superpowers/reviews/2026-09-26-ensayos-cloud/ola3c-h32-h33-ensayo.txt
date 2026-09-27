@@ -1,0 +1,43 @@
+BEGIN
+CREATE FUNCTION
+DO
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+DO
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+DO
+DO
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+DO
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+ROLLBACK
+
+[probe_rollback] exit=0 (todo revertido: BEGIN ... ROLLBACK; o conexión cerrada en error)
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmp1jo_7qpw.sql:892: NOTICE:  VERIFICACION H-28 OK: ARGA sigue en A-00001001 (cero cambio), grupo nuevo (…0003) resuelve a A98765432 via persons.tax_id, y el caso sin ningún identificador sigue NULL
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmp1jo_7qpw.sql:1046: NOTICE:  PROBE H-28 OK: el gate del identificador fiscal ya NO bloquea (control negativo con el mismo mensaje exacto arriba; con dato real el error pasó a ser otro, ajeno a H-28: authoritative minute: every point needs a catalogued matter and every decision needs its exact proposal)
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmp1jo_7qpw.sql:1265: NOTICE:  VERIFICACION OK: fn_secretaria_add_session_agenda_item (owner=postgres, security definer=t)
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmp1jo_7qpw.sql:1344: NOTICE:  CONTROL POSITIVO OK: fn_secretaria_add_session_agenda_item rechaza kind inválido y crea el punto en el camino feliz cuando hay reunión abierta
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmp1jo_7qpw.sql:1529: NOTICE:  PROBE OK: alta real del grupo nuevo en reunión abierta nacida de convocatoria (con idempotencia), INSERT directo sigue rechazado, cross-tenant rechazado, reunión no abierta rechazada, punto de convocatoria no pisable
