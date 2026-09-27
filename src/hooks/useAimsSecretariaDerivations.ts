@@ -39,7 +39,7 @@ export function useCreateAimsSecretariaDerivation() {
       const row = buildDerivationInsert({ tenantId, ...input });
       const { data, error } = await supabase
         .from("aims_secretaria_derivations")
-        .insert(row)
+        .insert({ ...row, tenant_id: tenantId! })
         .select("id")
         .single();
       if (error) {
@@ -71,9 +71,7 @@ export function useAimsSecretariaDerivationsForIncident(
   const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: ["aims_secretaria_derivations", tenantId, incidentId ?? null],
-    queryFn:
-      tenantId && incidentId
-        ? async () => {
+    queryFn: tenantId && incidentId ? async () => {
             const { data, error } = await supabase
               .from("aims_secretaria_derivations")
               .select(

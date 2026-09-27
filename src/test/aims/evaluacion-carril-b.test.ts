@@ -32,7 +32,8 @@ describe("control positivo del instrumento", () => {
 describe("B1 — cambiar de sistema o de marco no reescribe el borrador del par anterior", () => {
   it("el UPDATE del borrador va acotado por id, sistema Y marco, y exige fila de vuelta", () => {
     const src = read(HOOK);
-    const update = src.slice(src.indexOf(".update(payload)"), src.indexOf(".maybeSingle()", src.indexOf(".update(payload)")));
+    // `.update(payload` admite el cast de tipos de MOI-194 (`payload as … TablesUpdate<…>`).
+    const update = src.slice(src.indexOf(".update(payload"), src.indexOf(".maybeSingle()", src.indexOf(".update(payload")));
     // Control positivo: el tramo existe y ya llevaba las dos condiciones previas.
     expect(update.length, "no se encuentra el UPDATE del borrador").toBeGreaterThan(0);
     expect(update).toContain('.eq("id", id)');

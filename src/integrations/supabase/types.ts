@@ -11,6 +11,10 @@
 // Functions y está congelado en mayo de 2026 (le faltan, por ejemplo, las
 // tablas `aims_fria_*`). Este fichero es el que refleja Cloud hoy.
 
+//
+// Regenerado de nuevo el 2026-09-27 con `supabase gen types typescript --project-id hzqwefkwsxopwrmtksbg`
+// (cierre masivo, ola 2): incorpora `aims_secretaria_derivations` (MOI-56) y las columnas de MOI-200.
+
 export type Json =
   | string
   | number
@@ -2763,6 +2767,67 @@ export type Database = {
             columns: ["version_id"]
             isOneToOne: false
             referencedRelation: "aims_system_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      aims_secretaria_derivations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          evidence_ref: string | null
+          id: string
+          source_event: string
+          source_incident_id: string
+          status: string
+          target_agreement_id: string | null
+          target_meeting_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          evidence_ref?: string | null
+          id?: string
+          source_event: string
+          source_incident_id: string
+          status?: string
+          target_agreement_id?: string | null
+          target_meeting_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          evidence_ref?: string | null
+          id?: string
+          source_event?: string
+          source_incident_id?: string
+          status?: string
+          target_agreement_id?: string | null
+          target_meeting_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aims_secretaria_derivations_source_incident_id_fkey"
+            columns: ["source_incident_id"]
+            isOneToOne: false
+            referencedRelation: "ai_incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aims_secretaria_derivations_target_agreement_id_fkey"
+            columns: ["target_agreement_id"]
+            isOneToOne: false
+            referencedRelation: "agreements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aims_secretaria_derivations_target_meeting_id_fkey"
+            columns: ["target_meeting_id"]
+            isOneToOne: false
+            referencedRelation: "meetings"
             referencedColumns: ["id"]
           },
         ]
@@ -14982,6 +15047,7 @@ export type Database = {
         Returns: string
       }
       fn_emit_convocatoria: { Args: { p_payload: Json }; Returns: Json }
+      fn_emit_convocatoria_junta: { Args: { p_payload: Json }; Returns: Json }
       fn_emit_standalone_certification: {
         Args: { p_artifact_id?: string; p_certification_id: string }
         Returns: string

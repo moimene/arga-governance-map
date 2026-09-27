@@ -113,7 +113,7 @@ describe("el camino de escritura de aims_incident_regimes", () => {
     // cualquier recuento sin que la mutación llevara ninguno.
     const src = codigo(HOOK);
     expect(
-      /\.update\(\{[\s\S]{0,300}?\}\)\s*\n\s*\.eq\("tenant_id", tenantId!?\)/.test(src),
+      /\.update\(\{[\s\S]{0,300}?\}(?:\s+as\s+[^)]*)?\)\s*\n\s*\.eq\("tenant_id", tenantId!?\)/.test(src),
       "el update de subexpedientes no lleva el filtro por tenant pegado a la mutación",
     ).toBe(true);
   });
