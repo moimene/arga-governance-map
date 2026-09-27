@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 
@@ -362,6 +362,97 @@ export function useEvidencesByControlIds(controlIds: string[]) {
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as EvidenceRow[];
+    },
+  });
+}
+
+// ───────── Altas (MOI-149 · D-23: alta por pantalla, tenant de la sesión) ─────────
+//
+// Los tres registros (política, obligación, control) nacían solo por seed:
+// ninguna pantalla podía darlos de alta. `tenant_id` viene SIEMPRE de
+// `useTenantContext()`, nunca del formulario, para que un grupo no pueda
+// escribir en otro — el mismo patrón que `useCreateRisk` en `useRisks.ts`.
+
+export type PolicyWriteInput = {
+  policy_code: string;
+  title: string;
+  normative_tier?: string | null;
+  scope_level?: string | null;
+  owner_function?: string | null;
+  status?: string;
+};
+
+export function useCreatePolicy() {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: PolicyWriteInput) => {
+      const { data, error } = await supabase
+        .from("policies")
+        .insert({ status: "Draft", ...input, tenant_id: tenantId! })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as PolicyRow;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["policies"] });
+    },
+  });
+}
+
+export type ObligationWriteInput = {
+  code: string;
+  title: string;
+  source?: string | null;
+  criticality?: string | null;
+  policy_id?: string | null;
+  legal_reference?: string | null;
+};
+
+export function useCreateObligation() {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ObligationWriteInput) => {
+      const { data, error } = await supabase
+        .from("obligations")
+        .insert({ ...input, tenant_id: tenantId! })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ObligationRow;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["obligations"] });
+    },
+  });
+}
+
+export type ControlWriteInput = {
+  code: string;
+  name: string;
+  obligation_id: string;
+  status?: string;
+  last_test_date?: string | null;
+  next_test_date?: string | null;
+};
+
+export function useCreateControl() {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ControlWriteInput) => {
+      const { data, error } = await supabase
+        .from("controls")
+        .insert({ status: "Parcial", ...input, tenant_id: tenantId! })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ControlRow;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["controls"] });
     },
   });
 }

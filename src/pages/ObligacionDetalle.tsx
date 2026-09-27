@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ObjectHeader } from "@/components/ObjectHeader";
@@ -10,6 +11,7 @@ import {
   useObligationByCode,
   useObligationControls,
   useEvidencesByControlIds,
+  useCreateControl,
   controlStatusLabel,
   controlStatusTone,
   evidenceStatusLabel,
@@ -19,9 +21,9 @@ import {
   exclusionKind,
   splitFirmeza,
 } from "@/hooks/usePoliciesObligations";
-import { AlertTriangle, ShieldOff, Plus, ShieldCheck, Siren, Clock } from "lucide-react";
+import { AlertTriangle, ShieldOff, Plus, ShieldCheck, Siren, Clock, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { useMemo } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +38,9 @@ const fmtDate = (d: string | null | undefined) => {
   return `${day}/${m}/${y}`;
 };
 
+const emptyToNull = (v: string) => (v.trim().length > 0 ? v.trim() : null);
+const emptyNewControl = { code: "", name: "", last_test_date: "", next_test_date: "" };
+
 // G4 Task 8/Step 5b: el criterio de exclusión (no sujeción / excepción legal)
 // y la extracción de la cautela de firmeza viven en el hook, compartidos con
 // la lista y con la pestaña "Obligaciones" de la ficha de política. Sin este
@@ -48,6 +53,36 @@ export default function ObligacionDetalle() {
   const { data: controls = [] } = useObligationControls(obligation?.id);
   const controlIds = useMemo(() => controls.map((c) => c.id), [controls]);
   const { data: evidences = [] } = useEvidencesByControlIds(controlIds);
+
+  const [showNewControl, setShowNewControl] = useState(false);
+  const [newControl, setNewControl] = useState(emptyNewControl);
+  const createControl = useCreateControl();
+
+  const handleCreateControl = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!obligation) return;
+    const code = newControl.code.trim();
+    const name = newControl.name.trim();
+    if (!code || !name) {
+      toast({ title: "Código y nombre son obligatorios", variant: "destructive" });
+      return;
+    }
+    try {
+      await createControl.mutateAsync({
+        code,
+        name,
+        obligation_id: obligation.id,
+        last_test_date: emptyToNull(newControl.last_test_date),
+        next_test_date: emptyToNull(newControl.next_test_date),
+      });
+      toast({ title: `Control ${code} asignado a ${obligation.code}` });
+      setNewControl(emptyNewControl);
+      setShowNewControl(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast({ title: "No se pudo crear el control", description: message, variant: "destructive" });
+    }
+  };
 
   // Incidentes GRC vinculados por FK obligation_id (GAP 3 — obligation_id → incidents).
   const { tenantId } = useTenantContext();
@@ -253,14 +288,74 @@ export default function ObligacionDetalle() {
         </TabsContent>
 
         <TabsContent value="controles" className="mt-4 space-y-3">
+          {controls.length > 0 && (
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowNewControl((v) => !v)} aria-expanded={showNewControl}>
+                {showNewControl ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                {showNewControl ? "Cancelar" : "Nuevo control"}
+              </Button>
+            </div>
+          )}
+          {showNewControl && (
+            <Card className="p-4">
+              <form onSubmit={handleCreateControl} className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label htmlFor="new-ctrl-code" className="mb-1 block text-xs font-medium text-muted-foreground">Código *</label>
+                  <Input
+                    id="new-ctrl-code"
+                    value={newControl.code}
+                    onChange={(e) => setNewControl((c) => ({ ...c, code: e.target.value }))}
+                    placeholder="CTR-99"
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="new-ctrl-name" className="mb-1 block text-xs font-medium text-muted-foreground">Nombre *</label>
+                  <Input
+                    id="new-ctrl-name"
+                    value={newControl.name}
+                    onChange={(e) => setNewControl((c) => ({ ...c, name: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="new-ctrl-last" className="mb-1 block text-xs font-medium text-muted-foreground">Última prueba</label>
+                  <Input
+                    id="new-ctrl-last"
+                    type="date"
+                    value={newControl.last_test_date}
+                    onChange={(e) => setNewControl((c) => ({ ...c, last_test_date: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="new-ctrl-next" className="mb-1 block text-xs font-medium text-muted-foreground">Próxima prueba</label>
+                  <Input
+                    id="new-ctrl-next"
+                    type="date"
+                    value={newControl.next_test_date}
+                    onChange={(e) => setNewControl((c) => ({ ...c, next_test_date: e.target.value }))}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground md:col-span-2">Estado inicial: En remediación (pendiente de primera prueba).</p>
+                <div className="flex items-end justify-end gap-2 md:col-span-2">
+                  <Button type="button" variant="outline" onClick={() => setShowNewControl(false)}>Cancelar</Button>
+                  <Button type="submit" disabled={createControl.isPending}>
+                    {createControl.isPending ? "Guardando..." : "Crear control"}
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          )}
           {controls.length === 0 ? (
             <Card className="flex flex-col items-center justify-center gap-3 p-12 text-center">
               <ShieldOff className="h-12 w-12 text-status-critical" />
               <div className="text-base font-semibold">No hay ningún control asignado a esta obligación</div>
               <p className="max-w-md text-sm text-muted-foreground">Asigna un control para comenzar el proceso de cobertura.</p>
-              <Button onClick={() => toast({ title: "Función disponible en entorno de producción" })} className="gap-1.5">
-                <Plus className="h-4 w-4" />Asignar control
-              </Button>
+              {!showNewControl && (
+                <Button onClick={() => setShowNewControl(true)} className="gap-1.5">
+                  <Plus className="h-4 w-4" />Asignar control
+                </Button>
+              )}
             </Card>
           ) : (
             <Card>

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,8 @@ import { StatusBadge } from "@/components/StatusBadge";
 import {
   useObligationsList,
   useAllControlsByObligationIds,
+  usePoliciesList,
+  useCreateObligation,
   controlStatusLabel,
   controlStatusTone,
   obligationCriticalityTone,
@@ -19,9 +21,14 @@ import {
   type ObligationWithPolicy,
   type ControlWithOwner,
 } from "@/hooks/usePoliciesObligations";
+import { toast } from "@/hooks/use-toast";
 import { useTenantBranding } from "@/context/TenantBrandContext";
-import { AlertTriangle, CheckCircle, AlertCircle, XCircle, ClipboardList, ShieldCheck, Info } from "lucide-react";
+import { AlertTriangle, CheckCircle, AlertCircle, XCircle, ClipboardList, ShieldCheck, Info, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const NATIVE_SELECT_CLASSES = "h-10 w-full rounded-md border border-input bg-background px-3 text-sm";
+const emptyToNull = (v: string) => (v.trim().length > 0 ? v.trim() : null);
+const emptyNewObligation = { code: "", title: "", source: "", criticality: "", policy_id: "", legal_reference: "" };
 // El criterio de cobertura vive en src/lib/grc/obligation-coverage.ts para que
 // esta pantalla y sus dos hermanas (ObligacionDetalle, PoliticaDetalle) no
 // puedan volver a divergir.
@@ -58,9 +65,40 @@ export default function ObligacionesList() {
   const [status, setStatus] = useState("all");
   const [search, setSearch] = useState("");
 
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [newObligation, setNewObligation] = useState(emptyNewObligation);
+
   const { data: allObligations = [], isLoading } = useObligationsList();
+  const { data: policiesForSelect = [] } = usePoliciesList();
+  const createObligation = useCreateObligation();
   const obligationIds = useMemo(() => allObligations.map((o) => o.id), [allObligations]);
   const { data: controls = [] } = useAllControlsByObligationIds(obligationIds);
+
+  const handleCreateObligation = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const code = newObligation.code.trim();
+    const title = newObligation.title.trim();
+    if (!code || !title) {
+      toast({ title: "Código y título son obligatorios", variant: "destructive" });
+      return;
+    }
+    try {
+      await createObligation.mutateAsync({
+        code,
+        title,
+        source: emptyToNull(newObligation.source),
+        criticality: emptyToNull(newObligation.criticality),
+        policy_id: emptyToNull(newObligation.policy_id),
+        legal_reference: emptyToNull(newObligation.legal_reference),
+      });
+      toast({ title: `Obligación ${code} creada` });
+      setNewObligation(emptyNewObligation);
+      setShowNewForm(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast({ title: "No se pudo crear la obligación", description: message, variant: "destructive" });
+    }
+  };
   // G4 Task 7: aviso de postura demo sobre los estados de control, gateado
   // por tenant (branding NULL = ARGA = sin aviso nuevo). No hay columna que
   // distinga postura demo de real, así que el gate es el tenant.
@@ -132,7 +170,90 @@ export default function ObligacionesList() {
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">Trazabilidad norma → obligación → control → evidencia</p>
         </div>
+        <Button className="gap-1.5" onClick={() => setShowNewForm((v) => !v)} aria-expanded={showNewForm}>
+          {showNewForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+          {showNewForm ? "Cancelar" : "Nueva obligación"}
+        </Button>
       </div>
+
+      {showNewForm && (
+        <Card className="mb-5 p-4">
+          <form onSubmit={handleCreateObligation} className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div>
+              <label htmlFor="new-obl-code" className="mb-1 block text-xs font-medium text-muted-foreground">Código *</label>
+              <Input
+                id="new-obl-code"
+                value={newObligation.code}
+                onChange={(e) => setNewObligation((o) => ({ ...o, code: e.target.value }))}
+                placeholder="OBL-99"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="new-obl-title" className="mb-1 block text-xs font-medium text-muted-foreground">Título *</label>
+              <Input
+                id="new-obl-title"
+                value={newObligation.title}
+                onChange={(e) => setNewObligation((o) => ({ ...o, title: e.target.value }))}
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="new-obl-source" className="mb-1 block text-xs font-medium text-muted-foreground">Marco / fuente</label>
+              <Input
+                id="new-obl-source"
+                value={newObligation.source}
+                onChange={(e) => setNewObligation((o) => ({ ...o, source: e.target.value }))}
+                placeholder="Ej. RGPD"
+              />
+            </div>
+            <div>
+              <label htmlFor="new-obl-criticality" className="mb-1 block text-xs font-medium text-muted-foreground">Criticidad</label>
+              <select
+                id="new-obl-criticality"
+                className={NATIVE_SELECT_CLASSES}
+                value={newObligation.criticality}
+                onChange={(e) => setNewObligation((o) => ({ ...o, criticality: e.target.value }))}
+              >
+                <option value="">—</option>
+                <option value="Crítico">Crítico</option>
+                <option value="Alto">Alto</option>
+                <option value="Medio">Medio</option>
+                <option value="Bajo">Bajo</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="new-obl-policy" className="mb-1 block text-xs font-medium text-muted-foreground">Política vinculada</label>
+              <select
+                id="new-obl-policy"
+                className={NATIVE_SELECT_CLASSES}
+                value={newObligation.policy_id}
+                onChange={(e) => setNewObligation((o) => ({ ...o, policy_id: e.target.value }))}
+              >
+                <option value="">— Sin política vinculada —</option>
+                {policiesForSelect.map((p) => (
+                  <option key={p.id} value={p.id}>{p.policy_code} — {p.title}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="new-obl-legal" className="mb-1 block text-xs font-medium text-muted-foreground">Referencia legal</label>
+              <Input
+                id="new-obl-legal"
+                value={newObligation.legal_reference}
+                onChange={(e) => setNewObligation((o) => ({ ...o, legal_reference: e.target.value }))}
+                placeholder="Ej. art. 32 RGPD"
+              />
+            </div>
+            <div className="flex items-end justify-end gap-2 md:col-span-2">
+              <Button type="button" variant="outline" onClick={() => setShowNewForm(false)}>Cancelar</Button>
+              <Button type="submit" disabled={createObligation.isPending}>
+                {createObligation.isPending ? "Guardando..." : "Crear obligación"}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
 
       <div className="mb-5 grid grid-cols-4 gap-4">
         <Kpi label="Total obligaciones" value={kpis.total} icon={ClipboardList} tone="primary" />
