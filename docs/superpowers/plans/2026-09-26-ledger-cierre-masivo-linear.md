@@ -205,3 +205,8 @@ instrucción de delegación: Suite Tax IS (P-MOI-4, archivada, con una hija del 
   base de datos de producción ni fusiones a `main`. Aquí se aplicó la interpretación publicada el 26-09
   (comentario del proyecto `f9bc253e`). Se deja al usuario la ratificación expresa, en un único
   comentario del proyecto.
+- Comprobador de la skill sobre los 8 issues tocados (y sus 3 bloqueantes, 24 comentarios): los
+  comentarios de esta ronda llevan la línea de agente y no hay cierres con bloqueo abierto. Por su
+  hallazgo, MOI-309 pasa de Done a In Review a nombre de Moisés (pide su aprobación y no consta).
+  Quedan señalados, sin reescribir, los informes antiguos de otro agente sin línea de agente (MOI-16,
+  15, 144 y 87, del 24-25/09).
