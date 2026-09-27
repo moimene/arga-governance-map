@@ -203,6 +203,14 @@ describe("G-SYNC — el espejo de obligaciones respeta el criterio del código",
         expect(art4, `${cuenta} sin la obligación del art. 4`).toBeTruthy();
         expect(d.espejo.find((e) => e.id === art4!.id)?.module_id).toBe("ai");
       });
+
+      // MOI-175 (F5.T5, resto) — misma comprobación para el art. 5.
+      it(`${cuenta}: el art. 5 del RIA está dentro del módulo ai`, () => {
+        const d = dato.get(cuenta)!;
+        const art5 = d.obligaciones.find((o) => o.code === "OBL-RIA-ORG-05");
+        expect(art5, `${cuenta} sin la obligación del art. 5`).toBeTruthy();
+        expect(d.espejo.find((e) => e.id === art5!.id)?.module_id).toBe("ai");
+      });
     }
   }
 

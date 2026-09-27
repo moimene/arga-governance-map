@@ -205,6 +205,10 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
       // F5.T5, 2026-09-20: art. 4 del RIA como obligación de ORGANIZACIÓN, que es
       // donde el experto la coloca. Órgano: CATIT (decisión D-U2 del usuario).
       "OBL-RIA-ORG-04": "F5.T5 — art. 4 RIA",
+      // MOI-175 (F5.T5, resto), 2026-09-28: art. 5 del RIA (prácticas de riesgo
+      // inaceptable), misma obligación de ORGANIZACIÓN y mismo órgano (CATIT).
+      // Alta por delegación de Moisés, declarada en el ledger de la tarea.
+      "OBL-RIA-ORG-05": "MOI-175 (F5.T5) — art. 5 RIA",
     };
     const { data } = await arga.from("obligations").select("code");
     const extra = ((data ?? []) as Array<{ code: string }>)
@@ -212,5 +216,42 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
       .filter((c) => !["OBL-DORA-003", "OBL-GDPR-001", "OBL-LGPD-001", "OBL-ORSA-001", "OBL-SII-001"].includes(c))
       .filter((c) => !Object.prototype.hasOwnProperty.call(DECLARADAS, c));
     expect(extra, "altas en ARGA sin declarar: decláralas aquí con su tarea").toEqual([]);
+  });
+
+  // MOI-175 (F5.T5, resto) — OBL-RIA-ORG-05 (art. 5) por
+  // fn_grc_alta_obligacion_organizacion_ria, mismo órgano/política que el
+  // art. 4 en cada tenant. Falla si la RPC no resolvió el órgano/política o
+  // si el alta no llegó a alguno de los dos tenants.
+  it("OBL-RIA-ORG-05 (art. 5) está en los dos tenants con su órgano y su política", async () => {
+    expect(authed && garr && argaAuthed && arga, "faltan sesiones").toBeTruthy();
+    const { data: g } = await garr
+      .from("obligations")
+      .select("code, owner_body_id, policy_id, criticality")
+      .eq("code", "OBL-RIA-ORG-05")
+      .maybeSingle();
+    expect(g, "Garrigues sin OBL-RIA-ORG-05").toBeTruthy();
+    expect(g!.owner_body_id, "OBL-RIA-ORG-05 de Garrigues sin órgano").toBeTruthy();
+    expect(g!.policy_id, "OBL-RIA-ORG-05 de Garrigues sin política").toBeTruthy();
+
+    const { data: a } = await arga
+      .from("obligations")
+      .select("code, owner_body_id, policy_id, criticality")
+      .eq("code", "OBL-RIA-ORG-05")
+      .maybeSingle();
+    expect(a, "ARGA sin OBL-RIA-ORG-05").toBeTruthy();
+    expect(a!.owner_body_id, "OBL-RIA-ORG-05 de ARGA sin órgano").toBeTruthy();
+    expect(a!.policy_id, "OBL-RIA-ORG-05 de ARGA sin política").toBeTruthy();
+
+    // El art. 4 y el art. 5 comparten órgano y política en cada tenant
+    // (mismo criterio de organización del RIA).
+    const { data: g4 } = await garr
+      .from("obligations").select("owner_body_id, policy_id").eq("code", "OBL-RIA-ORG-04").maybeSingle();
+    expect(g!.owner_body_id).toBe(g4!.owner_body_id);
+    expect(g!.policy_id).toBe(g4!.policy_id);
+
+    const { data: a4 } = await arga
+      .from("obligations").select("owner_body_id, policy_id").eq("code", "OBL-RIA-ORG-04").maybeSingle();
+    expect(a!.owner_body_id).toBe(a4!.owner_body_id);
+    expect(a!.policy_id).toBe(a4!.policy_id);
   });
 });
