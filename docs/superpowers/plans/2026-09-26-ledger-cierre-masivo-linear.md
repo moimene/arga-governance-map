@@ -144,3 +144,34 @@ estado de cada issue en Linear.
 - Ejecutor de ensayos: ahora restaura el rol y los claims entre ficheros (una sonda dejaba la
   sesión como `authenticated` y la migración siguiente no podía crear tablas).
 - Pendiente: ola 5 (H-50, MOI-150 grupo nuevo, MOI-15 4.1 por pantalla, MOI-16, MOI-143).
+
+### 5.4 Ola 5 y suspensión del carril (27-09-2026, 08:30 CEST)
+
+- Ola 5 integrada y publicada (`548a2537`; `bun test` 5483 / 163 skip / 0 fail; producción 3/3):
+  H-50 con fallo cerrado en convocatoria, punto nacido en sesión y acuerdo sin sesión (D-30; 19
+  materias pendientes en MOI-319); MOI-16 (tabla de comunicaciones y custodia en
+  `docs/superpowers/reviews/2026-09-27-moi16-comunicaciones-custodia.md`); MOI-143 aplicado
+  (`20260928160000`, evaluador de Junta por capital; el acta real espera a la Junta del 12-11-2026,
+  D-29); script y e2e de MOI-150 (solo ensayo).
+- Recorrido 4.1 de MOI-15 (reunión `81a4de74…` del grupo nuevo): el punto nacido en sesión se añade
+  por pantalla (`dc938c06…`), pero el acta no se genera. Hallazgos nuevos: H-51 (botón de votación),
+  H-52 (la RPC del punto nacido en sesión no acepta materia) y H-53 (el manifiesto del acta exige que
+  la agenda coincida exactamente con la convocatoria y rechaza los puntos nacidos en sesión).
+- MOI-150: la RPC de sujetos no escribe `governing_body_id`; decisión D-28 bis, completar la RPC con
+  `p_governing_body_id` en vez de fabricar una política de IA.
+- **Carril suspendido por el usuario** («hasta renovación de créditos»). La ola 6 se detuvo a medias:
+  `agent/moi-150rpc-ola6` tiene 1 commit sin revisar; `agent/moi-15h53-ola6`, ninguno. Nada de la
+  ola 6 está aplicado en Cloud (cabecera `20260928160000`, 392 versiones).
+
+**Para retomar:** relanzar la ola 6 con `Workflow({scriptPath: <scratchpad>/ola6.js, resumeFromRunId:
+"wf_502bbd6c-fe8", args: {base: "548a2537fa06e66a86592616c86d6ef6449272b1"}})` (reutiliza lo ya hecho
+por los agentes); integrar, ensayar y aplicar `20260928170000/171000/172000`; ejecutar
+`scripts/aims/seed-organo-ia-grupo-nuevo.ts --commit`; recorrer por pantalla el acta de `81a4de74…`
+y el panel de IA del grupo nuevo (`e2e/72-verif-moi150-organo-ia.spec.ts`); redactar y publicar los
+cierres de MOI-15, MOI-16, MOI-143 y MOI-150 (comprobando después el estado real en Linear: el
+publicador informó mal dos estados el 27-09); y pasar el comprobador de la skill al final.
+
+Issues abiertos al suspender, con su motivo: MOI-15 (acta 4.1, H-51/H-52/H-53) y MOI-16 (en
+revisión; falta su comentario de cierre); MOI-143 (acta real el 12-11-2026); MOI-150 (declaración
+del grupo nuevo); MOI-170, MOI-175 y MOI-181 (en revisión para Moisés o terceros); y los de comités,
+personas y proveedor que quedan fuera del mandato (§4), más MOI-319.
