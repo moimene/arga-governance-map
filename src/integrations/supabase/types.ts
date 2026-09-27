@@ -7284,6 +7284,113 @@ export type Database = {
           },
         ]
       }
+      // MOI-175 F5.T11: grc_dpias, sin migración regenerada todavía —
+      // patrón ya usado por aims_secretaria_derivations (MOI-56).
+      grc_dpias: {
+        Row: {
+          ai_system_id: string | null
+          approved_at: string | null
+          approved_by_body_id: string | null
+          code: string
+          content_hash: string | null
+          controller_role: string
+          created_at: string
+          created_by: string | null
+          dpo_consulted_at: string | null
+          dpo_opinion: string | null
+          dpo_person_id: string | null
+          entity_id: string
+          id: string
+          instructions_record_id: string | null
+          necessity_criteria: Json
+          necessity_rationale: string
+          necessity_result: string
+          next_review_date: string | null
+          prior_consultation_at: string | null
+          prior_consultation_required: boolean
+          processing_description: string
+          rat_ref: string | null
+          residual_high: boolean | null
+          result: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          ai_system_id?: string | null
+          approved_at?: string | null
+          approved_by_body_id?: string | null
+          code: string
+          content_hash?: string | null
+          controller_role: string
+          created_at?: string
+          created_by?: string | null
+          dpo_consulted_at?: string | null
+          dpo_opinion?: string | null
+          dpo_person_id?: string | null
+          entity_id: string
+          id?: string
+          instructions_record_id?: string | null
+          necessity_criteria?: Json
+          necessity_rationale: string
+          necessity_result?: string
+          next_review_date?: string | null
+          prior_consultation_at?: string | null
+          prior_consultation_required?: boolean
+          processing_description: string
+          rat_ref?: string | null
+          residual_high?: boolean | null
+          result?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          ai_system_id?: string | null
+          approved_at?: string | null
+          approved_by_body_id?: string | null
+          code?: string
+          content_hash?: string | null
+          controller_role?: string
+          created_at?: string
+          created_by?: string | null
+          dpo_consulted_at?: string | null
+          dpo_opinion?: string | null
+          dpo_person_id?: string | null
+          entity_id?: string
+          id?: string
+          instructions_record_id?: string | null
+          necessity_criteria?: Json
+          necessity_rationale?: string
+          necessity_result?: string
+          next_review_date?: string | null
+          prior_consultation_at?: string | null
+          prior_consultation_required?: boolean
+          processing_description?: string
+          rat_ref?: string | null
+          residual_high?: boolean | null
+          result?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grc_dpias_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grc_dpias_ai_system_id_fkey"
+            columns: ["ai_system_id"]
+            isOneToOne: false
+            referencedRelation: "ai_systems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grc_evidence_links: {
         Row: {
           created_at: string
@@ -15581,6 +15688,23 @@ export type Database = {
           manifest_hash_sha512: string
         }[]
       }
+      // MOI-175 F5.T11.
+      fn_grc_registrar_eipd: {
+        Args: {
+          p_ai_system_id?: string
+          p_code: string
+          p_controller_role: string
+          p_dpo_opinion?: string
+          p_dpo_person_id?: string
+          p_entity_id: string
+          p_necessity_criteria?: Json
+          p_necessity_rationale?: string
+          p_necessity_result?: string
+          p_prior_consultation_required?: boolean
+          p_processing_description: string
+        }
+        Returns: string
+      }
       fn_import_persona_row: {
         Args: {
           p_denomination?: string
@@ -16399,6 +16523,19 @@ export type Database = {
           p_signer_person_id: string
           p_signer_role: string
           p_verification_payload: Json
+        }
+        Returns: string
+      }
+      // MOI-175 F5.T13 — solo el mecanismo; ningún dictamen real se registra
+      // en esta entrega.
+      fn_secretaria_registrar_dictamen_ia: {
+        Args: {
+          p_asunto: string
+          p_body_id: string
+          p_contenido: string
+          p_decisor_person_id: string
+          p_entity_id: string
+          p_system_id: string
         }
         Returns: string
       }
