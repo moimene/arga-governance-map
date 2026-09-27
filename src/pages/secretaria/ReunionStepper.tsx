@@ -4849,7 +4849,7 @@ function ReunionIntake() {
   const [searchParams] = useSearchParams();
   // Contrato de handoff compartido (ver cross-module-handoff.ts): preserva el contexto
   // completo de la propuesta (órgano/asunto/justificación) emitido por GRC/AIMS.
-  const { source, event, sourceId, organ, matter, rationale, isCrossModule } = readMeetingHandoff(
+  const { source, event, sourceId, organ, organId, matter, rationale, isCrossModule } = readMeetingHandoff(
     (key) => searchParams.get(key),
   );
   // MOI-158: el sourceId de un handoff `source=aims` es un id de `ai_incidents`.
@@ -4876,7 +4876,7 @@ function ReunionIntake() {
     scopedEntityId
       ? `/secretaria/reuniones/nueva?flow=junta-universal&scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`
       : "/secretaria/reuniones/nueva?flow=junta-universal",
-    { source, event, sourceId, organ, matter, rationale, isCrossModule },
+    { source, event, sourceId, organ, organId, matter, rationale, isCrossModule },
   );
   const sourceLabel = source === "grc" ? "GRC Compass" : source === "aims" ? "AIMS 360" : "Secretaría";
 
@@ -4927,6 +4927,20 @@ function ReunionIntake() {
                           <>
                             {" "}
                             · Sistema: <span className="font-medium text-[var(--g-text-primary)]">{aimsIncidentRef.ai_systems.name}</span>
+                          </>
+                        ) : null}
+                        {/* F2.T13: entidad/sujeto del incidente cuando el carril A
+                            los tiene sembrados (0 en Cloud a 2026-09-27). */}
+                        {aimsIncidentRef.entity?.common_name ? (
+                          <>
+                            {" "}
+                            · Entidad: <span className="font-medium text-[var(--g-text-primary)]">{aimsIncidentRef.entity.common_name}</span>
+                          </>
+                        ) : null}
+                        {aimsIncidentRef.subject?.entity?.common_name ? (
+                          <>
+                            {" "}
+                            · Sujeto: <span className="font-medium text-[var(--g-text-primary)]">{aimsIncidentRef.subject.entity.common_name}</span>
                           </>
                         ) : null}
                       </>

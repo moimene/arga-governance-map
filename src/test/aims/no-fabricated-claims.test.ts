@@ -1149,8 +1149,10 @@ describe("2026-09-07 — el escalado no redacta la justificación por el oficial
       "vuelve el órgano preseleccionado por posición: nadie lo ha elegido",
     ).toBe(false);
     // Ni la justificación ni el órgano nacen con valor: las dos entradas del
-    // handoff que el usuario tiene que escribir arrancan vacías.
-    for (const campo of ["justificacion", "organo"]) {
+    // handoff que el usuario tiene que escribir arrancan vacías. F2.T14
+    // (MOI-170) renombró el estado de `organo` (nombre) a `organoId` (id,
+    // resuelto por sociedad con adoptingOnly) — el invariante es el mismo.
+    for (const campo of ["justificacion", "organoId"]) {
       const m = src.match(new RegExp(`\\[${campo},\\s*set\\w+\\]\\s*=\\s*useState\\(([^)]*)\\)`, "i"));
       expect(m, `ha desaparecido el estado de ${campo} en el modal de escalado`).not.toBeNull();
       expect(m![1].trim(), `${campo} nace con un valor que nadie ha elegido → ${m![1]}`).toBe('""');

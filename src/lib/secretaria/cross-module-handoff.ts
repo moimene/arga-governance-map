@@ -17,8 +17,25 @@ export interface MeetingHandoffContext {
   event: string;
   /** Id del objeto origen (incidente, excepción, sistema IA…). */
   sourceId?: string | null;
-  /** Órgano propuesto (CDA, JUNTA, comisión…). */
+  /**
+   * Órgano propuesto, en TEXTO LIBRE (nombre visible). Los emisores no-AIMS
+   * (GRC: Excepciones, IncidenteDetalle, SolvenciaII) siguen mandando aquí un
+   * nombre de comité tecleado a mano o fijo ("CDA") — su semántica no cambia.
+   */
   organ?: string | null;
+  /**
+   * F2.T14 (MOI-170/MOI-158): id del órgano propuesto, cuando el emisor lo
+   * conoce con certeza (AIMS, resuelto por `useBodiesByEntity(…, {
+   * adoptingOnly: true })`). Viaja JUNTO a `organ`, nunca en su lugar: un
+   * emisor no-AIMS que no lo pasa no ve cambiar nada.
+   */
+  organId?: string | null;
+  /**
+   * F2.T14: sociedad del sujeto/sistema de origen. Presente ⇒ el intake abre
+   * en `scope=sociedad&entity=<id>` (mismo contrato que `useSecretariaScope`,
+   * donde la `entity` de la URL manda sobre lo guardado en localStorage).
+   */
+  entityId?: string | null;
   /** Asunto / materia propuesta para el orden del día. */
   matter?: string | null;
   /** Justificación de la propuesta. */
@@ -34,8 +51,15 @@ export function buildMeetingHandoffSearch(ctx: MeetingHandoffContext): string {
   params.set("event", ctx.event);
   if (ctx.sourceId) params.set("source_id", ctx.sourceId);
   if (ctx.organ) params.set("organ", ctx.organ);
+  if (ctx.organId) params.set("organ_id", ctx.organId);
   if (ctx.matter) params.set("matter", ctx.matter);
   if (ctx.rationale) params.set("rationale", ctx.rationale);
+  // F2.T14: la sociedad manda el intake a scope=sociedad, mismo contrato que
+  // useSecretariaScope (la entity de la URL gana a la guardada en localStorage).
+  if (ctx.entityId) {
+    params.set("scope", "sociedad");
+    params.set("entity", ctx.entityId);
+  }
   return params.toString();
 }
 
@@ -49,6 +73,8 @@ export interface ReadMeetingHandoff {
   event: string | null;
   sourceId: string | null;
   organ: string | null;
+  /** F2.T14: id del órgano propuesto, cuando el emisor lo mandó (ver `organId`). */
+  organId: string | null;
   matter: string | null;
   rationale: string | null;
   isCrossModule: boolean;
@@ -65,6 +91,7 @@ export function readMeetingHandoff(get: (key: string) => string | null): ReadMee
     event: get("event") ?? get("handoff"),
     sourceId: get("source_id") ?? get("ai_incident"),
     organ: get("organ"),
+    organId: get("organ_id"),
     matter: get("matter"),
     rationale: get("rationale"),
     isCrossModule: source === "grc" || source === "aims",
@@ -87,6 +114,7 @@ export function appendHandoffParams(basePath: string, ctx: ReadMeetingHandoff): 
     event: ctx.event ?? "",
     sourceId: ctx.sourceId,
     organ: ctx.organ,
+    organId: ctx.organId,
     matter: ctx.matter,
     rationale: ctx.rationale,
   });

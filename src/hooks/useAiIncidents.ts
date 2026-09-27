@@ -81,9 +81,11 @@ const UUID_SHAPE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
  * A diferencia de `useAiIncidentById`, nunca lanza por 0 filas: un id
  * inexistente o de OTRO tenant (la RLS lo filtra sin error) devuelve `data:
  * null`, que el llamador interpreta como "no mostrar nada". Incluye el
- * sistema (F2.T13 de la spec RIA: "sistema resuelto desde el incidente" — la
- * parte que no depende de las columnas `entity_id`/`subject_id` pendientes de
- * F2.T2/F2.T3).
+ * sistema y, desde F2.T13 (carril A ya aplicado: `ai_incidents.entity_id` /
+ * `.subject_id`), la entidad y el sujeto RIA del incidente CUANDO EXISTEN —
+ * hoy (2026-09-27) hay 0 sujetos sembrados en Cloud, así que ambos resuelven
+ * `null` en la práctica hasta F2.T16; el receptor no falla ni inventa nada
+ * mientras tanto. 0 escrituras: sigue siendo un SELECT.
  */
 export function useAiIncidentHandoffReference(id: string | null | undefined) {
   const { tenantId } = useTenantContext();
@@ -93,12 +95,18 @@ export function useAiIncidentHandoffReference(id: string | null | undefined) {
     queryFn: tenantId && validId ? async () => {
       const { data, error } = await supabase
         .from("ai_incidents")
-        .select("*, ai_systems(name)")
+        .select("*, ai_systems(name), entity:entity_id(common_name), subject:subject_id(role, entity:entity_id(common_name))")
         .eq("tenant_id", tenantId!)
         .eq("id", validId)
         .maybeSingle();
       if (error) throw error;
-      return data as { id: string; title: string; ai_systems: { name: string } | null } | null;
+      return data as {
+        id: string;
+        title: string;
+        ai_systems: { name: string } | null;
+        entity: { common_name: string } | null;
+        subject: { role: string; entity: { common_name: string } | null } | null;
+      } | null;
     } : skipToken,
   });
 }
