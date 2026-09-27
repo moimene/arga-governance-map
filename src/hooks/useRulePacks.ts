@@ -73,7 +73,7 @@ export function useRuleParamOverrides(entityId?: string) {
         .eq("entity_id", entityId!);
 
       if (error) throw error;
-      return (data ?? []) as RuleParamOverrideRow[];
+      return (data ?? []) as unknown as RuleParamOverrideRow[];
     },
   });
 }
@@ -114,7 +114,7 @@ export function useRulePacksForEntity(entityId?: string) {
 
       if (overridesError) throw overridesError;
 
-      const overrides = (overridesData ?? []) as RuleParamOverrideRow[];
+      const overrides = (overridesData ?? []) as unknown as RuleParamOverrideRow[];
 
       return {
         packs,

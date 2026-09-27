@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import type { Banda } from "@/lib/grc/assessed-band";
+import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
 export type RiskRow = {
   id: string;
@@ -127,7 +128,7 @@ export function useCreateRisk() {
     mutationFn: async (input: RiskWriteInput) => {
       const { data, error } = await supabase
         .from("risks")
-        .insert({ ...input, tenant_id: tenantId! })
+        .insert({ ...input, tenant_id: tenantId! } as unknown as TablesInsert<"risks">)
         .select()
         .single();
       if (error) throw error;
@@ -147,7 +148,7 @@ export function useUpdateRisk(id?: string) {
     mutationFn: async (input: RiskWriteInput) => {
       const { data, error } = await supabase
         .from("risks")
-        .update(input)
+        .update(input as unknown as TablesUpdate<"risks">)
         .eq("tenant_id", tenantId!)
         .eq("id", id!)
         .select()

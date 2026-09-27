@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
 export type CifaAssessment = {
   q1_core: boolean;
@@ -106,7 +107,7 @@ export function useCreateThirdParty() {
       const id = input.id || `TPRM-${Math.floor(1000 + Math.random() * 9000)}`;
       const { data, error } = await supabase
         .from("grc_third_parties")
-        .insert({ ...input, id, tenant_id: tenantId! })
+        .insert({ ...input, id, tenant_id: tenantId! } as unknown as TablesInsert<"grc_third_parties">)
         .select()
         .single();
       if (error) throw error;
@@ -124,7 +125,7 @@ export function useUpdateThirdParty() {
     mutationFn: async ({ id, ...changes }: Partial<ThirdParty> & { id: string }) => {
       const { data, error } = await supabase
         .from("grc_third_parties")
-        .update(changes)
+        .update(changes as unknown as TablesUpdate<"grc_third_parties">)
         .eq("id", id)
         .select()
         .single();
