@@ -65,6 +65,7 @@ alter table public.grc_training_records enable row level security;
 -- Solo SELECT por tenant. Sin política de escritura: RLS deniega INSERT/UPDATE/
 -- DELETE a authenticated/anon aunque tuvieran grant (no lo tienen, ver abajo).
 -- Los altas van solo por fn_grc_registrar_formacion (SECURITY DEFINER).
+drop policy if exists grc_training_records_select_tenant on public.grc_training_records;
 create policy grc_training_records_select_tenant on public.grc_training_records
   for select
   using (tenant_id = public.fn_current_tenant_id());

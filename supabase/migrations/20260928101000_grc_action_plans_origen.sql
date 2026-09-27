@@ -24,9 +24,10 @@
 --   * `tenant_id` pasa a NOT NULL (medido: 0 filas con tenant_id NULL hoy).
 --   * Guardia de tenant sobre los tres orígenes, mismo patrón que
 --     `fn_risks_ai_system_tenant_guard` (20260926116400).
---   * NO crea ningún plan de acción nuevo. Los 8 de ARGA y el 1 del grupo
+--   * NO crea ningún plan de acción nuevo. Los 8 de ARGA y los del grupo
 --     nuevo no cambian: siguen con `finding_id` y sin `obligation_id`/
---     `ai_system_id` (verificado abajo, antes y después).
+--     `ai_system_id` (verificado abajo, antes y después, contra el recuento
+--     real de cada tenant, no contra una cifra fija en este comentario).
 --   * NO toca `fn_grc_crear_acciones_desde_aims` ni el origen BRECHA_AIMS
 --     (DS-32): eso es F5.T8, que depende de F4 y queda fuera de esta tarea.
 --   * `TRUNCATE`/`TRIGGER`/`REFERENCES` de `anon`/`authenticated` sobre
@@ -55,9 +56,20 @@ comment on column public.action_plans.ai_system_id is
   'F5.T7 (MOI-175, D-04). Sistema de IA (ai_systems.id) del que nace el plan '
   'cuando no hay hallazgo ni obligación concreta.';
 
-alter table public.action_plans
-  add constraint action_plans_origen_check
-  check (finding_id is not null or obligation_id is not null or ai_system_id is not null);
+-- PostgreSQL no soporta ADD CONSTRAINT IF NOT EXISTS: guardar con el mismo
+-- patrón que ya usa la verificación de abajo para comprobar pg_constraint.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.action_plans'::regclass and conname = 'action_plans_origen_check'
+  ) then
+    alter table public.action_plans
+      add constraint action_plans_origen_check
+      check (finding_id is not null or obligation_id is not null or ai_system_id is not null);
+  end if;
+end;
+$$;
 
 -- 0 filas con tenant_id NULL medido en Cloud el 2026-09-27 (sin DEFAULT desde
 -- 20260906072910): a NOT NULL sin riesgo de bloquear el ALTER.
