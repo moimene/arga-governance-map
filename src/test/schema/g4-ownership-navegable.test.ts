@@ -118,6 +118,7 @@ describe("G4 — ownership navegable del catálogo normativo (Cloud)", () => {
 
     const CON_ORGANO_DECLARADO: Record<string, string> = {
       "OBL-RIA-ORG-04": "F5.T5 — art. 4 RIA, órgano CATIT (D-U2)",
+      "OBL-RIA-ORG-05": "F5.T5 — art. 5 RIA (prácticas prohibidas), órgano CATIT (20260928130000, cierre masivo 27-09)",
     };
     const { data: obl } = await arga.from("obligations").select(`code, ${OBLIGATION_SELECT}`);
     const conOrgano = ((obl ?? []) as Array<{ code: string; owner_body: OwnerEmbed }>)
@@ -125,6 +126,7 @@ describe("G4 — ownership navegable del catálogo normativo (Cloud)", () => {
       .map((r) => r.code);
     // Control positivo: la declarada SÍ tiene órgano, o el gate sería vacuo.
     expect(conOrgano, "el alta declarada del art. 4 ha perdido su órgano").toContain("OBL-RIA-ORG-04");
+    expect(conOrgano, "el alta declarada del art. 5 ha perdido su órgano").toContain("OBL-RIA-ORG-05");
     expect(
       conOrgano.filter((c) => !Object.prototype.hasOwnProperty.call(CON_ORGANO_DECLARADO, c)),
       "obligaciones de ARGA con comité sin declarar",

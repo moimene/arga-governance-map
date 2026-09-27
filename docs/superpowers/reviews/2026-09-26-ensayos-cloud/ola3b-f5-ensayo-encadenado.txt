@@ -1,0 +1,316 @@
+BEGIN
+CREATE TABLE
+COMMENT
+COMMENT
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+DROP POLICY
+CREATE POLICY
+REVOKE
+REVOKE
+CREATE FUNCTION
+REVOKE
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+DROP TRIGGER
+CREATE TRIGGER
+DO
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+DO
+DO
+DO
+DO
+        resultado        
+-------------------------
+ PROBE 20260928100000 OK
+(1 row)
+
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+ALTER TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+DO
+ALTER TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE FUNCTION
+REVOKE
+DROP TRIGGER
+CREATE TRIGGER
+DO
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+DO
+DO
+DO
+DO
+        resultado        
+-------------------------
+ PROBE 20260928101000 OK
+(1 row)
+
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+DO
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+SET
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "85e24c66-02c7-4175-b260-1330930ad49f", "role" : "authenticated"}
+(1 row)
+
+DO
+DO
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "7ad12313-2a13-4c5c-b530-423c35ef049b", "role" : "authenticated"}
+(1 row)
+
+DO
+DO
+DO
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+CREATE TABLE
+COMMENT
+COMMENT
+ALTER TABLE
+DROP POLICY
+CREATE POLICY
+REVOKE
+GRANT
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+INSERT 0 5
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+DO
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+SET
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "7ad12313-2a13-4c5c-b530-423c35ef049b", "role" : "authenticated"}
+(1 row)
+
+DO
+DO
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "657c8700-c90f-4d22-b2db-5419d2d8e292", "role" : "authenticated"}
+(1 row)
+
+DO
+DO
+DO
+DO
+DO
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+CREATE TABLE
+COMMENT
+COMMENT
+COMMENT
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+DROP POLICY
+CREATE POLICY
+REVOKE
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+DO
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+                              set_config                               
+-----------------------------------------------------------------------
+ {"sub":"85e24c66-02c7-4175-b260-1330930ad49f","role":"authenticated"}
+(1 row)
+
+SET
+DO
+DO
+DO
+DO
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+CREATE FUNCTION
+REVOKE
+DROP TRIGGER
+CREATE TRIGGER
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+REVOKE
+DROP TRIGGER
+CREATE TRIGGER
+REVOKE
+REVOKE
+CREATE INDEX
+CREATE FUNCTION
+REVOKE
+GRANT
+DO
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+                              set_config                               
+-----------------------------------------------------------------------
+ {"sub":"85e24c66-02c7-4175-b260-1330930ad49f","role":"authenticated"}
+(1 row)
+
+SET
+DO
+DO
+DO
+DO
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+CREATE FUNCTION
+REVOKE
+DO
+DO
+DO
+DO
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+CREATE FUNCTION
+REVOKE
+DO
+DO
+DO
+DO
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+CREATE VIEW
+COMMENT
+REVOKE
+GRANT
+DO
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+ROLLBACK
+
+[probe_rollback] exit=0 (todo revertido: BEGIN ... ROLLBACK; o conexión cerrada en error)
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:71: NOTICE:  policy "grc_training_records_select_tenant" for relation "public.grc_training_records" does not exist, skipping
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:123: NOTICE:  trigger "trg_grc_training_record_tenant_guard" for relation "public.grc_training_records" does not exist, skipping
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:223: NOTICE:  trigger "trg_controls_formacion_evidencia_guard" for relation "public.controls" does not exist, skipping
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:342: NOTICE:  F5.T6 OK: grc_training_records creada vacía, guardia de evidencia probado en los dos sentidos, sin residuo
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:631: NOTICE:  trigger "trg_action_plans_origen_tenant_guard" for relation "public.action_plans" does not exist, skipping
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:767: NOTICE:  F5.T7 OK: finding_id anulable, CHECK de origen y guardia de tenant probados; ARGA (8) y grupo nuevo (6) sin cambio
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:1028: NOTICE:  PROBE OK: tercero IA sembrado y leído en ARGA (id=__PROBE_T9_ARGA__)
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:1047: NOTICE:  PROBE OK: INSERT cruzado rechazado por RLS (insufficient_privilege / 42501)
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:1088: NOTICE:  PROBE OK: Harvey sembrado con su razón social en Garrigues, sin datos inventados
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:1115: NOTICE:  PROBE OK: OpenAI sembrado con ai_roles = PROVEEDOR_MODELO_GPAI
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:1174: NOTICE:  policy "grc_ai_links_tenant_read" for relation "public.grc_ai_links" does not exist, skipping
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:1390: NOTICE:  PROBE OK: INSERT directo rechazado (sin política de escritura, sólo SELECT)
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:1411: NOTICE:  PROBE OK: SECRETARIO rechazado por falta de capacidad GRC_AI_LINK (capability GRC_AI_LINK denied for role SECRETARIO)
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:1449: NOTICE:  PROBE OK: ADMIN_TENANT vinculó CTR-GARR-33 a Harvey (id=75a55b83-4d13-4437-848f-dca59bf8a4e8)
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:1483: NOTICE:  PROBE OK: OBL-GARR-CYBER-02 enlazada al incidente, idempotente (id=483e47f6-c10b-4e8a-bcf7-17b6f13bc65a)
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:1500: NOTICE:  PROBE OK: p_tenant_id ajeno a la sesión rechazado (tenant access denied for 00000000-0000-0000-0000-000000000001)
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:1522: NOTICE:  PROBE OK: grc_id de otro tenant rechazado (GRC_AI_LINK_GRC_ID_NO_PERTENECE_AL_TENANT)
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:1610: NOTICE:  policy "grc_dpias_tenant_read" for relation "public.grc_dpias" does not exist, skipping
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:1804: NOTICE:  MOI-175 F5.T11 OK: grc_dpias + fn_grc_registrar_eipd, sin residuo de sonda
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:2009: NOTICE:  trigger "trg_secretaria_document_artifact_ai_immutable_update" for relation "public.secretaria_document_artifacts" does not exist, skipping
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:2015: NOTICE:  trigger "trg_secretaria_document_artifact_ai_immutable_delete" for relation "public.secretaria_document_artifacts" does not exist, skipping
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:2045: NOTICE:  trigger "trg_secretaria_document_artifact_ai_insert_guard" for relation "public.secretaria_document_artifacts" does not exist, skipping
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:2316: NOTICE:  MOI-175 F5.T13 OK: mecanismo de dictamen + GC-139, sin residuo de sonda
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:2752: NOTICE:  MOI-175 F5.T5 OK: art. 5 dado de alta en los dos tenants por RPC, con órgano, en el módulo ai, sin residuo del control fail-closed
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:3022: NOTICE:  MOI-175 F5.T5 OK: art. 5 dado de alta en los dos tenants por RPC, con órgano, en el módulo ai, sin residuo del control fail-closed
+psql:/var/folders/5p/z9dpb0mx6qsbkfzq6650gg100000gn/T/tmpz0jsv3ck.sql:3252: NOTICE:  VERIFICACION OK: vista security_invoker, anon sin privilegio, authenticated solo SELECT, 58 filas correladas de 61 comprobaciones legacy, 0 filas tocadas

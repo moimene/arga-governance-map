@@ -78,7 +78,6 @@
 -- ejecutado con el ejecutor seguro (BEGIN … ROLLBACK), control positivo del
 -- fallo cerrado sin órgano y de la idempotencia, ambos revertidos.
 
-begin;
 
 -- 1. La RPC que fija la especificación.
 create or replace function public.fn_grc_alta_obligacion_organizacion_ria(
@@ -264,4 +263,3 @@ begin
   raise notice 'MOI-175 F5.T5 OK: art. 5 dado de alta en los dos tenants por RPC, con órgano, en el módulo ai, sin residuo del control fail-closed';
 end $verificacion$;
 
-commit;

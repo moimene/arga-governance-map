@@ -55,9 +55,19 @@ describe("MOI-149 — alta por pantalla de hallazgos y planes de acción (grupo 
     expect(errFinding).not.toBeNull();
     expect(RECHAZOS_ESPERADOS).toContain(errFinding!.code);
 
+    // Con un hallazgo REAL del propio grupo: desde F5.T7 (20260928101000) la
+    // guardia de origen rechaza con 23503 un finding_id inexistente ANTES de
+    // llegar al tenant, y la sonda dejaría de medir el hueco de tenant_id.
+    const { data: hallazgo } = await nuevo
+      .from("findings")
+      .select("id")
+      .eq("tenant_id", NUEVO_TENANT)
+      .limit(1)
+      .maybeSingle();
+    expect(hallazgo?.id, "el grupo nuevo necesita un hallazgo para que la sonda mida algo").toBeTruthy();
     const { error: errPlan } = await nuevo
       .from("action_plans")
-      .insert({ finding_id: "00000000-0000-0000-0000-000000000000", title: "Sonda MOI-149 sin tenant" });
+      .insert({ finding_id: hallazgo!.id, title: "Sonda MOI-149 sin tenant" });
     expect(errPlan).not.toBeNull();
     expect(RECHAZOS_ESPERADOS).toContain(errPlan!.code);
   });
