@@ -50,6 +50,7 @@ export const findingStatusLabel = (s: string | null | undefined) => {
     case "Abierto": return "ABIERTO";
     case "Asignado": return "ASIGNADO";
     case "EnRemediacion":
+    case "En remediación":
     case "En Remediación": return "EN REMEDIACIÓN";
     case "EnInvestigacion":
     case "En Investigación": return "EN INVESTIGACIÓN";
@@ -67,6 +68,7 @@ export const findingStatusToStep = (s: string | null | undefined): number => {
     case "EnInvestigacion":
     case "En Investigación": return 3;
     case "EnRemediacion":
+    case "En remediación":
     case "En Remediación": return 4;
     case "PendienteValidacion":
     case "Pendiente Validación": return 5;
