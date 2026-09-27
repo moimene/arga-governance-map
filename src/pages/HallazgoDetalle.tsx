@@ -1,9 +1,13 @@
+import { FormEvent, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ObjectHeader } from "@/components/ObjectHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { StatusBadgeTip } from "@/components/StatusBadgeTip";
@@ -13,6 +17,7 @@ import {
   useFindingByCode,
   useFindingRelatedControls,
   useActionPlansByFinding,
+  useCreateActionPlan,
   severityLabel,
   severityTone,
   findingStatusLabel,
@@ -123,6 +128,7 @@ export default function HallazgoDetalle() {
 
         <TabsContent value="acciones">
           <Card className="p-5">
+            <NuevoPlanAccionForm findingId={finding.id} />
             {actionPlans.length === 0 && (
               <div className="text-center text-sm text-muted-foreground py-6">Sin planes de acción registrados.</div>
             )}
@@ -202,6 +208,48 @@ export default function HallazgoDetalle() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+// MOI-149 (D-23, alta por pantalla): alta de planes de acción. `finding_id`
+// viene fijo del hallazgo abierto y el tenant lo añade `useCreateActionPlan`
+// desde la sesión — nunca se nombra a mano aquí.
+function NuevoPlanAccionForm({ findingId }: { findingId: string }) {
+  const createActionPlan = useCreateActionPlan();
+  const [title, setTitle] = useState("");
+  const [dueDate, setDueDate] = useState("");
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (title.trim().length < 3) {
+      toast.error("El título del plan de acción debe tener al menos 3 caracteres.");
+      return;
+    }
+    try {
+      await createActionPlan.mutateAsync({ finding_id: findingId, title: title.trim(), due_date: dueDate || null });
+      toast.success("Plan de acción creado.");
+      setTitle("");
+      setDueDate("");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`No se pudo crear el plan de acción: ${message}`);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="mb-4 flex flex-wrap items-end gap-3 rounded-md border border-dashed border-border p-3">
+      <div className="min-w-[220px] flex-1">
+        <Label htmlFor="ap-title">Nuevo plan de acción</Label>
+        <Input id="ap-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Qué hay que hacer" />
+      </div>
+      <div>
+        <Label htmlFor="ap-due">Vence</Label>
+        <Input id="ap-due" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+      </div>
+      <Button type="submit" size="sm" disabled={createActionPlan.isPending} aria-busy={createActionPlan.isPending}>
+        {createActionPlan.isPending ? "Guardando..." : "Añadir"}
+      </Button>
+    </form>
   );
 }
 

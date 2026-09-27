@@ -29,7 +29,7 @@ export default function HallazgosList() {
           <h1 className="text-2xl font-semibold tracking-tight">Hallazgos y Acciones</h1>
           <p className="mt-1 text-sm text-muted-foreground">Observaciones de auditoría, cumplimiento y planes de remediación.</p>
         </div>
-        <Button className="gap-1"><Plus className="h-4 w-4" />Nuevo hallazgo</Button>
+        <Button asChild className="gap-1"><Link to="/hallazgos/nuevo"><Plus className="h-4 w-4" />Nuevo hallazgo</Link></Button>
       </div>
 
       <div className="grid grid-cols-5 gap-4">
