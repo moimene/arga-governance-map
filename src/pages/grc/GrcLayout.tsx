@@ -12,6 +12,7 @@ import {
   Scale,
   Menu,
   Layers,
+  ShieldQuestion,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -34,6 +35,7 @@ const navItems: NavItem[] = [
   { label: "Risk 360",        to: "/grc/risk-360",  icon: Activity },
   { label: "Terceros (TPRM)", to: "/grc/tprm",      icon: Layers },
   { label: "Penal / Anticorr.", to: "/grc/penal-anticorrupcion", icon: Scale },
+  { label: "EIPD",              to: "/grc/eipd",       icon: ShieldQuestion },
   { label: "Packs por País",  to: "/grc/packs",     icon: Globe2 },
   { label: "Mi Trabajo",      to: "/grc/mywork",    icon: Briefcase },
   { label: "Alertas",         to: "/grc/alertas",   icon: AlertTriangle },
