@@ -10,10 +10,13 @@
 // El gemelo `supabase/functions/_types/database.ts` es la copia de las Edge
 // Functions y está congelado en mayo de 2026 (le faltan, por ejemplo, las
 // tablas `aims_fria_*`). Este fichero es el que refleja Cloud hoy.
+// 2026-09-27: `aims_secretaria_derivations.created_by` → `created_by_user_id`
+// (migración 20260927137000), mismo resultado que la regeneración.
 
 //
 // Regenerado de nuevo el 2026-09-27 con `supabase gen types typescript --project-id hzqwefkwsxopwrmtksbg`
 // (cierre masivo, ola 2): incorpora `aims_secretaria_derivations` (MOI-56) y las columnas de MOI-200.
+// Regenerado otra vez el 2026-09-27 tras aplicar F2 carril A (MOI-170): aims_ria_subjects, aims_specialty_bodies y columnas de sujeto.
 
 export type Json =
   | string
@@ -718,6 +721,7 @@ export type Database = {
           requirement_code: string
           requirement_title: string | null
           status: string | null
+          subject_id: string | null
           system_id: string | null
         }
         Insert: {
@@ -731,6 +735,7 @@ export type Database = {
           requirement_code: string
           requirement_title?: string | null
           status?: string | null
+          subject_id?: string | null
           system_id?: string | null
         }
         Update: {
@@ -744,6 +749,7 @@ export type Database = {
           requirement_code?: string
           requirement_title?: string | null
           status?: string | null
+          subject_id?: string | null
           system_id?: string | null
         }
         Relationships: [
@@ -762,6 +768,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ai_compliance_checks_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "aims_ria_subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_compliance_checks_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "v_aims_sistemas_por_entidad"
+            referencedColumns: ["subject_id"]
+          },
+          {
+            foreignKeyName: "ai_compliance_checks_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "v_aims_sistemas_por_organo"
+            referencedColumns: ["subject_id"]
+          },
+          {
             foreignKeyName: "ai_compliance_checks_system_id_fkey"
             columns: ["system_id"]
             isOneToOne: false
@@ -778,16 +805,24 @@ export type Database = {
           closed_at: string | null
           corrective_action: string | null
           description: string | null
+          entity_id: string | null
           high_risk_to_subjects: boolean | null
           ict_related: boolean | null
           id: string
           incident_type: string | null
           knowledge_at: string | null
+          occurred_member_state: string | null
+          qualified_at: string | null
+          qualified_by: string | null
           reported_at: string | null
+          ria_qualification: string
+          ria_qualification_motivation: string | null
+          ria_serious_letters: string[]
           ria_severity: string | null
           root_cause: string | null
           severity: string | null
           status: string | null
+          subject_id: string | null
           system_id: string | null
           tenant_id: string
           title: string
@@ -799,16 +834,24 @@ export type Database = {
           closed_at?: string | null
           corrective_action?: string | null
           description?: string | null
+          entity_id?: string | null
           high_risk_to_subjects?: boolean | null
           ict_related?: boolean | null
           id?: string
           incident_type?: string | null
           knowledge_at?: string | null
+          occurred_member_state?: string | null
+          qualified_at?: string | null
+          qualified_by?: string | null
           reported_at?: string | null
+          ria_qualification?: string
+          ria_qualification_motivation?: string | null
+          ria_serious_letters?: string[]
           ria_severity?: string | null
           root_cause?: string | null
           severity?: string | null
           status?: string | null
+          subject_id?: string | null
           system_id?: string | null
           tenant_id: string
           title: string
@@ -820,21 +863,57 @@ export type Database = {
           closed_at?: string | null
           corrective_action?: string | null
           description?: string | null
+          entity_id?: string | null
           high_risk_to_subjects?: boolean | null
           ict_related?: boolean | null
           id?: string
           incident_type?: string | null
           knowledge_at?: string | null
+          occurred_member_state?: string | null
+          qualified_at?: string | null
+          qualified_by?: string | null
           reported_at?: string | null
+          ria_qualification?: string
+          ria_qualification_motivation?: string | null
+          ria_serious_letters?: string[]
           ria_severity?: string | null
           root_cause?: string | null
           severity?: string | null
           status?: string | null
+          subject_id?: string | null
           system_id?: string | null
           tenant_id?: string
           title?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "ai_incidents_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_incidents_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "aims_ria_subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_incidents_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "v_aims_sistemas_por_entidad"
+            referencedColumns: ["subject_id"]
+          },
+          {
+            foreignKeyName: "ai_incidents_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "v_aims_sistemas_por_organo"
+            referencedColumns: ["subject_id"]
+          },
           {
             foreignKeyName: "ai_incidents_system_id_fkey"
             columns: ["system_id"]
@@ -849,8 +928,10 @@ export type Database = {
           action_plan: Json | null
           assessment_date: string | null
           assessor_id: string | null
+          catalog_version: string | null
           content_hash: string | null
           created_at: string | null
+          created_by: string | null
           findings: Json | null
           framework: string | null
           frozen_at: string | null
@@ -858,18 +939,23 @@ export type Database = {
           id: string
           notes: string | null
           questionnaire_id: string | null
+          review_decision: string | null
+          review_motivation: string | null
           reviewed_at: string | null
           reviewed_by_id: string | null
           score: number | null
           status: string | null
+          subject_id: string | null
           system_id: string | null
         }
         Insert: {
           action_plan?: Json | null
           assessment_date?: string | null
           assessor_id?: string | null
+          catalog_version?: string | null
           content_hash?: string | null
           created_at?: string | null
+          created_by?: string | null
           findings?: Json | null
           framework?: string | null
           frozen_at?: string | null
@@ -877,18 +963,23 @@ export type Database = {
           id?: string
           notes?: string | null
           questionnaire_id?: string | null
+          review_decision?: string | null
+          review_motivation?: string | null
           reviewed_at?: string | null
           reviewed_by_id?: string | null
           score?: number | null
           status?: string | null
+          subject_id?: string | null
           system_id?: string | null
         }
         Update: {
           action_plan?: Json | null
           assessment_date?: string | null
           assessor_id?: string | null
+          catalog_version?: string | null
           content_hash?: string | null
           created_at?: string | null
+          created_by?: string | null
           findings?: Json | null
           framework?: string | null
           frozen_at?: string | null
@@ -896,16 +987,26 @@ export type Database = {
           id?: string
           notes?: string | null
           questionnaire_id?: string | null
+          review_decision?: string | null
+          review_motivation?: string | null
           reviewed_at?: string | null
           reviewed_by_id?: string | null
           score?: number | null
           status?: string | null
+          subject_id?: string | null
           system_id?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "ai_risk_assessments_assessor_id_fkey"
             columns: ["assessor_id"]
+            isOneToOne: false
+            referencedRelation: "persons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_risk_assessments_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "persons"
             referencedColumns: ["id"]
@@ -918,6 +1019,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ai_risk_assessments_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "aims_ria_subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_risk_assessments_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "v_aims_sistemas_por_entidad"
+            referencedColumns: ["subject_id"]
+          },
+          {
+            foreignKeyName: "ai_risk_assessments_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "v_aims_sistemas_por_organo"
+            referencedColumns: ["subject_id"]
+          },
+          {
             foreignKeyName: "ai_risk_assessments_system_id_fkey"
             columns: ["system_id"]
             isOneToOne: false
@@ -928,13 +1050,17 @@ export type Database = {
       }
       ai_systems: {
         Row: {
+          ai_policy_id: string | null
           aims_reference_code: string | null
           created_at: string | null
           deployment_date: string | null
           description: string | null
           id: string
+          inventory_kind: string
           name: string
           owner_id: string | null
+          prohibited_practice_status: string | null
+          provider_third_party_id: string | null
           regulatory_profile: Json | null
           regulatory_role: string | null
           risk_level: string | null
@@ -945,13 +1071,17 @@ export type Database = {
           vendor: string | null
         }
         Insert: {
+          ai_policy_id?: string | null
           aims_reference_code?: string | null
           created_at?: string | null
           deployment_date?: string | null
           description?: string | null
           id?: string
+          inventory_kind?: string
           name: string
           owner_id?: string | null
+          prohibited_practice_status?: string | null
+          provider_third_party_id?: string | null
           regulatory_profile?: Json | null
           regulatory_role?: string | null
           risk_level?: string | null
@@ -962,13 +1092,17 @@ export type Database = {
           vendor?: string | null
         }
         Update: {
+          ai_policy_id?: string | null
           aims_reference_code?: string | null
           created_at?: string | null
           deployment_date?: string | null
           description?: string | null
           id?: string
+          inventory_kind?: string
           name?: string
           owner_id?: string | null
+          prohibited_practice_status?: string | null
+          provider_third_party_id?: string | null
           regulatory_profile?: Json | null
           regulatory_role?: string | null
           risk_level?: string | null
@@ -980,11 +1114,25 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "ai_systems_ai_policy_id_fkey"
+            columns: ["ai_policy_id"]
+            isOneToOne: false
+            referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ai_systems_owner_id_fkey"
             columns: ["owner_id"]
             isOneToOne: false
             referencedRelation: "persons"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_systems_provider_third_party_fkey"
+            columns: ["tenant_id", "provider_third_party_id"]
+            isOneToOne: false
+            referencedRelation: "grc_third_parties"
+            referencedColumns: ["tenant_id", "id"]
           },
           {
             foreignKeyName: "ai_systems_tenant_id_fkey"
@@ -2771,10 +2919,136 @@ export type Database = {
           },
         ]
       }
+      aims_ria_subjects: {
+        Row: {
+          cadence_decision_ref: string | null
+          created_at: string
+          created_by: string | null
+          derivation: string
+          entity_id: string
+          establishment: string | null
+          governing_body_id: string | null
+          id: string
+          next_review_due: string | null
+          output_used_in_eu: boolean | null
+          owner_person_id: string | null
+          provenance: Json
+          questionnaire_id: string | null
+          rationale: string | null
+          review_cadence_months: number | null
+          role: string
+          role_basis: string[]
+          scope_basis: string[]
+          scope_result: string | null
+          status: string
+          suspended_at: string | null
+          suspension_reason: string | null
+          system_id: string
+          tenant_id: string
+          updated_at: string
+          valid_from: string
+          valid_to: string | null
+        }
+        Insert: {
+          cadence_decision_ref?: string | null
+          created_at?: string
+          created_by?: string | null
+          derivation: string
+          entity_id: string
+          establishment?: string | null
+          governing_body_id?: string | null
+          id?: string
+          next_review_due?: string | null
+          output_used_in_eu?: boolean | null
+          owner_person_id?: string | null
+          provenance?: Json
+          questionnaire_id?: string | null
+          rationale?: string | null
+          review_cadence_months?: number | null
+          role: string
+          role_basis?: string[]
+          scope_basis?: string[]
+          scope_result?: string | null
+          status?: string
+          suspended_at?: string | null
+          suspension_reason?: string | null
+          system_id: string
+          tenant_id: string
+          updated_at?: string
+          valid_from?: string
+          valid_to?: string | null
+        }
+        Update: {
+          cadence_decision_ref?: string | null
+          created_at?: string
+          created_by?: string | null
+          derivation?: string
+          entity_id?: string
+          establishment?: string | null
+          governing_body_id?: string | null
+          id?: string
+          next_review_due?: string | null
+          output_used_in_eu?: boolean | null
+          owner_person_id?: string | null
+          provenance?: Json
+          questionnaire_id?: string | null
+          rationale?: string | null
+          review_cadence_months?: number | null
+          role?: string
+          role_basis?: string[]
+          scope_basis?: string[]
+          scope_result?: string | null
+          status?: string
+          suspended_at?: string | null
+          suspension_reason?: string | null
+          system_id?: string
+          tenant_id?: string
+          updated_at?: string
+          valid_from?: string
+          valid_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aims_ria_subjects_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aims_ria_subjects_governing_body_id_fkey"
+            columns: ["governing_body_id"]
+            isOneToOne: false
+            referencedRelation: "governing_bodies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aims_ria_subjects_owner_person_id_fkey"
+            columns: ["owner_person_id"]
+            isOneToOne: false
+            referencedRelation: "persons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aims_ria_subjects_questionnaire_id_fkey"
+            columns: ["questionnaire_id"]
+            isOneToOne: false
+            referencedRelation: "aims_classification_questionnaires"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aims_ria_subjects_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "ai_systems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       aims_secretaria_derivations: {
         Row: {
           created_at: string
-          created_by: string | null
+          created_by_user_id: string | null
           evidence_ref: string | null
           id: string
           source_event: string
@@ -2786,7 +3060,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          created_by?: string | null
+          created_by_user_id?: string | null
           evidence_ref?: string | null
           id?: string
           source_event: string
@@ -2798,7 +3072,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          created_by?: string | null
+          created_by_user_id?: string | null
           evidence_ref?: string | null
           id?: string
           source_event?: string
@@ -2828,6 +3102,47 @@ export type Database = {
             columns: ["target_meeting_id"]
             isOneToOne: false
             referencedRelation: "meetings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      aims_specialty_bodies: {
+        Row: {
+          created_at: string
+          declared_at: string
+          declared_by: string | null
+          especialidad: string
+          governing_body_id: string
+          id: string
+          provenance: Json
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          declared_at?: string
+          declared_by?: string | null
+          especialidad: string
+          governing_body_id: string
+          id?: string
+          provenance?: Json
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          declared_at?: string
+          declared_by?: string | null
+          especialidad?: string
+          governing_body_id?: string
+          id?: string
+          provenance?: Json
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aims_specialty_bodies_governing_body_id_fkey"
+            columns: ["governing_body_id"]
+            isOneToOne: false
+            referencedRelation: "governing_bodies"
             referencedColumns: ["id"]
           },
         ]
@@ -14729,6 +15044,98 @@ export type Database = {
         }
         Relationships: []
       }
+      v_aims_sistemas_por_entidad: {
+        Row: {
+          entity_id: string | null
+          governing_body_id: string | null
+          owner_person_id: string | null
+          role: string | null
+          status: string | null
+          subject_id: string | null
+          system_id: string | null
+          system_name: string | null
+          tenant_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_systems_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aims_ria_subjects_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aims_ria_subjects_governing_body_id_fkey"
+            columns: ["governing_body_id"]
+            isOneToOne: false
+            referencedRelation: "governing_bodies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aims_ria_subjects_owner_person_id_fkey"
+            columns: ["owner_person_id"]
+            isOneToOne: false
+            referencedRelation: "persons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aims_ria_subjects_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "ai_systems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_aims_sistemas_por_organo: {
+        Row: {
+          entity_id: string | null
+          governing_body_id: string | null
+          role: string | null
+          status: string | null
+          subject_id: string | null
+          system_id: string | null
+          system_name: string | null
+          tenant_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_systems_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aims_ria_subjects_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aims_ria_subjects_governing_body_id_fkey"
+            columns: ["governing_body_id"]
+            isOneToOne: false
+            referencedRelation: "governing_bodies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aims_ria_subjects_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "ai_systems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       fn_acta_book_kind_for_body: {
@@ -14751,6 +15158,10 @@ export type Database = {
         }
         Returns: Json
       }
+      fn_aims_assert_capacidad: {
+        Args: { p_action: string }
+        Returns: undefined
+      }
       fn_aims_close_technical_file: {
         Args: {
           p_qseal_token?: string
@@ -14769,8 +15180,24 @@ export type Database = {
           version: number
         }[]
       }
+      fn_aims_confirmar_sujeto: {
+        Args: { p_motivo: string; p_nuevo_status: string; p_subject_id: string }
+        Returns: string
+      }
+      fn_aims_declarar_especialidad: {
+        Args: { p_especialidad: string; p_governing_body_id: string }
+        Returns: string
+      }
       fn_aims_derivar_nivel: { Args: { p: Json }; Returns: string }
       fn_aims_derivar_rol: { Args: { p: Json }; Returns: string }
+      fn_aims_entidad_puede_ser_sujeto: {
+        Args: { p_entity_id: string }
+        Returns: boolean
+      }
+      fn_aims_es_miembro_organo: {
+        Args: { p_body_id: string }
+        Returns: boolean
+      }
       fn_aims_freeze_assessment: {
         Args: { p_assessment_id: string }
         Returns: {
@@ -14783,6 +15210,18 @@ export type Database = {
         Args: { p_nivel: string; p_rol: string }
         Returns: string
       }
+      fn_aims_proponer_sujeto: {
+        Args: {
+          p_derivation: string
+          p_entity_id: string
+          p_questionnaire_id?: string
+          p_rationale?: string
+          p_role: string
+          p_role_basis?: string[]
+          p_system_id: string
+        }
+        Returns: string
+      }
       fn_aims_registrar_sistema: {
         Args: { p_cuestionario: Json; p_sistema: Json }
         Returns: {
@@ -14791,14 +15230,29 @@ export type Database = {
           system_id: string
         }[]
       }
-      fn_aims_review_assessment: {
-        Args: { p_assessment_id: string }
-        Returns: {
-          id: string
-          reviewed_at: string
-          reviewed_by_id: string
-        }[]
-      }
+      fn_aims_review_assessment:
+        | {
+            Args: { p_assessment_id: string }
+            Returns: {
+              id: string
+              reviewed_at: string
+              reviewed_by_id: string
+            }[]
+          }
+        | {
+            Args: {
+              p_assessment_id: string
+              p_decision?: string
+              p_motivation?: string
+            }
+            Returns: {
+              id: string
+              review_decision: string
+              reviewed_at: string
+              reviewed_by_id: string
+            }[]
+          }
+      fn_aims_tiene_capacidad: { Args: { p_action: string }; Returns: boolean }
       fn_aprobar_acta: {
         Args: {
           p_minute_id: string

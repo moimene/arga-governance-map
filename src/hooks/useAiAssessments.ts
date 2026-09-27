@@ -95,7 +95,7 @@ export function useAssessmentById(id: string | undefined) {
         .eq("id", id)
         .single();
       if (error) throw error;
-      return data as AiRiskAssessment & {
+      return data as unknown as AiRiskAssessment & {
         ai_systems: {
           id: string;
           name: string;
@@ -121,7 +121,7 @@ export function useAllAssessments() {
         .eq("ai_systems.tenant_id", tenantId!)
         .order("assessment_date", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as (AiRiskAssessment & {
+      return (data ?? []) as unknown as (AiRiskAssessment & {
         ai_systems: { name: string; risk_level: string; tenant_id: string; regulatory_role: string | null; regulatory_profile: Record<string, unknown> | null } | null;
       })[];
     } : skipToken,
@@ -284,7 +284,7 @@ export function useSaveAssessment() {
           .select()
           .single();
         if (error) throw error;
-        return data as AiRiskAssessment;
+        return data as unknown as AiRiskAssessment;
       }
 
       // 2. La escritura va acotada por el sistema ya comprobado Y por el marco,
@@ -308,7 +308,7 @@ export function useSaveAssessment() {
           "No se pudo guardar: la evaluación no pertenece a este entorno o ya no existe.",
         );
       }
-      return data as AiRiskAssessment;
+      return data as unknown as AiRiskAssessment;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ai_risk_assessments"] }),
   });

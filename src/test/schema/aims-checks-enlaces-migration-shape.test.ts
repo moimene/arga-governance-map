@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 
 /**
  * M01 (F1.T14) — forma de la migración de enlaces ANTES de aplicarla, sobre el
@@ -42,7 +42,12 @@ function columnasPersona(ficheros: string[]): string[] {
   }
   return [...cols].sort();
 }
-const COLUMNAS_PERSONA = columnasPersona(todas).join("|");
+// `created_by` se excluye del universo POR NOMBRE (orquestador, 27-09-2026): F2
+// (20260927131000, E-01) la hizo persona en ai_risk_assessments, pero en el resto
+// del repositorio `created_by DEFAULT auth.uid()` es el usuario de sesión desde
+// mayo, así que el criterio por nombre daría falsos positivos en todo el repo. Su
+// caso real se vigila aparte, acotado a ai_risk_assessments (último `it`).
+const COLUMNAS_PERSONA = columnasPersona(todas).filter((c) => c !== "created_by").join("|");
 // `[^,;]` y no `[^;]`: con un universo amplio, `[^;]` cruzaría de una columna a
 // otra dentro de un mismo CREATE TABLE.
 const DEFAULT_USUARIO = new RegExp(`\\b(${COLUMNAS_PERSONA})\\b[^,;]*?default\\s+auth\\.uid\\(\\)`, "i");
@@ -63,16 +68,37 @@ describe("E-01 — ninguna migración mete un usuario de Auth en una columna FK 
     expect(ASIGNA_USUARIO.test("new.assessor_id := auth.uid();")).toBe(true);
     expect(ASIGNA_USUARIO.test("set checked_by_id = auth.uid()")).toBe(true);
     // Y no cruza columnas: el DEFAULT de otra columna del mismo CREATE no cuenta.
-    expect(DEFAULT_USUARIO.test("create table t (owner_id uuid references persons(id), created_by uuid default auth.uid())")).toBe(false);
+    expect(DEFAULT_USUARIO.test("create table t (owner_id uuid references persons(id), created_by_user_id uuid default auth.uid())")).toBe(false);
     expect(todas.length, "el universo de migraciones está vacío").toBeGreaterThan(100);
     expect(todas, "la migración M01 no está en el universo barrido").toContain(M01);
   });
 
   it("ni DEFAULT ni asignación de auth.uid() a una FK a persons en ninguna migración", () => {
     for (const f of todas) {
-      const sql = ejecutable(f);
+      // En ai_risk_assessments, reviewed_by_id (como frozen_by_id) guarda el USUARIO
+      // y no tiene FK a persons: la revisión v2 de F2 compara en dominio persona sin
+      // tocar la columna (E-01). Esos UPDATE se excluyen del criterio por nombre y se
+      // vigila aparte que la columna no gane nunca una FK a persons.
+      const sql = ejecutable(f).replace(/update\s+(?:public\.)?ai_risk_assessments\b[^;]*;/gi, "");
       expect(DEFAULT_USUARIO.test(sql), `${f}: DEFAULT auth.uid() sobre una FK a persons`).toBe(false);
       expect(ASIGNA_USUARIO.test(sql), `${f}: asigna auth.uid() a una FK a persons`).toBe(false);
+    }
+  });
+});
+
+describe("E-01 — created_by de ai_risk_assessments es persona (F2)", () => {
+  it("ninguna migración asigna auth.uid() al created_by de ai_risk_assessments y F2 lo resuelve desde la persona de la sesión", () => {
+    const a2 = todas.find((f) => f.includes("20260927131000_"));
+    expect(a2, "falta la migración A2 de F2").toBeTruthy();
+    const sqlA2 = ejecutable(a2!);
+    expect(sqlA2).toMatch(/created_by\s+uuid[^,;]*references\s+(?:public\.)?persons/i);
+    expect(sqlA2).toMatch(/person_id/);
+    for (const f of todas) {
+      const sql = ejecutable(f);
+      if (!/ai_risk_assessments/i.test(sql)) continue;
+      expect(/new\.created_by\s*:?=\s*auth\.uid\(\)/i.test(sql), `${f}: asigna auth.uid() a ai_risk_assessments.created_by`).toBe(false);
+      expect(/alter\s+table\s+(?:public\.)?ai_risk_assessments[^;]*created_by[^,;]*default\s+auth\.uid\(\)/i.test(sql), `${f}: DEFAULT auth.uid() en ai_risk_assessments.created_by`).toBe(false);
+      expect(/alter\s+table\s+(?:public\.)?ai_risk_assessments[^;]*reviewed_by_id[^,;]*references\s+(?:public\.)?persons/i.test(sql), `${f}: ai_risk_assessments.reviewed_by_id pasa a FK a persons (guarda usuario)`).toBe(false);
     }
   });
 });

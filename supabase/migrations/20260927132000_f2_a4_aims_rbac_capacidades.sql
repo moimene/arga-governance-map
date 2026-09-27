@@ -1,3 +1,10 @@
+-- Nota del orquestador (27-09-2026, revisión adversarial): al sustituir las
+-- políticas FOR ALL por políticas por comando, ai_incidents,
+-- ai_risk_assessments y ai_compliance_checks quedan SIN política DELETE, a
+-- propósito: el permiso de borrado de `authenticated` sobre esas tablas ya se
+-- retiró el 14-09-2026 (20260914120000, DA-16) y el programa RIA las trata
+-- como de solo anexión. Solo ai_systems conserva su política DELETE (DA-16).
+
 -- MOI-170 — F2.T5 (M04), programa RIA, carril A.
 -- Especificación §2.2 (Funciones SQL / fn_aims_assert_capacidad), F2.T5, F2.T6.
 --
