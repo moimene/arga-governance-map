@@ -1138,6 +1138,18 @@ describe("C1 — los 10 acuerdos de la Junta en Cloud", () => {
       .select("id, meeting_id, legal_gate_status, authoritative_manifest, authoritative_manifest_hash")
       .eq("tenant_id", GARRIGUES_TENANT);
     expect(eActas).toBeNull();
+    // Revisor MOI-143 (P1): el bucle de abajo NO itera si `actas` está
+    // vacío, y hoy lo está -el censo ECONOMICO de la Junta canónica
+    // (2a4cdc49…) es anterior a esta migración y el evaluador lo rechaza por
+    // no llevar raw_votes/share_class_code, ver 20260928160000_secretaria_
+    // junta_capital_evaluator.sql-. Sin pinzar el conteo, un evaluador roto
+    // que SIEMPRE produjera 0 actas pasaría tan silenciosamente como el dato
+    // de hoy. Se pinza el valor MEDIDO: el día que aparezca una fila (censo
+    // nuevo → acta real) este assert es el primero en romper y obliga a
+    // comprobar que las aserciones de DENTRO del bucle -las que de verdad
+    // validan el manifiesto- se ejecutaron y son coherentes, en vez de dejar
+    // pasar cero iteraciones sin que nadie lo note.
+    expect((actas ?? []).length).toBe(0);
     for (const acta of actas ?? []) {
       expect(["MANIFEST_READY", "ARTIFACT_FINAL", "APPROVED_SIGNED"]).toContain(acta.legal_gate_status);
       expect(String(acta.authoritative_manifest_hash ?? "")).toMatch(/^[0-9a-f]{64}$/);

@@ -1904,7 +1904,18 @@ BEGIN
       )
     ),
     'convocation', v_convocatoria_manifest,
-    'quorum', jsonb_build_object(
+    -- MOI-143 (revisor, P2): para Junta el bloque de cabeza-de-colegiado
+    -- (personas/2+1) nunca fue el quórum autoritativo -eso vive por
+    -- resolución en resolutions[].server_evaluation.quorum, por CAPITAL- y
+    -- publicarlo igualmente aquí deja dos criterios de quórum bajo la misma
+    -- acta, potencialmente contradictorios (uno por cabeza, otro por
+    -- capital). Se sustituye por un puntero explícito; no se agrega un
+    -- resumen numérico propio para no inventar un TERCER criterio.
+    'quorum', CASE WHEN v_is_junta THEN jsonb_build_object(
+      'is_universal', v_is_universal,
+      'source', 'SEE_RESOLUTIONS_SERVER_EVALUATION',
+      'note', 'Junta computa por CAPITAL: el quórum autoritativo vive por resolución en resolutions[].server_evaluation.quorum (evaluador dedicado MOI-143). Este bloque de nivel superior es la fórmula de un colegiado de asiento único (personas/2+1, art. 247.2 LSC) y no aplica a Junta.'
+    ) ELSE jsonb_build_object(
       'is_universal', v_is_universal,
       'source', 'SERVER_CENSUS_AND_ATTENDANCE',
       'reached', v_quorum_reached,
@@ -1913,7 +1924,7 @@ BEGIN
       'required_count', v_required_present_count,
       'present_or_represented_weight', v_server_present_weight,
       'total_weight', v_server_total_weight
-    ),
+    ) END,
     'census', jsonb_build_object(
       'snapshot_id', v_snapshot.id,
       'snapshot_type', v_snapshot.snapshot_type,
@@ -1964,6 +1975,12 @@ BEGIN
   END IF;
   IF v_src !~ 'v_representation_scope' THEN
     RAISE EXCEPTION 'VERIFICACION MOI-143: el manifiesto no resuelve el scope de representación por variable';
+  END IF;
+  -- P2 del revisor: el bloque `quorum` de nivel superior ya no publica el
+  -- cómputo por cabeza-de-colegiado para Junta (sería un segundo criterio de
+  -- quórum, potencialmente contradictorio con resolutions[].server_evaluation).
+  IF v_src !~ 'SEE_RESOLUTIONS_SERVER_EVALUATION' THEN
+    RAISE EXCEPTION 'VERIFICACION MOI-143: el manifiesto de Junta sigue publicando el quórum por cabeza-de-colegiado en el bloque superior';
   END IF;
 
   SELECT pg_get_functiondef(oid) INTO v_src_snapshot
