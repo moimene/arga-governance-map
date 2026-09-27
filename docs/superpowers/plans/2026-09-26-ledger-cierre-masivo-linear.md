@@ -73,7 +73,11 @@ ya traía; donde coincide, se adopta.
 | D-21 | MOI-148 | Alta por pantalla (**A**) de la edición de matriz y porcentaje después del alta. | Es operación recurrente del cliente, no catálogo. |
 | D-22 | MOI-217 | Esperar a sus bloqueadores (no se adelanta un ensayo sobre un esquema que va a cambiar). | Recomendación del triage. |
 
-Pendientes de decidir tras análisis: MOI-147 y MOI-149 (tabla de coste y gravedad por hueco).
+| D-23 | MOI-147/149 | Las ocho tablas de la consola sin alta van por **alta por pantalla**; el alta de grupo y el enlace cuenta-persona siguen por script. Detalle hueco a hueco en `docs/context/06-TENANT-CERO-ONBOARDING.md` §5. | Operación recurrente del cliente; el script queda para lo que se hace una vez. |
+| D-24 | MOI-214 | El golden path del cuestionario se escribe contra el **grupo nuevo**, desactivado por defecto y con tope de residuo (10 sistemas `PROBE-E2E`). | Con D-12 (FK RESTRICT) una prueba que da de alta un sistema ya no puede limpiarlo; Garrigues no se ensucia. |
+| D-25 | F2 (MOI-170) | La revisión v2 (`fn_aims_review_assessment` con decisión) queda **sin valores por defecto**; la pantalla sigue en la v1 hasta que haya sujetos con órgano (siembra del carril C). | Con DEFAULT, PostgREST no elegía sobrecarga y la revisión fallaba en producción. |
+| D-26 | Recorrido MOI-15 | Los hallazgos del recorrido se numeran **H-32…H-36** (H-27…H-31 ya eran del bloque 5, MOI-55). H-33 (acta bloqueada sin `registration_number`) y H-32 (punto nacido en sesión) se corrigen antes de cerrar MOI-15. | El acta es el entregable del recorrido; con H-33 abierto no se genera en ninguna sociedad dada de alta por el asistente. |
+| D-27 | MOI-150 | Se ejecuta con F2.T9 en el mismo cambio (el mapa fijo del órgano de IA pasa a dato). | Mismo fichero y misma solución; dos cambios separados dejarían una pantalla por dato y otra por constante. |
 
 ## 4. Lo que queda fuera del mandato (se prepara y se deja abierto)
 
@@ -88,3 +92,37 @@ Pendientes de decidir tras análisis: MOI-147 y MOI-149 (tabla de coste y graved
 
 Se irá anotando por oleada: ramas, commits, migraciones aplicadas (con su ensayo), pruebas y
 estado de cada issue en Linear.
+
+### 5.1 Oleadas 1 y 2 (26-09-2026 tarde – 27-09-2026 madrugada)
+
+- Ola 1 publicada en `main` con `2a84fc18`; ola 2 con `bbd4008a`. Cada rama: implementación
+  (Sonnet, worktree aislado) → revisión adversarial → corrección; ensayo revertido de cada
+  migración con `/tmp/probe_rollback.py` antes de aplicarla; aplicación por el orquestador con
+  registro en `schema_migrations`.
+- Migraciones aplicadas: `20260926113700` (MOI-137), `114200` (MOI-142), `114800` (MOI-148),
+  `115200` (MOI-152), `116400/116401` (MOI-164), `118500` (MOI-185), `119000` (MOI-190),
+  `119300` (MOI-193), `120400` (MOI-204), `121000` (MOI-210), `20260927105600` (MOI-56),
+  `120000` (MOI-200). Ensayos en `docs/superpowers/reviews/2026-09-26-ensayos-cloud/`.
+- Pruebas al cerrar la ola 2: `bun test` 5267 / 159 skip / 0 fail; typecheck, lint y build
+  limpios; arnés de producción 3/3 con los dos grupos.
+- Verificación por pantalla (Playwright local contra Cloud): MOI-137, 134, 193, 195, 197, 158,
+  157, 148 correctos; MOI-142 falló (UI sin cablear) → rama de corrección; bloque 5 del guion
+  (MOI-55) recorrido por pantalla, con 4 sistemas de residuo declarados en el grupo nuevo.
+
+### 5.2 Ola 3 (27-09-2026, mañana)
+
+- F2 carril A (MOI-170) aplicado: `20260927130000…135000` (sujetos y especialidades, columnas de
+  sujeto y disparador de `assessor_id`, 45 capacidades AIMS, RPC de sujetos, cuatro ojos v2,
+  especialidad).
+- Regresión encontrada y corregida: la v2 de la revisión con DEFAULT hacía ambigua la llamada de
+  la pantalla → `20260927136000` (D-25), `aims-revisar-live` 4/4. `20260927137000` renombra
+  `aims_secretaria_derivations.created_by` → `created_by_user_id` (E-01, tabla vacía).
+- Gate del grupo nuevo invertido: el recorrido de MOI-146 dio de alta 2 obligaciones `OBL-GN-*`
+  por pantalla; el gate vigila ahora la ausencia de RIA, no de obligaciones.
+- Publicado en `main`: `a1489dee` (Vercel READY, arnés de producción 3/3) y `4cdf5802`
+  (recorrido MOI-15 integrado, D-26). `bun test` 5306 pass / 159 skip, con el único rojo
+  restante corregido en `a1489dee`; `e2e/10-grc` 14/14.
+- Recorrido MOI-15 (4.1/4.5/4.6 por pantalla en el grupo nuevo): 4.5 y 4.6 correctos; 4.1 bloqueado
+  por H-33. 9 convocatorias emitidas de residuo declaradas (no hay pantalla para retirarlas).
+- En curso al anotar: ola 3b (F5 del programa RIA, MOI-181, MOI-214, MOI-146), corrección de
+  MOI-142, ola 3c (H-32/H-33) y ola 4 (F2 carriles B y C).
