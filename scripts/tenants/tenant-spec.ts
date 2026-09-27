@@ -28,6 +28,15 @@ export type RolDemo = "SECRETARIO" | "ADMIN_TENANT" | "COMPLIANCE" | "CONSEJERO"
 export interface TenantUserSpec {
   email: string;
   role: RolDemo;
+  /**
+   * Convención documentada (D-23, MOI-147) para el enlace `user_profiles.person_id`
+   * que hace la fase `fundacion`: UUID de una persona YA existente en `persons`
+   * del mismo tenant. Opcional porque un tenant recién creado no tiene personas
+   * (nacen por pantalla); se puede fijar aquí en cuanto se conozca, o pasar por
+   * `--persona-id email=uuid` en cada ejecución (el parámetro manda sobre esto).
+   * Nunca pisa un `person_id` ya puesto.
+   */
+  personId?: string;
 }
 
 export interface GrcModuleSpec {
@@ -108,8 +117,12 @@ export const TENANT_SPECS: Record<string, TenantSpec> = {
     packIdPrefix: "GN",
     passwordEnvVar: "DEMO_PASSWORD_NUEVO",
     users: [
-      { email: "demo@grupo-nuevo-demo.dev", role: "SECRETARIO" },
-      { email: "admin@grupo-nuevo-demo.dev", role: "ADMIN_TENANT" },
+      // personId: enlace ya aplicado en Cloud por la migración puntual
+      // 20260925130000_tenant_cero_link_demo_users_to_persons.sql (MOI-133).
+      // Documentado aquí (D-23, MOI-147) para que re-ejecutar `fundacion
+      // --commit` sea un no-op — la fase ve `person_id` ya puesto y no lo pisa.
+      { email: "demo@grupo-nuevo-demo.dev", role: "SECRETARIO", personId: "0ed63079-0422-4cb1-b50a-bb38fa5da725" }, // Elena Gómez Blanco
+      { email: "admin@grupo-nuevo-demo.dev", role: "ADMIN_TENANT", personId: "608f8eaf-6335-4102-96f4-a412974d5079" }, // Carlos Mendoza Ruiz
     ],
     branding: {
       nombre: "Grupo Nuevo",
@@ -219,6 +232,7 @@ export function validarTenantSpec(spec: TenantSpec): string[] {
     }
     if (emails.has(u.email)) p.push(`email repetido: ${u.email}`);
     emails.add(u.email);
+    if (u.personId !== undefined && !UUID_RE.test(u.personId)) p.push(`personId de ${u.email} no es un UUID: ${u.personId}`);
   }
 
   const ids = spec.grcModules.map((m) => m.id);

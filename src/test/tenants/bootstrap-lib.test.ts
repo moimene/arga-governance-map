@@ -15,6 +15,8 @@ import {
   mencionaArga,
   neutralizarAvisoPrototipo,
   packIdPara,
+  parsearPersonaOverrides,
+  personaParaUsuario,
   resolverEntorno,
   seleccionarCertificationKinds,
   seleccionarPlantillas,
@@ -283,5 +285,66 @@ describe("clonado a un tenant", () => {
     expect(c.is_active).toBe(true);
     expect(c.id).toBe(clonarCertificationKind(spec, origen).id);
     expect(c.id).not.toBe(origen.id);
+  });
+});
+
+describe("enlace cuenta-persona (D-23, MOI-147)", () => {
+  const UUID_1 = "608f8eaf-6335-4102-96f4-a412974d5079";
+  const UUID_2 = "0ed63079-0422-4cb1-b50a-bb38fa5da725";
+
+  it("parsearPersonaOverrides: lee un --persona-id email=uuid", () => {
+    const overrides = parsearPersonaOverrides(["--tenant", "nuevo", "--persona-id", `demo@grupo-nuevo-demo.dev=${UUID_1}`, "--commit"]);
+    expect(overrides.get("demo@grupo-nuevo-demo.dev")).toBe(UUID_1);
+  });
+
+  it("parsearPersonaOverrides: repetible y case-insensitive en el email", () => {
+    const overrides = parsearPersonaOverrides([
+      "--persona-id", `DEMO@grupo-nuevo-demo.dev=${UUID_1}`,
+      "--persona-id", `admin@grupo-nuevo-demo.dev=${UUID_2}`,
+    ]);
+    expect(overrides.size).toBe(2);
+    expect(overrides.get("demo@grupo-nuevo-demo.dev")).toBe(UUID_1);
+    expect(overrides.get("admin@grupo-nuevo-demo.dev")).toBe(UUID_2);
+  });
+
+  it("parsearPersonaOverrides: el mismo email dos veces se queda con el último", () => {
+    const overrides = parsearPersonaOverrides([
+      "--persona-id", `demo@grupo-nuevo-demo.dev=${UUID_1}`,
+      "--persona-id", `demo@grupo-nuevo-demo.dev=${UUID_2}`,
+    ]);
+    expect(overrides.get("demo@grupo-nuevo-demo.dev")).toBe(UUID_2);
+  });
+
+  it("parsearPersonaOverrides: ignora flags que no son --persona-id", () => {
+    expect(parsearPersonaOverrides(["--tenant", "nuevo", "--commit"]).size).toBe(0);
+  });
+
+  it("parsearPersonaOverrides: rechaza un par sin '=' o sin valor", () => {
+    expect(() => parsearPersonaOverrides(["--persona-id", "demo@grupo-nuevo-demo.dev"])).toThrow(/mal formado/);
+    expect(() => parsearPersonaOverrides(["--persona-id"])).toThrow(/mal formado/);
+    expect(() => parsearPersonaOverrides(["--persona-id", "=algo"])).toThrow(/mal formado/);
+  });
+
+  it("parsearPersonaOverrides: rechaza un valor que no es UUID", () => {
+    expect(() => parsearPersonaOverrides(["--persona-id", "demo@grupo-nuevo-demo.dev=no-es-un-uuid"])).toThrow(/no es un UUID/);
+  });
+
+  it("personaParaUsuario: el parámetro CLI manda sobre la convención del spec", () => {
+    const overrides = new Map([["demo@grupo-nuevo-demo.dev", UUID_2]]);
+    expect(personaParaUsuario({ email: "demo@grupo-nuevo-demo.dev", personId: UUID_1 }, overrides)).toBe(UUID_2);
+  });
+
+  it("personaParaUsuario: sin parámetro, cae a la convención documentada en el spec", () => {
+    expect(personaParaUsuario({ email: "demo@grupo-nuevo-demo.dev", personId: UUID_1 }, new Map())).toBe(UUID_1);
+  });
+
+  it("personaParaUsuario: sin parámetro ni convención, null — el tenant puede no tener personas todavía", () => {
+    expect(personaParaUsuario({ email: "demo@grupo-nuevo-demo.dev" }, new Map())).toBeNull();
+  });
+
+  it("el spec 'nuevo' documenta la convención ya aplicada en Cloud por MOI-133, con UUIDs distintos por usuario", () => {
+    const ids = spec.users.map((u) => u.personId);
+    expect(ids.every((id) => typeof id === "string")).toBe(true);
+    expect(new Set(ids).size).toBe(spec.users.length);
   });
 });

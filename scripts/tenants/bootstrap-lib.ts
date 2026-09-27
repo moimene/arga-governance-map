@@ -10,7 +10,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { TenantSpec } from "./tenant-spec";
+import type { TenantSpec, TenantUserSpec } from "./tenant-spec";
 
 // ───────────────────────────── utilidades ──────────────────────────────────
 
@@ -85,6 +85,48 @@ const AVISO_PROTOTIPO_NEUTRO = "prototipo TGMS";
 export function neutralizarAvisoPrototipo(texto: string): { texto: string; cambiado: boolean } {
   if (!texto.includes(AVISO_PROTOTIPO_ORIGEN)) return { texto, cambiado: false };
   return { texto: texto.split(AVISO_PROTOTIPO_ORIGEN).join(AVISO_PROTOTIPO_NEUTRO), cambiado: true };
+}
+
+// ─────────────────────── enlace cuenta-persona (fundación) ─────────────────
+//
+// Decisión D-23 (MOI-147): el enlace `user_profiles.person_id` no tiene
+// pantalla propia — 2 filas por tenant nuevo no la justifican — y se
+// incorpora a la fase `fundacion` en vez de repetir a mano la migración
+// puntual de MOI-133. La persona se indica por parámetro CLI (`--persona-id
+// email=uuid`, repetible) o por convención documentada en
+// `TenantSpec.users[].personId`; el parámetro manda sobre la convención.
+// Nunca pisa un `person_id` ya puesto (ver `tenant-bootstrap.ts`).
+
+const PERSONA_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Parsea `--persona-id email=uuid` (repetible) de un argv. Sin red, sin exit. */
+export function parsearPersonaOverrides(argv: readonly string[]): Map<string, string> {
+  const overrides = new Map<string, string>();
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] !== "--persona-id") continue;
+    const par = argv[i + 1];
+    const igual = par ? par.indexOf("=") : -1;
+    if (!par || igual <= 0 || igual === par.length - 1) {
+      throw new Error(`--persona-id mal formado (se esperaba email=uuid): ${par ?? "(sin valor)"}`);
+    }
+    const email = par.slice(0, igual).toLowerCase();
+    const personId = par.slice(igual + 1);
+    if (!PERSONA_UUID_RE.test(personId)) throw new Error(`--persona-id ${email}: "${personId}" no es un UUID`);
+    overrides.set(email, personId);
+  }
+  return overrides;
+}
+
+/**
+ * Persona a enlazar para un usuario del spec, o `null` si ninguna vía la
+ * indica (el tenant puede no tener personas todavía: se enlaza más tarde
+ * re-ejecutando `fundacion --commit --persona-id …`).
+ */
+export function personaParaUsuario(
+  u: Pick<TenantUserSpec, "email" | "personId">,
+  overrides: ReadonlyMap<string, string>,
+): string | null {
+  return overrides.get(u.email.toLowerCase()) ?? u.personId ?? null;
 }
 
 // ─────────────────────────── formas de dato ────────────────────────────────
