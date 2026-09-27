@@ -10,7 +10,7 @@ import {
   requiresLegalReference,
   templateMetadataPolicy,
 } from "./template-admin/labels";
-import { hasCitedOriginApproval, hasDemoApprovalMarker } from "./template-admin/patterns";
+import { hasCitaDesfasadaPendiente, hasCitedOriginApproval, hasDemoApprovalMarker } from "./template-admin/patterns";
 
 export type LegalTemplateReviewStatus =
   | "legally_approved"
@@ -32,7 +32,8 @@ export type LegalTemplateReviewFilter =
   | "MISSING_REFERENCE"
   | "MISSING_OWNER"
   | "DUPLICATE_MATTER"
-  | "LOCAL_FIXTURE";
+  | "LOCAL_FIXTURE"
+  | "OUTDATED_CITATION_PENDING";
 
 export interface LegalTemplateReviewFlags {
   missingApproval: boolean;
@@ -46,6 +47,8 @@ export interface LegalTemplateReviewFlags {
   localFixture: boolean;
   legalReportApproved: boolean;
   legalReportApprovedWithVariants: boolean;
+  /** MOI-139, D-19: clon del pack base con cita/variable pendiente del Comité Legal (MOI-138). */
+  outdatedCitationPending: boolean;
 }
 
 export interface LegalTemplateReviewRow {
@@ -78,6 +81,7 @@ export interface LegalTemplateReviewSummary {
   duplicateMatter: number;
   legalReportApproved: number;
   legalReportApprovedWithVariants: number;
+  outdatedCitationPending: number;
 }
 
 const REVIEW_NOTE_RE =
@@ -151,6 +155,7 @@ export function buildLegalTemplateReviewRows(templates: PlantillaProtegidaRow[])
     const legalReportApproved = approvalPlan?.decision === "APROBADA";
     const legalReportApprovedWithVariants = approvalPlan?.decision === "APROBADA_CON_VARIANTES";
     const committeeApproved = legalReportApproved || legalReportApprovedWithVariants;
+    const outdatedCitationPending = !localFixture && hasCitaDesfasadaPendiente(template.notas_legal);
     const hasDemoMarker = !localFixture && hasDemoApprovalMarker(template.aprobada_por);
     // MOI-137, D-20: un texto de "aprobada en origen por" cita la aprobación de
     // la plantilla FUENTE de un clon, no de esta copia — nunca constituye
@@ -173,9 +178,15 @@ export function buildLegalTemplateReviewRows(templates: PlantillaProtegidaRow[])
       localFixture,
       legalReportApproved,
       legalReportApprovedWithVariants,
+      outdatedCitationPending,
     };
 
     const reasons: string[] = [];
+    if (outdatedCitationPending) {
+      reasons.push(
+        "Contiene una cita legal o variable desfasada del pack base (RD 84/2015, QTSP.*, art. 17/19 RRM u oposición de acreedores), pendiente del criterio del Comité Legal (MOI-138).",
+      );
+    }
     if (localFixture) reasons.push("Cobertura provisional no persistida; no sustituye una aprobación legal.");
     if (hasDemoMarker) {
       reasons.push("Aprobación registrada con marcador de demostración; no constituye aprobación legal nominativa.");
@@ -210,6 +221,7 @@ export function buildLegalTemplateReviewRows(templates: PlantillaProtegidaRow[])
       !duplicateMatter &&
       !hasDemoMarker &&
       !hasCitedOrigin &&
+      !outdatedCitationPending &&
       (committeeApproved || (isOperationalActive && reasons.length === 0));
     const requiresLegalReview = !canClaimLegalApproval;
 
@@ -221,7 +233,7 @@ export function buildLegalTemplateReviewRows(templates: PlantillaProtegidaRow[])
     } else if (canClaimLegalApproval) {
       status = "legally_approved";
       label = "Aprobada legalmente";
-    } else if (notesRequireReview || draftVersion || missingReference || missingOwner || duplicateMatter) {
+    } else if (outdatedCitationPending || notesRequireReview || draftVersion || missingReference || missingOwner || duplicateMatter) {
       status = "needs_review";
       label = "Revisión legal";
     } else if (isOperationalActive && (missingApproval || hasDemoMarker || hasCitedOrigin)) {
@@ -266,6 +278,7 @@ export function summarizeLegalTemplateReview(rows: LegalTemplateReviewRow[]): Le
       if (row.flags.duplicateMatter) acc.duplicateMatter += 1;
       if (row.flags.legalReportApproved) acc.legalReportApproved += 1;
       if (row.flags.legalReportApprovedWithVariants) acc.legalReportApprovedWithVariants += 1;
+      if (row.flags.outdatedCitationPending) acc.outdatedCitationPending += 1;
       return acc;
     },
     {
@@ -283,6 +296,7 @@ export function summarizeLegalTemplateReview(rows: LegalTemplateReviewRow[]): Le
       duplicateMatter: 0,
       legalReportApproved: 0,
       legalReportApprovedWithVariants: 0,
+      outdatedCitationPending: 0,
     },
   );
 }
@@ -307,5 +321,6 @@ export function matchesLegalTemplateReviewFilter(
   if (filter === "MISSING_OWNER") return row.flags.missingOwner;
   if (filter === "DUPLICATE_MATTER") return row.flags.duplicateMatter;
   if (filter === "LOCAL_FIXTURE") return row.flags.localFixture;
+  if (filter === "OUTDATED_CITATION_PENDING") return row.flags.outdatedCitationPending;
   return true;
 }

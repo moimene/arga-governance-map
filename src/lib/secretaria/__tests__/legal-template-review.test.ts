@@ -9,6 +9,7 @@ import {
   LEGAL_TEMPLATE_APPROVAL_PLAN,
   LEGAL_TEMPLATE_APPROVAL_REPORT_SUMMARY,
 } from "../legal-template-approval-plan";
+import { avisoCitaDesfasada } from "../template-admin/patterns";
 
 // MOI-137, D-20: el informe del Comité Legal del 01-05-2026 solo se aplica al
 // tenant de emisión (ARGA). Los tests que no ejercitan tenant explícitamente
@@ -483,6 +484,35 @@ describe("legal-template-review", () => {
     expect(simulada.flags.demoApprovalMarker).toBe(true);
     expect(simulada.canClaimLegalApproval).toBe(false);
     expect(simulada.label).toBe("Vigente sin aprobación nominativa");
+  });
+
+  it("MOI-139, D-19: un clon del pack base con cita desfasada se rotula Revisión legal, no Aprobada legalmente", () => {
+    const rows = buildLegalTemplateReviewRows([
+      template({
+        id: "clon-con-cita-desfasada",
+        tipo: "ACTA_ACUERDO_ESCRITO",
+        // El clon ya no cita el origen (caso límite: nada más lo desmentiría)
+        // salvo el propio marcador de cita desfasada que dejó el bootstrap.
+        aprobada_por: "Lucía Martín Gómez (Secretaria del Consejo)",
+        notas_legal: `Pack base LSC (snapshot 2026-09-19).\n\n${avisoCitaDesfasada(["variable {{QTSP.*}} (firma/sello EAD Trust)"])}`,
+      }),
+      template({ id: "sin-cita-desfasada", tipo: "ACTA_SESION" }),
+    ]);
+    const [conCita, sinCita] = rows;
+
+    expect(conCita.flags.outdatedCitationPending).toBe(true);
+    expect(conCita.canClaimLegalApproval).toBe(false);
+    expect(conCita.status).toBe("needs_review");
+    expect(conCita.label).toBe("Revisión legal");
+    expect(conCita.reasons.join(" ")).toMatch(/Comité Legal.*MOI-138/);
+    expect(matchesLegalTemplateReviewFilter(conCita, "OUTDATED_CITATION_PENDING")).toBe(true);
+    expect(matchesLegalTemplateReviewFilter(conCita, "REVISION_LEGAL")).toBe(true);
+
+    expect(sinCita.flags.outdatedCitationPending).toBe(false);
+    expect(matchesLegalTemplateReviewFilter(sinCita, "OUTDATED_CITATION_PENDING")).toBe(false);
+
+    const summary = summarizeLegalTemplateReview(rows);
+    expect(summary.outdatedCitationPending).toBe(1);
   });
 });
 

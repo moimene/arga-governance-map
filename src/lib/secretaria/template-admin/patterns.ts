@@ -90,3 +90,57 @@ export function hasCitedOriginApproval(aprobadaPor?: string | null): boolean {
   return CITED_ORIGIN_APPROVAL_RE.test(aprobadaPor);
 }
 
+/**
+ * Citas o variables desfasadas que el Comité Legal aún no ha resuelto
+ * (MOI-138, Backlog a 2026-09-27). Decisión D-19 (delegada por Moisés,
+ * 2026-09-27): mientras no haya criterio, el alta de un grupo NO excluye la
+ * plantilla o el pack que las contenga ni corrige el texto — los copia
+ * marcados «pendiente de revisión», visibles en pantalla (`MARCADOR_CITA_DESFASADA`
+ * en `notas_legal`/`descripcion`, ver `scripts/tenants/bootstrap-lib.ts`).
+ * Corregir la cita en el tenant de origen (ARGA) queda fuera de este alcance.
+ */
+export const CITAS_DESFASADAS: ReadonlyArray<{ id: string; etiqueta: string; re: RegExp }> = [
+  { id: "RD_84_2015", etiqueta: "Real Decreto 84/2015", re: /\b(?:RD|Real Decreto)\s*84\/2015\b/i },
+  { id: "QTSP_VAR", etiqueta: "variable {{QTSP.*}} (firma/sello EAD Trust)", re: /\bQTSP\./ },
+  {
+    id: "RRM_17_19",
+    etiqueta: "art. 17/19 RRM",
+    re: /\bart\.?\s*(?<!\d)1[79](?!\d)\s*RRM\b/i,
+  },
+  { id: "OPOSICION_ACREEDORES", etiqueta: "derecho de oposición de acreedores", re: /derecho de oposici[oó]n/i },
+];
+
+/** Concatena valores heterogéneos (string, JSON) en un único texto buscable. */
+function textoBuscable(valores: ReadonlyArray<unknown>): string {
+  return valores
+    .map((v) => (v == null ? "" : typeof v === "string" ? v : JSON.stringify(v)))
+    .join("\n");
+}
+
+/** Etiquetas de los patrones de `CITAS_DESFASADAS` presentes en `valores`; `[]` si ninguno. */
+export function detectarCitasDesfasadas(...valores: ReadonlyArray<unknown>): string[] {
+  const texto = textoBuscable(valores);
+  return CITAS_DESFASADAS.filter((c) => c.re.test(texto)).map((c) => c.etiqueta);
+}
+
+/** Marcador insertado en `notas_legal`/`descripcion` de un clon con citas desfasadas. */
+export const MARCADOR_CITA_DESFASADA = "PENDIENTE DE REVISIÓN (MOI-138)";
+
+export const CITA_DESFASADA_RE = new RegExp(
+  MARCADOR_CITA_DESFASADA.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+);
+
+export function hasCitaDesfasadaPendiente(texto?: string | null): boolean {
+  if (!texto) return false;
+  return CITA_DESFASADA_RE.test(texto);
+}
+
+/** Aviso legible que se antepone/añade al texto del clon cuando hay coincidencias. */
+export function avisoCitaDesfasada(etiquetas: string[]): string {
+  return (
+    `${MARCADOR_CITA_DESFASADA}: contiene ${etiquetas.join(", ")}. ` +
+    "Copiado del pack base sin corregir; el criterio corresponde al Comité Legal " +
+    "(MOI-138) y no se aplica al dar de alta el grupo."
+  );
+}
+

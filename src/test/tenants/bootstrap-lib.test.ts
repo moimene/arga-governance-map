@@ -31,6 +31,7 @@ import {
   type StandaloneCertificationKindOrigen,
 } from "../../../scripts/tenants/bootstrap-lib";
 import { TENANT_SPECS } from "../../../scripts/tenants/tenant-spec";
+import { hasCitaDesfasadaPendiente } from "../../lib/secretaria/template-admin/patterns";
 
 const spec = TENANT_SPECS.nuevo;
 
@@ -184,6 +185,19 @@ describe("clonado a un tenant", () => {
     expect(c.version.payload).toBe(p.payload);
     expect(c.version).toMatchObject({ pack_id: c.pack.id, version: "1.0.1", is_active: true, status: "ACTIVE" });
     expect(c.pack.descripcion).toMatch(/Pack base LSC \(origen APROBACION_CUENTAS@1\.0\.1\)/);
+    expect(hasCitaDesfasadaPendiente(c.pack.descripcion)).toBe(false);
+  });
+
+  it("MOI-139, D-19: rule pack con art. 17/19 RRM se copia igual, marcado en la descripción", () => {
+    const [p] = seleccionarRulePacks([
+      packOrigen({ id: "CESE_CONSEJERO" }, { payload: { referencia: "art. 17 RRM" } }),
+    ]).incluidos;
+    const c = clonarRulePack(spec, p, "2026-09-19");
+    // No se excluye: sigue entrando con su payload verbatim.
+    expect(c.version.payload).toBe(p.payload);
+    expect(hasCitaDesfasadaPendiente(c.pack.descripcion)).toBe(true);
+    expect(c.pack.descripcion).toContain("art. 17/19 RRM");
+    expect(c.pack.descripcion).toMatch(/Comité Legal.*MOI-138/);
   });
 
   it("rule set: tenant explícito (la columna tiene DEFAULT de ARGA) e id determinista", () => {
@@ -204,7 +218,31 @@ describe("clonado a un tenant", () => {
     expect(c.aprobada_por).toBeNull();
     expect(c.content_hash_sha256).toBe(sha256Hex(c.capa1_inmutable));
     expect(c.notas_legal).toMatch(/Clon de la plantilla 33333333/);
+    expect(hasCitaDesfasadaPendiente(c.notas_legal)).toBe(false);
     expect(aprobadaPorClon(p)).toMatch(/aprobada en origen por «Comité Legal ARGA»/);
+  });
+
+  it("MOI-139, D-19: plantilla con cita desfasada NO se excluye, se copia marcada en notas_legal", () => {
+    const [p] = seleccionarPlantillas([
+      plantillaOrigen({
+        tipo: "ACTA_ACUERDO_ESCRITO",
+        capa1_inmutable: "Firma del socio único: {{QTSP.firma_socio_unico_ref}}. Conforme al Real Decreto 84/2015.",
+      }),
+    ]).incluidas;
+    const c = clonarPlantilla(spec, p, "2026-09-19");
+    // No se excluye del alta: sigue entrando en BORRADOR con su capa1 intacta.
+    expect(c.estado).toBe("BORRADOR");
+    expect(c.capa1_inmutable).toContain("{{QTSP.firma_socio_unico_ref}}");
+    expect(hasCitaDesfasadaPendiente(c.notas_legal)).toBe(true);
+    expect(c.notas_legal).toContain("Real Decreto 84/2015");
+    expect(c.notas_legal).toContain("variable {{QTSP.*}} (firma/sello EAD Trust)");
+    expect(c.notas_legal).toMatch(/Comité Legal.*MOI-138/);
+  });
+
+  it("MOI-139, D-19: una plantilla sin patrones desfasados no lleva el marcador", () => {
+    const [p] = seleccionarPlantillas([plantillaOrigen({ referencia_legal: "Art. 202 LSC" })]).incluidas;
+    const c = clonarPlantilla(spec, p, "2026-09-19");
+    expect(hasCitaDesfasadaPendiente(c.notas_legal)).toBe(false);
   });
 
   it("seleccionarCertificationKinds: excluye tipos inactivos, con requires_qes o que afirman envío/entrega", () => {

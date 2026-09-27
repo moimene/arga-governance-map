@@ -53,6 +53,7 @@ const emptyFlags: LegalTemplateReviewRow["flags"] = {
   localFixture: false,
   legalReportApproved: false,
   legalReportApprovedWithVariants: false,
+  outdatedCitationPending: false,
 };
 
 function review(

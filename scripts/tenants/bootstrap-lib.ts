@@ -11,6 +11,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { TenantSpec, TenantUserSpec } from "./tenant-spec";
+import { avisoCitaDesfasada, detectarCitasDesfasadas } from "../../src/lib/secretaria/template-admin/patterns";
 
 // ───────────────────────────── utilidades ──────────────────────────────────
 
@@ -468,6 +469,13 @@ export const PROCEDENCIA_PACK_BASE = "Pack base LSC";
 
 export function clonarRulePack(spec: TenantSpec, p: PackBaseRulePack, hoy: string) {
   const id = packIdPara(spec, p.source_id);
+  // MOI-139, D-19 (delegada): si el payload cita un patrón que el Comité Legal
+  // aún no ha resuelto (MOI-138), el pack se copia igual, marcado en la
+  // descripción visible en pantalla — no se excluye ni se corrige aquí.
+  const citas = detectarCitasDesfasadas(p.descripcion, p.payload);
+  const descripcion =
+    `${p.descripcion} · ${PROCEDENCIA_PACK_BASE} (origen ${p.source_id}@${p.version})` +
+    (citas.length > 0 ? ` · ${avisoCitaDesfasada(citas)}` : "");
   return {
     pack: {
       id,
@@ -477,7 +485,7 @@ export function clonarRulePack(spec: TenantSpec, p: PackBaseRulePack, hoy: strin
       // reglas aunque las filas existan.
       materia: p.materia,
       organo_tipo: p.organo_tipo,
-      descripcion: `${p.descripcion} · ${PROCEDENCIA_PACK_BASE} (origen ${p.source_id}@${p.version})`,
+      descripcion,
     },
     version: {
       pack_id: id,
@@ -545,9 +553,22 @@ export function notasLegalesClon(p: PackBasePlantilla, exportadoEn: string): str
       ? " Única transformación: el aviso de prototipo nombra el producto (TGMS) en lugar del repositorio de origen."
       : " Sin transformaciones sobre la capa inmutable.") +
     " Entorno de validación funcional: sin eficacia jurídica productiva.";
-  return p.notas_legal_origen
+  const cuerpo = p.notas_legal_origen
     ? `${cabecera}\n\n[Notas de la plantilla de origen, conservadas como procedencia]\n${p.notas_legal_origen}`
     : cabecera;
+  // MOI-139, D-19 (delegada): citas o variables que el Comité Legal aún no ha
+  // resuelto (MOI-138) NO excluyen la plantilla del alta del grupo ni se
+  // corrigen aquí — se copian marcadas, visibles en pantalla (Revisión legal,
+  // ver src/lib/secretaria/legal-template-review.ts).
+  const citas = detectarCitasDesfasadas(
+    p.capa1_inmutable,
+    p.contenido_template,
+    p.capa2_variables,
+    p.capa3_editables,
+    p.variables,
+    p.referencia_legal,
+  );
+  return citas.length > 0 ? `${cuerpo}\n\n${avisoCitaDesfasada(citas)}` : cuerpo;
 }
 
 /** Fila de INSERT. Entra SIEMPRE en BORRADOR: el trigger rechaza cualquier otro estado. */
