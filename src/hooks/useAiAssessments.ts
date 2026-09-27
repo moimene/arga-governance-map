@@ -90,7 +90,7 @@ export function useAssessmentById(id: string | undefined) {
     queryFn: tenantId && id ? async () => {
       const { data, error } = await supabase
         .from("ai_risk_assessments")
-        .select("*, ai_systems!inner(id, name, risk_level, system_type, tenant_id, regulatory_role, regulatory_profile)")
+        .select("*, ai_systems!inner(id, name, vendor, risk_level, system_type, tenant_id, regulatory_role, regulatory_profile)")
         .eq("ai_systems.tenant_id", tenantId!)
         .eq("id", id)
         .single();
@@ -99,6 +99,7 @@ export function useAssessmentById(id: string | undefined) {
         ai_systems: {
           id: string;
           name: string;
+          vendor: string | null;
           risk_level: string;
           system_type: string;
           tenant_id: string;

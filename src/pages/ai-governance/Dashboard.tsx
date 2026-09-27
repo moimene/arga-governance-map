@@ -10,6 +10,7 @@ import {
   incidenteCerrado,
   isAimsMaterialIncidentCandidate,
   normalizeAimsStatus,
+  proveedorDeSistema,
   systemStatusChipClass,
   systemStatusLabel,
 } from "@/lib/aims/readiness";
@@ -288,7 +289,7 @@ export default function AiDashboard() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-[var(--g-text-primary)]">{sys.name}</p>
-                      <p className="mt-1 text-xs leading-5 text-[var(--g-text-secondary)]">{sys.vendor ?? "Proveedor no informado"}</p>
+                      <p className="mt-1 text-xs leading-5 text-[var(--g-text-secondary)]">{proveedorDeSistema(sys.id, [], sys.vendor, "Proveedor no informado")}</p>
                     </div>
                     <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[var(--g-text-secondary)]" />
                   </div>
@@ -322,7 +323,7 @@ export default function AiDashboard() {
                   >
                     <td className="px-6 py-4">
                       <p className="text-sm font-medium text-[var(--g-text-primary)]">{sys.name}</p>
-                      <p className="text-xs text-[var(--g-text-secondary)]">{sys.vendor}</p>
+                      <p className="text-xs text-[var(--g-text-secondary)]">{proveedorDeSistema(sys.id, [], sys.vendor, "Sin proveedor declarado")}</p>
                     </td>
                     <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">{sys.system_type ?? "—"}</td>
                     <td className="px-6 py-4">

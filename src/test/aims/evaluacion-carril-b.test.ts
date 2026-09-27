@@ -134,7 +134,9 @@ describe("B4 — evaluación anterior a la clasificación vigente", () => {
   });
   it("el hook trae regulatory_role y regulatory_profile del sistema (sin ellos la hoja falla abierto y nunca avisa)", () => {
     const src = read(HOOK);
-    expect(src).toContain("ai_systems!inner(id, name, risk_level, system_type, tenant_id, regulatory_role, regulatory_profile)");
+    // F2.T8/T17: el hook trae también `vendor` (proveedor/responsable interno
+    // en la cabecera y en la declaración del art. 47).
+    expect(src).toContain("ai_systems!inner(id, name, vendor, risk_level, system_type, tenant_id, regulatory_role, regulatory_profile)");
     expect(src).toContain("ai_systems!inner(name, risk_level, tenant_id, regulatory_role, regulatory_profile)");
   });
 });
