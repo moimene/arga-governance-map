@@ -175,3 +175,33 @@ Issues abiertos al suspender, con su motivo: MOI-15 (acta 4.1, H-51/H-52/H-53) y
 revisión; falta su comentario de cierre); MOI-143 (acta real el 12-11-2026); MOI-150 (declaración
 del grupo nuevo); MOI-170, MOI-175 y MOI-181 (en revisión para Moisés o terceros); y los de comités,
 personas y proveedor que quedan fuera del mandato (§4), más MOI-319.
+
+### 5.5 Conversaciones derivadas: análisis y cierres (27-09-2026, 20:30 CEST)
+
+Encargo del usuario: analizar las conversaciones basadas en esta y cerrar issues conforme a la skill.
+Son tres conversaciones hermanas, abiertas el 26-09 entre las 16:27 y las 16:46 UTC con la misma
+instrucción de delegación: Suite Tax IS (P-MOI-4, archivada, con una hija del PR #172), CLM · NDA
+(P-MOI-6) y PersonaTax (P-MOI-3, con dos hijas).
+
+- Análisis con revisión adversarial de los 10 issues abiertos (Suite Tax 84/88/316/317/320,
+  PersonaTax 313, Governance OS 16/143/150/15) y auditoría de coherencia (estado pretendido frente a
+  estado real) de las tres conversaciones hermanas. Ningún issue abierto cumple sus criterios de
+  cierre: los de Suite Tax y PersonaTax esperan un acto de Moisés (secretos en Devin, migraciones de
+  producción, decisión de lectura de cuentas anuales), salvo MOI-320, técnico y sin ejecutar.
+- CLM y PersonaTax **no se tocan**: sus sesiones están en marcha (CLM retomó a las 18:03 UTC;
+  PersonaTax empuja arreglos de CI al PR #4) y ellas mismas corrigen sus estados. Hallazgos
+  entregados al usuario: en CLM, MOI-103 está en Done con «dos de tres protecciones publicadas» y la
+  protección `strict` de la rama principal de su repositorio sigue desactivada; en PersonaTax, el PR
+  #4 que sostiene MOI-76/80 tenía la CI en rojo (su sesión la está arreglando) y quedan un arreglo
+  sin commit (worktree `busy-joliot`) y el PR #5 sin issue.
+- Escrito en Linear: MOI-16 (sigue en revisión, bloqueado por MOI-15; entregable publicado), MOI-144
+  (enlace a la propuesta de adaptador), MOI-143 y MOI-150 a In Progress con comentario de avance,
+  MOI-15 (avance); en Suite Tax, MOI-87 (descripción al día: decisión B por delegación), MOI-328 y
+  MOI-309 (creados por la integración con GitHub sin trazabilidad: explicación en cinco apartados y
+  comentario). Estados releídos en Linear después de escribir.
+- MOI-61 (Suite Tax) no se reabre: su sesión dejó escrito que la puerta humana quedaba cubierta por
+  la delegación y que no hubo distribución externa, el mismo criterio aplicado aquí.
+- Los revisores adversariales sostienen que, según la skill, un mandato genérico no cubre cambios de
+  base de datos de producción ni fusiones a `main`. Aquí se aplicó la interpretación publicada el 26-09
+  (comentario del proyecto `f9bc253e`). Se deja al usuario la ratificación expresa, en un único
+  comentario del proyecto.
