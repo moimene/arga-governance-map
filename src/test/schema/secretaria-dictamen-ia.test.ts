@@ -27,7 +27,7 @@
 // existe" (mismo patrón que `risks-ai-system-link.test.ts`); cualquier otro
 // error hace fallar el test.
 import { describe, expect, it } from "bun:test";
-import { sesionDe } from "../helpers/supabase-test-client";
+import { DEMO_TENANT, sesionDe } from "../helpers/supabase-test-client";
 
 const NO_APLICADO = /could not find the function|does not exist|schema cache/i;
 
@@ -97,5 +97,49 @@ describe("MOI-175 F5.T13 — fn_secretaria_registrar_dictamen_ia (solo mecanismo
     expect(error).not.toBeNull();
     if (NO_APLICADO.test(error!.message)) return;
     expect(error!.message).toMatch(/DECISOR_SIN_CARGO_VIGENTE/);
+  });
+
+  // Revisión P1: el trigger de inmutabilidad solo cubría BEFORE UPDATE/DELETE;
+  // un INSERT directo con source_domain='ai_system' seguía abierto por el
+  // GRANT de 20260620045834 + la política de tenant/capacidad, sin ninguna de
+  // las tres validaciones de la RPC (asunto, membresía, cargo vigente).
+  // Simétrico a "RS-TABLA" en grc-eipd-shape.test.ts, pero `grc_dpias` aún no
+  // existe en Cloud (su INSERT falla por "schema cache" mientras la migración
+  // no se aplique) y `secretaria_document_artifacts` SÍ existe ya, así que un
+  // INSERT sin el guard nuevo tendría éxito en vez de fallar. Por eso, si no
+  // hay error, se trata como puerta humana aún cerrada — pero limpiando el
+  // residuo, para no dejar contaminado el tenant demo con la propia sonda.
+  it("un INSERT directo con source_domain='ai_system', sin pasar por la RPC, se rechaza", async () => {
+    const arga = await sesionDe("ARGA");
+    const { data, error } = await arga
+      .from("secretaria_document_artifacts")
+      .insert({
+        tenant_id: DEMO_TENANT,
+        artifact_kind: "INFORME_PRECEPTIVO",
+        title: "__TEST_NUNCA_PERSISTE__",
+        status: "APPROVED",
+        source_domain: "ai_system",
+        source_id: ARGA_SYSTEM,
+      } as never)
+      .select("id");
+
+    if (error === null) {
+      // Puerta humana aún cerrada: el guard todavía no está en Cloud, así que
+      // el INSERT tuvo éxito. Deshacerlo para no dejar residuo permanente.
+      const inserted = (data as { id: string }[] | null) ?? [];
+      if (inserted.length > 0) {
+        await arga
+          .from("secretaria_document_artifacts")
+          .delete()
+          .in(
+            "id",
+            inserted.map((row) => row.id),
+          );
+      }
+      return;
+    }
+
+    if (NO_APLICADO.test(error.message)) return; // puerta humana aún cerrada
+    expect(error.message).toMatch(/DICTAMEN_IA_SOLO_POR_RPC/);
   });
 });

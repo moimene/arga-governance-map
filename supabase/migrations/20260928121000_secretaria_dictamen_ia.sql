@@ -17,12 +17,24 @@
 --    TRUNCATE incluido. Se añade: inmutabilidad (BEFORE UPDATE) y
 --    BEFORE DELETE para `source_domain = 'ai_system'` desde APPROVED,
 --    SIGNED, ARCHIVED o SUPERSEDED; `REVOKE ALL FROM anon`;
---    `REVOKE TRUNCATE, TRIGGER, REFERENCES FROM authenticated`. Los demás
---    dominios (`agreement`, `certification`, `condiciones_persona`,
+--    `REVOKE TRUNCATE, TRIGGER, REFERENCES FROM authenticated`; y un
+--    BEFORE INSERT que rechaza cualquier alta con `source_domain =
+--    'ai_system'` que no venga de `fn_secretaria_registrar_dictamen_ia`
+--    (revisión: el trigger de inmutabilidad solo cubría UPDATE/DELETE — el
+--    INSERT directo seguía abierto por el GRANT de `20260620045834` + la
+--    política `secretaria_document_artifacts_tenant_write`, que valida
+--    tenant y capacidad pero no asunto, membresía ni cargo vigente). El
+--    mecanismo es el mismo GUC local a transacción que usa el programa
+--    Secretaría para sus RPC autoritativas (`app.secretaria_authoritative_rpc`
+--    en `20260720120000_authoritative_legal_artifact_gates.sql`): la RPC lo
+--    marca antes del INSERT, el trigger lo exige y `set_config(..., true)`
+--    lo hace local a la transacción — no requiere limpieza explícita. Los
+--    demás dominios (`agreement`, `certification`, `condiciones_persona`,
 --    `mandatory_books`, `registry_filing`) NO cambian de comportamiento:
 --    `useSecretariaDocumentArtifacts.ts:539` y
---    `standalone-certifications/document.ts:247` siguen actualizando estado
---    exactamente igual.
+--    `standalone-certifications/document.ts:247` siguen insertando/
+--    actualizando estado exactamente igual (el guard de INSERT solo mira
+--    `source_domain = 'ai_system'`).
 --
 -- QUÉ NO HACE (a propósito)
 -- -------------------------
@@ -77,6 +89,36 @@ CREATE TRIGGER trg_secretaria_document_artifact_ai_immutable_delete
   BEFORE DELETE ON public.secretaria_document_artifacts
   FOR EACH ROW
   EXECUTE FUNCTION public.fn_secretaria_document_artifact_ai_immutability_guard();
+
+-- El "mecanismo único" solo lo era de nombre: la política de tenant/capacidad
+-- (`secretaria_document_artifacts_tenant_write`) deja pasar un INSERT directo
+-- con `source_domain = 'ai_system'` sin las tres validaciones de la RPC
+-- (asunto, membresía del autor, cargo vigente del decisor). Este guard cierra
+-- ese camino: solo `fn_secretaria_registrar_dictamen_ia` puede insertar en ese
+-- dominio, marcando la transacción con un GUC local que el trigger exige.
+CREATE OR REPLACE FUNCTION public.fn_secretaria_document_artifact_ai_insert_guard()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $fn$
+BEGIN
+  IF NEW.source_domain = 'ai_system'
+     AND COALESCE(current_setting('app.secretaria_dictamen_ia_rpc', true), '') <> '1' THEN
+    RAISE EXCEPTION 'DICTAMEN_IA_SOLO_POR_RPC: un artefacto ai_system solo puede insertarse via fn_secretaria_registrar_dictamen_ia'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END;
+$fn$;
+
+REVOKE ALL ON FUNCTION public.fn_secretaria_document_artifact_ai_insert_guard() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS trg_secretaria_document_artifact_ai_insert_guard ON public.secretaria_document_artifacts;
+CREATE TRIGGER trg_secretaria_document_artifact_ai_insert_guard
+  BEFORE INSERT ON public.secretaria_document_artifacts
+  FOR EACH ROW
+  EXECUTE FUNCTION public.fn_secretaria_document_artifact_ai_insert_guard();
 
 -- Un GRANT es aditivo y TRUNCATE no pasa por RLS (gotcha medido varias veces
 -- en este programa). `anon` medía con SELECT/INSERT/UPDATE/DELETE heredados
@@ -164,6 +206,8 @@ BEGIN
       USING ERRCODE = '42501';
   END IF;
 
+  PERFORM set_config('app.secretaria_dictamen_ia_rpc', '1', true);
+
   INSERT INTO public.secretaria_document_artifacts (
     tenant_id, artifact_kind, title, status,
     source_domain, source_id, source_payload,
@@ -212,6 +256,10 @@ BEGIN
     RAISE EXCEPTION 'VERIFICACION MOI-175 T13: falta fn_secretaria_registrar_dictamen_ia';
   END IF;
 
+  IF to_regprocedure('public.fn_secretaria_document_artifact_ai_insert_guard()') IS NULL THEN
+    RAISE EXCEPTION 'VERIFICACION MOI-175 T13: falta fn_secretaria_document_artifact_ai_insert_guard';
+  END IF;
+
   SELECT count(*) INTO v_residuales_anon
     FROM information_schema.role_table_grants
    WHERE table_schema = 'public' AND table_name = 'secretaria_document_artifacts' AND grantee = 'anon';
@@ -227,13 +275,34 @@ BEGIN
     RAISE EXCEPTION 'VERIFICACION MOI-175 T13: authenticated conserva % privilegios de TRUNCATE/TRIGGER/REFERENCES', v_residuales_auth;
   END IF;
 
-  -- Control positivo del guardia: un artefacto ai_system en APPROVED no
-  -- admite UPDATE. Fila de sonda insertada y borrada dentro de la misma
-  -- subtransacción deshecha (el propio INSERT también es de sonda, así que
-  -- no hace falta un DELETE aparte antes del rollback).
+  -- Control positivo del guard de INSERT (el hallazgo P1): un INSERT directo
+  -- con source_domain='ai_system', sin el GUC que solo pone la RPC, se
+  -- rechaza — es exactamente el camino que dejaba usar cualquier SECRETARIO
+  -- para acuñar un dictamen "APPROVED" sin las tres validaciones.
   BEGIN
     INSERT INTO public.secretaria_document_artifacts (id, tenant_id, artifact_kind, title, status, source_domain, source_id)
+    VALUES (v_probe_id, v_arga_tenant, 'INFORME_PRECEPTIVO', '__PROBE_MOI175_T13_INS__', 'APPROVED', 'ai_system', v_arga_system);
+    RAISE EXCEPTION 'VERIFICACION MOI-175 T13: el INSERT directo con source_domain=ai_system NO fue rechazado';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'DICTAMEN_IA_SOLO_POR_RPC%' THEN
+      RAISE;
+    END IF;
+  END;
+
+  IF EXISTS (SELECT 1 FROM public.secretaria_document_artifacts WHERE id = v_probe_id) THEN
+    RAISE EXCEPTION 'VERIFICACION MOI-175 T13: quedó residuo del INSERT directo rechazado';
+  END IF;
+
+  -- Control positivo del guardia de inmutabilidad: un artefacto ai_system en
+  -- APPROVED no admite UPDATE. La sonda entra marcando el GUC de la RPC
+  -- (solo para el INSERT — el guard de inmutabilidad no lo mira) y se
+  -- deshace en la misma subtransacción (el propio INSERT también es de
+  -- sonda, así que no hace falta un DELETE aparte antes del rollback).
+  BEGIN
+    PERFORM set_config('app.secretaria_dictamen_ia_rpc', '1', true);
+    INSERT INTO public.secretaria_document_artifacts (id, tenant_id, artifact_kind, title, status, source_domain, source_id)
     VALUES (v_probe_id, v_arga_tenant, 'INFORME_PRECEPTIVO', '__PROBE_MOI175_T13__', 'APPROVED', 'ai_system', v_arga_system);
+    PERFORM set_config('app.secretaria_dictamen_ia_rpc', '0', true);
 
     BEGIN
       UPDATE public.secretaria_document_artifacts SET title = 'intento de edición' WHERE id = v_probe_id;
@@ -263,8 +332,10 @@ BEGIN
   -- rechaza (segunda sonda, propia).
   v_bloqueado := false;
   BEGIN
+    PERFORM set_config('app.secretaria_dictamen_ia_rpc', '1', true);
     INSERT INTO public.secretaria_document_artifacts (id, tenant_id, artifact_kind, title, status, source_domain, source_id)
     VALUES (v_probe_id, v_arga_tenant, 'INFORME_PRECEPTIVO', '__PROBE_MOI175_T13_DEL__', 'APPROVED', 'ai_system', v_arga_system);
+    PERFORM set_config('app.secretaria_dictamen_ia_rpc', '0', true);
 
     BEGIN
       DELETE FROM public.secretaria_document_artifacts WHERE id = v_probe_id;
