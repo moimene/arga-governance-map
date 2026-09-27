@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { slugify } from "@/lib/secretaria/sociedad-onboarding/builders";
 
 export interface DelegationRow {
   id: string;
@@ -156,6 +157,72 @@ export function useShareholderRepresentationCandidates(
       );
       if (error) throw error;
       return (data ?? []) as ShareholderRepresentationCandidate[];
+    },
+  });
+}
+
+// `delegations.code` y `delegations.slug` son UNIQUE globales (no por
+// tenant): dos grupos pueden crear delegaciones el mismo día y sus valores
+// no pueden colisionar. Sufijo aleatorio + reintento ante colisión real,
+// en vez de asumir que nunca ocurre.
+function randomSuffix(): string {
+  const raw =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2);
+  return raw.replace(/-/g, "").slice(0, 6).toUpperCase();
+}
+
+export interface CreateDelegationInput {
+  entity_id: string | null;
+  grantor_id: string;
+  delegate_id: string;
+  delegate_name: string; // solo para el slug legible; no se persiste aparte
+  delegation_type: string;
+  scope: string;
+  limits?: string | null;
+  start_date: string;
+  end_date?: string | null;
+}
+
+export function useCreateDelegation() {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateDelegationInput): Promise<DelegationRow> => {
+      if (!tenantId) throw new Error("Tenant no inicializado");
+      let lastError: { code?: string; message: string } | null = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const suffix = randomSuffix();
+        const code = `GN-DEL-${suffix}`;
+        const slug = `gn-deleg-${slugify(input.delegate_name)}-${suffix.toLowerCase()}`;
+        const { data, error } = await supabase
+          .from("delegations")
+          .insert({
+            tenant_id: tenantId,
+            code,
+            slug,
+            delegation_type: input.delegation_type,
+            entity_id: input.entity_id,
+            grantor_id: input.grantor_id,
+            delegate_id: input.delegate_id,
+            scope: input.scope,
+            limits: input.limits ?? null,
+            start_date: input.start_date,
+            end_date: input.end_date ?? null,
+            status: "Vigente",
+          })
+          .select()
+          .single();
+        if (!error) return data as DelegationRow;
+        // 23505 = unique_violation. Cualquier otro error se propaga tal cual.
+        if (error.code !== "23505") throw error;
+        lastError = error;
+      }
+      throw new Error(`No se pudo generar un código/slug único tras 3 intentos: ${lastError?.message}`);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["delegations", "list", tenantId] });
     },
   });
 }

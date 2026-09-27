@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import { useTenantBranding, useTenantBrandingLoading } from "@/context/TenantBrandContext";
 import { groupFullLabel } from "@/lib/tenant-brand-labels";
 import { usaFixturesDemo } from "@/lib/tenant-fixtures";
+import { NewConflictDialog } from "@/components/NewConflictDialog";
 
 export function debeMostrarOpvDemo(
   branding: ReturnType<typeof useTenantBranding>,
@@ -116,6 +117,10 @@ export default function ConflictosList() {
             <KpiCard label="Conflictos permanentes declarados" value={conflictKpis.sinClasificar ? "—" : conflictKpis.permanentes} icon={CheckCircle} tone="success" />
             <KpiCard label="Conflictos situacionales" value={conflictKpis.sinClasificar ? "—" : conflictKpis.situacionales} icon={CheckCircle} tone="success" />
             <KpiCard label="Pendientes / No declarados" value={conflictKpis.noDeclarados} icon={ShieldAlert} tone="critical" />
+          </div>
+
+          <div className="flex justify-end">
+            <NewConflictDialog />
           </div>
 
           <Card className="overflow-hidden">
