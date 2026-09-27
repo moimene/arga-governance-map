@@ -48,17 +48,18 @@ describe("convocatoria — bifurcación de emisión Junta/Consejo (MOI-142)", ()
     expect(stepper).toContain('convocanteAuthority?.cargo !== "PRESIDENTE"');
   });
 
-  it("deriva el convocante de Junta del CDA de la entidad (art. 166 LSC), no del body_id de la propia Junta", () => {
-    expect(stepper).toContain("juntaAdminBody");
+  it("un solo criterio de quién convoca para la emisión y para el texto (arista; el comportamiento lo fija convocante-autoridad.test.ts)", () => {
+    expect(stepper).toContain('from "@/lib/secretaria/convocante-autoridad"');
+    expect(stepper).toContain("autoridadConvocante({");
     expect(stepper).toContain('(b.body_type ?? "").toUpperCase() === "CDA"');
-    expect(stepper).toContain("juntaConvocanteAuthority");
-    expect(stepper).toContain(
-      'ev.cargo === "PRESIDENTE" || ev.cargo === "ADMIN_UNICO"',
-    );
-    // Bloquea la emisión de Junta si no hay Presidente/Administrador único vigente.
-    expect(stepper).toContain(
-      'organoTipo === "JUNTA_GENERAL" && !juntaConvocanteAuthority',
-    );
+    // La emisión de Junta se bloquea sin convocante...
+    expect(stepper).toContain('organoTipo === "JUNTA_GENERAL" && !convocanteDelActo');
+    // ...y el texto nombra a ESE mismo convocante (antes leía el Presidente
+    // del órgano de la Junta, que no existe, y firmaba «: .»).
+    expect(stepper).toContain('convocanteNombre: convocanteDelActo?.person?.full_name');
+    expect(stepper).toContain('nombre_convocante: convocanteDelActo?.person?.full_name');
+    expect(stepper).not.toContain("convocanteNombre: convocanteAuthority");
+    expect(stepper).not.toContain("nombre_convocante: convocanteAuthority");
   });
 
   it("propaga body_type al crear la convocatoria, para que el hook sepa qué RPC llamar", () => {

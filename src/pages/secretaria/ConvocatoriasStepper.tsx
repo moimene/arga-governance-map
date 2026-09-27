@@ -44,6 +44,7 @@ import {
 import { secretariaErrorMessage } from "@/lib/secretaria/supabase-error-message";
 import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
 import { usePresidenteVigente, useAuthorityEvidence } from "@/hooks/useAuthorityEvidence";
+import { autoridadConvocante } from "@/lib/secretaria/convocante-autoridad";
 import { useShareholderRepresentationCandidates } from "@/hooks/useDelegations";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
@@ -628,13 +629,6 @@ export default function ConvocatoriasStepper() {
   // listado de autoridad vigente de la entidad en vez de una query nueva.
   const { data: entityAuthorityEvidence = [] } = useAuthorityEvidence(selectedEntityId ?? undefined);
   const juntaAdminBody = bodies.find((b) => (b.body_type ?? "").toUpperCase() === "CDA") ?? null;
-  const juntaConvocanteAuthority = juntaAdminBody
-    ? entityAuthorityEvidence.find(
-        (ev) =>
-          ev.body_id === juntaAdminBody.id &&
-          (ev.cargo === "PRESIDENTE" || ev.cargo === "ADMIN_UNICO"),
-      ) ?? null
-    : null;
   const lastResolvedOrganoTipoRef = useRef<TipoOrgano>("JUNTA_GENERAL");
   const resolvedOrganoTipo = selectedBody ? resolveOrganoTipo(selectedBody) : null;
   if (resolvedOrganoTipo) lastResolvedOrganoTipoRef.current = resolvedOrganoTipo;
@@ -644,6 +638,12 @@ export default function ConvocatoriasStepper() {
   const organoTipo = resolvedOrganoTipo ?? (
     selectedBodyId ? lastResolvedOrganoTipoRef.current : "JUNTA_GENERAL"
   );
+  const convocanteDelActo = autoridadConvocante({
+    organoTipo,
+    presidenteDelOrgano: convocanteAuthority,
+    organoAdministracionId: juntaAdminBody?.id ?? null,
+    evidenciasEntidad: entityAuthorityEvidence,
+  });
   const domicilioSocial = entityDomicilioSocial(selectedEntity);
   const { data: readiness } = useEntityDemoReadiness(selectedEntityId);
   const readinessBlocked = readiness?.status === "reference_only";
@@ -1341,8 +1341,8 @@ export default function ConvocatoriasStepper() {
         denominacionSocial: selectedEntity?.legal_name ?? selectedEntity?.common_name ?? "",
         entidadCotizada: Boolean(selectedEntity?.es_cotizada),
         organoNombre: selectedBody?.name ?? "",
-        convocanteNombre: convocanteAuthority?.person?.full_name ?? "",
-        convocanteCargo: convocanteAuthority?.cargo ?? "",
+        convocanteNombre: convocanteDelActo?.person?.full_name ?? "",
+        convocanteCargo: convocanteDelActo?.cargo ?? "",
         agendaSummaryText: canonicalAgendaSummary,
         agendaItems,
         channelLabels: channelLabelsForCapa3,
@@ -1355,8 +1355,8 @@ export default function ConvocatoriasStepper() {
       borradorCapa3BaseFields,
       channelLabelsForCapa3,
       canonicalAgendaSummary,
-      convocanteAuthority?.person?.full_name,
-      convocanteAuthority?.cargo,
+      convocanteDelActo?.person?.full_name,
+      convocanteDelActo?.cargo,
       domicilioSocial,
       fechaReunion,
       formatoReunion,
@@ -1669,15 +1669,15 @@ export default function ConvocatoriasStepper() {
           email: m.email ?? null,
           rol: m.role ?? null,
         })),
-      nombre_convocante: convocanteAuthority?.person?.full_name ?? "",
-      cargo_convocante: convocanteAuthority?.cargo ?? "",
+      nombre_convocante: convocanteDelActo?.person?.full_name ?? "",
+      cargo_convocante: convocanteDelActo?.cargo ?? "",
     };
   }, [
     activeRecipients, excludedPersonIds, selectedEntity, tipoSocial, selectedBody, organoTipo,
     jurisdiction, tipoConvocatoria, fechaReunion, horaReunion, lugar, formatoReunion,
     habilitarSegunda, fechaReunion2, horaReunion2, evaluacionV2.antelacionDiasRequerida,
     evaluacionV2.fechaLimitePublicacion, channelLabelsForCapa3, agendaItems, domicilioSocial,
-    borradorCapa3Values, convocanteAuthority?.person?.full_name, convocanteAuthority?.cargo,
+    borradorCapa3Values, convocanteDelActo?.person?.full_name, convocanteDelActo?.cargo,
     entities, agendaTitleForDocument, canonicalAgendaSummary, shareholderRepresentationCandidates,
   ]);
 
@@ -2100,7 +2100,7 @@ export default function ConvocatoriasStepper() {
     organoTipo === "CONSEJO"
       ? convocanteAuthority?.cargo === "PRESIDENTE"
       : organoTipo === "JUNTA_GENERAL"
-        ? Boolean(juntaConvocanteAuthority)
+        ? Boolean(convocanteDelActo)
         : true;
   const representationAgendaReady = agendaItems.every((item) => {
     if (item.materia !== "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL") return true;
@@ -2462,7 +2462,7 @@ export default function ConvocatoriasStepper() {
       );
       return;
     }
-    if (organoTipo === "JUNTA_GENERAL" && !juntaConvocanteAuthority) {
+    if (organoTipo === "JUNTA_GENERAL" && !convocanteDelActo) {
       toast.error(
         "No existe evidencia vigente de Presidente o Administrador único en el órgano de administración de esta sociedad (art. 166 LSC). Esa evidencia solo acredita el cargo y no una actuación personal; el registro DEMO queda bloqueado.",
       );
