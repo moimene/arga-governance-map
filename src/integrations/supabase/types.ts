@@ -15321,6 +15321,7 @@ export type Database = {
         Args: {
           p_derivation: string
           p_entity_id: string
+          p_governing_body_id?: string
           p_questionnaire_id?: string
           p_rationale?: string
           p_role: string
@@ -16156,8 +16157,10 @@ export type Database = {
         Args: {
           p_decision_subtype?: string | null
           p_kind?: string
+          p_matter_code?: string | null
           p_meeting_id: string
           p_order_number: number
+          p_proposal_text?: string | null
           p_title: string
         }
         Returns: string

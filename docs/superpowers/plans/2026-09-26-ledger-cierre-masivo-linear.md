@@ -210,3 +210,34 @@ instrucción de delegación: Suite Tax IS (P-MOI-4, archivada, con una hija del 
   hallazgo, MOI-309 pasa de Done a In Review a nombre de Moisés (pide su aprobación y no consta).
   Quedan señalados, sin reescribir, los informes antiguos de otro agente sin línea de agente (MOI-16,
   15, 144 y 87, del 24-25/09).
+
+### 2026-10-02 — relevo M1 (rama `claude/m1-cierre-secretaria-aims-20261002`, base `51e17a3`)
+
+Sesión de Claude Code en la nube (no en el Mac de Moisés): sin `.env`, sin contraseñas demo y sin las
+ramas locales de la ola 6. Reglas del relevo: nada a `main` ni a Cloud sin OK escrito de Moisés.
+
+- **MOI-15 · H-51** (cliente): `puedeRecalcularResoluciones` recibe los puntos votables y devuelve
+  `true` si alguno no tiene resolución; el paso de Votaciones vuelve a ofrecer «Registrar votación…»
+  y explica que hay un punto sin votar. Test con el caso medido y control positivo.
+- **MOI-15 · H-52** (migración `20261002100000` + cliente): `fn_secretaria_add_session_agenda_item`
+  acepta `p_matter_code` (validada en `materia_catalog`) y `p_proposal_text`; una llamada repetida
+  completa el punto nacido en sesión mientras no esté votado. El paso 4 la usa también para el punto
+  ya persistido de una reunión con convocatoria emitida.
+- **MOI-15 · H-53** (misma migración): el manifiesto del acta compara con la convocatoria solo los
+  puntos que vienen de ella y declara `origin` de cada punto. **En Junta sigue la comparación total**
+  (art. 223.1 LSC, reservado al Comité Legal). Decisión D-31.
+- Ensayos revertidos: control sin migración reproduce H-53; con la migración se genera el acta
+  (`MANIFEST_READY`). Detalle: `docs/superpowers/reviews/2026-10-02-ensayo-moi15-h52-h53.md`.
+- **MOI-150** (migración `20261002101000` + script): `fn_aims_proponer_sujeto` acepta
+  `p_governing_body_id` (mismo tenant); el script de siembra lo pasa. Ensayo revertido con control
+  positivo (grupo nuevo) y negativos (órgano ajeno, ARGA). Detalle:
+  `docs/superpowers/reviews/2026-10-02-ensayo-moi150-organo-ia.md`.
+- **Ola 6 no incorporada**: las ramas `agent/*-ola6` y las migraciones `20260928170000/171000/172000`
+  no están en GitHub (solo existe `main`); viven en el Mac de Moisés. H-53 y la RPC de MOI-150 se han
+  rehecho aquí con numeración `202610021xxxxx`; si lo de la ola 6 es equivalente, se descarta.
+- GOTCHA: el conector MCP de Supabase retiene un `DROP FUNCTION` a la espera de confirmación humana y la
+  llamada se corta a los 60 s sin ejecutar nada. En ensayos, crear la firma nueva junto a la antigua.
+
+| ID | Tema | Decisión | Motivo |
+|---|---|---|---|
+| D-31 | H-53 | Solo los puntos con `source_convocatoria_id` deben coincidir con la convocatoria en órganos que no son Junta; en Junta, comparación total. | Es la incompatibilidad medida con H-32 en el Consejo; ampliar a Junta es criterio jurídico (art. 223.1 LSC). |

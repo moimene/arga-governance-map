@@ -7,7 +7,9 @@
  *
  * Flujo:
  *  1. RPC `fn_secretaria_add_session_agenda_item(meeting_id, order_number,
- *     title, kind, decision_subtype)`.
+ *     title, kind, decision_subtype, matter_code, proposal_text)`. Llamarla
+ *     otra vez sobre el mismo punto nacido en sesión completa su materia y
+ *     su propuesta (H-52) mientras no se haya votado.
  *  2. Invalida queries derivadas (`meeting_agenda_sources`, `agenda_items`,
  *     `agenda_item_kind_changelog`) para que la UI refleje el nuevo row.
  *  3. Devuelve el nuevo `id` para que el caller pueda pasarlo al dialog
@@ -41,6 +43,10 @@ interface MaterializeAgendaItemParams {
   title: string;
   kind?: AgendaItemKind | null;
   decisionSubtype?: string | null;
+  /** H-52: materia catalogada del punto (se valida contra materia_catalog en servidor). */
+  matterCode?: string | null;
+  /** H-52: propuesta exacta del punto DECISORIO; el acta la exige. */
+  proposalText?: string | null;
 }
 
 export function useMaterializeAgendaItem() {
@@ -60,6 +66,12 @@ export function useMaterializeAgendaItem() {
         // (espejo de normalizeAgendaItemKind del cliente).
         p_kind: (params.kind ?? "DELIBERATIVO") as string,
         p_decision_subtype: params.decisionSubtype ?? null,
+        // H-52 (MOI-15): sin estos dos argumentos el punto nacido en sesión
+        // quedaba sin materia ni propuesta y el acta no se podía generar.
+        // Se envían siempre (aunque sean null) para que PostgREST resuelva
+        // la firma de 7 argumentos.
+        p_matter_code: params.matterCode?.trim() || null,
+        p_proposal_text: params.proposalText?.trim() || null,
       };
       // La RPC ya es idempotente en servidor (Codex P2 round 15 vivía aquí
       // client-side contra un INSERT directo; ahora vive dentro de

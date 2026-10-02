@@ -112,7 +112,10 @@ import {
   buildMeetingAdoptionDoubleEvaluation,
   type DualEvaluationComparison,
 } from "@/lib/secretaria/dual-evaluation";
-import { puedeRecalcularResoluciones } from "@/lib/secretaria/meeting-resolution-recalc";
+import {
+  puedeRecalcularResoluciones,
+  puntosVotablesSinResolucion,
+} from "@/lib/secretaria/meeting-resolution-recalc";
 import {
   isMeetingBoundToEmittedConvocation,
   patchQuorumDataSourceLinks,
@@ -2065,6 +2068,27 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
     let avisoAgendaInmutable = false;
 
     try {
+      // H-52 (MOI-15): en una reunión ligada a una convocatoria emitida el
+      // UPDATE directo está vetado, así que los puntos nacidos en sesión ya
+      // persistidos completan materia y propuesta por la misma RPC gobernada.
+      // Se distinguen de los de la convocatoria por source_convocatoria_id.
+      const puntosNacidosEnSesion = new Map<string, number>();
+      if (agendaInmutable && meetingId && tenantId) {
+        const { data: agendaRows, error: agendaRowsError } = await supabase
+          .from("agenda_items")
+          .select("id, order_number, source_convocatoria_id")
+          .eq("tenant_id", tenantId)
+          .eq("meeting_id", meetingId);
+        if (agendaRowsError) throw agendaRowsError;
+        for (const row of (agendaRows ?? []) as Array<{
+          id: string;
+          order_number: number;
+          source_convocatoria_id: string | null;
+        }>) {
+          if (!row.source_convocatoria_id) puntosNacidosEnSesion.set(row.id, row.order_number);
+        }
+      }
+
       for (let index = 0; index < debatesForSave.length; index += 1) {
         const point = debatesForSave[index];
         const kind = resolvePointKind(point, kindIndex);
@@ -2074,6 +2098,13 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
 
         const existingAgendaItemId =
           point.source_table === "agenda_items" && point.source_id ? point.source_id : null;
+        // Solo se envía una materia del catálogo: el servidor rechaza las
+        // demás (SESSION_AGENDA_ITEM_MATTER_NOT_CATALOGUED) y un punto no
+        // decisorio con materia libre no debe dejar de poder guardarse.
+        const matterCode = esMateriaCatalogada(point.materia, codigosCatalogo)
+          ? point.materia ?? null
+          : null;
+        const proposalText = kind === "DECISORIO" ? point.resolution_text ?? null : null;
         const agendaItemId =
           existingAgendaItemId ??
           await materializeAgendaItem.mutateAsync({
@@ -2083,9 +2114,25 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
             title: point.punto,
             kind,
             decisionSubtype: point.decision_subtype ?? null,
+            matterCode,
+            proposalText,
           });
 
-        if (existingAgendaItemId && agendaInmutable) {
+        const ordenNacidoEnSesion = existingAgendaItemId
+          ? puntosNacidosEnSesion.get(existingAgendaItemId)
+          : undefined;
+        if (existingAgendaItemId && agendaInmutable && ordenNacidoEnSesion !== undefined) {
+          await materializeAgendaItem.mutateAsync({
+            meetingId,
+            tenantId,
+            orderNumber: ordenNacidoEnSesion,
+            title: point.punto,
+            kind,
+            decisionSubtype: point.decision_subtype ?? null,
+            matterCode,
+            proposalText,
+          });
+        } else if (existingAgendaItemId && agendaInmutable) {
           avisoAgendaInmutable = true;
         } else if (existingAgendaItemId) {
           const persistedKind = kindIndex.get(existingAgendaItemId);
@@ -3144,6 +3191,14 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
   const canRecalculateExistingResolutions = puedeRecalcularResoluciones({
     resoluciones: existingResolutions,
     snapshots: existingPointSnapshots,
+    // H-51: un punto votable sin resolución (p. ej. nacido en sesión) mantiene
+    // el botón de registro aunque las resoluciones ya guardadas estén completas.
+    puntosVotables: votablePointIndices.map((index) => index + 1),
+  });
+
+  const pendingVotablePoints = puntosVotablesSinResolucion({
+    resoluciones: existingResolutions,
+    puntosVotables: votablePointIndices.map((index) => index + 1),
   });
 
   async function handleSaveResolutions() {
@@ -3797,9 +3852,9 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
             <p className="text-sm text-[var(--g-text-secondary)]">
-              Hay acuerdos votados sin expediente Acuerdo 360 o con snapshot no
-              proclamable. Puede recalcular la votación para crear o actualizar el expediente
-              canónico con el snapshot legal actual.
+              {pendingVotablePoints.length > 0
+                ? `Hay ${pendingVotablePoints.length} punto(s) decisorio(s) sin votación registrada (por ejemplo, un punto nacido en sesión). Registre la votación para crear su expediente Acuerdo 360; los acuerdos ya registrados se conservan.`
+                : "Hay acuerdos votados sin expediente Acuerdo 360 o con snapshot no proclamable. Puede recalcular la votación para crear o actualizar el expediente canónico con el snapshot legal actual."}
             </p>
           </div>
         ) : null}
@@ -3825,7 +3880,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
             ) : (
               <Save className="h-4 w-4" />
             )}
-            {canRecalculateExistingResolutions
+            {canRecalculateExistingResolutions && pendingVotablePoints.length === 0
               ? "Recalcular votación del acuerdo y crear expediente Acuerdo 360"
               : "Registrar votación del acuerdo y crear expediente Acuerdo 360"}
           </button>

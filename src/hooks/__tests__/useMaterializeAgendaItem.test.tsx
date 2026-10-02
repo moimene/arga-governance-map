@@ -79,10 +79,35 @@ describe("useMaterializeAgendaItem", () => {
       p_title: "Ruegos y preguntas nacido en sesión",
       p_kind: "INFORMATIVO",
       p_decision_subtype: null,
+      p_matter_code: null,
+      p_proposal_text: null,
     });
     // H-27: el defecto era un INSERT directo en agenda_items por PostgREST.
     // El fix no debe volver a tocar `.from("agenda_items")`.
     expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("H-52: envía materia y propuesta del punto decisorio nacido en sesión", async () => {
+    const { result } = renderHook(() => useMaterializeAgendaItem(), { wrapper });
+
+    await result.current.mutateAsync({
+      meetingId: "m-1",
+      tenantId: "t-1",
+      orderNumber: 2,
+      title: "Aprobación del presupuesto anual",
+      kind: "DECISORIO",
+      matterCode: " APROBACION_PRESUPUESTO ",
+      proposalText: "Se acuerda aprobar el presupuesto.",
+    });
+
+    expect(mockRpc).toHaveBeenCalledWith(
+      "fn_secretaria_add_session_agenda_item",
+      expect.objectContaining({
+        p_kind: "DECISORIO",
+        p_matter_code: "APROBACION_PRESUPUESTO",
+        p_proposal_text: "Se acuerda aprobar el presupuesto.",
+      }),
+    );
   });
 
   it("kind por defecto DELIBERATIVO cuando no se pasa", async () => {

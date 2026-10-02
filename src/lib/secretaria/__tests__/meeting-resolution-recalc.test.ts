@@ -7,6 +7,7 @@ import type { MeetingAdoptionSnapshot } from "@/lib/rules-engine/meeting-adoptio
 import {
   haySnapshotCertificable,
   puedeRecalcularResoluciones,
+  puntosVotablesSinResolucion,
 } from "../meeting-resolution-recalc";
 
 const snap = (ok: boolean, status: string) =>
@@ -72,5 +73,40 @@ describe("puedeRecalcularResoluciones", () => {
     expect(haySnapshotCertificable([snap(true, "ADOPTED")])).toBe(true);
     expect(haySnapshotCertificable([snap(true, "REJECTED"), snap(false, "ADOPTED")])).toBe(false);
     expect(haySnapshotCertificable([])).toBe(false);
+  });
+});
+
+// H-51 (2026-09-27, reunión `81a4de74` del grupo nuevo): el punto 1 completo y
+// un punto 2 nacido en sesión sin resolución. El botón de registro desaparecía.
+describe("H-51 — punto votable sin resolución", () => {
+  const completo = { agreement_id: "a1", status: "ADOPTED", agenda_item_index: 1 } as const;
+
+  it("EL DEFECTO: con el punto 1 completo y el 2 sin resolución, hay que registrar", () => {
+    expect(
+      puedeRecalcularResoluciones({
+        resoluciones: [completo],
+        snapshots: [snap(true, "ADOPTED")],
+        puntosVotables: [1, 2],
+      }),
+    ).toBe(true);
+    expect(
+      puntosVotablesSinResolucion({ resoluciones: [completo], puntosVotables: [1, 2] }),
+    ).toEqual([2]);
+  });
+
+  it("control positivo: con todos los puntos votables resueltos, el paso está terminado", () => {
+    expect(
+      puedeRecalcularResoluciones({
+        resoluciones: [completo, { ...completo, agreement_id: "a2", agenda_item_index: 2 }],
+        snapshots: [snap(true, "ADOPTED")],
+        puntosVotables: [1, 2],
+      }),
+    ).toBe(false);
+  });
+
+  it("sin puntos votables informados conserva el comportamiento anterior", () => {
+    expect(
+      puedeRecalcularResoluciones({ resoluciones: [completo], snapshots: [snap(true, "ADOPTED")] }),
+    ).toBe(false);
   });
 });
