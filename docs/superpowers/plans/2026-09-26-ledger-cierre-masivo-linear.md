@@ -210,3 +210,56 @@ instrucción de delegación: Suite Tax IS (P-MOI-4, archivada, con una hija del 
   hallazgo, MOI-309 pasa de Done a In Review a nombre de Moisés (pide su aprobación y no consta).
   Quedan señalados, sin reescribir, los informes antiguos de otro agente sin línea de agente (MOI-16,
   15, 144 y 87, del 24-25/09).
+
+### 5.6 Relevo M1 — ola 6 integrada y ensayada, sin aplicar (03-10-2026)
+
+Encargo de Moisés (relevo en modo no interactivo): cerrar M1 cuanto antes, todo en la rama
+`agent/m1-relevo-20261003` (desde `origin/main` `51e17a36`) y en una PR contra `main`, **sin tocar la
+base de producción**: migraciones y siembra solo ensayadas con ROLLBACK; se aplican con su OK escrito.
+Sin acceso a Linear ni al MCP de Supabase; canal de base de datos: `psql` al pooler con la contraseña
+de `.env` (nunca impresa), vía `scripts/db/ensayo-rollback.sh` (nuevo: concatena BEGIN … ROLLBACK).
+
+- **MOI-15 (acta 4.1, reunión `81a4de74…`).** H-51 corregido en `puedeRecalcularResoluciones`
+  (`puntosVotables`): un punto votable sin resolución es votación pendiente aunque las guardadas
+  estén completas. H-52: migración **`20260928171000`** — la RPC del punto nacido en sesión acepta
+  `p_matter_code` y `p_proposal_text`, los exige en DECISORIO (misma condición que el acta y que
+  H-50) y, en el camino idempotente, **sincroniza** el punto de sesión ya existente (es la única
+  escritura que el guard de agenda emitida admite; permite reparar `dc938c06…` por pantalla); el
+  cliente pasa ambos y, en una reunión convocada, completa el punto de sesión por la RPC en vez de
+  saltarlo (`source_convocatoria_id` viaja ahora con la agenda). La **propuesta** también faltaba y
+  el acta la exige: el hallazgo H-52 solo había medido la materia. H-53: migración
+  **`20260928170000`** del worktree de la ola 6 (sin commit; se incorpora tal cual: sustitución
+  anclada sobre el cuerpo vivo del manifiesto y del renderizador, origen `CONVOCATORIA` /
+  `MEETING_FLOOR` declarado). **H-54, nuevo y medido en el ensayo**: con los tres anteriores
+  resueltos, el cierre fallaba con `SERVER_VOTE_EXACTLY_ONE_VOTE_REQUIRED` porque la presidencia
+  tiene un conflicto activo (alta de prueba de MOI-149) y el envío filtraba `vote !== ""`: el
+  asiento excluido nunca llegaba a `meeting_votes`. Criterio único `votesForPersistence` en el
+  módulo hoja de completitud; el asiento viaja como ABSTENCION + conflicto + motivo y el servidor lo
+  descuenta. Fila H-54 añadida al guion.
+- **Ensayo revertido, de extremo a extremo** (`docs/superpowers/reviews/2026-09-26-ensayos-cloud/ola6-ensayo.txt`),
+  con la sesión real del SECRETARIO del grupo nuevo y las mismas RPC que llama la pantalla:
+  171000 + sonda (el punto 2 queda con materia y propuesta por la vía idempotente, convocatoria
+  protegida, Garrigues y anon con 42501) → votación del punto 2 por `fn_save_meeting_resolutions`
+  (2 resoluciones ADOPTED, acuerdo del punto 1 conservado) → cierre bloqueado **solo** por H-53 →
+  170000 → **acta generada** (`MANIFEST_READY`, `agenda[0].origin=CONVOCATORIA`,
+  `agenda[1].origin=MEETING_FLOOR`, «Procedencia: …» en el texto) → 172000 + sonda MOI-150. ARGA
+  (13 actas / 52 acuerdos) y Garrigues (0 / 10) sin cambio. Cloud intacto después: cabecera
+  `20260928160000`, 392 versiones, `81a4de74…` EN_CURSO y sin acta. Lo simulado y declarado: el
+  sentido del voto del punto 2 y su snapshot (clonado del punto 1 sin `rule_trace`); el recorrido
+  real por pantalla se hace tras aplicar las migraciones.
+- **MOI-150.** `e3f3c304` (rama `agent/moi-150rpc-ola6`) incorporado por cherry-pick: migración
+  **`20260928172000`** (`p_governing_body_id` en proponer y confirmar, `AIMS_GOBIERNO` y tenant
+  validados) y seed con camino de completar. Dry-run del seed con la cuenta `admin@` del grupo
+  nuevo: «se propondría 1 sujeto nuevo … CON el órgano D-28 puesto de una vez»
+  (`govos-m1-notas/moi150-seed-dry-run.txt`). El caso `nuevo` de `e2e/72` queda **saltado** hasta
+  `E2E_MOI150_APLICADO=1` (un gate que exige lo que aún no existe empuja a fabricarlo).
+- **Numeración.** `20260928170000/171000/172000` son posteriores a la cabecera aplicada
+  `20260928160000`: no hace falta renumerar. **Orden de aplicación propuesto**: 170000, 171000,
+  172000, después `seed-organo-ia-grupo-nuevo.ts --commit`, y **solo entonces** fusionar la PR: el
+  cliente llama a la RPC de 171000 con parámetros nuevos y a la de 172000 con otra firma; desplegar
+  antes de aplicar rompería «Añadir punto nacido en sesión» (PGRST202).
+- Verificación por pantalla en solo lectura (guard de red bloqueante): `e2e/73` (H-51: el botón
+  existe y queda deshabilitado hasta registrar el voto del punto 2) y `e2e/72` (ARGA y Garrigues).
+- Pendiente de Moisés: OK a las tres migraciones y al seed; después, recorrido por pantalla del
+  acta de `81a4de74…` (con `E2E_ESCRIBE_GRUPO_NUEVO=1`, `e2e/71` ola 5) y cierres en Linear
+  (textos propuestos en `govos-m1-notas/RESULTADO.md`).
