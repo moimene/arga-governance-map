@@ -7,7 +7,7 @@
  *
  * Flujo:
  *  1. RPC `fn_secretaria_add_session_agenda_item(meeting_id, order_number,
- *     title, kind, decision_subtype)`.
+ *     title, kind, decision_subtype, matter_code, proposal_text)`.
  *  2. Invalida queries derivadas (`meeting_agenda_sources`, `agenda_items`,
  *     `agenda_item_kind_changelog`) para que la UI refleje el nuevo row.
  *  3. Devuelve el nuevo `id` para que el caller pueda pasarlo al dialog
@@ -28,6 +28,14 @@
  * permanentemente disabled para puntos de convocatoria porque
  * `useCreateMeetingFromConvocatoria` solo inserta `meetings`, no
  * `agenda_items`. Este hook cierra ese gap on-demand.
+ *
+ * H-52 (MOI-15, 2026-10-03): la materia elegida y el texto resolutivo
+ * propuesto de un punto nacido en sesión no se persistían (la RPC no los
+ * aceptaba y en una reunión convocada el cliente no puede hacer UPDATE
+ * directo). Desde `20260928171000` la RPC acepta `p_matter_code` y
+ * `p_proposal_text`, y en el camino idempotente (mismo order_number ya
+ * materializado como punto de sesión) sincroniza esos campos: por eso el
+ * stepper también la llama para completar un punto de sesión ya existente.
  */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +49,10 @@ interface MaterializeAgendaItemParams {
   title: string;
   kind?: AgendaItemKind | null;
   decisionSubtype?: string | null;
+  /** H-52: materia catalogada (`materia_catalog.materia`). Obligatoria en servidor si kind es DECISORIO. */
+  matterCode?: string | null;
+  /** H-52: texto resolutivo propuesto. Obligatorio en servidor si kind es DECISORIO. */
+  proposalText?: string | null;
 }
 
 export function useMaterializeAgendaItem() {
@@ -60,6 +72,8 @@ export function useMaterializeAgendaItem() {
         // (espejo de normalizeAgendaItemKind del cliente).
         p_kind: (params.kind ?? "DELIBERATIVO") as string,
         p_decision_subtype: params.decisionSubtype ?? null,
+        p_matter_code: params.matterCode?.trim() || null,
+        p_proposal_text: params.proposalText?.trim() || null,
       };
       // La RPC ya es idempotente en servidor (Codex P2 round 15 vivía aquí
       // client-side contra un INSERT directo; ahora vive dentro de

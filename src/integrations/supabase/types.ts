@@ -16162,8 +16162,10 @@ export type Database = {
         Args: {
           p_decision_subtype?: string | null
           p_kind?: string
+          p_matter_code?: string | null
           p_meeting_id: string
           p_order_number: number
+          p_proposal_text?: string | null
           p_title: string
         }
         Returns: string

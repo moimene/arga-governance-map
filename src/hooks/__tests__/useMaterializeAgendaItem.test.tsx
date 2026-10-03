@@ -79,9 +79,36 @@ describe("useMaterializeAgendaItem", () => {
       p_title: "Ruegos y preguntas nacido en sesión",
       p_kind: "INFORMATIVO",
       p_decision_subtype: null,
+      p_matter_code: null,
+      p_proposal_text: null,
     });
     // H-27: el defecto era un INSERT directo en agenda_items por PostgREST.
     // El fix no debe volver a tocar `.from("agenda_items")`.
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("H-52: materia y propuesta viajan a la RPC (p_matter_code / p_proposal_text), recortadas", async () => {
+    const { result } = renderHook(() => useMaterializeAgendaItem(), { wrapper });
+
+    await result.current.mutateAsync({
+      meetingId: "m-1",
+      tenantId: "t-1",
+      orderNumber: 2,
+      title: "Aprobación del presupuesto anual 2027",
+      kind: "DECISORIO",
+      decisionSubtype: null,
+      matterCode: " APROBACION_PRESUPUESTO ",
+      proposalText: "  Se acuerda aprobar el presupuesto anual del ejercicio 2027.  ",
+    });
+
+    expect(mockRpc).toHaveBeenCalledWith(
+      "fn_secretaria_add_session_agenda_item",
+      expect.objectContaining({
+        p_kind: "DECISORIO",
+        p_matter_code: "APROBACION_PRESUPUESTO",
+        p_proposal_text: "Se acuerda aprobar el presupuesto anual del ejercicio 2027.",
+      }),
+    );
     expect(mockFrom).not.toHaveBeenCalled();
   });
 
