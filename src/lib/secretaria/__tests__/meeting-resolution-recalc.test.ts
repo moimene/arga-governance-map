@@ -66,6 +66,35 @@ describe("puedeRecalcularResoluciones", () => {
 
   it("sin resoluciones no hay nada que recalcular: el paso aún no ha ocurrido", () => {
     expect(puedeRecalcularResoluciones({ resoluciones: [], snapshots: [] })).toBe(false);
+    // Con puntos votables y cero resoluciones el botón ya lo pinta `!hasResolutions`.
+    expect(puedeRecalcularResoluciones({ resoluciones: [], snapshots: [], puntosVotables: 2 })).toBe(false);
+  });
+
+  it("H-51: un punto votable más que resoluciones guardadas sigue siendo votación pendiente, aunque las guardadas estén completas", () => {
+    // Reunión 81a4de74… del grupo nuevo: punto 1 ADOPTED con acuerdo y
+    // snapshot certificable; punto 2 DECISORIO nacido en sesión, sin resolución.
+    expect(
+      puedeRecalcularResoluciones({
+        resoluciones: [adoptadaConAcuerdo],
+        snapshots: [snap(true, "ADOPTED")],
+        puntosVotables: 2,
+      }),
+    ).toBe(true);
+    // Mismo número de puntos que de resoluciones completas: terminado.
+    expect(
+      puedeRecalcularResoluciones({
+        resoluciones: [adoptadaConAcuerdo],
+        snapshots: [snap(true, "ADOPTED")],
+        puntosVotables: 1,
+      }),
+    ).toBe(false);
+    // Sin el dato (llamadores antiguos) el criterio no cambia.
+    expect(
+      puedeRecalcularResoluciones({
+        resoluciones: [adoptadaConAcuerdo],
+        snapshots: [snap(true, "ADOPTED")],
+      }),
+    ).toBe(false);
   });
 
   it("haySnapshotCertificable exige AMBAS condiciones", () => {

@@ -601,7 +601,10 @@ export function useMeetingAgendaSources(meetingId: string | undefined) {
           // propague la clasificación a debates/votación (sin ellos, source.kind
           // viene undefined y el merge cae a DELIBERATIVO por defecto — Codex P2
           // round 2 + reviewer adversarial C1).
-          .select("id, order_number, title, description, matter_code, kind, decision_subtype, proposal_text, requires_attachments")
+          // source_convocatoria_id (H-52, MOI-15): distingue un punto del
+          // orden del día emitido (intocable) de uno nacido en sesión, que
+          // solo puede completarse por la RPC gobernada.
+          .select("id, order_number, title, description, matter_code, kind, decision_subtype, proposal_text, requires_attachments, source_convocatoria_id")
           .eq("meeting_id", meetingId!)
           .order("order_number", { ascending: true }),
         explicitConvocatoriaId

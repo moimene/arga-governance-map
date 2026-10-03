@@ -26,6 +26,12 @@ export interface MeetingAgendaPoint {
   kind?: AgendaItemKind | null;
   /** Subtipo opcional cuando kind === DECISORIO. */
   decision_subtype?: AgendaDecisionSubtype | null;
+  /**
+   * H-52 (MOI-15): id de la convocatoria emitida de la que procede el row de
+   * `agenda_items`. `null` en un punto nacido en sesión (origen MEETING_FLOOR
+   * en BD), que es el único que la RPC gobernada puede completar o corregir.
+   */
+  source_convocatoria_id?: string | null;
 }
 
 export interface MeetingAgendaItemSource {
@@ -40,6 +46,7 @@ export interface MeetingAgendaItemSource {
   matter_code?: string | null;
   proposal_text?: string | null;
   requires_attachments?: boolean | null;
+  source_convocatoria_id?: string | null;
 }
 
 export interface ConvocatoriaAgendaItemSource {
@@ -184,6 +191,7 @@ function normalizePoint(point: Partial<MeetingAgendaPoint>): MeetingAgendaPoint 
     // resolvePointKind pueda distinguir "kind no informado" de "kind explícito".
     kind: point.kind ?? null,
     decision_subtype: point.decision_subtype ?? null,
+    source_convocatoria_id: point.source_convocatoria_id ?? null,
   };
 }
 
@@ -212,6 +220,7 @@ function normalizeSavedDebate(value: unknown): MeetingAgendaPoint | null {
     // Codex P1 #2: preserva kind desde savedDebates JSON
     kind: typeof value.kind === "string" ? normalizeAgendaItemKind(value.kind) : null,
     decision_subtype: typeof value.decision_subtype === "string" ? value.decision_subtype as AgendaDecisionSubtype : null,
+    source_convocatoria_id: typeof value.source_convocatoria_id === "string" ? value.source_convocatoria_id : null,
   });
 }
 
@@ -239,6 +248,7 @@ function sourcePoints(input: MergeMeetingAgendaSourcesInput): MeetingAgendaPoint
           // Codex P1 #2: agenda_items.kind autoritative si viene del row
           kind: item.kind ? normalizeAgendaItemKind(item.kind) : null,
           decision_subtype: item.decision_subtype as AgendaDecisionSubtype | null,
+          source_convocatoria_id: item.source_convocatoria_id ?? null,
         })
       );
     });
@@ -395,6 +405,9 @@ export function mergeMeetingAgendaSources(input: MergeMeetingAgendaSourcesInput)
       // null/undefined, hereda del source (ej. DECISORIO viniendo de convocatoria).
       kind: point.kind ?? source.kind ?? null,
       decision_subtype: point.decision_subtype ?? source.decision_subtype ?? null,
+      // H-52: el vínculo con la convocatoria es un hecho del row en BD, no
+      // del JSON guardado: manda siempre la fuente.
+      source_convocatoria_id: source.source_convocatoria_id ?? point.source_convocatoria_id ?? null,
     });
   });
 

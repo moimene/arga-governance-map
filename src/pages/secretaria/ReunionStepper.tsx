@@ -113,6 +113,7 @@ import {
   type DualEvaluationComparison,
 } from "@/lib/secretaria/dual-evaluation";
 import { puedeRecalcularResoluciones } from "@/lib/secretaria/meeting-resolution-recalc";
+import { votesForPersistence } from "@/lib/rules-engine/meeting-vote-completeness";
 import {
   isMeetingBoundToEmittedConvocation,
   patchQuorumDataSourceLinks,
@@ -2074,26 +2075,46 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
 
         const existingAgendaItemId =
           point.source_table === "agenda_items" && point.source_id ? point.source_id : null;
+        // H-52 (MOI-15): la materia elegida y el texto resolutivo propuesto
+        // se persisten en `agenda_items` (el acta exige ambos en todo punto
+        // decisorio). Solo viaja una materia con fila en el catálogo; la
+        // heurística `OTROS_LIBRE` de un punto no decisorio no se escribe.
+        const matterCode = esMateriaCatalogada(point.materia, codigosCatalogo) ? point.materia : null;
+        const proposalText = kind === "DECISORIO" ? point.resolution_text?.trim() || null : null;
+        // Un punto nacido en sesión ya materializado (sin source_convocatoria_id)
+        // dentro de una reunión convocada no admite UPDATE directo
+        // (AGENDA_EMITIDA_RPC_REQUIRED): se completa por la misma RPC, que es
+        // idempotente y sincroniza sus campos. Es lo que permite reparar un
+        // punto guardado antes de esta corrección (p. ej. `dc938c06…`).
+        const sessionBornRow = Boolean(existingAgendaItemId) && !point.source_convocatoria_id;
+        const syncSessionBornByRpc = agendaInmutable && sessionBornRow;
         const agendaItemId =
-          existingAgendaItemId ??
-          await materializeAgendaItem.mutateAsync({
-            meetingId,
-            tenantId,
-            orderNumber: index + 1,
-            title: point.punto,
-            kind,
-            decisionSubtype: point.decision_subtype ?? null,
-          });
+          existingAgendaItemId && !syncSessionBornByRpc
+            ? existingAgendaItemId
+            : await materializeAgendaItem.mutateAsync({
+                meetingId,
+                tenantId,
+                orderNumber: syncSessionBornByRpc ? point.source_index ?? index + 1 : index + 1,
+                title: point.punto,
+                kind,
+                decisionSubtype: point.decision_subtype ?? null,
+                matterCode,
+                proposalText,
+              });
 
         if (existingAgendaItemId && agendaInmutable) {
-          avisoAgendaInmutable = true;
+          if (!sessionBornRow) avisoAgendaInmutable = true;
         } else if (existingAgendaItemId) {
           const persistedKind = kindIndex.get(existingAgendaItemId);
           const updatePayload: Record<string, unknown> = {
             title: point.punto,
             description: point.notas || null,
             decision_subtype: kind === "DECISORIO" ? point.decision_subtype ?? null : null,
+            proposal_text: proposalText,
           };
+          if (matterCode) {
+            updatePayload.matter_code = matterCode;
+          }
           if (persistedKind !== kind) {
             updatePayload.kind = kind;
           }
@@ -3141,10 +3162,16 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
   // `point_snapshots.length > 0` para considerar bloqueado el paso, así que una
   // reunión con resoluciones pero SIN ningún snapshot se daba por terminada y
   // perdía el único control capaz de generarlos.
+  // H-51 (MOI-15): un punto DECISORIO nacido en sesión DESPUÉS de registrar
+  // las resoluciones no tiene fila en `meeting_resolutions`; sin contar los
+  // puntos votables el predicado daba el paso por terminado y el botón
+  // desaparecía del DOM.
   const canRecalculateExistingResolutions = puedeRecalcularResoluciones({
     resoluciones: existingResolutions,
     snapshots: existingPointSnapshots,
+    puntosVotables: votablePointIndices.length,
   });
+  const puntosSinResolucion = Math.max(0, votablePointIndices.length - existingResolutions.length);
 
   async function handleSaveResolutions() {
     const pointWithoutResolution = votablePointIndices
@@ -3186,14 +3213,18 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
         agreement_id: point.agreement_id ?? null,
         agreement_origin: agreementOriginForPoint(point),
         adoption_snapshot: snapshot,
-        votes: rowsForPoint
-          .filter((v) => v.vote !== "")
-          .map((v) => ({
+        // H-54 (MOI-15): el asiento excluido por conflicto también viaja; si
+        // se filtra por `vote !== ""` nunca llega a meeting_votes y el
+        // servidor rechaza el acta (SERVER_VOTE_EXACTLY_ONE_VOTE_REQUIRED).
+        votes: votesForPersistence(
+          rowsForPoint.map((v) => ({
+            id: v.id,
             attendee_id: v.person_id ? v.id : null,
-            vote_value: v.vote,
+            vote: v.vote,
             conflict_flag: v.conflict_flag,
-            reason: v.conflict_reason.trim() || null,
+            conflict_reason: v.conflict_reason,
           })),
+        ),
       };
     });
 
@@ -3797,9 +3828,9 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
             <p className="text-sm text-[var(--g-text-secondary)]">
-              Hay acuerdos votados sin expediente Acuerdo 360 o con snapshot no
-              proclamable. Puede recalcular la votación para crear o actualizar el expediente
-              canónico con el snapshot legal actual.
+              {puntosSinResolucion > 0 && existingResolutions.length > 0
+                ? `Hay ${puntosSinResolucion} punto(s) decisorio(s) sin votación registrada (por ejemplo, nacidos en sesión). Registra el voto de cada punto y vuelve a guardar la votación: los acuerdos ya registrados se conservan y se recalculan con el snapshot legal actual.`
+                : "Hay acuerdos votados sin expediente Acuerdo 360 o con snapshot no proclamable. Puede recalcular la votación para crear o actualizar el expediente canónico con el snapshot legal actual."}
             </p>
           </div>
         ) : null}
