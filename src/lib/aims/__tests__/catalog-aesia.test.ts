@@ -498,14 +498,30 @@ describe("Recotejo — art. 73 (incidentes graves)", () => {
   it("la salvedad del 73.6, párrafo segundo: no modificar el sistema sin informar antes", () => {
     // «…no emprenderá acción alguna que suponga la modificación del sistema de IA
     // afectado de un modo que pueda repercutir en cualquier evaluación posterior
-    // de las causas del incidente sin haber informado antes…». MG_INCI_02 pide
-    // contención y remediación: sin la salvedad, empuja a modificar antes.
+    // de las causas del incidente sin haber informado antes…». MG_INCI_02 recoge
+    // esa salvedad (H-11, 2026-10-04: antes hablaba de «contención»).
     const d = medida(inc, "MG_INCI_02").description;
-    expect(d).toMatch(/modific/);
+    expect(d).toMatch(/modifique el sistema afectado/);
     expect(d).toMatch(/evaluación posterior de las causas/);
-    expect(d).toMatch(/sin haber informado antes a las autoridades competentes/);
+    expect(d).toMatch(/sin haber informado antes de dicha acción a las autoridades competentes/);
     // Control: la medida de notificación no la lleva.
     expect(medida(inc, "MG_INCI_01").description).not.toMatch(/evaluación posterior de las causas/);
+  });
+
+  it("H-11 (2026-10-04): MG_INCI_02 ya no habla de «contención» y cuelga del párrafo segundo, que es donde está la salvedad", () => {
+    const m = medida(inc, "MG_INCI_02");
+    expect(m.subpartId).toBe("73.6.p2");
+    expect(m.description).not.toMatch(/contención|remediación/);
+    // Control: la investigación y las medidas correctoras (párrafo primero) siguen en su sitio.
+    expect(medida(inc, "MG_INCI_03").subpartId).toBe("73.6.p1");
+  });
+
+  it("H-11 (2026-10-04): correcciones al literal de 10.3, 10.4, 13.3 y 12.3.a", () => {
+    expect(medida(req("DATA_GOVERNANCE"), "MG_DATA_09").description).toMatch(/en la medida necesaria para la finalidad prevista/);
+    expect(medida(req("DATA_GOVERNANCE"), "MG_DATA_08").description).toMatch(/propiedades estadísticas adecuadas/);
+    expect(medida(req("TRANSPARENCY"), "MG_TRANS_02").description).toMatch(/representante autorizado/);
+    expect(medida(req("TRANSPARENCY"), "MG_TRANS_05").description).not.toMatch(/puede fallar/);
+    expect(medida(req("LOGGING"), "MG_LOGG_02").description).not.toMatch(/marca de tiempo precisa/);
   });
 
   it("sin «afectados»: el art. 73 notifica a la autoridad de vigilancia del mercado", () => {
@@ -516,7 +532,7 @@ describe("Recotejo — art. 73 (incidentes graves)", () => {
 
   it("claves del art. 73 que existen: 73.1 a 73.5 en la notificación y 73.6 en la investigación", () => {
     const u = ubicacion(inc);
-    expect(u).toMatchObject({ MG_INCI_01: "73.1", MG_INCI_02: "73.6.p1", MG_INCI_03: "73.6.p1", MG_INCI_04: "73.6.p2" });
+    expect(u).toMatchObject({ MG_INCI_01: "73.1", MG_INCI_02: "73.6.p2", MG_INCI_03: "73.6.p1", MG_INCI_04: "73.6.p2" });
   });
 });
 

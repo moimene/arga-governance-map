@@ -54,8 +54,18 @@
  * versión la detecta `cambiosDelCatalogoDesde`, y el informe marca en el
  * desglose cada medida cuyo texto cambió desde la respuesta.
  *
- * Segunda lectura pendiente: el lote H-11 de Harvey (§9 de la especificación)
- * no se ha enviado. Hasta su veredicto, el cotejo es de TGMS.
+ * Segunda lectura (2026-10-04): el lote H-11 de Harvey (docs/legal/harvey/
+ * 2026-10-04-lote-H-11.md) se contrastó con el literal consolidado. Corregidas
+ * contra el literal: MG_INCI_02 (la salvedad es del 73.6, párrafo SEGUNDO), MG_RISK_08,
+ * MG_RISK_09 (no es literal del 9.4), MG_DATA_08, MG_DATA_09 (inciso «en la medida
+ * necesaria»), MG_TRANS_02, MG_TRANS_05, MG_TRANS_08, MG_ACCU_02 y MG_LOGG_02.
+ * MG_INCI_01 mantiene la clave «73.1» como clave interna del bloque: la
+ * notificación abre en el 73.1 y los plazos están en 73.2 a 73.5.
+ * Quedan como GUÍA PRÁCTICA no literal, sin cambiar y a decisión del Comité de IA:
+ * MG_POST_04 (reentrenamiento: art. 20), MG_POST_05 (canales) y MG_LOGG_06 (dos
+ * sujetos: 19.1 proveedor y 26.6 responsable del despliegue). El cotejo sigue
+ * siendo de TGMS con Harvey como segunda lectura: Harvey no es un tercero experto
+ * independiente y su lectura no cubrió todos los artículos.
  */
 
 import { acreditaConformidad } from "./conformidad";
@@ -73,7 +83,7 @@ export const TEXTO_COTEJADO_RIA = {
   url: "https://eur-lex.europa.eu/legal-content/ES/TXT/HTML/?uri=CELEX:02024R1689-20260727",
   /** SHA-256 del HTML descargado el 2026-09-19 (conversor EUR-Lex del 11-08-2026). */
   sha256Html: "ed11ce60514e9030bda35bfc2de78ff83306980ece16b095695d9ff5c93ad904",
-  segundaLectura: "Pendiente: lote H-11 de Harvey",
+  segundaLectura: "Lote H-11 de Harvey (2026-10-04, hilo 458233287), contrastado con el consolidado; Harvey declara que no es un tercero experto independiente",
 } as const;
 
 export interface RequirementDef {
@@ -400,9 +410,9 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
       { id: "MG_RISK_03", code: "MG_RISK_03", description: "Evaluar los riesgos derivados del uso previsto y del uso indebido razonablemente previsible", subpartId: "9.2.b" },
       { id: "MG_RISK_10", code: "MG_RISK_10", description: "Evaluar otros riesgos a partir del análisis de los datos de la vigilancia poscomercialización (art. 72)", subpartId: "9.2.c", desde: VERSION_CATALOGO_RIA },
       { id: "MG_RISK_04", code: "MG_RISK_04", description: "Adoptar medidas de gestión de riesgos eficaces y proporcionadas", subpartId: "9.2.d" },
-      { id: "MG_RISK_09", code: "MG_RISK_09", description: "Asegurar que las medidas de mitigación no introducen riesgos nuevos o desproporcionados, teniendo en cuenta la aplicación combinada de los requisitos", subpartId: "9.4" },
+      { id: "MG_RISK_09", code: "MG_RISK_09", description: "Tener debidamente en cuenta los efectos y la posible interacción de aplicar los requisitos de forma combinada, para reducir al mínimo los riesgos con la mayor eficacia y lograr un equilibrio adecuado en las medidas", subpartId: "9.4" },
       { id: "MG_RISK_07", code: "MG_RISK_07", description: "Diseñar el sistema para asegurar que el riesgo residual resulte aceptable", subpartId: "9.5" },
-      { id: "MG_RISK_08", code: "MG_RISK_08", description: "Ejecutar pruebas iterativas para seleccionar las medidas de gestión de riesgos más adecuadas", subpartId: "9.6" },
+      { id: "MG_RISK_08", code: "MG_RISK_08", description: "Someter el sistema a pruebas para determinar las medidas de gestión de riesgos más adecuadas y específicas, y comprobar que funciona de manera coherente con su finalidad prevista", subpartId: "9.6" },
       { id: "MG_RISK_05", code: "MG_RISK_05", description: "Realizar pruebas para verificar que las medidas de gestión cumplen sus objetivos", subpartId: "9.6" },
       { id: "MG_RISK_11", code: "MG_RISK_11", description: "Si el sistema se prueba en condiciones reales, hacerlo conforme al art. 60", subpartId: "9.7", desde: VERSION_CATALOGO_RIA },
       { id: "MG_RISK_12", code: "MG_RISK_12", description: "Probar el sistema durante el desarrollo y, en todo caso, antes de introducirlo en el mercado o ponerlo en servicio, con parámetros y umbrales de probabilidad definidos previamente", subpartId: "9.8", desde: VERSION_CATALOGO_RIA },
@@ -474,8 +484,8 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
       { id: "MG_DATA_06", code: "MG_DATA_06", description: "Examinar la presencia de sesgos históricos o de muestreo que afecten a derechos", subpartId: "10.2.f" },
       { id: "MG_DATA_11", code: "MG_DATA_11", description: "Adoptar medidas adecuadas para detectar, prevenir y mitigar los posibles sesgos detectados", subpartId: "10.2.g", desde: VERSION_CATALOGO_RIA },
       { id: "MG_DATA_07", code: "MG_DATA_07", description: "Identificar lagunas informativas y aplicar medidas correctivas de enriquecimiento", subpartId: "10.2.h" },
-      { id: "MG_DATA_08", code: "MG_DATA_08", description: "Asegurar que los conjuntos de entrenamiento, validación y prueba sean pertinentes, suficientemente representativos y, en la mayor medida posible, sin errores y completos", subpartId: "10.3" },
-      { id: "MG_DATA_09", code: "MG_DATA_09", description: "Tener en cuenta en los conjuntos de datos las características del entorno geográfico, contextual, conductual o funcional específico en que está previsto usar el sistema", subpartId: "10.4" },
+      { id: "MG_DATA_08", code: "MG_DATA_08", description: "Asegurar que los conjuntos de entrenamiento, validación y prueba sean pertinentes, suficientemente representativos y, en la mayor medida posible, sin errores y completos en vista de su finalidad prevista, y que tengan las propiedades estadísticas adecuadas", subpartId: "10.3" },
+      { id: "MG_DATA_09", code: "MG_DATA_09", description: "Tener en cuenta en los conjuntos de datos, en la medida necesaria para la finalidad prevista, las características o elementos particulares del entorno geográfico, contextual, conductual o funcional específico en que está previsto usar el sistema", subpartId: "10.4" },
       { id: "MG_DATA_10", code: "MG_DATA_10", description: "Garantizar las salvaguardas estrictas si se tratan categorías especiales bajo RGPD", subpartId: "4bis.1" },
     ],
   },
@@ -505,17 +515,17 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     ],
     measures: [
       { id: "MG_TRANS_01", code: "MG_TRANS_01", description: "Diseñar el sistema para que su funcionamiento sea transparente para los responsables del despliegue", subpartId: "13.1" },
-      { id: "MG_TRANS_02", code: "MG_TRANS_02", description: "Proporcionar en las instrucciones de uso la identidad y datos de contacto del proveedor", subpartId: "13.3.a" },
+      { id: "MG_TRANS_02", code: "MG_TRANS_02", description: "Proporcionar en las instrucciones de uso la identidad y los datos de contacto del proveedor y, en su caso, de su representante autorizado", subpartId: "13.3.a" },
       { id: "MG_TRANS_03", code: "MG_TRANS_03", description: "Documentar con claridad las características, capacidades y limitaciones del modelo", subpartId: "13.3.b" },
       { id: "MG_TRANS_12", code: "MG_TRANS_12", description: "Indicar en las instrucciones de uso la finalidad prevista del sistema", subpartId: "13.3.b.i", desde: VERSION_CATALOGO_RIA },
       { id: "MG_TRANS_04", code: "MG_TRANS_04", description: "Declarar de forma explícita el nivel de precisión y las métricas evaluadas", subpartId: "13.3.b.ii" },
-      { id: "MG_TRANS_05", code: "MG_TRANS_05", description: "Describir las circunstancias, de uso conforme o de uso indebido previsible, en que el sistema puede fallar y generar riesgos para la salud, la seguridad o los derechos fundamentales", subpartId: "13.3.b.iii" },
+      { id: "MG_TRANS_05", code: "MG_TRANS_05", description: "Describir cualquier circunstancia conocida o previsible, asociada al uso conforme a la finalidad prevista o a un uso indebido razonablemente previsible, que pueda dar lugar a riesgos para la salud, la seguridad o los derechos fundamentales", subpartId: "13.3.b.iii" },
       { id: "MG_TRANS_13", code: "MG_TRANS_13", description: "Describir, cuando las haya, las capacidades técnicas del sistema para explicar sus resultados de salida", subpartId: "13.3.b.iv", desde: VERSION_CATALOGO_RIA },
       { id: "MG_TRANS_14", code: "MG_TRANS_14", description: "Informar, cuando proceda, del funcionamiento del sistema respecto de las personas o colectivos con los que está previsto utilizarlo", subpartId: "13.3.b.v", desde: VERSION_CATALOGO_RIA },
       { id: "MG_TRANS_06", code: "MG_TRANS_06", description: "Especificar los requisitos de formato y calidad exigidos a los datos de entrada", subpartId: "13.3.b.vi" },
       { id: "MG_TRANS_07", code: "MG_TRANS_07", description: "Informar sobre el tipo y alcance de los datos de entrenamiento empleados", subpartId: "13.3.b.vi" },
       { id: "MG_TRANS_15", code: "MG_TRANS_15", description: "Dar a los responsables del despliegue la información necesaria para interpretar los resultados de salida y usarlos adecuadamente", subpartId: "13.3.b.vii", desde: VERSION_CATALOGO_RIA },
-      { id: "MG_TRANS_08", code: "MG_TRANS_08", description: "Documentar los cambios del sistema y de su funcionamiento predeterminados en la evaluación de la conformidad inicial", subpartId: "13.3.c" },
+      { id: "MG_TRANS_08", code: "MG_TRANS_08", description: "Incluir en las instrucciones de uso los cambios del sistema y de su funcionamiento que el proveedor haya predeterminado en la evaluación de la conformidad inicial, en su caso", subpartId: "13.3.c" },
       { id: "MG_TRANS_09", code: "MG_TRANS_09", description: "Describir las medidas de supervisión humana, incluidas las técnicas que facilitan a los responsables del despliegue interpretar los resultados", subpartId: "13.3.d" },
       { id: "MG_TRANS_10", code: "MG_TRANS_10", description: "Especificar los recursos informáticos y de hardware necesarios, la vida útil prevista y las medidas de mantenimiento y cuidado, con su frecuencia, incluidas las actualizaciones del software", subpartId: "13.3.e" },
       { id: "MG_TRANS_11", code: "MG_TRANS_11", description: "Describir los mecanismos que permiten a los responsables del despliegue recabar, almacenar e interpretar los archivos de registro", subpartId: "13.3.f" },
@@ -537,7 +547,7 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     ],
     measures: [
       { id: "MG_ACCU_01", code: "MG_ACCU_01", description: "Alcanzar un nivel de precisión adecuado validado en entornos reales de uso", subpartId: "15.1" },
-      { id: "MG_ACCU_02", code: "MG_ACCU_02", description: "Declarar en las instrucciones de uso las métricas de precisión alcanzadas (F1, AUC, precisión, recall)", subpartId: "15.3" },
+      { id: "MG_ACCU_02", code: "MG_ACCU_02", description: "Indicar en las instrucciones de uso los niveles de precisión del sistema y los parámetros pertinentes para medirla (por ejemplo, F1, AUC, precisión o recall)", subpartId: "15.3" },
       { id: "MG_ACCU_03", code: "MG_ACCU_03", description: "Implementar mecanismos para asegurar la estabilidad de la precisión ante drift", subpartId: "15.1" },
     ],
   },
@@ -612,7 +622,7 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
       { id: "MG_LOGG_09", code: "MG_LOGG_09", description: "Registrar los acontecimientos que faciliten la vigilancia poscomercialización del art. 72", subpartId: "12.2.b", desde: VERSION_CATALOGO_RIA },
       { id: "MG_LOGG_10", code: "MG_LOGG_10", description: "Registrar los acontecimientos que permitan al responsable del despliegue vigilar el funcionamiento del sistema (art. 26.5)", subpartId: "12.2.c", desde: VERSION_CATALOGO_RIA },
       { id: "MG_LOGG_07", code: "MG_LOGG_07", description: "Determinar si el sistema es de identificación biométrica remota del anexo III, punto 1, letra a), y, si lo es, cumplir los mínimos reforzados de registro", subpartId: "12.3" },
-      { id: "MG_LOGG_02", code: "MG_LOGG_02", description: "Registrar con marca de tiempo precisa el inicio y el fin de cada uso del sistema", subpartId: "12.3.a" },
+      { id: "MG_LOGG_02", code: "MG_LOGG_02", description: "Registrar la fecha y la hora de inicio y la fecha y la hora de finalización de cada uso del sistema", subpartId: "12.3.a" },
       { id: "MG_LOGG_03", code: "MG_LOGG_03", description: "Registrar la base de datos de referencia con la que el sistema ha cotejado los datos de entrada", subpartId: "12.3.b" },
       { id: "MG_LOGG_04", code: "MG_LOGG_04", description: "Registrar los datos de entrada con los que la búsqueda ha arrojado una correspondencia", subpartId: "12.3.c" },
       { id: "MG_LOGG_05", code: "MG_LOGG_05", description: "Identificar a las personas físicas que verifican los resultados", subpartId: "12.3.d" },
@@ -695,7 +705,7 @@ export const AESIA_RIA_REQUIREMENTS: RequirementDef[] = [
     ],
     measures: [
       { id: "MG_INCI_01", code: "MG_INCI_01", description: "Protocolo para notificar los incidentes graves a la autoridad de vigilancia del mercado del Estado miembro donde ocurran: de inmediato y, como máximo, a los 15 días de conocerlos; a los 10 días si hay un fallecimiento; y a los 2 días si hay una infracción generalizada o una alteración grave e irreversible de la gestión o el funcionamiento de infraestructuras críticas. Admite una notificación inicial incompleta", subpartId: "73.1" },
-      { id: "MG_INCI_02", code: "MG_INCI_02", description: "Adoptar medidas de contención y remediación ante fallos críticos sin modificar el sistema afectado de un modo que pueda repercutir en la evaluación posterior de las causas sin haber informado antes a las autoridades competentes", subpartId: "73.6.p1" },
+      { id: "MG_INCI_02", code: "MG_INCI_02", description: "No emprender, durante la investigación de un incidente grave, ninguna acción que modifique el sistema afectado de un modo que pueda repercutir en cualquier evaluación posterior de las causas del incidente sin haber informado antes de dicha acción a las autoridades competentes", subpartId: "73.6.p2" },
       { id: "MG_INCI_03", code: "MG_INCI_03", description: "Investigar la causa raíz técnica y documentar las medidas correctoras", subpartId: "73.6.p1" },
       { id: "MG_INCI_04", code: "MG_INCI_04", description: "Proporcionar a las autoridades toda la información técnica requerida sobre el incidente", subpartId: "73.6.p2" },
       { id: "MG_INCI_05", code: "MG_INCI_05", description: "Custodiar el registro histórico de incidentes y lecciones aprendidas", subpartId: "17.1.k" },
