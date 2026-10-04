@@ -98,13 +98,20 @@ describe("EvaluacionNueva — el catálogo lo decide el perfil", () => {
 // estado se lee del registro: sin veredicto, ni vuelven a obligación ni pierden
 // el rótulo.
 describe("F1.T11 — carácter de las medidas del desplegador, provisional hasta H-02A", () => {
-  type Peticion = { id: string; estado?: string };
+  type Peticion = { id: string; estado?: string; revision_legal?: string | null };
   const registro = JSON.parse(read("docs/legal/harvey/registro.json")) as { peticiones: Peticion[] };
-  const h02aConVeredicto = registro.peticiones.some((p) => p.id === "H-02A" && p.estado === "RESPONDIDA");
+  const h02a = registro.peticiones.find((p) => p.id === "H-02A");
+  // MOI-165: el rótulo «provisional» NO lo retira el veredicto de Harvey sino la
+  // revisión del equipo legal (F1.T15), que se registra en `revision_legal`.
+  const revisionLegalRegistrada = !!h02a && h02a.estado === "RESPONDIDA" && !!h02a.revision_legal;
   const CUATRO = ["MD_TRA_01", "MD_CS_01", "MD_CS_02", "MD_CS_05"];
 
   it("el registro de Harvey se lee (control positivo del instrumento)", () => {
     expect(registro.peticiones.some((p) => p.id === "H-01" && p.estado === "RESPONDIDA")).toBe(true);
+    // Control del bloqueo (MOI-165): H-02A consta RESPONDIDA y aun así el rótulo se
+    // exige mientras no haya revisión legal registrada.
+    expect(h02a?.estado).toBe("RESPONDIDA");
+    expect(revisionLegalRegistrada).toBe(h02a?.revision_legal != null);
   });
 
   it("sin veredicto de H-02A, las cuatro son marco operativo y llevan el rótulo provisional", async () => {
@@ -113,7 +120,7 @@ describe("F1.T11 — carácter de las medidas del desplegador, provisional hasta
     for (const id of CUATRO) {
       const proc = procedenciaDe(id);
       expect(proc, `${id} ha perdido su procedencia`).not.toBeNull();
-      if (h02aConVeredicto) continue;
+      if (revisionLegalRegistrada) continue;
       expect({ id, caracter: proc!.caracter }).toEqual({ id, caracter: "MARCO_OPERATIVO" });
       expect({ id, provisional: proc!.provisional }).toEqual({ id, provisional: ROTULO_PROVISIONAL });
     }
@@ -122,7 +129,7 @@ describe("F1.T11 — carácter de las medidas del desplegador, provisional hasta
   it("el rótulo provisional no se reparte más allá de las cuatro", async () => {
     const { PROCEDENCIA_DESPLIEGUE } = await import("@/lib/aims/perfil-aplicabilidad");
     const conRotulo = Object.entries(PROCEDENCIA_DESPLIEGUE).filter(([, p]) => p.provisional).map(([id]) => id).sort();
-    expect(conRotulo).toEqual(h02aConVeredicto ? [] : [...CUATRO].sort());
+    expect(conRotulo).toEqual(revisionLegalRegistrada ? [] : [...CUATRO].sort());
   });
 
   it("las dos superficies que pintan la procedencia la leen de la hoja", () => {
@@ -143,7 +150,7 @@ describe("F1.T11 — carácter de las medidas del desplegador, provisional hasta
     const { default: ChecklistMedidas } = await import("@/components/ai-governance/evaluacion-detalle/ChecklistMedidas");
     const veces = (html: string, t: string) => html.split(t).length - 1;
     const noop = () => {};
-    const esperadas = h02aConVeredicto ? 0 : CUATRO.length;
+    const esperadas = revisionLegalRegistrada ? 0 : CUATRO.length;
 
     const checklist = renderToStaticMarkup(
       createElement(ChecklistMedidas, {

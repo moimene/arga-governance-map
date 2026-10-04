@@ -121,9 +121,12 @@ describe("cuestionario guiado — la arista con la hoja del criterio", () => {
 // alto riesgo si elabora perfiles. Las ayudas del art. 5 quedan PROVISIONALES
 // hasta el veredicto de Harvey H-02A: el estado del lote se lee del registro.
 describe("F1.T10 — ayudas del cuestionario v1.1", () => {
-  type Peticion = { id: string; estado?: string };
+  type Peticion = { id: string; estado?: string; revision_legal?: string | null };
   const registro = JSON.parse(readFileSync("docs/legal/harvey/registro.json", "utf8")) as { peticiones: Peticion[] };
-  const h02aConVeredicto = registro.peticiones.some((p) => p.id === "H-02A" && p.estado === "RESPONDIDA");
+  const h02a = registro.peticiones.find((p) => p.id === "H-02A");
+  // MOI-165: el rótulo «provisional» NO lo retira el veredicto de Harvey sino la
+  // revisión del equipo legal (F1.T15), que se registra en `revision_legal`.
+  const revisionLegalRegistrada = !!h02a && h02a.estado === "RESPONDIDA" && !!h02a.revision_legal;
   // Sin distinguir mayúsculas ni tilde: «solo si» excluye igual que «SOLO si».
   // `\b` al final para no morder «sólo sistemas».
   const PROHIBIDAS = [/\bs[óo]lo si\b/i, /casi seguro/i, /ante la duda/i];
@@ -132,9 +135,13 @@ describe("F1.T10 — ayudas del cuestionario v1.1", () => {
     [p.titulo, p.ayuda.queSignifica, ...p.ayuda.ejemplos, p.ayuda.comoSaberlo].join("\n");
 
   it("el registro de Harvey se lee (control positivo del instrumento)", () => {
-    // Si el lector no viera nada, `h02aConVeredicto` sería false por ceguera y
+    // Si el lector no viera nada, `revisionLegalRegistrada` sería false por ceguera y
     // el rótulo se exigiría por el motivo equivocado.
     expect(registro.peticiones.some((p) => p.id === "H-01" && p.estado === "RESPONDIDA")).toBe(true);
+    // Control del bloqueo (MOI-165): H-02A consta RESPONDIDA y aun así el rótulo se
+    // exige mientras no haya revisión legal registrada.
+    expect(h02a?.estado).toBe("RESPONDIDA");
+    expect(revisionLegalRegistrada).toBe(h02a?.revision_legal != null);
     for (const re of PROHIBIDAS.slice(0, 2)) {
       expect(re.test("Marque «Sí» SOLO si el sistema… la respuesta casi seguro es «No»")).toBe(true);
     }
@@ -193,7 +200,7 @@ describe("F1.T10 — ayudas del cuestionario v1.1", () => {
     const q21 = PREGUNTAS.find((p) => p.id === "Q2_1")!;
     // Con veredicto (CORRECTO o INCORRECTO) el rótulo se va: o se valida o se
     // revierte. Un «pendiente de validación» que sobrevive al veredicto miente.
-    if (!h02aConVeredicto) expect(q21.provisional).toBe(ROTULO_PROVISIONAL);
+    if (!revisionLegalRegistrada) expect(q21.provisional).toBe(ROTULO_PROVISIONAL);
     else expect(q21.provisional).toBeUndefined();
   });
 
@@ -213,7 +220,7 @@ describe("F1.T10 — ayudas del cuestionario v1.1", () => {
     // Control positivo: la ayuda llega al marcado (va en un panel `hidden`).
     expect(q23).toContain("¿Qué significa esto?");
     expect(q23).not.toContain(ROTULO_PROVISIONAL);
-    if (!h02aConVeredicto) expect(q21).toContain(ROTULO_PROVISIONAL);
+    if (!revisionLegalRegistrada) expect(q21).toContain(ROTULO_PROVISIONAL);
     else expect(q21).not.toContain(ROTULO_PROVISIONAL);
   });
 
